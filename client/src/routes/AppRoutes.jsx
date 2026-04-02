@@ -50,17 +50,22 @@ import ActiveOrders from "../pages/user/ActiveOrders";
 import UserOrderHistory from "../pages/user/OrderHistory";
 
 // Kitchen Pages
-import KitchenOrders from "../pages/kitchen/Orders";
-import KitchenPrepareOrder from "../pages/kitchen/PrepareOrder";
-import KitchenOrderHistory from "../pages/kitchen/OrderHistory";
+
+
+
+
+
+import OutletDashboard from "../pages/kitchen/outlet/dashboard";
+import OutletOrderHistory from "../pages/kitchen/outlet/OrderHistory";
+import OutletOrders from "../pages/kitchen/outlet/Orders";
+import OutletPrepareOrder from "../pages/kitchen/outlet/PrepareOrder";
+
 
 // Optional for now (later if needed)
 // import BarLayout from "../layouts/BarLayout";
 // import StorekeeperLayout from "../layouts/StorekeeperLayout";
 
-// Bar Pages
-import BarOrders from "../pages/bar/Orders";
-import BarPrepareOrder from "../pages/bar/PrepareOrder";
+
 
 // Storekeeper Pages
 import StorekeeperDashboard from "../pages/storekeeper/Dashboard";
@@ -91,7 +96,7 @@ export default function AppRoutes() {
         <Route path="profit-management" element={<ProfitManagement />} />
         <Route path="cocktail-management" element={<CocktailManagement />} />
         <Route path="order-history" element={<AdminOrderHistory />} />
-          <Route path="cancelled-orders" element={<CancelledOrders />} />
+        <Route path="cancelled-orders" element={<CancelledOrders />} />
       </Route>
 
       {/* ================= ATTENDANT ================= */}
@@ -119,16 +124,20 @@ export default function AppRoutes() {
         <Route path="order-history" element={<UserOrderHistory />} />
       </Route>
 
-      {/* ================= KITCHEN ================= */}
+      {/* ================= OUTLETS ================= */}
       <Route path="/kitchen" element={<KitchenLayout />}>
-        <Route path="orders" element={<KitchenOrders />} />
-        <Route path="prepare-order" element={<KitchenPrepareOrder />} />
-        <Route path="order-history" element={<KitchenOrderHistory />} />
+        <Route path="dashboard" element={<OutletDashboard outletType="KITCHEN" />} />
+        <Route path="orders" element={<OutletOrders outletType="KITCHEN" />} />
+        <Route path="prepare-order/:id" element={<OutletPrepareOrder outletType="KITCHEN" />} />
+        <Route path="order-history" element={<OutletOrderHistory outletType="KITCHEN" />} />
       </Route>
 
-      {/* ================= BAR ================= */}
-      <Route path="/bar/orders" element={<BarOrders />} />
-      <Route path="/bar/prepare-order" element={<BarPrepareOrder />} />
+      <Route path="/bar" element={<KitchenLayout />}>
+        <Route path="dashboard" element={<OutletDashboard outletType="BAR" />} />
+        <Route path="orders" element={<OutletOrders outletType="BAR" />} />
+        <Route path="prepare-order/:id" element={<OutletPrepareOrder outletType="BAR" />} />
+        <Route path="order-history" element={<OutletOrderHistory outletType="BAR" />} />
+      </Route>
 
       {/* ================= STOREKEEPER ================= */}
       <Route path="/storekeeper/dashboard" element={<StorekeeperDashboard />} />

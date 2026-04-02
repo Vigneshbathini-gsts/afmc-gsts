@@ -12,16 +12,42 @@ import {
   FaCookieBite,
 } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
-import {authAPI} from "../../services/api";
+import { authAPI } from "../../services/api";
 
 export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [outletType, setOutletType] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [roleId, setRoleId] = useState(null);
+  const [showOutletDropdown, setShowOutletDropdown] = useState(false);
 
   const navigate = useNavigate();
+
+
+  const fetchUserRole = async () => {
+    if (!email.trim()) return;
+
+    try {
+      const response = await authAPI.getRole({ username: email });
+      console.log("Get Role response:", response.data);
+      if (response.data.success) {
+        setRoleId(response.data.roleId);
+        setShowOutletDropdown(response.data.showOutletSelection);
+
+        if (!response.data.showOutletSelection) {
+          setOutletType("");
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching user role:", error);
+      setRoleId(null);
+      setShowOutletDropdown(false);
+      setOutletType("");
+    }
+  };
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -29,19 +55,18 @@ export default function Login() {
     setLoading(true);
 
     try {
-      const response = await authAPI.login({ 
-        username: email, // Your backend expects 'username'
-        password: password 
+      const response = await authAPI.login({
+        username: email,
+        password: password,
+        outletType: outletType,
       });
-      
+
       console.log("Login response:", response.data);
-      
+
       if (response.data.success) {
-        // Store token and user data
         localStorage.setItem("token", response.data.token);
         localStorage.setItem("user", JSON.stringify(response.data.user));
-        
-        // Navigate to the redirect path from backend
+
         navigate(response.data.redirectPath);
       } else {
         setError(response.data.message || "Login failed");
@@ -49,8 +74,8 @@ export default function Login() {
     } catch (error) {
       console.error("Error during login:", error);
       setError(
-        error.response?.data?.message || 
-        error.response?.data?.error || 
+        error.response?.data?.message ||
+        error.response?.data?.error ||
         "Login failed. Please check your credentials."
       );
     } finally {
@@ -76,7 +101,7 @@ export default function Login() {
           <FaCoffee className="absolute top-[28%] left-[75%] text-[#ff025e] text-5xl animate-float4 drop-shadow-md" />
           <FaCookieBite className="absolute top-[72%] left-[58%] text-[#d70652] text-5xl animate-float5 drop-shadow-md" />
         </div>
-        
+
         <div className="relative z-10 flex flex-col justify-between p-14 w-full">
           <div>
             <div className="flex items-center gap-3 mb-8">
@@ -147,9 +172,10 @@ export default function Login() {
                   <FaEnvelope className="text-gray-400" />
                   <input
                     type="text"
-                    placeholder="Enter your username"
+                    placeholder="Enter your username / email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
+                    onBlur={fetchUserRole}
                     className="w-full bg-transparent outline-none text-gray-800 placeholder:text-gray-400"
                     required
                   />
@@ -171,6 +197,7 @@ export default function Login() {
                     className="w-full bg-transparent outline-none text-gray-800 placeholder:text-gray-400"
                     required
                   />
+                 
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
@@ -179,6 +206,25 @@ export default function Login() {
                     {showPassword ? <FaEyeSlash /> : <FaEye />}
                   </button>
                 </div>
+                 {showOutletDropdown && (
+                    <div>
+                      <label className="block text-sm text-gray-700 mb-2 font-medium">
+                        Select Outlet
+                      </label>
+                      <div className="flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 focus-within:border-[#ff025e] focus-within:ring-2 focus-within:ring-[#ff025e]/20 transition-all">
+                        <select
+                          value={outletType}
+                          onChange={(e) => setOutletType(e.target.value)}
+                          className="w-full bg-transparent outline-none text-gray-800"
+                          required={showOutletDropdown}
+                        >
+                          <option value="">Select Kitchen / Bar</option>
+                          <option value="KITCHEN">Kitchen</option>
+                          <option value="BAR">Bar</option>
+                        </select>
+                      </div>
+                    </div>
+                  )}
               </div>
 
               {/* Remember + Forgot */}

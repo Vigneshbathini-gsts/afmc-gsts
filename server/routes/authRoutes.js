@@ -9,5 +9,6 @@ router.post("/register", authController.createUser);
 
 // Route for user login
 router.post("/login", authController.loginUser);
+router.post("/get-role", authController.getUserRole);
 
 module.exports = router;
