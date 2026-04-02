@@ -14,18 +14,36 @@ import {
 
 export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleLogin = (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    
+    setTimeout(() => {
+      if (rememberMe) {
+        localStorage.setItem("isAuthenticated", "true");
+        localStorage.setItem("userEmail", email);
+      } else {
+        sessionStorage.setItem("isAuthenticated", "true");
+        sessionStorage.setItem("userEmail", email);
+      }
+      
+      window.location.href = "/dashboard";
+      setIsLoading(false);
+    }, 1000);
+  };
 
   return (
     <div className="min-h-screen flex bg-gradient-to-br from-pink-50 via-rose-50 to-white">
-      {/* Left Section */}
       <div className="hidden lg:flex w-1/2 relative overflow-hidden bg-gradient-to-br from-[#d70652]/10 via-rose-100 to-[#ff025e]/10">
-        {/* Background glow - using the new colors */}
         <div className="absolute inset-0 opacity-30">
           <div className="absolute top-20 left-20 h-72 w-72 rounded-full bg-[#d70652] blur-3xl opacity-20"></div>
           <div className="absolute bottom-20 right-20 h-80 w-80 rounded-full bg-[#ff025e] blur-3xl opacity-20"></div>
         </div>
-
-        {/* Floating Food Icons - using gradient colors */}
 
         <div className="absolute inset-0 pointer-events-none">
           <FaPizzaSlice className="absolute top-[22%] left-[18%] text-[#d70652] text-5xl animate-float1 drop-shadow-md" />
@@ -60,7 +78,6 @@ export default function Login() {
                 with a seamless experience.
               </p>
 
-              {/* Optional glowing plate effect */}
               <div className="mt-12 relative w-72 h-72">
                 <div className="absolute inset-0 rounded-full bg-[#d70652]/10 blur-3xl"></div>
                 <div className="absolute inset-8 rounded-full border border-[#ff025e]/30 bg-white/60 backdrop-blur-sm shadow-xl"></div>
@@ -71,7 +88,6 @@ export default function Login() {
         </div>
       </div>
 
-      {/* Right Section */}
       <div className="flex w-full lg:w-1/2 items-center justify-center px-6 py-10 bg-white relative">
         <div className="absolute top-16 right-16 h-40 w-40 rounded-full bg-[#d70652]/10 blur-3xl"></div>
         <div className="absolute bottom-16 left-16 h-52 w-52 rounded-full bg-[#ff025e]/10 blur-3xl"></div>
@@ -88,8 +104,7 @@ export default function Login() {
               </p>
             </div>
 
-            <form className="space-y-6">
-              {/* Email */}
+            <form onSubmit={handleLogin} className="space-y-6">
               <div>
                 <label className="block text-sm text-gray-700 mb-2 font-medium">
                   Email Address
@@ -98,13 +113,15 @@ export default function Login() {
                   <FaEnvelope className="text-gray-400" />
                   <input
                     type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                     placeholder="you@example.com"
                     className="w-full bg-transparent outline-none text-gray-800 placeholder:text-gray-400"
+                    required
                   />
                 </div>
               </div>
 
-              {/* Password */}
               <div>
                 <label className="block text-sm text-gray-700 mb-2 font-medium">
                   Password
@@ -113,8 +130,11 @@ export default function Login() {
                   <FaLock className="text-gray-400" />
                   <input
                     type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
                     placeholder="Enter your password"
                     className="w-full bg-transparent outline-none text-gray-800 placeholder:text-gray-400"
+                    required
                   />
                   <button
                     type="button"
@@ -126,11 +146,12 @@ export default function Login() {
                 </div>
               </div>
 
-              {/* Remember + Forgot */}
               <div className="flex items-center justify-between text-sm">
                 <label className="flex items-center gap-2 text-gray-600 cursor-pointer">
                   <input
                     type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
                     className="accent-[#d70652] w-4 h-4 rounded"
                   />
                   Remember me
@@ -144,29 +165,39 @@ export default function Login() {
                 </a>
               </div>
 
-              {/* Login Button - using your gradient */}
               <button
                 type="submit"
-                className="w-full bg-gradient-to-r from-[#d70652] to-[#ff025e] hover:from-[#ff025e] hover:to-[#d70652] text-white font-bold py-3.5 rounded-2xl shadow-md shadow-[#d70652]/30 transition duration-300 transform hover:scale-[1.01]"
+                disabled={isLoading}
+                className="w-full bg-gradient-to-r from-[#d70652] to-[#ff025e] hover:from-[#ff025e] hover:to-[#d70652] text-white font-bold py-3.5 rounded-2xl shadow-md shadow-[#d70652]/30 transition duration-300 transform hover:scale-[1.01] disabled:opacity-70 disabled:cursor-not-allowed"
               >
-                Sign In
+                {isLoading ? (
+                  <div className="flex items-center justify-center gap-2">
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>Signing in...</span>
+                  </div>
+                ) : (
+                  "Sign In"
+                )}
               </button>
             </form>
 
-            {/* Divider */}
+            <div className="mt-6 p-3 bg-blue-50 rounded-xl border border-blue-100">
+              <p className="text-xs text-blue-600 text-center">
+                Demo Credentials: any email & password works
+              </p>
+            </div>
+
             <div className="flex items-center gap-4 my-8">
               <div className="h-px flex-1 bg-gray-200"></div>
               <span className="text-gray-400 text-sm">Secure Access</span>
               <div className="h-px flex-1 bg-gray-200"></div>
             </div>
 
-            {/* Footer */}
             <div className="text-center text-sm text-gray-400">
               Protected by AFMC Authentication System
             </div>
           </div>
 
-          {/* Mobile branding */}
           <div className="lg:hidden text-center mt-8">
             <h1 className="text-2xl font-bold text-gray-800">AFMC Portal</h1>
             <p className="text-gray-500 text-sm mt-1">
@@ -176,7 +207,6 @@ export default function Login() {
         </div>
       </div>
 
-      {/* Add keyframe animations for floating icons */}
       <style jsx>{`
         @keyframes float1 {
           0%, 100% { transform: translateY(0px) rotate(0deg); }
