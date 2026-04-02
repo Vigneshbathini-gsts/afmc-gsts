@@ -1,0 +1,11 @@
+-- AFMC Mess App schema starter
+CREATE DATABASE IF NOT EXISTS afmc_mess;
+USE afmc_mess;
+
+CREATE TABLE IF NOT EXISTS users (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  username VARCHAR(100) NOT NULL UNIQUE,
+  password_hash VARCHAR(255) NOT NULL,
+  role VARCHAR(50) NOT NULL,
+  is_active TINYINT(1) DEFAULT 1
+);
