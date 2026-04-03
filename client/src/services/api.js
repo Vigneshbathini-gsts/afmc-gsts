@@ -91,7 +91,21 @@ export const itemAPI = {
 // INVENTORY API
 // ================================
 export const inventoryAPI = {
-  getAll: () => api.get("/inventory"),
+  getAll: (params) => api.get("/inventory", { params }),
+  getCategories: () => api.get("/inventory/categories"),
+  getItems: (params) => api.get("/inventory/items", { params }),
+  getSubCategories: (params) => api.get("/inventory/subcategories", { params }),
+  getBarTypes: () => api.get("/inventory/bar-types"),
+  createWithImage: (formData) =>
+    api.post("/inventory", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }),
+  updateImage: (itemCode, formData) =>
+    api.put(`/inventory/${itemCode}/image`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }),
+  getStockInReport: (params) => api.get("/inventory/stock-in-report", { params }),
+  getStockOutReport: (params) => api.get("/inventory/stock-out-report", { params }),
   getById: (id) => api.get(`/inventory/${id}`),
   addStock: (data) => api.post("/inventory/add-stock", data),
   updateStock: (id, data) => api.put(`/inventory/${id}`, data),

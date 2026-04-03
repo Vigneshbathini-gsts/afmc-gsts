@@ -21,7 +21,6 @@ export default function Login() {
   const [outletType, setOutletType] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [roleId, setRoleId] = useState(null);
   const [showOutletDropdown, setShowOutletDropdown] = useState(false);
 
   const navigate = useNavigate();
@@ -34,7 +33,6 @@ export default function Login() {
       const response = await authAPI.getRole({ username: email });
       console.log("Get Role response:", response.data);
       if (response.data.success) {
-        setRoleId(response.data.roleId);
         setShowOutletDropdown(response.data.showOutletSelection);
 
         if (!response.data.showOutletSelection) {
@@ -43,7 +41,6 @@ export default function Login() {
       }
     } catch (error) {
       console.error("Error fetching user role:", error);
-      setRoleId(null);
       setShowOutletDropdown(false);
       setOutletType("");
     }

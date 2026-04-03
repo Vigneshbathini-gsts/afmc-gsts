@@ -20,6 +20,7 @@ import Inventory from "../pages/admin/Inventory";
 import AddItem from "../pages/admin/AddItem";
 import EditItem from "../pages/admin/EditItem";
 import Reports from "../pages/admin/Reports";
+import StockReports from "../pages/admin/StockReports";
 import UserManagement from "../pages/admin/UserManagement";
 import Offers from "../pages/admin/Offers";
 import PriceUpdate from "../pages/admin/PriceUpdate";
@@ -90,6 +91,7 @@ export default function AppRoutes() {
         <Route path="add-item" element={<AddItem />} />
         <Route path="edit-item" element={<EditItem />} />
         <Route path="reports" element={<Reports />} />
+        <Route path="stock-reports" element={<StockReports />} />
         <Route path="users" element={<UserManagement />} />
         <Route path="offers" element={<Offers />} />
         <Route path="price-update" element={<PriceUpdate />} />
