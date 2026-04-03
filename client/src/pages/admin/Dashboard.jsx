@@ -16,7 +16,7 @@ export default function Dashboard() {
   const menuItems = [
     { title: "Inventory Management", icon: <FaChartBar />, color: "bg-blue-500/20 text-blue-600" },
     { title: "Stock Reports", icon: <FaTable />, color: "bg-slate-500/20 text-slate-600" },
-    { title: "Offers", icon: <FaTags />, color: "bg-teal-500/20 text-teal-600" },
+    { title: "Offers", icon: <FaTags />, color: "bg-teal-500/20 text-teal-600", path: "/admin/offers" },
     { title: "Item Price", icon: <FaDollarSign />, color: "bg-green-500/20 text-green-600", path: "/admin/price-update" },
     { title: "Stock In/Out Report", icon: <FaExchangeAlt />, color: "bg-olive-500/20 text-green-700" },
     { title: "Profit Management", icon: <FaCoins />, color: "bg-gray-500/20 text-gray-700" },

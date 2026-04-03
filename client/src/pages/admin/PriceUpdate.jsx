@@ -281,9 +281,7 @@ export default function PriceUpdate() {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-800">Price Update</h1>
-          <p className="text-gray-500 mt-2">
-            Scan barcode, fetch item details, and update item price
-          </p>
+         
         </div>
 
         {/* Form Card */}

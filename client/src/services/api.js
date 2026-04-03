@@ -47,7 +47,7 @@ api.interceptors.response.use(
 // ================================
 export const authAPI = {
   login: (credentials) => api.post("/auth/login", credentials),
-   getRole: (data) => api.post("/auth/get-role", data),
+  getRole: (data) => api.post("/auth/get-role", data),
   register: (userData) => api.post("/auth/register", userData),
   getProfile: () => api.get("/auth/profile"),
   changePassword: (data) => api.put("/auth/change-password", data),
@@ -147,11 +147,12 @@ export const reportAPI = {
 // ================================
 // OFFERS API
 // ================================
-export const offerAPI = {
-  getAll: () => api.get("/offers"),
-  create: (data) => api.post("/offers", data),
-  update: (id, data) => api.put(`/offers/${id}`, data),
-  delete: (id) => api.delete(`/offers/${id}`),
+export const offersAPI = {
+  getAllOffers: () => api.get("/offers"),
+  getOfferById: (id) => api.get(`/offers/${id}`),
+  createOffer: (data) => api.post('/offers', data),
+  updateOffer: (id, data) => api.put(`/offers/${id}`, data),
+  getAllItemsForOffer: () => api.get("/offers/items"),
 };
 
 // ================================

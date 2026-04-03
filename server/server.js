@@ -27,6 +27,9 @@ app.use("/api/auth", authRoutes);
 const priceRoutes = require("./routes/priceRoutes");
 app.use("/api/price", priceRoutes);
 
+const offerRoutes = require("./routes/offerRoutes");
+app.use("/api/offers", offerRoutes);
+
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () =>
   console.log(` Server listening on port ${PORT}`)
