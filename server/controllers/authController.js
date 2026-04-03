@@ -2,6 +2,8 @@ const db = require("../config/db");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const { getRedirectPath } = require("../utils/roleRedirect");
+const nodemailer = require("nodemailer");
+const { generateResetToken, hashPassword } = require("../helpers/authHelper");
 
 // helper: MD5 hash
 const md5Hash = (text) => {
@@ -172,11 +174,117 @@ exports.loginUser = async (req, res) => {
   }
 };
 
+
+
+
+// =========================
+// Forgot Password
+// =========================
 exports.forgotPassword = async (req, res) => {
   try {
-    // TODO
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+
+    // Check user exists
+    const [users] = await db.query(
+      "SELECT * FROM users WHERE email = ?",
+      [email]
+    );
+
+    if (users.length === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const user = users[0];
+
+    // Generate token and expiry
+    const resetToken = generateResetToken();
+    const expiryTime = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
+
+    // Save token in DB
+    await db.query(
+      "UPDATE users SET reset_token = ?, reset_token_expiry = ? WHERE id = ?",
+      [resetToken, expiryTime, user.id]
+    );
+
+    // Reset URL
+    const resetLink = `http://localhost:3000/reset-password/${resetToken}`;
+
+    // Mail config
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+
+    // Mail options
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: "Password Reset Request",
+      html: `
+        <h3>Reset Your Password</h3>
+        <p>Click the link below to reset your password:</p>
+        <a href="${resetLink}">${resetLink}</a>
+        <p>This link will expire in 15 minutes.</p>
+      `,
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    res.status(200).json({
+      message: "Password reset link sent to email",
+    });
   } catch (err) {
-    console.log("Error while forgot password:", err);
-    res.status(500).json({ error: "Internal server error" });
+    console.log("Forgot Password Error:", err);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// =========================
+// Reset Password
+// =========================
+exports.resetPassword = async (req, res) => {
+  try {
+    const { token, password } = req.body;
+
+    if (!token || !password) {
+      return res.status(400).json({ message: "Token and password are required" });
+    }
+
+    // Find user with valid token
+    const [users] = await db.query(
+      "SELECT * FROM users WHERE reset_token = ? AND reset_token_expiry > NOW()",
+      [token]
+    );
+
+    if (users.length === 0) {
+      return res.status(400).json({ message: "Invalid or expired token" });
+    }
+
+    const user = users[0];
+
+    // Hash new password
+    const hashedPassword = await hashPassword(password);
+
+    // Update password and clear token
+    await db.query(
+      `UPDATE users 
+       SET password = ?, reset_token = NULL, reset_token_expiry = NULL 
+       WHERE id = ?`,
+      [hashedPassword, user.id]
+    );
+
+    res.status(200).json({
+      message: "Password reset successful",
+    });
+  } catch (err) {
+    console.log("Reset Password Error:", err);
+    res.status(500).json({ message: "Internal server error" });
   }
 };
