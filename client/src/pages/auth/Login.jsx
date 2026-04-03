@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState } from "react";
 import {
   FaEnvelope,
   FaLock,
@@ -11,125 +11,74 @@ import {
   FaCoffee,
   FaCookieBite,
 } from "react-icons/fa";
-import axios from "axios";
 import { useNavigate } from "react-router-dom";
-import debounce from "lodash.debounce";
-
-// ✅ API outside component (prevents recreation)
-const api = axios.create({
-  baseURL: "http://localhost:5000",
-});
+import { authAPI } from "../../services/api";
 
 export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
-  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [selectedKitchen, setSelectedKitchen] = useState("");
-  const [userRole, setUserRole] = useState("");
+  const [outletType, setOutletType] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [showOutletDropdown, setShowOutletDropdown] = useState(false);
 
   const navigate = useNavigate();
 
-  // ✅ Fetch role
-  const fetchUserRole = async (username) => {
-    try {
-      const res = await api.get("/user/KitchenSignIn", {
-        params: { username },
-      });
+  const fetchUserRole = async () => {
+    if (!email.trim()) return;
 
-      if (res.data?.items?.length > 0) {
-        setUserRole(res.data.items[0].role);
-      } else {
-        setUserRole("");
+    try {
+      const response = await authAPI.getRole({ username: email.trim() });
+      const shouldShowOutletSelection = Boolean(
+        response.data?.showOutletSelection
+      );
+
+      setShowOutletDropdown(shouldShowOutletSelection);
+      if (!shouldShowOutletSelection) {
+        setOutletType("");
       }
-    } catch (err) {
-      console.error("Error fetching role:", err);
-      setUserRole("");
+    } catch (fetchError) {
+      console.error("Error fetching user role:", fetchError);
+      setShowOutletDropdown(false);
+      setOutletType("");
     }
   };
 
-  // ✅ Debounced function
-  const fetchUserRoleDebounced = useCallback(
-    debounce((username) => fetchUserRole(username), 500),
-    []
-  );
-
-  // ✅ Cleanup debounce
-  useEffect(() => {
-    return () => {
-      fetchUserRoleDebounced.cancel();
-    };
-  }, [fetchUserRoleDebounced]);
-
-  // ✅ Submit handler
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    if (name.includes(" ") || password.includes(" ")) {
-      alert("Spaces are not allowed in username or password.");
-      return;
-    }
-
-    if (!name || !password) {
-      alert("Please enter credentials.");
-      return;
-    }
+  const handleLogin = async (event) => {
+    event.preventDefault();
+    setError("");
+    setLoading(true);
 
     try {
-      const response = await api.get("/login", {
-        params: {
-          userName: name,
-          pwd: password,
-        },
+      const response = await authAPI.login({
+        username: email.trim(),
+        password,
+        outletType,
       });
 
-      const data = response.data;
-      console.log("API Response:", data);
-
-      if (data.result === 1) {
-        const role = data.role_code;
-        const userId = data.userid;
-
-        localStorage.setItem("Token", data.acctkn);
-        localStorage.setItem("userId", userId);
-
-        // ✅ Role navigation
-        if (role === "STMG") {
-          navigate("/admin");
-        } else if (role === "USER") {
-          console.log("navigation is successs");
-          navigate("/userdashboard");
-        } else if (role === "KADM") {
-          if (!selectedKitchen) {
-            alert("Please select Kitchen/Bar");
-            return;
-          }
-
-          if (selectedKitchen === "Bar") {
-            navigate("/barorder");
-          } else {
-            navigate("/kitchenorder");
-          }
-        } else if (role === "MBOP") {
-          navigate("/orderdetails");
-        } else if (role === "STKP") {
-          navigate("/store");
-        }
-      } else if (data.result === 2) {
-        alert("Incorrect username or password.");
-      } else if (data.result === 4) {
-        alert("Employee expired. Contact admin.");
-      } else {
-        alert("Login failed.");
+      if (response.data?.success) {
+        localStorage.setItem("token", response.data.token);
+        localStorage.setItem("user", JSON.stringify(response.data.user));
+        navigate(response.data.redirectPath);
+        return;
       }
-    } catch (error) {
-      console.error("Login Error:", error);
-      alert("Network issue.");
+
+      setError(response.data?.message || "Login failed");
+    } catch (loginError) {
+      console.error("Error during login:", loginError);
+      setError(
+        loginError.response?.data?.message ||
+          loginError.response?.data?.error ||
+          "Login failed. Please check your credentials."
+      );
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <div className="min-h-screen flex bg-gradient-to-br from-pink-50 via-rose-50 to-white">
-      {/* Left Section */}
       <div className="hidden lg:flex w-1/2 relative overflow-hidden bg-gradient-to-br from-[#d70652]/10 via-rose-100 to-[#ff025e]/10">
         <div className="absolute inset-0 opacity-30">
           <div className="absolute top-20 left-20 h-72 w-72 rounded-full bg-[#d70652] blur-3xl opacity-20"></div>
@@ -173,14 +122,15 @@ export default function Login() {
               <div className="mt-12 relative w-72 h-72">
                 <div className="absolute inset-0 rounded-full bg-[#d70652]/10 blur-3xl"></div>
                 <div className="absolute inset-8 rounded-full border border-[#ff025e]/30 bg-white/60 backdrop-blur-sm shadow-xl"></div>
-                <div className="absolute top-16 left-16 text-7xl animate-bounce-slow">🍽️</div>
+                <div className="absolute top-16 left-16 text-4xl font-semibold text-[#d70652] animate-bounce-slow">
+                  AFMC
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Right Section */}
       <div className="flex w-full lg:w-1/2 items-center justify-center px-6 py-10 bg-white relative">
         <div className="absolute top-16 right-16 h-40 w-40 rounded-full bg-[#d70652]/10 blur-3xl"></div>
         <div className="absolute bottom-16 left-16 h-52 w-52 rounded-full bg-[#ff025e]/10 blur-3xl"></div>
@@ -197,34 +147,31 @@ export default function Login() {
               </p>
             </div>
 
-            {/* ✅ FIXED */}
-            <form className="space-y-6" onSubmit={handleSubmit}>
-              {/* Email */}
+            {error && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">
+                {error}
+              </div>
+            )}
+
+            <form onSubmit={handleLogin} className="space-y-6">
               <div>
                 <label className="block text-sm text-gray-700 mb-2 font-medium">
-                  Email Address
+                  Username / Email
                 </label>
                 <div className="flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 focus-within:border-[#ff025e] focus-within:ring-2 focus-within:ring-[#ff025e]/20 transition-all">
                   <FaEnvelope className="text-gray-400" />
                   <input
                     type="text"
-                    value={name}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setName(val);
-                      if (val.trim() === "") {
-                        setUserRole("");
-                      } else {
-                        fetchUserRoleDebounced(val);
-                      }
-                    }}
-                    placeholder="Username"
+                    placeholder="Enter your username / email"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    onBlur={fetchUserRole}
                     className="w-full bg-transparent outline-none text-gray-800 placeholder:text-gray-400"
+                    required
                   />
                 </div>
               </div>
 
-              {/* Password */}
               <div>
                 <label className="block text-sm text-gray-700 mb-2 font-medium">
                   Password
@@ -234,13 +181,15 @@ export default function Login() {
                   <input
                     type={showPassword ? "text" : "password"}
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={(event) => setPassword(event.target.value)}
                     placeholder="Enter your password"
                     className="w-full bg-transparent outline-none text-gray-800 placeholder:text-gray-400"
+                    required
                   />
+
                   <button
                     type="button"
-                    onClick={() => setShowPassword(!showPassword)}
+                    onClick={() => setShowPassword((current) => !current)}
                     className="text-gray-400 hover:text-[#d70652] transition"
                   >
                     {showPassword ? <FaEyeSlash /> : <FaEye />}
@@ -248,16 +197,24 @@ export default function Login() {
                 </div>
               </div>
 
-              {userRole === "KITCHEN_ADMIN" && (
-                <select
-                  value={selectedKitchen}
-                  onChange={(e) => setSelectedKitchen(e.target.value)}
-                  className="w-full p-3 border rounded-xl"
-                >
-                  <option value="">Select Kitchen</option>
-                  <option value="Bar">Bar</option>
-                  <option value="Kitchen">Kitchen</option>
-                </select>
+              {showOutletDropdown && (
+                <div>
+                  <label className="block text-sm text-gray-700 mb-2 font-medium">
+                    Select Outlet
+                  </label>
+                  <div className="flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 focus-within:border-[#ff025e] focus-within:ring-2 focus-within:ring-[#ff025e]/20 transition-all">
+                    <select
+                      value={outletType}
+                      onChange={(event) => setOutletType(event.target.value)}
+                      className="w-full bg-transparent outline-none text-gray-800"
+                      required={showOutletDropdown}
+                    >
+                      <option value="">Select Kitchen / Bar</option>
+                      <option value="KITCHEN">Kitchen</option>
+                      <option value="BAR">Bar</option>
+                    </select>
+                  </div>
+                </div>
               )}
 
               <div className="flex items-center justify-between text-sm">
@@ -266,16 +223,20 @@ export default function Login() {
                   Remember me
                 </label>
 
-                <a href="/forgot-password" className="text-[#d70652] hover:text-[#ff025e] transition font-medium">
+                <a
+                  href="/forgot-password"
+                  className="text-[#d70652] hover:text-[#ff025e] transition font-medium"
+                >
                   Forgot password?
                 </a>
               </div>
 
               <button
                 type="submit"
-                className="w-full bg-gradient-to-r from-[#d70652] to-[#ff025e] hover:from-[#ff025e] hover:to-[#d70652] text-white font-bold py-3.5 rounded-2xl shadow-md shadow-[#d70652]/30 transition duration-300 transform hover:scale-[1.01]"
+                disabled={loading}
+                className="w-full bg-gradient-to-r from-[#d70652] to-[#ff025e] hover:from-[#ff025e] hover:to-[#d70652] text-white font-bold py-3.5 rounded-2xl shadow-md shadow-[#d70652]/30 transition duration-300 transform hover:scale-[1.01] disabled:opacity-70 disabled:cursor-not-allowed"
               >
-                Sign In
+                {loading ? "Signing in..." : "Sign In"}
               </button>
             </form>
 
@@ -299,7 +260,7 @@ export default function Login() {
         </div>
       </div>
 
-      <style jsx>{`
+      <style>{`
         @keyframes float1 {
           0%, 100% { transform: translateY(0px) rotate(0deg); }
           50% { transform: translateY(-20px) rotate(5deg); }
