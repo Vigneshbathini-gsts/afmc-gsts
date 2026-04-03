@@ -24,6 +24,8 @@ app.get("/", (req, res) =>
 
 const authRoutes = require("./routes/authRoutes");
 app.use("/api/auth", authRoutes);
+const priceRoutes = require("./routes/priceRoutes");
+app.use("/api/price", priceRoutes);
 
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () =>

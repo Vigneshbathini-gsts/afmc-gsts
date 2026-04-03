@@ -35,7 +35,7 @@ api.interceptors.response.use(
       !window.location.pathname.includes("/login")
     ) {
       localStorage.removeItem("token");
-      localStorage.removeItem("user");
+      localStorage.removeItem("authUser");
       window.location.href = "/login";
     }
     return Promise.reject(err);
@@ -53,6 +53,10 @@ export const authAPI = {
   changePassword: (data) => api.put("/auth/change-password", data),
   logout: () => api.post("/auth/logout"),
 };
+
+
+
+
 
 // ================================
 // USER MANAGEMENT API (Admin)
@@ -153,8 +157,10 @@ export const offerAPI = {
 // ================================
 // PRICE MANAGEMENT API
 // ================================
+
 export const priceAPI = {
-  updatePrice: (id, data) => api.put(`/items/${id}/price`, data),
+  getItemByBarcode: (barcode) => api.get(`/price/barcode/${barcode}`),
+  updateItemPrice: (data) => api.put("/price/price-update", data),
 };
 
 // ================================
