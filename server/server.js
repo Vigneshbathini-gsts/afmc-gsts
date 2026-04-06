@@ -18,8 +18,10 @@ app.get("/", (req, res) => {
 });
 
 const authRoutes = require("./routes/authRoutes");
+const reportRoutes = require("./routes/reportRoutes");
 
 app.use("/api/auth", authRoutes);
+app.use("/api/reports", reportRoutes);
 
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {

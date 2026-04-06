@@ -56,14 +56,15 @@ export default function Login() {
         password,
         outletType,
       });
-
+    // console.log(response.data);
       if (response.data?.success) {
         localStorage.setItem("token", response.data.token);
         localStorage.setItem("user", JSON.stringify(response.data.user));
         navigate(response.data.redirectPath);
+        console.log(response.data);
         return;
       }
-
+      console.log(response.data);
       setError(response.data?.message || "Login failed");
     } catch (loginError) {
       console.error("Error during login:", loginError);
