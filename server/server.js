@@ -18,8 +18,10 @@ app.get("/", (req, res) => {
 });
 
 const authRoutes = require("./routes/authRoutes");
+const reportRoutes = require("./routes/reportRoutes");
 
 app.use("/api/auth", authRoutes);
+app.use("/api/reports", reportRoutes);
 const priceRoutes = require("./routes/priceRoutes");
 app.use("/api/price", priceRoutes);
 

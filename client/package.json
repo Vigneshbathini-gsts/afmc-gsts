@@ -27,6 +27,7 @@
     "zod": "^4.3.6"
   },
   "scripts": {
+    "postinstall": "node scripts/fix-html5-qrcode-sourcemaps.js",
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",

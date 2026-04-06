@@ -1,6 +1,6 @@
 import React from "react";
 import { Routes, Route } from "react-router-dom";
-
+import { Navigate } from "react-router-dom";
 // Common Pages
 import Home from "../pages/common/Home";
 import NotFound from "../pages/common/NotFound";
@@ -76,6 +76,11 @@ import StorekeeperInventory from "../pages/storekeeper/Inventory";
 import StorekeeperAddItem from "../pages/storekeeper/AddItem";
 import StorekeeperEditItem from "../pages/storekeeper/EditItem";
 
+import BarstockReports from "../pages/admin/StockReportspages/BarstockReports";
+import Ordertransactiondetails from "../pages/admin/StockReportspages/Ordertransactiondetails";
+import Orderitemdetails from "../pages/admin/StockReportspages/Orderitemdetails";
+
+
 export default function AppRoutes() {
   return (
     <Routes>
@@ -90,10 +95,14 @@ export default function AppRoutes() {
       <Route path="/admin" element={<AdminLayout />}>
         <Route path="dashboard" element={<AdminDashboard />} />
         <Route path="inventory" element={<Inventory />} />
+        <Route path="stock-reports" element={<Navigate to="barstock" replace />} />
+        <Route path="stock-reports/barstock" element={<BarstockReports />} />
+        <Route path="stock-reports/order-transaction" element={<Ordertransactiondetails />} />
+        <Route path="stock-reports/order-item" element={<Orderitemdetails />} />
+        <Route path="stock-in-out-report" element={<StockReports />} />
         <Route path="add-item" element={<AddItem />} />
         <Route path="edit-item" element={<EditItem />} />
         <Route path="reports" element={<Reports />} />
-        <Route path="stock-reports" element={<StockReports />} />
         <Route path="users" element={<UserManagement />} />
         <Route path="offers" element={<Offers />} />
         <Route path="offers/create" element={<OfferCreate/>} />
