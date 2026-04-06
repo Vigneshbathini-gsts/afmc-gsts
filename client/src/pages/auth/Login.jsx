@@ -27,55 +27,52 @@ export default function Login() {
   const navigate = useNavigate();
   const { setUser } = useAuth();
 
-
   const fetchUserRole = async () => {
     if (!email.trim()) return;
 
     try {
-      const response = await authAPI.getRole({ username: email });
-      console.log("Get Role response:", response.data);
-      if (response.data.success) {
-        setShowOutletDropdown(response.data.showOutletSelection);
+      const response = await authAPI.getRole({ username: email.trim() });
+      const shouldShowOutletSelection = Boolean(
+        response.data?.showOutletSelection
+      );
 
-        if (!response.data.showOutletSelection) {
-          setOutletType("");
-        }
+      setShowOutletDropdown(shouldShowOutletSelection);
+      if (!shouldShowOutletSelection) {
+        setOutletType("");
       }
-    } catch (error) {
-      console.error("Error fetching user role:", error);
+    } catch (fetchError) {
+      console.error("Error fetching user role:", fetchError);
       setShowOutletDropdown(false);
       setOutletType("");
     }
   };
 
-  const handleLogin = async (e) => {
-    e.preventDefault();
+  const handleLogin = async (event) => {
+    event.preventDefault();
     setError("");
     setLoading(true);
 
     try {
       const response = await authAPI.login({
-        username: email,
-        password: password,
-        outletType: outletType,
+        username: email.trim(),
+        password,
+        outletType,
       });
 
-      console.log("Login response:", response.data);
-
-      if (response.data.success) {
+      if (response.data?.success) {
         localStorage.setItem("token", response.data.token);
-        setUser(response.data.user);
-
+        localStorage.setItem("user", JSON.stringify(response.data.user));
         navigate(response.data.redirectPath);
-      } else {
-        setError(response.data.message || "Login failed");
+        return;
       }
-    } catch (error) {
-      console.error("Error during login:", error);
+
+      setError(response.data?.message || "Login failed");
+    } catch (loginError) {
+      console.error("Error during login:", loginError);
       setError(
-        error.response?.data?.message ||
-        error.response?.data?.error ||
-        "Login failed. Please check your credentials."
+        loginError.response?.data?.message ||
+          loginError.response?.data?.error ||
+          "Login failed. Please check your credentials."
       );
     } finally {
       setLoading(false);
@@ -84,15 +81,12 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex bg-gradient-to-br from-pink-50 via-rose-50 to-white">
-      {/* Left Section - same as before */}
       <div className="hidden lg:flex w-1/2 relative overflow-hidden bg-gradient-to-br from-[#d70652]/10 via-rose-100 to-[#ff025e]/10">
-        {/* Background glow */}
         <div className="absolute inset-0 opacity-30">
           <div className="absolute top-20 left-20 h-72 w-72 rounded-full bg-[#d70652] blur-3xl opacity-20"></div>
           <div className="absolute bottom-20 right-20 h-80 w-80 rounded-full bg-[#ff025e] blur-3xl opacity-20"></div>
         </div>
 
-        {/* Floating Food Icons */}
         <div className="absolute inset-0 pointer-events-none">
           <FaPizzaSlice className="absolute top-[22%] left-[18%] text-[#d70652] text-5xl animate-float1 drop-shadow-md" />
           <FaHamburger className="absolute top-[40%] left-[65%] text-[#ff025e] text-6xl animate-float2 drop-shadow-md" />
@@ -130,14 +124,15 @@ export default function Login() {
               <div className="mt-12 relative w-72 h-72">
                 <div className="absolute inset-0 rounded-full bg-[#d70652]/10 blur-3xl"></div>
                 <div className="absolute inset-8 rounded-full border border-[#ff025e]/30 bg-white/60 backdrop-blur-sm shadow-xl"></div>
-                <div className="absolute top-16 left-16 text-7xl animate-bounce-slow">🍽️</div>
+                <div className="absolute top-16 left-16 text-4xl font-semibold text-[#d70652] animate-bounce-slow">
+                  AFMC
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Right Section */}
       <div className="flex w-full lg:w-1/2 items-center justify-center px-6 py-10 bg-white relative">
         <div className="absolute top-16 right-16 h-40 w-40 rounded-full bg-[#d70652]/10 blur-3xl"></div>
         <div className="absolute bottom-16 left-16 h-52 w-52 rounded-full bg-[#ff025e]/10 blur-3xl"></div>
@@ -154,7 +149,6 @@ export default function Login() {
               </p>
             </div>
 
-            {/* Error Message */}
             {error && (
               <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">
                 {error}
@@ -162,7 +156,6 @@ export default function Login() {
             )}
 
             <form onSubmit={handleLogin} className="space-y-6">
-              {/* Email/Username */}
               <div>
                 <label className="block text-sm text-gray-700 mb-2 font-medium">
                   Username / Email
@@ -173,7 +166,7 @@ export default function Login() {
                     type="text"
                     placeholder="Enter your username / email"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(event) => setEmail(event.target.value)}
                     onBlur={fetchUserRole}
                     className="w-full bg-transparent outline-none text-gray-800 placeholder:text-gray-400"
                     required
@@ -181,7 +174,6 @@ export default function Login() {
                 </div>
               </div>
 
-              {/* Password */}
               <div>
                 <label className="block text-sm text-gray-700 mb-2 font-medium">
                   Password
@@ -190,49 +182,46 @@ export default function Login() {
                   <FaLock className="text-gray-400" />
                   <input
                     type={showPassword ? "text" : "password"}
-                    placeholder="Enter your password"
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={(event) => setPassword(event.target.value)}
+                    placeholder="Enter your password"
                     className="w-full bg-transparent outline-none text-gray-800 placeholder:text-gray-400"
                     required
                   />
-                 
+
                   <button
                     type="button"
-                    onClick={() => setShowPassword(!showPassword)}
+                    onClick={() => setShowPassword((current) => !current)}
                     className="text-gray-400 hover:text-[#d70652] transition"
                   >
                     {showPassword ? <FaEyeSlash /> : <FaEye />}
                   </button>
                 </div>
-                 {showOutletDropdown && (
-                    <div>
-                      <label className="block text-sm text-gray-700 mb-2 font-medium">
-                        Select Outlet
-                      </label>
-                      <div className="flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 focus-within:border-[#ff025e] focus-within:ring-2 focus-within:ring-[#ff025e]/20 transition-all">
-                        <select
-                          value={outletType}
-                          onChange={(e) => setOutletType(e.target.value)}
-                          className="w-full bg-transparent outline-none text-gray-800"
-                          required={showOutletDropdown}
-                        >
-                          <option value="">Select Kitchen / Bar</option>
-                          <option value="KITCHEN">Kitchen</option>
-                          <option value="BAR">Bar</option>
-                        </select>
-                      </div>
-                    </div>
-                  )}
               </div>
 
-              {/* Remember + Forgot */}
+              {showOutletDropdown && (
+                <div>
+                  <label className="block text-sm text-gray-700 mb-2 font-medium">
+                    Select Outlet
+                  </label>
+                  <div className="flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 focus-within:border-[#ff025e] focus-within:ring-2 focus-within:ring-[#ff025e]/20 transition-all">
+                    <select
+                      value={outletType}
+                      onChange={(event) => setOutletType(event.target.value)}
+                      className="w-full bg-transparent outline-none text-gray-800"
+                      required={showOutletDropdown}
+                    >
+                      <option value="">Select Kitchen / Bar</option>
+                      <option value="KITCHEN">Kitchen</option>
+                      <option value="BAR">Bar</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+
               <div className="flex items-center justify-between text-sm">
                 <label className="flex items-center gap-2 text-gray-600 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    className="accent-[#d70652] w-4 h-4 rounded"
-                  />
+                  <input type="checkbox" className="accent-[#d70652] w-4 h-4 rounded" />
                   Remember me
                 </label>
 
@@ -244,7 +233,6 @@ export default function Login() {
                 </a>
               </div>
 
-              {/* Login Button */}
               <button
                 type="submit"
                 disabled={loading}
@@ -254,20 +242,17 @@ export default function Login() {
               </button>
             </form>
 
-            {/* Divider */}
             <div className="flex items-center gap-4 my-8">
               <div className="h-px flex-1 bg-gray-200"></div>
               <span className="text-gray-400 text-sm">Secure Access</span>
               <div className="h-px flex-1 bg-gray-200"></div>
             </div>
 
-            {/* Footer */}
             <div className="text-center text-sm text-gray-400">
               Protected by AFMC Authentication System
             </div>
           </div>
 
-          {/* Mobile branding */}
           <div className="lg:hidden text-center mt-8">
             <h1 className="text-2xl font-bold text-gray-800">AFMC Portal</h1>
             <p className="text-gray-500 text-sm mt-1">
@@ -277,8 +262,7 @@ export default function Login() {
         </div>
       </div>
 
-      {/* Add keyframe animations */}
-      <style jsx>{`
+      <style>{`
         @keyframes float1 {
           0%, 100% { transform: translateY(0px) rotate(0deg); }
           50% { transform: translateY(-20px) rotate(5deg); }
