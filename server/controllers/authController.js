@@ -85,7 +85,6 @@ exports.loginUser = async (req, res) => {
   try {
     const { username, password, outletType } = req.body;
 
-    console.log("Login Attempt:", { username, outletType });
 
     if (!username || !password) {
       return res.status(400).json({
