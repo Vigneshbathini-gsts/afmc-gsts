@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
 import { FaBell, FaExclamationTriangle } from "react-icons/fa";
+import { useNavigate } from "react-router-dom";
 import { notificationAPI } from "../../services/api";
 
 export default function StockNotificationBell() {
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState([]);
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef(null);
@@ -48,6 +50,26 @@ export default function StockNotificationBell() {
     }
   };
 
+  const handleNotificationClick = async (note) => {
+    try {
+      await notificationAPI.markStockOutRead(note.item_code);
+
+      setNotifications((prev) =>
+        prev.filter((item) => item.item_code !== note.item_code)
+      );
+      setOpen(false);
+
+      navigate(
+        `/admin/stock-reports/barstock?itemCode=${encodeURIComponent(
+          note.item_code
+        )}&itemName=${encodeURIComponent(note.item_name || "")}`
+      );
+    } catch (error) {
+      console.error("Error opening stock notification:", error);
+      alert("Failed to open stock notification");
+    }
+  };
+
   return (
     <div className="relative" ref={dropdownRef}>
       {/* Bell Button */}
@@ -82,7 +104,8 @@ export default function StockNotificationBell() {
               notifications.map((note, index) => (
                 <div
                   key={index}
-                  className="px-4 py-3 border-b border-gray-100 hover:bg-gray-50 transition"
+                  className="px-4 py-3 border-b border-gray-100 hover:bg-gray-50 transition cursor-pointer"
+                  onClick={() => handleNotificationClick(note)}
                 >
                   <div className="flex items-start gap-3">
                     <div className="mt-1 text-red-500">
@@ -98,7 +121,10 @@ export default function StockNotificationBell() {
                       </p>
 
                       <button
-                        onClick={() => handleMarkAsRead(note.item_code)}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleMarkAsRead(note.item_code);
+                        }}
                         className="mt-2 text-xs font-medium text-[#d70652] hover:text-pink-700 transition"
                       >
                         Mark as Read

@@ -1,9 +1,15 @@
 import React from "react";
 import { FaBars, FaUtensils } from "react-icons/fa";
+import { useLocation } from "react-router-dom";
 import UserMenuDropdown from "../common/UserMenuDropdown";
 import StockNotificationBell from "../common/StockNotificationBell";
 
 export default function AdminNavbar({ onMenuClick }) {
+  const location = useLocation();
+
+  // Show bell only on admin dashboard page
+  const showNotificationBell = location.pathname === "/admin/dashboard";
+
   return (
     <header className="bg-white shadow-md sticky top-0 z-30">
       <div className="flex items-center justify-between px-4 md:px-6 py-4">
@@ -31,7 +37,7 @@ export default function AdminNavbar({ onMenuClick }) {
 
         {/* Right */}
         <div className="flex items-center gap-4">
-          <StockNotificationBell />
+          {showNotificationBell && <StockNotificationBell />}
           <UserMenuDropdown />
         </div>
       </div>

@@ -2,7 +2,7 @@ const db = require("../config/db");
 
 exports.getStockReport = async (req, res) => {
   try {
-    const { itemName, limit, offset } = req.query;
+    const { itemName, itemCode, limit, offset } = req.query;
 
     const parsedLimit = parseInt(limit, 10);
     const parsedOffset = parseInt(offset, 10);
@@ -16,6 +16,10 @@ exports.getStockReport = async (req, res) => {
     const itemValue =
       typeof itemName === "string" && itemName.trim() !== ""
         ? itemName.trim()
+        : null;
+    const itemCodeValue =
+      typeof itemCode === "string" && itemCode.trim() !== ""
+        ? itemCode.trim()
         : null;
 
     const query = `
@@ -48,6 +52,7 @@ exports.getStockReport = async (req, res) => {
           ) AS total_price
         FROM xxafmc_stock_out xso
         WHERE (? IS NULL OR UPPER(xso.item_name) LIKE CONCAT('%', UPPER(?), '%'))
+          AND (? IS NULL OR xso.item_code = ?)
         GROUP BY xso.item_code, xso.item_name
       ) AS stock_summary
       LEFT JOIN (
@@ -98,7 +103,12 @@ exports.getStockReport = async (req, res) => {
       LIMIT ${limitNum} OFFSET ${offsetNum}
     `;
 
-    const [results] = await db.execute(query, [itemValue, itemValue]);
+    const [results] = await db.execute(query, [
+      itemValue,
+      itemValue,
+      itemCodeValue,
+      itemCodeValue,
+    ]);
 
     res.json({
       success: true,

@@ -1,14 +1,20 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import api from "../../../services/api";
 import Stackreporttab from "./Stackreporttab";
 
 export default function BarstockReports() {
   const rowsPerPage = 15;
   const requestInFlight = useRef(false);
+  const [searchParams] = useSearchParams();
 
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [itemName, setItemName] = useState("");
+  const [itemName, setItemName] = useState(searchParams.get("itemName") || "");
+  const [activeFilters, setActiveFilters] = useState({
+    itemName: searchParams.get("itemName") || "",
+    itemCode: searchParams.get("itemCode") || "",
+  });
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
 
@@ -24,7 +30,8 @@ export default function BarstockReports() {
 
         const res = await api.get("/reports/stock-report", {
           params: {
-            itemName: itemName.trim(),
+            itemName: activeFilters.itemName.trim(),
+            itemCode: activeFilters.itemCode.trim(),
             limit: rowsPerPage,
             offset: nextPage * rowsPerPage,
           },
@@ -52,8 +59,22 @@ export default function BarstockReports() {
         setLoading(false);
       }
     },
-    [itemName]
+    [activeFilters]
   );
+
+  useEffect(() => {
+    const nextItemName = searchParams.get("itemName") || "";
+    const nextItemCode = searchParams.get("itemCode") || "";
+
+    setItemName(nextItemName);
+    setActiveFilters({
+      itemName: nextItemName,
+      itemCode: nextItemCode,
+    });
+    setPage(0);
+    setHasMore(true);
+    setData([]);
+  }, [searchParams]);
 
   useEffect(() => {
     fetchData({ reset: true, nextPage: 0 });
@@ -62,7 +83,10 @@ export default function BarstockReports() {
   const handleSearch = () => {
     setPage(0);
     setHasMore(true);
-    fetchData({ reset: true, nextPage: 0 });
+    setActiveFilters({
+      itemName: itemName.trim(),
+      itemCode: "",
+    });
   };
 
   const handleScroll = (event) => {
@@ -97,6 +121,12 @@ export default function BarstockReports() {
           Search
         </button>
       </div>
+
+      {activeFilters.itemCode && (
+        <p className="mt-3 text-sm text-gray-600">
+          Showing stock report for item: <span className="font-semibold">{activeFilters.itemName || activeFilters.itemCode}</span>
+        </p>
+      )}
 
       <div
         className="mt-6 max-h-[70vh] overflow-auto rounded-xl bg-white shadow"
