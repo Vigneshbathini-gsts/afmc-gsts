@@ -199,4 +199,14 @@ export const cocktailAPI = {
   delete: (id) => api.delete(`/cocktails/${id}`),
 };
 
+//Notification API
+
+export const notificationAPI = {
+  getStockOutNotifications: () => api.get("/notifications/stock-out"),
+  markStockOutRead: (itemCode) =>
+    api.put(`/notifications/stock-out/read/${itemCode}`),
+};
+
+
+
 export default api;
