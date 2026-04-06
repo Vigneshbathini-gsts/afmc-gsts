@@ -158,6 +158,8 @@ export const reportAPI = {
   getCancelledOrdersReport: () => api.get("/reports/cancelled-orders"),
 };
 
+
+
 // ================================
 // OFFERS API
 // ================================
@@ -182,7 +184,9 @@ export const priceAPI = {
 // PROFIT MANAGEMENT API
 // ================================
 export const profitAPI = {
-  getProfitData: () => api.get("/profit"),
+  getProfitData: () => api.get("/profit/report"),
+  updateMemberPricing: (data) => api.put("/profit/member", data),
+  updateNonMemberPricing: (data) => api.put("/profit/non-member", data),
 };
 
 // ================================

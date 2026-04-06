@@ -33,6 +33,9 @@ app.use("/api/offers", offerRoutes);
 const inventoryRoutes = require("./routes/inventoryRoutes");
 app.use("/api/inventory", inventoryRoutes);
 
+const profitRoutes = require("./routes/profitRoutes");
+app.use("/api/profit", profitRoutes);
+
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () =>
   console.log(` Server listening on port ${PORT}`)

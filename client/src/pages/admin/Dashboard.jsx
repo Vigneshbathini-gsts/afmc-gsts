@@ -29,8 +29,10 @@ export default function Dashboard() {
       color: "bg-olive-500/20 text-green-700",
       path: "/admin/stock-reports",
     },
-    { title: "Profit Management", icon: <FaCoins />, color: "bg-gray-500/20 text-gray-700" },
-    { title: "Cocktails/Mocktails", icon: <FaWineGlassAlt />, color: "bg-yellow-600/20 text-yellow-700" },
+    { title: "Profit Management", icon: <FaCoins />, color: "bg-gray-500/20 text-gray-700", path: "/admin/profit-management" },
+    { title: "Cocktails/Mocktails", icon: <FaWineGlassAlt />, color: "bg-yellow-600/20 text-yellow-700", path: "/admin/cocktails" }
+    
+
   ];
 
   const handleCardClick = (item) => {
