@@ -131,11 +131,9 @@ export default function OfferEdit() {
               <span className="w-12 h-12 rounded-2xl bg-[#d70652] text-white flex items-center justify-center shadow-lg">
                 <FaGift />
               </span>
-              Deactivate Offer
+              Edit  Offer
             </h1>
-            <p className="text-gray-500 mt-2">
-              Set end date and deactivate Offer #{formData.offerId}
-            </p>
+           
           </div>
 
           <div className="flex flex-wrap gap-3">
@@ -263,7 +261,7 @@ export default function OfferEdit() {
           <div className="bg-white rounded-2xl p-4 border border-gray-200">
             <h3 className="text-md font-semibold text-gray-700 mb-4 flex items-center gap-2">
               <FaCalendarCheck className="text-[#d70652]" />
-              Deactivate Offer
+              End Offer
             </h3>
 
             <div className="grid grid-cols-1 gap-6">
@@ -289,13 +287,7 @@ export default function OfferEdit() {
             </div>
           </div>
 
-          {/* Info Box */}
-          <div className="bg-yellow-50 rounded-2xl p-4 border border-yellow-200">
-            <p className="text-sm text-yellow-700">
-              <strong>Note:</strong> After setting the end date, this offer will be <strong>deactivated (Status: Inactive)</strong>.
-              To modify other fields (Item, Quantity, etc.), please create a new offer.
-            </p>
-          </div>
+         
 
           {/* Buttons */}
           <div className="flex flex-col sm:flex-row gap-4 pt-4">
