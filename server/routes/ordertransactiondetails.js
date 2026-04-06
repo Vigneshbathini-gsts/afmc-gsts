@@ -225,17 +225,6 @@ const getOrderTransactionFilterOptions = async (req, res) => {
   const fromDate = normalizeDateParam(req.query.fromDate);
   const toDate = normalizeDateParam(req.query.toDate);
 
-  if (!fromDate || !toDate) {
-    return res.json({
-      success: true,
-      data: {
-        itemNames: [],
-        userNames: [],
-        kitchenNames: [],
-      },
-    });
-  }
-
   const dateFilterClause = buildDateFilterClause(
     "oh.order_date_new",
     fromDate,

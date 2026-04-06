@@ -54,15 +54,6 @@ export default function Orderitemdetails() {
 
   useEffect(() => {
     const fetchFilterOptions = async () => {
-      if (!filters.fromDate || !filters.toDate) {
-        setFilterOptions({
-          itemNames: [],
-          userNames: [],
-          kitchenNames: [],
-        });
-        return;
-      }
-
       setFiltersLoading(true);
       try {
         const response = await api.get("/reports/orderitem/filter-options", {
@@ -169,7 +160,7 @@ export default function Orderitemdetails() {
         <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mt-5 mb-5">
           <input type="date" name="fromDate" value={filters.fromDate} onChange={handleChange} className="input"/>
           <input type="date" name="toDate" value={filters.toDate} onChange={handleChange} className="input"/>
-          <select name="itemNames" value={filters.itemNames} onChange={handleChange} className="input" disabled={!filters.fromDate || !filters.toDate || filtersLoading}>
+          <select name="itemNames" value={filters.itemNames} onChange={handleChange} className="input" disabled={filtersLoading}>
             <option value="">{filtersLoading ? "Loading items..." : "Select Item Name"}</option>
             {filterOptions.itemNames.map((itemName) => (
               <option key={itemName} value={itemName}>
@@ -177,7 +168,7 @@ export default function Orderitemdetails() {
               </option>
             ))}
           </select>
-          <select name="kitchenName" value={filters.kitchenName} onChange={handleChange} className="input" disabled={!filters.fromDate || !filters.toDate || filtersLoading}>
+          <select name="kitchenName" value={filters.kitchenName} onChange={handleChange} className="input" disabled={filtersLoading}>
             <option value="">{filtersLoading ? "Loading kitchens..." : "Select Kitchen Name"}</option>
             {filterOptions.kitchenNames.map((kitchenName) => (
               <option key={kitchenName} value={kitchenName}>
@@ -185,7 +176,7 @@ export default function Orderitemdetails() {
               </option>
             ))}
           </select>
-          <select name="userName" value={filters.userName} onChange={handleChange} className="input" disabled={!filters.fromDate || !filters.toDate || filtersLoading}>
+          <select name="userName" value={filters.userName} onChange={handleChange} className="input" disabled={filtersLoading}>
             <option value="">{filtersLoading ? "Loading users..." : "Select User Name"}</option>
             {filterOptions.userNames.map((userName) => (
               <option key={userName} value={userName}>

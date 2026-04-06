@@ -1,9 +1,10 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import api from "../../../services/api";
 import Stackreporttab from "./Stackreporttab";
 
 export default function BarstockReports() {
   const rowsPerPage = 15;
+  const requestInFlight = useRef(false);
 
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -13,7 +14,12 @@ export default function BarstockReports() {
 
   const fetchData = useCallback(
     async ({ reset = false, nextPage = 0 } = {}) => {
+      if (requestInFlight.current) {
+        return;
+      }
+
       try {
+        requestInFlight.current = true;
         setLoading(true);
 
         const res = await api.get("/reports/stock-report", {
@@ -42,6 +48,7 @@ export default function BarstockReports() {
         }
         setHasMore(false);
       } finally {
+        requestInFlight.current = false;
         setLoading(false);
       }
     },
@@ -53,6 +60,7 @@ export default function BarstockReports() {
   }, [fetchData]);
 
   const handleSearch = () => {
+    setPage(0);
     setHasMore(true);
     fetchData({ reset: true, nextPage: 0 });
   };
@@ -61,7 +69,7 @@ export default function BarstockReports() {
     const { scrollTop, clientHeight, scrollHeight } = event.currentTarget;
 
     if (
-      scrollTop + clientHeight >= scrollHeight - 20 &&
+      scrollTop + clientHeight >= scrollHeight - 80 &&
       !loading &&
       hasMore
     ) {

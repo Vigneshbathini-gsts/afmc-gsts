@@ -53,15 +53,6 @@ export default function OrderTransactionUI() {
 
   useEffect(() => {
     const fetchFilterOptions = async () => {
-      if (!filters.fromDate || !filters.toDate) {
-        setFilterOptions({
-          itemNames: [],
-          userNames: [],
-          kitchenNames: [],
-        });
-        return;
-      }
-
       setFiltersLoading(true);
       try {
         const response = await api.get(
@@ -203,7 +194,7 @@ export default function OrderTransactionUI() {
             value={filters.itemNames}
             onChange={handleChange}
             className="input"
-            disabled={!filters.fromDate || !filters.toDate || filtersLoading}
+            disabled={filtersLoading}
           >
             <option value="">
               {filtersLoading ? "Loading items..." : "Select Item Name"}
@@ -219,7 +210,7 @@ export default function OrderTransactionUI() {
             value={filters.userName}
             onChange={handleChange}
             className="input"
-            disabled={!filters.fromDate || !filters.toDate || filtersLoading}
+            disabled={filtersLoading}
           >
             <option value="">
               {filtersLoading ? "Loading users..." : "Select User Name"}
@@ -235,7 +226,7 @@ export default function OrderTransactionUI() {
             value={filters.kitchenName}
             onChange={handleChange}
             className="input"
-            disabled={!filters.fromDate || !filters.toDate || filtersLoading}
+            disabled={filtersLoading}
           >
             <option value="">
               {filtersLoading ? "Loading kitchens..." : "Select Kitchen Name"}
