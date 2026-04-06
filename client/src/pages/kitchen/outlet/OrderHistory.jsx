@@ -1,7 +1,8 @@
 import React from "react";
+import { useAuth } from "../../../context/AuthContext";
 
 export default function OutletOrderHistory() {
-  const user = JSON.parse(localStorage.getItem("user"));
+  const { user } = useAuth();
   const outletType = user?.outletType || "KITCHEN";
 
   return (

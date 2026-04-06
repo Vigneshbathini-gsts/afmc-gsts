@@ -24,6 +24,11 @@ app.get("/", (req, res) =>
 
 const authRoutes = require("./routes/authRoutes");
 app.use("/api/auth", authRoutes);
+const priceRoutes = require("./routes/priceRoutes");
+app.use("/api/price", priceRoutes);
+
+const offerRoutes = require("./routes/offerRoutes");
+app.use("/api/offers", offerRoutes);
 
 const inventoryRoutes = require("./routes/inventoryRoutes");
 app.use("/api/inventory", inventoryRoutes);

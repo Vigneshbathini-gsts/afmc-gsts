@@ -13,6 +13,7 @@ import {
 } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { authAPI } from "../../services/api";
+import { useAuth } from "../../context/AuthContext";
 
 export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
@@ -24,6 +25,7 @@ export default function Login() {
   const [showOutletDropdown, setShowOutletDropdown] = useState(false);
 
   const navigate = useNavigate();
+  const { setUser } = useAuth();
 
 
   const fetchUserRole = async () => {
@@ -62,7 +64,7 @@ export default function Login() {
 
       if (response.data.success) {
         localStorage.setItem("token", response.data.token);
-        localStorage.setItem("user", JSON.stringify(response.data.user));
+        setUser(response.data.user);
 
         navigate(response.data.redirectPath);
       } else {

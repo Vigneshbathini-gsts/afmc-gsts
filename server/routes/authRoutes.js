@@ -10,5 +10,8 @@ router.post("/register", authController.createUser);
 // Route for user login
 router.post("/login", authController.loginUser);
 router.post("/get-role", authController.getUserRole);
+router.post("/forgot-password", authController.forgotPassword);
+router.post("/reset-password", authController.resetPassword);
+
 
 module.exports = router;

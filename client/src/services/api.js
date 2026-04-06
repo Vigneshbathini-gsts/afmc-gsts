@@ -35,7 +35,7 @@ api.interceptors.response.use(
       !window.location.pathname.includes("/login")
     ) {
       localStorage.removeItem("token");
-      localStorage.removeItem("user");
+      localStorage.removeItem("authUser");
       window.location.href = "/login";
     }
     return Promise.reject(err);
@@ -47,12 +47,16 @@ api.interceptors.response.use(
 // ================================
 export const authAPI = {
   login: (credentials) => api.post("/auth/login", credentials),
-   getRole: (data) => api.post("/auth/get-role", data),
+  getRole: (data) => api.post("/auth/get-role", data),
   register: (userData) => api.post("/auth/register", userData),
   getProfile: () => api.get("/auth/profile"),
   changePassword: (data) => api.put("/auth/change-password", data),
   logout: () => api.post("/auth/logout"),
 };
+
+
+
+
 
 // ================================
 // USER MANAGEMENT API (Admin)
@@ -157,18 +161,21 @@ export const reportAPI = {
 // ================================
 // OFFERS API
 // ================================
-export const offerAPI = {
-  getAll: () => api.get("/offers"),
-  create: (data) => api.post("/offers", data),
-  update: (id, data) => api.put(`/offers/${id}`, data),
-  delete: (id) => api.delete(`/offers/${id}`),
+export const offersAPI = {
+  getAllOffers: () => api.get("/offers"),
+  getOfferById: (id) => api.get(`/offers/${id}`),
+  createOffer: (data) => api.post('/offers', data),
+  updateOffer: (id, data) => api.put(`/offers/${id}`, data),
+  getAllItemsForOffer: () => api.get("/offers/items"),
 };
 
 // ================================
 // PRICE MANAGEMENT API
 // ================================
+
 export const priceAPI = {
-  updatePrice: (id, data) => api.put(`/items/${id}/price`, data),
+  getItemByBarcode: (barcode) => api.get(`/price/barcode/${barcode}`),
+  updateItemPrice: (data) => api.put("/price/price-update", data),
 };
 
 // ================================

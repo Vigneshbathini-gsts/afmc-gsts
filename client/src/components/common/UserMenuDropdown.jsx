@@ -2,14 +2,18 @@ import React, { useState } from "react";
 import { FaUserCircle, FaSignOutAlt, FaKey, FaChevronDown } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import ChangePasswordModal from "./ChangePasswordModal";
+import { useAuth } from "../../context/AuthContext";
 
-export default function UserMenuDropdown({ username = "Admin" }) {
+export default function UserMenuDropdown({ username }) {
   const [open, setOpen] = useState(false);
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
   const navigate = useNavigate();
+  const { user, clearUser } = useAuth();
+  const displayName = username || user?.username || "User";
 
   const handleLogout = () => {
     localStorage.removeItem("token");
+    clearUser();
     navigate("/login");
   };
 
@@ -21,7 +25,7 @@ export default function UserMenuDropdown({ username = "Admin" }) {
         className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded-xl transition"
       >
         <FaUserCircle className="text-xl text-[#d70652]" />
-        <span className="font-medium text-gray-800">{username}</span>
+        <span className="font-medium text-gray-800">{displayName}</span>
         <FaChevronDown className="text-sm text-gray-500" />
       </button>
 

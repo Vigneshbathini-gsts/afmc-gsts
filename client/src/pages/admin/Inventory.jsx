@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { FaArrowLeft, FaPlus, FaSearch, FaPen } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { inventoryAPI } from "../../services/api";
@@ -82,7 +82,7 @@ export default function Inventory() {
     }
   };
 
-  const fetchInventory = async (options = {}) => {
+  const fetchInventory = useCallback(async (options = {}) => {
     setLoading(true);
     setError("");
     try {
@@ -99,7 +99,7 @@ export default function Inventory() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [categoryId, itemCode, search]);
 
   const fetchBarTypes = async () => {
     try {
@@ -116,7 +116,7 @@ export default function Inventory() {
     fetchSubCategories();
     fetchBarTypes();
     fetchInventory();
-  }, []);
+  }, [fetchInventory]);
 
   useEffect(() => {
     fetchItems(categoryId || "");
@@ -129,7 +129,7 @@ export default function Inventory() {
 
   useEffect(() => {
     fetchInventory({ categoryId, itemCode, search });
-  }, [categoryId, itemCode]);
+  }, [categoryId, itemCode, search, fetchInventory]);
 
   const filteredItems = useMemo(() => items, [items]);
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { FaSearch, FaArrowLeft, FaDownload } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { inventoryAPI } from "../../services/api";
@@ -48,7 +48,7 @@ export default function StockReports() {
     };
   }, [fromDate, toDate]);
 
-  const fetchStockIn = async () => {
+  const fetchStockIn = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
@@ -60,9 +60,9 @@ export default function StockReports() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [params]);
 
-  const fetchStockOut = async () => {
+  const fetchStockOut = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
@@ -74,19 +74,19 @@ export default function StockReports() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [params]);
 
-  const handleSearch = async () => {
+  const handleSearch = useCallback(async () => {
     if (activeTab === "in") {
       await fetchStockIn();
     } else {
       await fetchStockOut();
     }
-  };
+  }, [activeTab, fetchStockIn, fetchStockOut]);
 
   useEffect(() => {
     handleSearch();
-  }, []);
+  }, [handleSearch]);
 
   const rows = activeTab === "in" ? stockInRows : stockOutRows;
 

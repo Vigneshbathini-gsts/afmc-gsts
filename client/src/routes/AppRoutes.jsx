@@ -28,6 +28,8 @@ import ProfitManagement from "../pages/admin/ProfitManagement";
 import CocktailManagement from "../pages/admin/CocktailManagement";
 import AdminOrderHistory from "../pages/admin/OrderHistory";
 import CancelledOrders from "../pages/admin/CancelledOrders";
+import OfferCreate from "../pages/admin/OfferCreate";
+import OfferEdit from "../pages/admin/OfferEdit";
 
 // Attendant Pages
 import AttendantDashboard from "../pages/attendant/Dashboard";
@@ -94,6 +96,10 @@ export default function AppRoutes() {
         <Route path="stock-reports" element={<StockReports />} />
         <Route path="users" element={<UserManagement />} />
         <Route path="offers" element={<Offers />} />
+        <Route path="offers/create" element={<OfferCreate/>} />
+        <Route path="offers/edit/:id" element={<OfferEdit />} />
+
+
         <Route path="price-update" element={<PriceUpdate />} />
         <Route path="profit-management" element={<ProfitManagement />} />
         <Route path="cocktail-management" element={<CocktailManagement />} />

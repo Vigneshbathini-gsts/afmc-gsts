@@ -30,7 +30,7 @@ export default function UserNavbar({ onMenuClick }) {
             <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full"></span>
           </button>
 
-          <UserMenuDropdown username="User" />
+          <UserMenuDropdown />
         </div>
       </div>
     </header>
