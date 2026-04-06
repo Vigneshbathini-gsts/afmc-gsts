@@ -41,8 +41,18 @@ const menuItems = [
     color: "bg-olive-500/20 text-green-700",
     path: "/admin/stock-in-out-report",
   },
-  { title: "Profit Management", icon: <FaCoins />, color: "bg-gray-500/20 text-gray-700" },
-  { title: "Cocktails/Mocktails", icon: <FaWineGlassAlt />, color: "bg-yellow-600/20 text-yellow-700" },
+  {
+    title: "Profit Management",
+    icon: <FaCoins />,
+    color: "bg-gray-500/20 text-gray-700",
+    path: "/admin/profit-management",
+  },
+  {
+    title: "Cocktails/Mocktails",
+    icon: <FaWineGlassAlt />,
+    color: "bg-yellow-600/20 text-yellow-700",
+    path: "/admin/cocktail-management",
+  },
 ];
 
 export default function Dashboard() {
@@ -61,7 +71,9 @@ export default function Dashboard() {
               onClick={() => item.path && navigate(item.path)}
               className="flex items-center gap-5 p-6 rounded-2xl bg-white/70 backdrop-blur-md border border-white/40 shadow-md hover:shadow-xl hover:scale-[1.02] transition-all cursor-pointer"
             >
-              <div className={`w-14 h-14 flex items-center justify-center rounded-full ${item.color}`}>
+              <div
+                className={`w-14 h-14 flex items-center justify-center rounded-full ${item.color}`}
+              >
                 <span className="text-xl">{item.icon}</span>
               </div>
 
