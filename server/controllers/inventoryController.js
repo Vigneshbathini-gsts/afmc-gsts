@@ -119,6 +119,46 @@ exports.addStock = async (req, res) => {
   }
 };
 
+exports.getStockOutItemByBarcode = async (req, res) => {
+  try {
+    const { barcode } = req.params;
+
+    if (!barcode) {
+      return res.status(400).json({ success: false, message: "Barcode is required" });
+    }
+
+    const item = await inventoryModel.getStockOutItemByBarcode(barcode);
+    if (!item) {
+      return res.status(404).json({ success: false, message: "Item not found for this barcode" });
+    }
+
+    res.status(200).json({ success: true, data: item });
+  } catch (error) {
+    console.error("Error fetching stock-out item by barcode:", error);
+    res.status(500).json({ success: false, message: "Failed to fetch item" });
+  }
+};
+
+exports.addStockOut = async (req, res) => {
+  try {
+    const payload = Array.isArray(req.body?.items) ? req.body.items : [];
+    const result = await inventoryModel.addStockOutTransactions(payload);
+    res.status(201).json({ success: true, data: result });
+  } catch (error) {
+    console.error("Error creating stock-out transactions:", error);
+    if (error.code === "ITEM_NOT_FOUND") {
+      return res.status(404).json({ success: false, message: "Item not found" });
+    }
+    if (error.code === "INVALID_DATA") {
+      return res.status(400).json({ success: false, message: "Invalid stock-out data" });
+    }
+    if (error.code === "INSUFFICIENT_STOCK") {
+      return res.status(409).json({ success: false, message: "Insufficient stock" });
+    }
+    res.status(500).json({ success: false, message: "Failed to create stock-out transactions" });
+  }
+};
+
 exports.updateItemImage = async (req, res) => {
   try {
     const { itemCode } = req.params;

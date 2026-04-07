@@ -216,6 +216,28 @@ const getInventoryItemByCode = async (itemCode) => {
   return rows && rows.length ? rows[0] : null;
 };
 
+const getStockOutItemByBarcode = async (barcode) => {
+  const sql = `
+    SELECT
+      xit.ITEM_CODE AS item_code,
+      xi.ITEM_NAME AS item_name,
+      COALESCE(NULLIF(xit.\`A/C_UNIT\`, ''), NULLIF(xi.\`A/C_UNIT\`, ''), 'Nos') AS ac_unit,
+      xit.RATE AS unit_price,
+      xit.VOLUME AS volume,
+      xit.BATCH_NAME AS batch_name,
+      IFNULL(xit.PEGS, 0) AS pegs,
+      IFNULL(xi.STOCK_QUANTITY, 0) AS available_stock
+    FROM xxafmc_items_transactions xit
+    JOIN xxafmc_inventory xi ON xi.ITEM_CODE = xit.ITEM_CODE
+    WHERE xit.BARCODE = ?
+      AND xit.FLAG = 'IN'
+    ORDER BY xit.TRANSACTION_ID DESC
+    LIMIT 1
+  `;
+  const [rows] = await db.execute(sql, [Number(barcode)]);
+  return rows && rows.length ? rows[0] : null;
+};
+
 const getItemImageInfo = async (itemCode) => {
   const sql = `
     SELECT FILE_NAME AS file_name, MIME_TYPE AS mime_type
@@ -431,6 +453,142 @@ const addStockTransactions = async (payload) => {
   }
 };
 
+const getStockOutNextId = async (connection) => {
+  const sql = "SELECT IFNULL(MAX(ITEM_ID), 0) + 1 AS next_id FROM xxafmc_stock_out";
+  const [rows] = await connection.execute(sql);
+  return rows[0]?.next_id || 1;
+};
+
+const addStockOutTransactions = async (payload) => {
+  const items = Array.isArray(payload) ? payload : [payload];
+
+  if (!items.length) {
+    const error = new Error("INVALID_DATA");
+    error.code = "INVALID_DATA";
+    throw error;
+  }
+
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    let nextStockOutId = await getStockOutNextId(connection);
+    let nextTransactionId = await getTransactionNextId(connection);
+
+    for (const item of items) {
+      const {
+        barcode,
+        quantity,
+        transactionDate,
+        createdBy,
+      } = item;
+
+      const numericBarcode = Number(barcode);
+      const numericQuantity = Number(quantity);
+      const normalizedTransactionDate = normalizeTransactionDate(transactionDate);
+
+      if (!numericBarcode || !numericQuantity || numericQuantity <= 0 || !normalizedTransactionDate) {
+        const error = new Error("INVALID_DATA");
+        error.code = "INVALID_DATA";
+        throw error;
+      }
+
+      const stockItem = await getStockOutItemByBarcode(numericBarcode);
+      if (!stockItem) {
+        const error = new Error("ITEM_NOT_FOUND");
+        error.code = "ITEM_NOT_FOUND";
+        throw error;
+      }
+
+      const divisor = Number(stockItem.pegs) > 0 ? Number(stockItem.pegs) : 1;
+      const inventoryDelta = numericQuantity / divisor;
+
+      if (Number(stockItem.available_stock || 0) < inventoryDelta) {
+        const error = new Error("INSUFFICIENT_STOCK");
+        error.code = "INSUFFICIENT_STOCK";
+        throw error;
+      }
+
+      const totalValue = Number(stockItem.unit_price || 0) * numericQuantity;
+
+      await connection.execute(
+        `
+          INSERT INTO xxafmc_stock_out
+            (ITEM_ID, ITEM_NAME, ITEM_CODE, UNIT_PRICE, STOCK_QUANTITY, TOTAL_VALUE,
+             BARCODE, CREATION_DATE, PEGS, \`A/C_UNIT\`, VOLUME, BATCH_NAME,
+             MSG_READ, STATUS, CREATED_BY)
+          VALUES
+            (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+        [
+          nextStockOutId,
+          stockItem.item_name,
+          Number(stockItem.item_code),
+          Number(stockItem.unit_price || 0),
+          numericQuantity,
+          totalValue,
+          numericBarcode,
+          normalizedTransactionDate,
+          Number(stockItem.pegs || 0),
+          stockItem.ac_unit || "Nos",
+          stockItem.volume || "",
+          stockItem.batch_name || "",
+          "N",
+          "CLOSED",
+          createdBy || "SYSTEM",
+        ]
+      );
+
+      await connection.execute(
+        `
+          INSERT INTO xxafmc_items_transactions
+            (TRANSACTION_ID, ITEM_CODE, \`A/C_UNIT\`, RATE, STOCK, TOTAL_VALUE,
+             PEGS, VOLUME, BATCH_NAME, TRANSACTION_DATE, FLAG, BARCODE,
+             CREATED_BY, CREATION_DATE)
+          VALUES
+            (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+        [
+          nextTransactionId,
+          Number(stockItem.item_code),
+          stockItem.ac_unit || "Nos",
+          Number(stockItem.unit_price || 0),
+          numericQuantity,
+          totalValue,
+          Number(stockItem.pegs || 0),
+          stockItem.volume || "",
+          stockItem.batch_name || "",
+          normalizedTransactionDate,
+          "OUT",
+          numericBarcode,
+          createdBy || "SYSTEM",
+          normalizedTransactionDate,
+        ]
+      );
+
+      await connection.execute(
+        `
+          UPDATE xxafmc_inventory
+          SET STOCK_QUANTITY = IFNULL(STOCK_QUANTITY, 0) - ?
+          WHERE ITEM_CODE = ?
+        `,
+        [inventoryDelta, Number(stockItem.item_code)]
+      );
+
+      nextStockOutId += 1;
+      nextTransactionId += 1;
+    }
+
+    await connection.commit();
+    return { count: items.length };
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+};
+
 const getStockInReport = async ({ fromDate, toDate }) => {
   const normalizedFrom = normalizeReportDate(fromDate);
   const normalizedTo = normalizeReportDate(toDate);
@@ -496,7 +654,9 @@ module.exports = {
   getSubCategories,
   createItem,
   getBarTypes,
+  getStockOutItemByBarcode,
   addStockTransactions,
+  addStockOutTransactions,
   getItemImageInfo,
   updateItemImage,
   getStockInReport,
