@@ -58,9 +58,20 @@ export const authAPI = {
 // USER MANAGEMENT API (Admin)
 // ================================
 export const userAPI = {
-  getAll: () => api.get("/users"),
+  getAll: (search = "") =>
+    api.get("/users", {
+      params: search ? { search } : undefined,
+    }),
   getById: (id) => api.get(`/users/${id}`),
+  getRoleOptions: (loginType = "Member") =>
+    api.get("/users/roles/options", {
+      params: { loginType },
+    }),
   create: (userData) => api.post("/users", userData),
+  bulkUpload: (formData) =>
+    api.post("/users/bulk-upload", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }),
   update: (id, userData) => api.put(`/users/${id}`, userData),
   delete: (id) => api.delete(`/users/${id}`),
 };

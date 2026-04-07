@@ -21,6 +21,7 @@ import AddItem from "../pages/admin/AddItem";
 import EditItem from "../pages/admin/EditItem";
 import Reports from "../pages/admin/Reports";
 import UserManagement from "../pages/admin/UserManagement";
+import UserEdit from "../pages/admin/UserEdit";
 import Offers from "../pages/admin/Offers";
 import PriceUpdate from "../pages/admin/PriceUpdate";
 import ProfitManagement from "../pages/admin/ProfitManagement";
@@ -102,6 +103,7 @@ export default function AppRoutes() {
         <Route path="edit-item" element={<EditItem />} />
         <Route path="reports" element={<Reports />} />
         <Route path="users" element={<UserManagement />} />
+        <Route path="users/:id" element={<UserEdit />} />
         <Route path="offers" element={<Offers />} />
         <Route path="price-update" element={<PriceUpdate />} />
         <Route path="profit-management" element={<ProfitManagement />} />
