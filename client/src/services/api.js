@@ -169,8 +169,29 @@ export const profitAPI = {
 // ================================
 export const cocktailAPI = {
   getAll: () => api.get("/cocktails"),
-  create: (data) => api.post("/cocktails", data),
-  update: (id, data) => api.put(`/cocktails/${id}`, data),
+  getIngredientOptions: (search = "") =>
+    api.get("/cocktails/ingredients/options", {
+      params: search ? { search } : undefined,
+    }),
+  getIngredientPrice: (itemCode, pegs) =>
+    api.get("/cocktails/ingredients/price", {
+      params: { itemCode, pegs },
+    }),
+  getById: (id) => api.get(`/cocktails/${id}`),
+  create: (data) =>
+    api.post("/cocktails", data, {
+      headers:
+        data instanceof FormData
+          ? { "Content-Type": "multipart/form-data" }
+          : undefined,
+    }),
+  update: (id, data) =>
+    api.put(`/cocktails/${id}`, data, {
+      headers:
+        data instanceof FormData
+          ? { "Content-Type": "multipart/form-data" }
+          : undefined,
+    }),
   delete: (id) => api.delete(`/cocktails/${id}`),
 };
 

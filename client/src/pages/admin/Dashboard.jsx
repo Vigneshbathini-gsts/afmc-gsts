@@ -17,7 +17,7 @@ const menuItems = [
   { title: "Item Price", icon: <FaDollarSign />, color: "bg-green-500/20 text-green-600" },
   { title: "Stock In/Out Report", icon: <FaExchangeAlt />, color: "bg-olive-500/20 text-green-700" },
   { title: "Profit Management", icon: <FaCoins />, color: "bg-gray-500/20 text-gray-700" },
-  { title: "Cocktails/Mocktails", icon: <FaWineGlassAlt />, color: "bg-yellow-600/20 text-yellow-700" },
+  { title: "Cocktails/Mocktails", icon: <FaWineGlassAlt />, color: "bg-yellow-600/20 text-yellow-700",path: "/admin/cocktailmanag"},
 ];
 
 export default function Dashboard() {

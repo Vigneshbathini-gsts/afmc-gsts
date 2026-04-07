@@ -19,9 +19,11 @@ app.get("/", (req, res) => {
 
 const authRoutes = require("./routes/authRoutes");
 const reportRoutes = require("./routes/reportRoutes");
+const cocktailRoutes = require("./routes/cocktailRoutes");
 
 app.use("/api/auth", authRoutes);
 app.use("/api/reports", reportRoutes);
+app.use("/api/cocktails", cocktailRoutes);
 
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
