@@ -100,6 +100,7 @@ export const inventoryAPI = {
   getItems: (params) => api.get("/inventory/items", { params }),
   getSubCategories: (params) => api.get("/inventory/subcategories", { params }),
   getBarTypes: () => api.get("/inventory/bar-types"),
+  checkBarcodeExists: (barcode) => api.get(`/inventory/barcode/${barcode}/exists`),
   createWithImage: (formData) =>
     api.post("/inventory", formData, {
       headers: { "Content-Type": "multipart/form-data" },

@@ -277,6 +277,12 @@ const barcodeExists = async (connection, barcode) => {
   return Number(rows[0]?.cnt || 0) > 0;
 };
 
+const barcodeExistsInDb = async (barcode) => {
+  const sql = "SELECT COUNT(1) AS cnt FROM xxafmc_items_transactions WHERE BARCODE = ?";
+  const [rows] = await db.execute(sql, [barcode]);
+  return Number(rows[0]?.cnt || 0) > 0;
+};
+
 const parseVolumeToNumber = (volume) => {
   if (!volume) return null;
   const match = String(volume).match(/(\d+(\.\d+)?)/);
@@ -367,7 +373,9 @@ const addStockTransactions = async (payload) => {
         acUnit,
       } = item;
 
-      if (!itemCode || !quantity || !rate || !transactionDate) {
+      const numericQuantity = Number(quantity || 1);
+
+      if (!itemCode || !rate || !transactionDate || !barcode || numericQuantity <= 0) {
         const error = new Error("INVALID_DATA");
         error.code = "INVALID_DATA";
         throw error;
@@ -401,7 +409,7 @@ const addStockTransactions = async (payload) => {
         acQuantity: barRow?.ac_quantity,
       });
 
-      const batchName = `${inventoryItem.item_name}-${quantity}-${volume || ""}-${transactionDate}`;
+      const batchName = `${inventoryItem.item_name}-${numericQuantity}-${volume || ""}-${transactionDate}`;
 
       const insertSql = `
         INSERT INTO xxafmc_items_transactions
@@ -416,7 +424,7 @@ const addStockTransactions = async (payload) => {
         Number(itemCode),
         effectiveAcUnit,
         Number(rate),
-        Number(quantity),
+        numericQuantity,
         batchName,
         volume || "",
         normalizedTransactionDate,
@@ -431,12 +439,14 @@ const addStockTransactions = async (payload) => {
       const updateSql = `
         UPDATE xxafmc_inventory
         SET STOCK_QUANTITY = IFNULL(STOCK_QUANTITY, 0) + ?,
-            UNIT_PRICE = ?
+            UNIT_PRICE = ?,
+            FLAG = ?
         WHERE ITEM_CODE = ?
       `;
       await connection.execute(updateSql, [
-        Number(quantity),
+        numericQuantity,
         Number(rate),
+        String(prepCharges || "N").toUpperCase(),
         Number(itemCode),
       ]);
 
@@ -596,6 +606,7 @@ const getStockInReport = async ({ fromDate, toDate }) => {
     SELECT
       XIT.ITEM_CODE AS item_code,
       XI.ITEM_NAME AS item_name,
+      XIT.BATCH_ID AS batch_id,
       COALESCE(NULLIF(XI.\`A/C_UNIT\`, ''), 'Nos') AS ac_unit,
       SUM(XIT.STOCK) AS stock,
       SUM(XIT.RATE) AS total_price,
@@ -606,7 +617,7 @@ const getStockInReport = async ({ fromDate, toDate }) => {
       AND COALESCE(?, CURDATE())
       AND XIT.FLAG = 'IN'
       AND XI.SUB_CATEGORY NOT IN (14, 15)
-    GROUP BY XIT.ITEM_CODE, XI.ITEM_NAME, XI.\`A/C_UNIT\`
+    GROUP BY XIT.ITEM_CODE, XI.ITEM_NAME, XIT.BATCH_ID, XI.\`A/C_UNIT\`
     ORDER BY creation_date DESC
   `;
   const [rows] = await db.execute(sql, [normalizedFrom, normalizedTo]);
@@ -655,6 +666,7 @@ module.exports = {
   createItem,
   getBarTypes,
   getStockOutItemByBarcode,
+  barcodeExistsInDb,
   addStockTransactions,
   addStockOutTransactions,
   getItemImageInfo,

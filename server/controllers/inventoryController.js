@@ -119,6 +119,22 @@ exports.addStock = async (req, res) => {
   }
 };
 
+exports.checkBarcodeExists = async (req, res) => {
+  try {
+    const { barcode } = req.params;
+
+    if (!barcode) {
+      return res.status(400).json({ success: false, message: "Barcode is required" });
+    }
+
+    const exists = await inventoryModel.barcodeExistsInDb(barcode);
+    res.status(200).json({ success: true, data: { exists } });
+  } catch (error) {
+    console.error("Error checking barcode:", error);
+    res.status(500).json({ success: false, message: "Failed to check barcode" });
+  }
+};
+
 exports.getStockOutItemByBarcode = async (req, res) => {
   try {
     const { barcode } = req.params;

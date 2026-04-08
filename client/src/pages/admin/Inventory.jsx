@@ -44,7 +44,7 @@ export default function Inventory() {
     transactionDate: "",
     acUnit: "",
     rate: "",
-    quantity: "",
+    quantity: 1,
     volume: "",
     barcode: "",
     batchId: "",
@@ -194,7 +194,7 @@ export default function Inventory() {
       transactionDate: formatDate(new Date()),
       acUnit: row.ac_unit || "",
       rate: "",
-      quantity: "",
+      quantity: 1,
       volume: "",
       barcode: "",
       batchId: "",
@@ -215,8 +215,8 @@ export default function Inventory() {
   };
 
   const handleAddStock = async () => {
-    if (!stockForm.itemCode || !stockForm.quantity || !stockForm.rate) {
-      setStockError("Item code, quantity, and rate are required.");
+    if (!stockForm.itemCode || !stockForm.rate || !stockForm.barcode || !stockForm.transactionDate) {
+      setStockError("Item code, barcode, rate, and transaction date are required.");
       return;
     }
 
@@ -546,10 +546,8 @@ export default function Inventory() {
                 <input
                   type="number"
                   value={stockForm.quantity}
-                  onChange={(e) =>
-                    setStockForm((prev) => ({ ...prev, quantity: e.target.value }))
-                  }
-                  className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-700"
+                  readOnly
+                  className="w-full rounded-2xl border border-gray-200 bg-gray-100 px-4 py-3 text-gray-600"
                 />
               </div>
 
@@ -592,6 +590,7 @@ export default function Inventory() {
                   onChange={(e) =>
                     setStockForm((prev) => ({ ...prev, batchId: e.target.value }))
                   }
+                  placeholder="Enter batch ID"
                   className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-700"
                 />
               </div>
