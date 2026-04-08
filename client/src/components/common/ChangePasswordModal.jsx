@@ -1,33 +1,66 @@
 import React, { useState } from "react";
 import { FaTimes, FaLock } from "react-icons/fa";
+import { authAPI } from "../../services/api";
+import { useNavigate } from "react-router-dom";
 
 export default function ChangePasswordModal({ isOpen, onClose }) {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     oldPassword: "",
     newPassword: "",
     confirmPassword: "",
   });
 
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+
   if (!isOpen) return null;
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+    setError("");
+    setMessage("");
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setError("");
+    setMessage("");
 
     if (formData.newPassword !== formData.confirmPassword) {
-      alert("New password and confirm password do not match");
+      setError("New password and confirm password do not match");
       return;
     }
 
-    console.log("Change Password Data:", formData);
+    try {
+      setLoading(true);
 
-    // TODO: Call backend API here
 
-    alert("Password changed successfully!");
-    onClose();
+      await authAPI.changePassword({
+        oldPassword: formData.oldPassword,
+        newPassword: formData.newPassword,
+        confirmPassword: formData.confirmPassword,
+      });
+
+      setMessage("Password changed successfully!");
+
+      setFormData({
+        oldPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      });
+
+      setTimeout(() => {
+        onClose();
+        setMessage("");
+          navigate("/login");
+      }, 1200);
+    } catch (error) {
+      setError(error.response?.data?.message || "Failed to change password");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -51,6 +84,19 @@ export default function ChangePasswordModal({ isOpen, onClose }) {
             <p className="text-sm text-gray-500">Update your account password</p>
           </div>
         </div>
+
+        {/* Message */}
+        {error && (
+          <div className="mb-4 rounded-lg bg-red-100 text-red-700 px-4 py-2 text-sm">
+            {error}
+          </div>
+        )}
+
+        {message && (
+          <div className="mb-4 rounded-lg bg-green-100 text-green-700 px-4 py-2 text-sm">
+            {message}
+          </div>
+        )}
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -101,9 +147,13 @@ export default function ChangePasswordModal({ isOpen, onClose }) {
 
           <button
             type="submit"
-            className="w-full bg-[#d70652] hover:bg-[#b90545] text-white font-semibold py-3 rounded-xl transition"
+            disabled={loading}
+            className={`w-full text-white font-semibold py-3 rounded-xl transition ${loading
+              ? "bg-gray-400 cursor-not-allowed"
+              : "bg-[#d70652] hover:bg-[#b90545]"
+              }`}
           >
-            Save Password
+            {loading ? "Saving..." : "Save Password"}
           </button>
         </form>
       </div>

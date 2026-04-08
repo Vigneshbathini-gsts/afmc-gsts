@@ -50,7 +50,9 @@ export const authAPI = {
   getRole: (data) => api.post("/auth/get-role", data),
   register: (userData) => api.post("/auth/register", userData),
   getProfile: () => api.get("/auth/profile"),
-  changePassword: (data) => api.put("/auth/change-password", data),
+  changePassword: (data) => api.post("/auth/change-password", data),
+  forgotPassword: (data) => api.post("/auth/forgot-password", data),
+  resetPassword: (data) => api.post("/auth/reset-password", data),
   logout: () => api.post("/auth/logout"),
 };
 
@@ -140,6 +142,8 @@ export const orderAPI = {
 
   // Admin
   getOrderHistory: () => api.get("/orders/history"),
+
+  getOrderDetails: (orderNumber) => api.get(`/orders/details/${orderNumber}`),
 };
 
 // ================================
@@ -205,6 +209,10 @@ export const notificationAPI = {
   getStockOutNotifications: () => api.get("/notifications/stock-out"),
   markStockOutRead: (itemCode) =>
     api.put(`/notifications/stock-out/read/${itemCode}`),
+};
+
+export const cancelledOrdersAPI = {
+  getCancelledOrders: (params) => api.get("/cancelled-orders", { params }),
 };
 
 
