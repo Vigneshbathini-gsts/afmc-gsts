@@ -153,102 +153,107 @@ export default function Orderitemdetails() {
 
   // ---------------- UI ----------------
   return (
-    <div className="p-6 bg-gray-100 min-h-screen">
-      <div className="bg-white p-6 rounded-xl shadow">
-        <Stackreporttab />
+    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-rose-50 to-white relative">
+      <div className="absolute top-16 left-12 w-72 h-72 bg-[#d70652]/10 rounded-full blur-3xl"></div>
+      <div className="absolute bottom-20 right-20 w-80 h-80 bg-[#ff025e]/10 rounded-full blur-3xl"></div>
 
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mt-5 mb-5">
-          <input type="date" name="fromDate" value={filters.fromDate} onChange={handleChange} className="input"/>
-          <input type="date" name="toDate" value={filters.toDate} onChange={handleChange} className="input"/>
-          <select name="itemNames" value={filters.itemNames} onChange={handleChange} className="input" disabled={filtersLoading}>
-            <option value="">{filtersLoading ? "Loading items..." : "Select Item Name"}</option>
-            {filterOptions.itemNames.map((itemName) => (
-              <option key={itemName} value={itemName}>
-                {itemName}
-              </option>
-            ))}
-          </select>
-          <select name="kitchenName" value={filters.kitchenName} onChange={handleChange} className="input" disabled={filtersLoading}>
-            <option value="">{filtersLoading ? "Loading kitchens..." : "Select Kitchen Name"}</option>
-            {filterOptions.kitchenNames.map((kitchenName) => (
-              <option key={kitchenName} value={kitchenName}>
-                {kitchenName}
-              </option>
-            ))}
-          </select>
-          <select name="userName" value={filters.userName} onChange={handleChange} className="input" disabled={filtersLoading}>
-            <option value="">{filtersLoading ? "Loading users..." : "Select User Name"}</option>
-            {filterOptions.userNames.map((userName) => (
-              <option key={userName} value={userName}>
-                {userName}
-              </option>
-            ))}
-          </select>
-        </div>
+      <div className="relative z-10 p-6">
+        <div className="bg-white p-6 rounded-xl shadow">
+          <Stackreporttab />
 
-        <div className="flex justify-end gap-3 mb-4">
-          <button onClick={handleSearch} className="btn">
-            <FaSearch size={16}/> {loading ? "Loading..." : "Search"}
-          </button>
-          <button onClick={exportPdf} className="btn">
-            <FaDownload size={16}/> Download
-          </button>
-        </div>
-
-        {error && (
-          <p className="mb-4 text-sm text-red-600">{error}</p>
-        )}
-
-        {!hasSearched ? (
-          <div className="rounded-lg border border-dashed border-gray-300 p-8 text-center text-gray-500">
-            Select filters and click Search to view data.
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mt-5 mb-5">
+            <input type="date" name="fromDate" value={filters.fromDate} onChange={handleChange} className="input"/>
+            <input type="date" name="toDate" value={filters.toDate} onChange={handleChange} className="input"/>
+            <select name="itemNames" value={filters.itemNames} onChange={handleChange} className="input" disabled={filtersLoading}>
+              <option value="">{filtersLoading ? "Loading items..." : "Select Item Name"}</option>
+              {filterOptions.itemNames.map((itemName) => (
+                <option key={itemName} value={itemName}>
+                  {itemName}
+                </option>
+              ))}
+            </select>
+            <select name="kitchenName" value={filters.kitchenName} onChange={handleChange} className="input" disabled={filtersLoading}>
+              <option value="">{filtersLoading ? "Loading kitchens..." : "Select Kitchen Name"}</option>
+              {filterOptions.kitchenNames.map((kitchenName) => (
+                <option key={kitchenName} value={kitchenName}>
+                  {kitchenName}
+                </option>
+              ))}
+            </select>
+            <select name="userName" value={filters.userName} onChange={handleChange} className="input" disabled={filtersLoading}>
+              <option value="">{filtersLoading ? "Loading users..." : "Select User Name"}</option>
+              {filterOptions.userNames.map((userName) => (
+                <option key={userName} value={userName}>
+                  {userName}
+                </option>
+              ))}
+            </select>
           </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full border">
-              <thead className="bg-gray-200">
-                <tr>
-                  <th className="th">Item</th>
-                  <th className="th">Qty</th>
-                  {/* <th className="th">Price</th> */}
-                  <th className="th">Total Profit</th>
-                  {/* <th className="th">Unit Profit</th> */}
-                  <th className="th">Prep Charges</th>
-                  {/* <th className="th">Profit %</th> */}
-                  <th className="th">Total</th>
-                </tr>
-              </thead>
 
-              <tbody>
-                {data.length ? (
-                  data.map((row, i) => (
-                    <tr
-                      key={i}
-                      className={`text-center border-t ${
-                        !row.item_id ? "font-bold text-red-600" : ""
-                      }`}
-                    >
-                      <td className="td">{row.item_name || "-"}</td>
-                      <td className="td">{formatQuantity(row.quantity)}</td>
-                      {/* <td className="td">{row.price ? formatNumber(row.price) : "-"}</td> */}
-                      <td className="td">{row.total_profit ? formatNumber(row.total_profit) : "-"}</td>
-                      <td className="td">{row.unit_profit ? formatNumber(row.unit_profit) : "-"}</td>
-                      {/* <td className="td">{row.food_pr_charges ? formatNumber(row.food_pr_charges) : "-"}</td> */}
-                      {/* <td className="td">{row.totalprofit ? `${formatNumber(row.totalprofit,0)}%` : "-"}</td> */}
-                      <td className="td">{row.subtotal ? formatNumber(row.subtotal) : "-"}</td>
-                    </tr>
-                  ))
-                ) : (
+          <div className="flex justify-end gap-3 mb-4">
+            <button onClick={handleSearch} className="btn">
+              <FaSearch size={16}/> {loading ? "Loading..." : "Search"}
+            </button>
+            <button onClick={exportPdf} className="btn">
+              <FaDownload size={16}/> Download
+            </button>
+          </div>
+
+          {error && (
+            <p className="mb-4 text-sm text-red-600">{error}</p>
+          )}
+
+          {!hasSearched ? (
+            <div className="rounded-lg border border-dashed border-gray-300 p-8 text-center text-gray-500">
+              Select filters and click Search to view data.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full border">
+                <thead className="bg-gray-200">
                   <tr>
-                    <td className="td text-center" colSpan="8">
-                      No data found.
-                    </td>
+                    <th className="th">Item</th>
+                    <th className="th">Qty</th>
+                    {/* <th className="th">Price</th> */}
+                    <th className="th">Total Profit</th>
+                    {/* <th className="th">Unit Profit</th> */}
+                    <th className="th">Prep Charges</th>
+                    {/* <th className="th">Profit %</th> */}
+                    <th className="th">Total</th>
                   </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
+                </thead>
+
+                <tbody>
+                  {data.length ? (
+                    data.map((row, i) => (
+                      <tr
+                        key={i}
+                        className={`text-center border-t ${
+                          !row.item_id ? "font-bold text-red-600" : ""
+                        }`}
+                      >
+                        <td className="td">{row.item_name || "-"}</td>
+                        <td className="td">{formatQuantity(row.quantity)}</td>
+                        {/* <td className="td">{row.price ? formatNumber(row.price) : "-"}</td> */}
+                        <td className="td">{row.total_profit ? formatNumber(row.total_profit) : "-"}</td>
+                        <td className="td">{row.unit_profit ? formatNumber(row.unit_profit) : "-"}</td>
+                        {/* <td className="td">{row.food_pr_charges ? formatNumber(row.food_pr_charges) : "-"}</td> */}
+                        {/* <td className="td">{row.totalprofit ? `${formatNumber(row.totalprofit,0)}%` : "-"}</td> */}
+                        <td className="td">{row.subtotal ? formatNumber(row.subtotal) : "-"}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td className="td text-center" colSpan="8">
+                        No data found.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
 
       <style>{`
