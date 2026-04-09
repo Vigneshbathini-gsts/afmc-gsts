@@ -1,4 +1,4 @@
-const { getAdminOrderHistory } = require("../models/orderModel");
+const { getAdminOrderHistory, getOrderDetails } = require("../models/orderModel");
 
 exports.fetchAdminOrderHistory = async (req, res) => {
   try {
@@ -20,6 +20,25 @@ exports.fetchAdminOrderHistory = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Unable to fetch order history.",
+      error: error.message,
+    });
+  }
+};
+
+exports.fetchOrderDetails = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const data = await getOrderDetails(id);
+
+    res.status(200).json({
+      success: true,
+      data,
+    });
+  } catch (error) {
+    console.error("Failed to fetch order details:", error);
+    res.status(500).json({
+      success: false,
+      message: "Unable to fetch order details.",
       error: error.message,
     });
   }

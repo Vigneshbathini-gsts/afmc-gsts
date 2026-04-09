@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { FaDownload, FaSearch } from "react-icons/fa";
+import { FaDownload, FaFilter, FaSearch, FaTimes } from "react-icons/fa";
 import api from "../../../services/api";
 import Stackreporttab from "./Stackreporttab";
 import { exportTableToPdf } from "../../../utils/pdfExport";
@@ -42,6 +42,7 @@ export default function OrderTransactionUI() {
     kitchenNames: [],
   });
   const [filtersLoading, setFiltersLoading] = useState(false);
+  const [showFilterModal, setShowFilterModal] = useState(false);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -127,7 +128,17 @@ export default function OrderTransactionUI() {
     setAppliedFilters(nextFilters);
     setHasSearched(true);
     setError("");
+    setShowFilterModal(false);
     await fetchData(nextFilters);
+  };
+
+  const clearFilters = () => {
+    setFilters(initialFilters);
+    setAppliedFilters(initialFilters);
+    setData([]);
+    setHasSearched(false);
+    setError("");
+    setShowFilterModal(false);
   };
 
   const exportPdf = () => {
@@ -167,6 +178,7 @@ export default function OrderTransactionUI() {
       <div className="absolute top-16 left-12 w-72 h-72 bg-[#d70652]/10 rounded-full blur-3xl"></div>
       <div className="absolute bottom-20 right-20 w-80 h-80 bg-[#ff025e]/10 rounded-full blur-3xl"></div>
 
+<<<<<<< HEAD
       <div className="relative z-10 p-6">
         <div className="bg-white rounded-2xl shadow p-6">
           <Stackreporttab />
@@ -241,6 +253,28 @@ export default function OrderTransactionUI() {
                 </option>
               ))}
             </select>
+=======
+        <div className="flex justify-end gap-3 mb-4">
+          <button className="btn" onClick={() => setShowFilterModal(true)}>
+            <FaFilter size={16} />
+            Filters
+          </button>
+          <button className="btn" onClick={handleSearch} disabled={loading}>
+            <FaSearch size={16} />
+            {loading ? "Loading..." : "Search"}
+          </button>
+          <button className="btn" onClick={exportPdf} disabled={!data.length}>
+            <FaDownload size={16} />
+            Download
+          </button>
+        </div>
+
+        {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
+
+        {!hasSearched ? (
+          <div className="rounded-lg border border-dashed border-gray-300 p-8 text-center text-gray-500">
+            Enter filters and click Search to view data.
+>>>>>>> 55d10ea2d20a23f6c0c06d524019f36849c4781e
           </div>
 
           <div className="flex justify-end gap-3 mb-4">
@@ -343,12 +377,144 @@ export default function OrderTransactionUI() {
         </div>
       </div>
 
+      {showFilterModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-3xl rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="mb-5 flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-semibold text-gray-800">Filter Report</h2>
+                <p className="text-sm text-gray-500">
+                  Choose the filters you want to apply to the transaction report.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowFilterModal(false)}
+                className="rounded-full p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+              >
+                <FaTimes size={18} />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="label">From Date</label>
+                <input
+                  type="date"
+                  name="fromDate"
+                  value={filters.fromDate}
+                  onChange={handleChange}
+                  className="input"
+                />
+              </div>
+              <div>
+                <label className="label">To Date</label>
+                <input
+                  type="date"
+                  name="toDate"
+                  value={filters.toDate}
+                  onChange={handleChange}
+                  className="input"
+                />
+              </div>
+              <div>
+                <label className="label">Order Number</label>
+                <input
+                  placeholder="Enter order number"
+                  name="orderNumber"
+                  value={filters.orderNumber}
+                  onChange={handleChange}
+                  className="input"
+                />
+              </div>
+              <div>
+                <label className="label">Item Name</label>
+                <select
+                  name="itemNames"
+                  value={filters.itemNames}
+                  onChange={handleChange}
+                  className="input"
+                  disabled={filtersLoading}
+                >
+                  <option value="">
+                    {filtersLoading ? "Loading items..." : "Select Item Name"}
+                  </option>
+                  {filterOptions.itemNames.map((itemName) => (
+                    <option key={itemName} value={itemName}>
+                      {itemName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="label">User Name</label>
+                <select
+                  name="userName"
+                  value={filters.userName}
+                  onChange={handleChange}
+                  className="input"
+                  disabled={filtersLoading}
+                >
+                  <option value="">
+                    {filtersLoading ? "Loading users..." : "Select User Name"}
+                  </option>
+                  {filterOptions.userNames.map((userName) => (
+                    <option key={userName} value={userName}>
+                      {userName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="label">Kitchen Name</label>
+                <select
+                  name="kitchenName"
+                  value={filters.kitchenName}
+                  onChange={handleChange}
+                  className="input"
+                  disabled={filtersLoading}
+                >
+                  <option value="">
+                    {filtersLoading ? "Loading kitchens..." : "Select Kitchen Name"}
+                  </option>
+                  {filterOptions.kitchenNames.map((kitchenName) => (
+                    <option key={kitchenName} value={kitchenName}>
+                      {kitchenName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button type="button" className="btn btn-secondary" onClick={clearFilters}>
+                Clear
+              </button>
+              <button type="button" className="btn btn-secondary" onClick={() => setShowFilterModal(false)}>
+                Cancel
+              </button>
+              <button type="button" className="btn" onClick={handleSearch} disabled={loading}>
+                <FaSearch size={16} />
+                {loading ? "Loading..." : "Apply Filters"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style>{`
         .input {
           padding: 10px;
           border: 1px solid #ccc;
           border-radius: 8px;
           width: 100%;
+        }
+        .label {
+          display: block;
+          margin-bottom: 8px;
+          font-size: 14px;
+          font-weight: 600;
+          color: #374151;
         }
         .btn {
           display: flex;
@@ -359,6 +525,10 @@ export default function OrderTransactionUI() {
           padding: 8px 16px;
           border-radius: 20px;
           border: none;
+        }
+        .btn-secondary {
+          background: #e5e7eb;
+          color: #374151;
         }
         .btn:disabled {
           opacity: 0.6;

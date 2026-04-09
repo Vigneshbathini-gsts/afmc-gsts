@@ -1,6 +1,7 @@
 import React from "react";
 import { Routes, Route } from "react-router-dom";
 import { Navigate } from "react-router-dom";
+import ProtectedRoute from "../components/ProtectedRoute";
 // Common Pages
 import Home from "../pages/common/Home";
 import NotFound from "../pages/common/NotFound";
@@ -8,6 +9,7 @@ import Login from "../pages/auth/Login";
 import ChangePassword from "../pages/auth/ChangePassword";
 import Unauthorized from "../pages/auth/Unauthorized";
 import ForgotPassword from "../pages/auth/ForgotPassword";
+import ResetPassword from "../pages/auth/ResetPassword";
 
 // Layouts
 import UserLayout from "../components/layouts/UserLayout";
@@ -93,9 +95,18 @@ export default function AppRoutes() {
       <Route path="/change-password" element={<ChangePassword />} />
       <Route path="/unauthorized" element={<Unauthorized />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password/:token" element={<ResetPassword />} />
+      
 
       {/* ================= ADMIN ================= */}
-      <Route path="/admin" element={<AdminLayout />}>
+      <Route
+        path="/admin"
+        element={
+          <ProtectedRoute allowedRoles={[10]}>
+            <AdminLayout />
+          </ProtectedRoute>
+        }
+      >
         <Route path="dashboard" element={<AdminDashboard />} />
         <Route path="inventory" element={<Inventory />} />
         <Route path="stock-reports" element={<Navigate to="barstock" replace />} />
@@ -124,7 +135,14 @@ export default function AppRoutes() {
       </Route>
 
       {/* ================= ATTENDANT ================= */}
-      <Route path="/attendant" element={<AttendantLayout />}>
+      <Route
+        path="/attendant"
+        element={
+          <ProtectedRoute allowedRoles={[20]}>
+            <AttendantLayout />
+          </ProtectedRoute>
+        }
+      >
         <Route path="dashboard" element={<AttendantDashboard />} />
         <Route path="register-member" element={<RegisterMember />} />
         <Route path="cart" element={<AttendantCart />} />
@@ -135,7 +153,14 @@ export default function AppRoutes() {
       </Route>
 
       {/* ================= USER ================= */}
-      <Route path="/user" element={<UserLayout />}>
+      <Route
+        path="/user"
+        element={
+          <ProtectedRoute allowedRoles={[30]}>
+            <UserLayout />
+          </ProtectedRoute>
+        }
+      >
         <Route path="dashboard" element={<UserDashboard />} />
         <Route path="snacks" element={<Snacks />} />
         <Route path="drinks" element={<Drinks />} />
@@ -149,14 +174,28 @@ export default function AppRoutes() {
       </Route>
 
       {/* ================= OUTLETS ================= */}
-      <Route path="/kitchen" element={<KitchenLayout />}>
+      <Route
+        path="/kitchen"
+        element={
+          <ProtectedRoute allowedRoles={[40]} allowedOutletTypes={["KITCHEN"]}>
+            <KitchenLayout />
+          </ProtectedRoute>
+        }
+      >
         <Route path="dashboard" element={<OutletDashboard outletType="KITCHEN" />} />
         <Route path="orders" element={<OutletOrders outletType="KITCHEN" />} />
         <Route path="prepare-order/:id" element={<OutletPrepareOrder outletType="KITCHEN" />} />
         <Route path="order-history" element={<OutletOrderHistory outletType="KITCHEN" />} />
       </Route>
 
-      <Route path="/bar" element={<KitchenLayout />}>
+      <Route
+        path="/bar"
+        element={
+          <ProtectedRoute allowedRoles={[40]} allowedOutletTypes={["BAR"]}>
+            <KitchenLayout />
+          </ProtectedRoute>
+        }
+      >
         <Route path="dashboard" element={<OutletDashboard outletType="BAR" />} />
         <Route path="orders" element={<OutletOrders outletType="BAR" />} />
         <Route path="prepare-order/:id" element={<OutletPrepareOrder outletType="BAR" />} />
@@ -164,10 +203,38 @@ export default function AppRoutes() {
       </Route>
 
       {/* ================= STOREKEEPER ================= */}
-      <Route path="/storekeeper/dashboard" element={<StorekeeperDashboard />} />
-      <Route path="/storekeeper/inventory" element={<StorekeeperInventory />} />
-      <Route path="/storekeeper/add-item" element={<StorekeeperAddItem />} />
-      <Route path="/storekeeper/edit-item" element={<StorekeeperEditItem />} />
+      <Route
+        path="/storekeeper/dashboard"
+        element={
+          <ProtectedRoute allowedRoles={["STOREKEEPER", 50]}>
+            <StorekeeperDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/storekeeper/inventory"
+        element={
+          <ProtectedRoute allowedRoles={["STOREKEEPER", 50]}>
+            <StorekeeperInventory />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/storekeeper/add-item"
+        element={
+          <ProtectedRoute allowedRoles={["STOREKEEPER", 50]}>
+            <StorekeeperAddItem />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/storekeeper/edit-item"
+        element={
+          <ProtectedRoute allowedRoles={["STOREKEEPER", 50]}>
+            <StorekeeperEditItem />
+          </ProtectedRoute>
+        }
+      />
 
       {/* 404 */}
       <Route path="*" element={<NotFound />} />

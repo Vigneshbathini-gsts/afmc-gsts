@@ -50,7 +50,9 @@ export const authAPI = {
   getRole: (data) => api.post("/auth/get-role", data),
   register: (userData) => api.post("/auth/register", userData),
   getProfile: () => api.get("/auth/profile"),
-  changePassword: (data) => api.put("/auth/change-password", data),
+  changePassword: (data) => api.post("/auth/change-password", data),
+  forgotPassword: (data) => api.post("/auth/forgot-password", data),
+  resetPassword: (data) => api.post("/auth/reset-password", data),
   logout: () => api.post("/auth/logout"),
 };
 
@@ -111,6 +113,7 @@ export const inventoryAPI = {
   getItems: (params) => api.get("/inventory/items", { params }),
   getSubCategories: (params) => api.get("/inventory/subcategories", { params }),
   getBarTypes: () => api.get("/inventory/bar-types"),
+  checkBarcodeExists: (barcode) => api.get(`/inventory/barcode/${barcode}/exists`),
   createWithImage: (formData) =>
     api.post("/inventory", formData, {
       headers: { "Content-Type": "multipart/form-data" },
@@ -121,6 +124,8 @@ export const inventoryAPI = {
     }),
   getStockInReport: (params) => api.get("/inventory/stock-in-report", { params }),
   getStockOutReport: (params) => api.get("/inventory/stock-out-report", { params }),
+  getStockOutItemByBarcode: (barcode) => api.get(`/inventory/stock-out/barcode/${barcode}`),
+  createStockOut: (data) => api.post("/inventory/stock-out", data),
   getById: (id) => api.get(`/inventory/${id}`),
   addStock: (data) => api.post("/inventory/add-stock", data),
   updateStock: (id, data) => api.put(`/inventory/${id}`, data),
@@ -135,6 +140,7 @@ export const orderAPI = {
   create: (orderData) => api.post("/orders", orderData),
   getAll: () => api.get("/orders"),
   getById: (id) => api.get(`/orders/${id}`),
+  getOrderDetails: (id) => api.get(`/orders/${id}`),
   updateStatus: (id, data) => api.put(`/orders/${id}/status`, data),
   cancelOrder: (id, data) => api.put(`/orders/${id}/cancel`, data),
 
@@ -237,6 +243,10 @@ export const notificationAPI = {
   getStockOutNotifications: () => api.get("/notifications/stock-out"),
   markStockOutRead: (itemCode) =>
     api.put(`/notifications/stock-out/read/${itemCode}`),
+};
+
+export const cancelledOrdersAPI = {
+  getCancelledOrders: (params) => api.get("/cancelled-orders", { params }),
 };
 
 

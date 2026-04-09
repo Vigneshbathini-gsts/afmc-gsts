@@ -99,6 +99,40 @@ exports.getBarTypes = async (_req, res) => {
   }
 };
 
+exports.checkBarcodeExists = async (req, res) => {
+  try {
+    const { barcode } = req.params;
+    if (!barcode) {
+      return res.status(400).json({ success: false, message: "Barcode is required" });
+    }
+
+    const exists = await inventoryModel.barcodeExistsInDb(String(barcode).trim());
+    res.status(200).json({ success: true, exists });
+  } catch (error) {
+    console.error("Error checking barcode:", error);
+    res.status(500).json({ success: false, message: "Failed to check barcode" });
+  }
+};
+
+exports.getStockOutItemByBarcode = async (req, res) => {
+  try {
+    const { barcode } = req.params;
+    if (!barcode) {
+      return res.status(400).json({ success: false, message: "Barcode is required" });
+    }
+
+    const item = await inventoryModel.getStockOutItemByBarcode(barcode);
+    if (!item) {
+      return res.status(404).json({ success: false, message: "Item not found" });
+    }
+
+    res.status(200).json({ success: true, data: item });
+  } catch (error) {
+    console.error("Error fetching stock-out item by barcode:", error);
+    res.status(500).json({ success: false, message: "Failed to fetch item" });
+  }
+};
+
 exports.addStock = async (req, res) => {
   try {
     const payload = req.body?.items ? req.body.items : req.body;
@@ -179,5 +213,28 @@ exports.getStockOutReport = async (req, res) => {
   } catch (error) {
     console.error("Error fetching stock-out report:", error);
     res.status(500).json({ success: false, message: "Failed to load stock-out report" });
+  }
+};
+
+exports.addStockOut = async (req, res) => {
+  try {
+    const payload = req.body?.items ? req.body.items : req.body;
+    const result = await inventoryModel.addStockOutTransactions(payload);
+    res.status(201).json({ success: true, data: result });
+  } catch (error) {
+    console.error("Error adding stock-out:", error);
+    if (error.code === "INVALID_DATA") {
+      return res.status(400).json({ success: false, message: "Invalid data" });
+    }
+    if (error.code === "ITEM_NOT_FOUND") {
+      return res.status(404).json({ success: false, message: "Item not found" });
+    }
+    if (error.code === "BARCODE_ALREADY_USED") {
+      return res.status(409).json({ success: false, message: "Barcode already used" });
+    }
+    if (error.code === "INSUFFICIENT_STOCK") {
+      return res.status(409).json({ success: false, message: "Insufficient stock" });
+    }
+    res.status(500).json({ success: false, message: "Failed to add stock-out" });
   }
 };

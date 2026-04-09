@@ -1,7 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { FaArrowLeft, FaPlus, FaSearch, FaPen } from "react-icons/fa";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FaArrowLeft, FaChevronDown, FaPlus, FaSearch, FaPen, FaTrash } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { inventoryAPI } from "../../services/api";
+
+const requiresVolume = (acUnit) => String(acUnit || "").trim().toUpperCase() !== "NOS";
+
+const isValidBarcode = (value) => /^\d{4,32}$/.test(String(value || "").trim());
 
 export default function Inventory() {
   const navigate = useNavigate();
@@ -11,7 +15,11 @@ export default function Inventory() {
   const [inventory, setInventory] = useState([]);
   const [barTypes, setBarTypes] = useState([]);
   const [categoryId, setCategoryId] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
   const [itemCode, setItemCode] = useState("");
+  const [itemFilter, setItemFilter] = useState("");
+  const [isItemDropdownOpen, setIsItemDropdownOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -44,12 +52,16 @@ export default function Inventory() {
     transactionDate: "",
     acUnit: "",
     rate: "",
-    quantity: "",
+    quantity: 1,
     volume: "",
     barcode: "",
     batchId: "",
     prepCharges: "N",
   });
+  const [stockRows, setStockRows] = useState([]);
+  const [stockRowSearch, setStockRowSearch] = useState("");
+  const categoryDropdownRef = useRef(null);
+  const itemDropdownRef = useRef(null);
 
   const fetchCategories = async () => {
     try {
@@ -115,12 +127,13 @@ export default function Inventory() {
     fetchItems();
     fetchSubCategories();
     fetchBarTypes();
-    fetchInventory();
-  }, [fetchInventory]);
+  }, []);
 
   useEffect(() => {
     fetchItems(categoryId || "");
     setItemCode("");
+    setItemFilter("");
+    setIsItemDropdownOpen(false);
   }, [categoryId]);
 
   useEffect(() => {
@@ -129,9 +142,70 @@ export default function Inventory() {
 
   useEffect(() => {
     fetchInventory({ categoryId, itemCode, search });
-  }, [categoryId, itemCode, search, fetchInventory]);
+  }, [fetchInventory, categoryId, itemCode, search]);
 
-  const filteredItems = useMemo(() => items, [items]);
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        categoryDropdownRef.current &&
+        !categoryDropdownRef.current.contains(event.target)
+      ) {
+        setIsCategoryDropdownOpen(false);
+      }
+
+      if (
+        itemDropdownRef.current &&
+        !itemDropdownRef.current.contains(event.target)
+      ) {
+        setIsItemDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const cleanedCategories = useMemo(
+    () =>
+      categories.filter(
+        (category) => String(category.category_name || "").trim() !== ""
+      ),
+    [categories]
+  );
+
+  const filteredCategories = useMemo(() => {
+    const query = categoryFilter.trim().toLowerCase();
+    if (!query) return cleanedCategories;
+
+    return cleanedCategories.filter((category) =>
+      String(category.category_name || "").toLowerCase().includes(query)
+    );
+  }, [categoryFilter, cleanedCategories]);
+
+  const filteredItems = useMemo(() => {
+    const query = itemFilter.trim().toLowerCase();
+    const cleanedItems = items.filter(
+      (item) => String(item.item_name || "").trim() !== ""
+    );
+    if (!query) return cleanedItems;
+
+    return cleanedItems.filter((item) =>
+      String(item.item_name || "").toLowerCase().includes(query)
+    );
+  }, [itemFilter, items]);
+
+  const selectedCategory = useMemo(
+    () =>
+      cleanedCategories.find(
+        (category) => String(category.category_id) === String(categoryId)
+      ),
+    [cleanedCategories, categoryId]
+  );
+
+  const selectedItem = useMemo(
+    () => items.find((item) => item.item_code === itemCode),
+    [items, itemCode]
+  );
 
   const formatDate = (date) => {
     const d = date instanceof Date ? date : new Date(date);
@@ -139,6 +213,13 @@ export default function Inventory() {
     const dd = String(d.getDate()).padStart(2, "0");
     const yyyy = d.getFullYear();
     return `${yyyy}-${mm}-${dd}`;
+  };
+
+  const formatDisplayDate = (value) => {
+    if (!value) return "";
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return String(value);
+    return `${parsed.getMonth() + 1}/${parsed.getDate()}/${parsed.getFullYear()}`;
   };
 
   const openAddModal = () => {
@@ -177,6 +258,7 @@ export default function Inventory() {
 
       await inventoryAPI.createWithImage(formData);
       setShowAddModal(false);
+      fetchItems(categoryId || "");
       fetchInventory();
     } catch (err) {
       console.error("Failed to create item:", err);
@@ -188,19 +270,28 @@ export default function Inventory() {
 
   const openStockModal = (row) => {
     setStockError("");
+    setStockRows([]);
+    setStockRowSearch("");
     setStockForm({
       itemCode: row.item_code,
       itemName: row.item_name,
       transactionDate: formatDate(new Date()),
       acUnit: row.ac_unit || "",
       rate: "",
-      quantity: "",
+      quantity: 1,
       volume: "",
       barcode: "",
       batchId: "",
       prepCharges: "N",
     });
     setShowStockModal(true);
+  };
+
+  const closeStockModal = () => {
+    setShowStockModal(false);
+    setStockError("");
+    setStockRows([]);
+    setStockRowSearch("");
   };
 
   const openImageModal = (row) => {
@@ -214,9 +305,78 @@ export default function Inventory() {
     setShowImageModal(true);
   };
 
+  const handleStageStock = () => {
+    if (!stockForm.itemCode || !stockForm.rate || !stockForm.barcode || !stockForm.transactionDate) {
+      setStockError("Item code, barcode, rate, and transaction date are required.");
+      return;
+    }
+
+    if (!Number.isFinite(Number(stockForm.rate)) || Number(stockForm.rate) <= 0) {
+      setStockError("Unit selling rate must be greater than 0.");
+      return;
+    }
+
+    if (!Number.isInteger(Number(stockForm.quantity)) || Number(stockForm.quantity) <= 0) {
+      setStockError("Quantity must be a whole number greater than 0.");
+      return;
+    }
+
+    if (!isValidBarcode(stockForm.barcode)) {
+      setStockError("Barcode must be 4 to 32 digits.");
+      return;
+    }
+
+    if (requiresVolume(stockForm.acUnit) && !String(stockForm.volume || "").trim()) {
+      setStockError("Volume is required for the selected type.");
+      return;
+    }
+
+    setStockError("");
+    const normalizedBarcode = String(stockForm.barcode).trim();
+
+    if (stockRows.some((row) => row.barcode === normalizedBarcode)) {
+      setStockError("This barcode is already staged.");
+      return;
+    }
+
+    setStockRows((current) => [
+      ...current,
+      {
+        itemCode: stockForm.itemCode,
+        itemName: stockForm.itemName,
+        quantity: 1,
+        barcode: normalizedBarcode,
+        batchName: `${stockForm.itemName}-1-${stockForm.volume || ""}-${formatDisplayDate(
+          stockForm.transactionDate
+        )}`,
+        rate: stockForm.rate,
+        transactionDate: stockForm.transactionDate,
+        displayTransactionDate: formatDisplayDate(stockForm.transactionDate),
+        volume: stockForm.volume,
+        acUnit: stockForm.acUnit,
+        prepCharges: stockForm.prepCharges,
+      },
+    ]);
+
+    setStockForm((prev) => ({
+      ...prev,
+      barcode: "",
+    }));
+  };
+
+  const handleDeleteStockRow = (barcode) => {
+    setStockRows((current) => current.filter((row) => row.barcode !== barcode));
+  };
+
+  const handleCancelStockRows = () => {
+    setStockRows([]);
+    setStockRowSearch("");
+    setStockError("");
+  };
+
   const handleAddStock = async () => {
-    if (!stockForm.itemCode || !stockForm.quantity || !stockForm.rate) {
-      setStockError("Item code, quantity, and rate are required.");
+    if (stockRows.length === 0) {
+      setStockError("Add at least one stock row before saving.");
       return;
     }
 
@@ -224,18 +384,19 @@ export default function Inventory() {
     setStockError("");
     try {
       await inventoryAPI.addStock({
-        itemCode: stockForm.itemCode,
-        quantity: stockForm.quantity,
-        transactionDate: stockForm.transactionDate,
-        volume: stockForm.volume,
-        barcode: stockForm.barcode,
-        rate: stockForm.rate,
-        batchId: stockForm.batchId,
-        prepCharges: stockForm.prepCharges,
-        acUnit: stockForm.acUnit,
-        createdBy: "ADMIN",
+        items: stockRows.map((row) => ({
+          itemCode: row.itemCode,
+          quantity: 1,
+          transactionDate: row.transactionDate,
+          volume: row.volume,
+          barcode: row.barcode,
+          rate: row.rate,
+          prepCharges: row.prepCharges,
+          acUnit: row.acUnit,
+          createdBy: "ADMIN",
+        })),
       });
-      setShowStockModal(false);
+      closeStockModal();
       fetchInventory();
     } catch (err) {
       console.error("Failed to add stock:", err);
@@ -244,6 +405,23 @@ export default function Inventory() {
       setStockSaving(false);
     }
   };
+
+  const filteredStockRows = useMemo(() => {
+    const query = stockRowSearch.trim().toLowerCase();
+    if (!query) return stockRows;
+    return stockRows.filter((row) =>
+      [
+        row.itemName,
+        row.barcode,
+        row.batchName,
+        row.volume,
+        row.rate,
+        row.displayTransactionDate,
+      ]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(query))
+    );
+  }, [stockRowSearch, stockRows]);
 
   const handleUpdateImage = async () => {
     if (!imageForm.itemCode || !imageForm.image) {
@@ -300,36 +478,164 @@ export default function Inventory() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Category Name
               </label>
-              <select
-                value={categoryId}
-                onChange={(e) => setCategoryId(e.target.value)}
-                className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-800 focus:border-[#ff025e] focus:ring-2 focus:ring-[#ff025e]/20"
-              >
-                <option value="">All Categories</option>
-                {categories.map((category) => (
-                  <option key={category.category_id} value={category.category_id}>
-                    {category.category_name}
-                  </option>
-                ))}
-              </select>
+              <div className="relative" ref={categoryDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setIsCategoryDropdownOpen((prev) => !prev)
+                  }
+                  className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-left text-gray-800 focus:border-[#ff025e] focus:ring-2 focus:ring-[#ff025e]/20 flex items-center justify-between"
+                >
+                  <span className="truncate">
+                    {selectedCategory?.category_name || "All Categories"}
+                  </span>
+                  <FaChevronDown
+                    className={`text-gray-400 transition-transform ${
+                      isCategoryDropdownOpen ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
+
+                {isCategoryDropdownOpen && (
+                  <div className="absolute z-30 mt-2 w-full rounded-2xl border border-gray-200 bg-white shadow-2xl overflow-hidden">
+                    <div className="border-b border-gray-100 p-3">
+                      <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2">
+                        <FaSearch className="text-gray-400" />
+                        <input
+                          type="text"
+                          value={categoryFilter}
+                          onChange={(e) => setCategoryFilter(e.target.value)}
+                          placeholder="Search category name"
+                          className="w-full bg-transparent text-sm text-gray-800 outline-none placeholder:text-gray-400"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="max-h-72 overflow-y-auto py-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCategoryId("");
+                          setCategoryFilter("");
+                          setIsCategoryDropdownOpen(false);
+                        }}
+                        className={`w-full px-4 py-2.5 text-left text-sm hover:bg-[#ff025e]/5 ${
+                          !categoryId
+                            ? "bg-[#ff025e]/10 font-medium text-[#d70652]"
+                            : "text-gray-700"
+                        }`}
+                      >
+                        All Categories
+                      </button>
+
+                      {filteredCategories.length === 0 ? (
+                        <div className="px-4 py-3 text-sm text-gray-500">
+                          No matching categories found.
+                        </div>
+                      ) : (
+                        filteredCategories.map((category) => (
+                          <button
+                            key={category.category_id}
+                            type="button"
+                            onClick={() => {
+                              setCategoryId(category.category_id);
+                              setCategoryFilter(category.category_name || "");
+                              setIsCategoryDropdownOpen(false);
+                            }}
+                            className={`w-full px-4 py-2.5 text-left text-sm hover:bg-[#ff025e]/5 ${
+                              String(categoryId) === String(category.category_id)
+                                ? "bg-[#ff025e]/10 font-medium text-[#d70652]"
+                                : "text-gray-700"
+                            }`}
+                          >
+                            {category.category_name}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Item Name
               </label>
-              <select
-                value={itemCode}
-                onChange={(e) => setItemCode(e.target.value)}
-                className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-800 focus:border-[#ff025e] focus:ring-2 focus:ring-[#ff025e]/20"
-              >
-                <option value="">All Items</option>
-                {filteredItems.map((item) => (
-                  <option key={item.item_code} value={item.item_code}>
-                    {item.item_name}
-                  </option>
-                ))}
-              </select>
+              <div className="relative" ref={itemDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsItemDropdownOpen((prev) => !prev)}
+                  className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-left text-gray-800 focus:border-[#ff025e] focus:ring-2 focus:ring-[#ff025e]/20 flex items-center justify-between"
+                >
+                  <span className="truncate">
+                    {selectedItem?.item_name || "All Items"}
+                  </span>
+                  <FaChevronDown
+                    className={`text-gray-400 transition-transform ${
+                      isItemDropdownOpen ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
+
+                {isItemDropdownOpen && (
+                  <div className="absolute z-30 mt-2 w-full rounded-2xl border border-gray-200 bg-white shadow-2xl overflow-hidden">
+                    <div className="border-b border-gray-100 p-3">
+                      <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2">
+                        <FaSearch className="text-gray-400" />
+                        <input
+                          type="text"
+                          value={itemFilter}
+                          onChange={(e) => setItemFilter(e.target.value)}
+                          placeholder="Search item name"
+                          className="w-full bg-transparent text-sm text-gray-800 outline-none placeholder:text-gray-400"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="max-h-72 overflow-y-auto py-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setItemCode("");
+                          setItemFilter("");
+                          setIsItemDropdownOpen(false);
+                        }}
+                        className={`w-full px-4 py-2.5 text-left text-sm hover:bg-[#ff025e]/5 ${
+                          !itemCode ? "bg-[#ff025e]/10 font-medium text-[#d70652]" : "text-gray-700"
+                        }`}
+                      >
+                        All Items
+                      </button>
+
+                      {filteredItems.length === 0 ? (
+                        <div className="px-4 py-3 text-sm text-gray-500">
+                          No matching items found.
+                        </div>
+                      ) : (
+                        filteredItems.map((item) => (
+                          <button
+                            key={item.item_code}
+                            type="button"
+                            onClick={() => {
+                              setItemCode(item.item_code);
+                              setItemFilter(item.item_name || "");
+                              setIsItemDropdownOpen(false);
+                            }}
+                            className={`w-full px-4 py-2.5 text-left text-sm hover:bg-[#ff025e]/5 ${
+                              itemCode === item.item_code
+                                ? "bg-[#ff025e]/10 font-medium text-[#d70652]"
+                                : "text-gray-700"
+                            }`}
+                          >
+                            {item.item_name}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="flex flex-col gap-3">
@@ -437,31 +743,31 @@ export default function Inventory() {
       </div>
 
       {showStockModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-5xl rounded-3xl bg-white/95 shadow-2xl border border-white/70 backdrop-blur-md p-8 relative">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/40 px-4 py-6">
+          <div className="mx-auto w-full max-w-5xl rounded-3xl bg-white/95 shadow-2xl border border-white/70 backdrop-blur-md p-8 relative max-h-[calc(100vh-3rem)] overflow-y-auto">
             <button
               type="button"
-              onClick={() => setShowStockModal(false)}
+              onClick={closeStockModal}
               className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"
               aria-label="Close"
             >
               X
             </button>
 
-            <div className="flex items-center justify-between mb-6">
+            <div className="sticky top-0 z-10 -mx-8 mb-6 flex items-center justify-between border-b border-gray-100 bg-white/95 px-8 py-4 backdrop-blur-md">
               <h2 className="text-xl font-semibold text-gray-800">Item Transaction</h2>
               <div className="flex items-center gap-3">
                 <button
                   type="button"
                   onClick={handleAddStock}
-                  disabled={stockSaving}
+                  disabled={stockSaving || stockRows.length === 0}
                   className="px-6 py-2.5 rounded-full bg-green-600 text-white font-semibold disabled:opacity-70"
                 >
                   {stockSaving ? "Saving..." : "Add"}
                 </button>
                 <button
                   type="button"
-                  onClick={() => setShowStockModal(false)}
+                  onClick={closeStockModal}
                   className="px-6 py-2.5 rounded-full bg-gray-600 text-white font-semibold"
                 >
                   Back
@@ -541,20 +847,6 @@ export default function Inventory() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Quantity
-                </label>
-                <input
-                  type="number"
-                  value={stockForm.quantity}
-                  onChange={(e) =>
-                    setStockForm((prev) => ({ ...prev, quantity: e.target.value }))
-                  }
-                  className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-700"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Volume
                 </label>
                 <input
@@ -577,20 +869,6 @@ export default function Inventory() {
                   value={stockForm.barcode}
                   onChange={(e) =>
                     setStockForm((prev) => ({ ...prev, barcode: e.target.value }))
-                  }
-                  className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-700"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Batch ID
-                </label>
-                <input
-                  type="text"
-                  value={stockForm.batchId}
-                  onChange={(e) =>
-                    setStockForm((prev) => ({ ...prev, batchId: e.target.value }))
                   }
                   className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-700"
                 />
@@ -630,6 +908,97 @@ export default function Inventory() {
                   />
                   Y
                 </label>
+              </div>
+            </div>
+
+            <div className="mt-8 rounded-3xl border border-gray-200 bg-white shadow-sm">
+              <div className="min-h-[140px] border-b border-gray-100 bg-[radial-gradient(circle_at_center,rgba(215,6,82,0.06),transparent_42%)]"></div>
+
+              <div className="flex flex-wrap items-center justify-between gap-4 p-4">
+                <button
+                  type="button"
+                  onClick={handleCancelStockRows}
+                  className="rounded-full bg-gray-600 px-5 py-2.5 text-white font-semibold"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleStageStock}
+                  className="inline-flex items-center gap-2 rounded-full bg-green-600 px-5 py-2.5 text-white font-semibold"
+                >
+                  <FaPlus />
+                  Add Stock
+                </button>
+              </div>
+
+              <div className="flex items-center gap-3 border-t border-gray-100 px-4 py-3">
+                <FaSearch className="text-gray-400" />
+                <input
+                  type="text"
+                  value={stockRowSearch}
+                  onChange={(e) => setStockRowSearch(e.target.value)}
+                  placeholder="Search staged rows"
+                  className="w-40 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 outline-none"
+                />
+                <button
+                  type="button"
+                  className="rounded-xl px-3 py-2 text-sm font-medium text-gray-700"
+                >
+                  Go
+                </button>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 text-gray-600">
+                    <tr>
+                      <th className="px-4 py-3 text-left font-medium">Item Name</th>
+                      <th className="px-4 py-3 text-left font-medium">Quantity</th>
+                      <th className="px-4 py-3 text-left font-medium">Barcode</th>
+                      <th className="px-4 py-3 text-left font-medium">Batchname</th>
+                      <th className="px-4 py-3 text-left font-medium">Rate</th>
+                      <th className="px-4 py-3 text-left font-medium">Transaction Date</th>
+                      <th className="px-4 py-3 text-left font-medium">Volume</th>
+                      <th className="px-4 py-3 text-left font-medium">Delete</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredStockRows.length === 0 ? (
+                      <tr>
+                        <td colSpan="8" className="px-4 py-8 text-center text-gray-500">
+                          No staged stock rows yet.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredStockRows.map((row) => (
+                        <tr key={row.barcode} className="border-t border-gray-100">
+                          <td className="px-4 py-3">{row.itemName}</td>
+                          <td className="px-4 py-3">{row.quantity}</td>
+                          <td className="px-4 py-3">{row.barcode}</td>
+                          <td className="px-4 py-3">{row.batchName}</td>
+                          <td className="px-4 py-3">{row.rate}</td>
+                          <td className="px-4 py-3">{row.displayTransactionDate}</td>
+                          <td className="px-4 py-3">{row.volume}</td>
+                          <td className="px-4 py-3">
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteStockRow(row.barcode)}
+                              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-red-600 hover:bg-red-50"
+                            >
+                              <FaTrash />
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="px-4 py-3 text-right text-sm text-gray-500">
+                {filteredStockRows.length}-{stockRows.length}
               </div>
             </div>
           </div>
