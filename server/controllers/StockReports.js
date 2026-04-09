@@ -2,7 +2,7 @@ const db = require("../config/db");
 
 exports.getStockReport = async (req, res) => {
   try {
-    const { itemName, limit, offset } = req.query;
+    const { itemName, itemCode, limit, offset } = req.query;
 
     const parsedLimit = parseInt(limit, 10);
     const parsedOffset = parseInt(offset, 10);
@@ -16,6 +16,10 @@ exports.getStockReport = async (req, res) => {
     const itemValue =
       typeof itemName === "string" && itemName.trim() !== ""
         ? itemName.trim()
+        : null;
+    const itemCodeValue =
+      typeof itemCode === "string" && itemCode.trim() !== ""
+        ? itemCode.trim()
         : null;
 
     const query = `
@@ -72,11 +76,17 @@ exports.getStockReport = async (req, res) => {
         ON reserved_summary.item_id = inv.item_code
       WHERE inv.sub_category NOT IN (14, 15)
         AND (? IS NULL OR UPPER(inv.item_name) LIKE CONCAT('%', UPPER(?), '%'))
+        AND (? IS NULL OR inv.item_code = ?)
       ORDER BY inv.item_name ASC
       LIMIT ${limitNum} OFFSET ${offsetNum}
     `;
 
-    const [results] = await db.execute(query, [itemValue, itemValue]);
+    const [results] = await db.execute(query, [
+      itemValue,
+      itemValue,
+      itemCodeValue,
+      itemCodeValue,
+    ]);
 
     res.json({
       success: true,

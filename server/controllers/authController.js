@@ -3,7 +3,7 @@ const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const { getRedirectPath } = require("../utils/roleRedirect");
 const nodemailer = require("nodemailer");
-const { generateResetToken, hashPassword } = require("../helpers/authHelper");
+const { generateResetToken, hashPassword ,comparePassword} = require("../helpers/authHelper");
 
 // helper: MD5 hash
 const md5Hash = (text) => {
@@ -26,7 +26,6 @@ exports.createUser = async (req, res) => {
 exports.getUserRole = async (req, res) => {
   try {
     const { username } = req.body;
-console.log("Get Role Request for:", username);
     if (!username) {
       return res.status(400).json({
         success: false,
@@ -182,6 +181,7 @@ exports.loginUser = async (req, res) => {
 exports.forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
+    console.log("Forgot Password Request for:", email);
 
     if (!email) {
       return res.status(400).json({ message: "Email is required" });
@@ -189,7 +189,7 @@ exports.forgotPassword = async (req, res) => {
 
     // Check user exists
     const [users] = await db.query(
-      "SELECT * FROM users WHERE email = ?",
+      "SELECT * FROM xxafmc_users WHERE EMAIL = ?",
       [email]
     );
 
@@ -199,18 +199,24 @@ exports.forgotPassword = async (req, res) => {
 
     const user = users[0];
 
+    if (!user.EMAIL) {
+      return res.status(400).json({ message: "Email not available for this user" });
+    }
+
     // Generate token and expiry
     const resetToken = generateResetToken();
-    const expiryTime = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
+    const expiryTime = new Date(Date.now() + 15 * 60 * 1000);
 
     // Save token in DB
     await db.query(
-      "UPDATE users SET reset_token = ?, reset_token_expiry = ? WHERE id = ?",
-      [resetToken, expiryTime, user.id]
+      "UPDATE xxafmc_users SET RESET_TOKEN = ?, RESET_EXPIRY = ? WHERE USER_ID = ?",
+      [resetToken, expiryTime, user.USER_ID]
     );
 
-    // Reset URL
-    const resetLink = `http://localhost:3000/reset-password/${resetToken}`;
+    // Include username in URL
+    const resetLink = `http://localhost:3000/reset-password/${resetToken}?username=${encodeURIComponent(
+      user.USER_NAME
+    )}`;
 
     // Mail config
     const transporter = nodemailer.createTransport({
@@ -221,13 +227,13 @@ exports.forgotPassword = async (req, res) => {
       },
     });
 
-    // Mail options
     const mailOptions = {
       from: process.env.EMAIL_USER,
-      to: email,
+      to: user.EMAIL,
       subject: "Password Reset Request",
       html: `
         <h3>Reset Your Password</h3>
+        <p>Hello ${user.FIRST_NAME || user.USER_NAME},</p>
         <p>Click the link below to reset your password:</p>
         <a href="${resetLink}">${resetLink}</a>
         <p>This link will expire in 15 minutes.</p>
@@ -236,12 +242,13 @@ exports.forgotPassword = async (req, res) => {
 
     await transporter.sendMail(mailOptions);
 
-    res.status(200).json({
-      message: "Password reset link sent to email",
+    return res.status(200).json({
+      success: true,
+      message: "Password reset link sent to registered email",
     });
   } catch (err) {
     console.log("Forgot Password Error:", err);
-    res.status(500).json({ message: "Internal server error" });
+    return res.status(500).json({ message: "Internal server error" });
   }
 };
 
@@ -250,17 +257,24 @@ exports.forgotPassword = async (req, res) => {
 // =========================
 exports.resetPassword = async (req, res) => {
   try {
-    const { token, password } = req.body;
+    const {username, token, password, confirmPassword } = req.body;
+    if (!token || !password || !confirmPassword) {
+      return res.status(400).json({
+        message: "Token, password and confirm password are required",
+      });
+    }
 
-    if (!token || !password) {
-      return res.status(400).json({ message: "Token and password are required" });
+    if (password !== confirmPassword) {
+      return res.status(400).json({
+        message: "Password and confirm password do not match",
+      });
     }
 
     // Find user with valid token
-    const [users] = await db.query(
-      "SELECT * FROM users WHERE reset_token = ? AND reset_token_expiry > NOW()",
-      [token]
-    );
+   const [users] = await db.query(
+  "SELECT * FROM xxafmc_users WHERE RESET_TOKEN = ? AND USER_NAME = ? AND RESET_EXPIRY > NOW()",
+  [token, username]
+);
 
     if (users.length === 0) {
       return res.status(400).json({ message: "Invalid or expired token" });
@@ -268,22 +282,108 @@ exports.resetPassword = async (req, res) => {
 
     const user = users[0];
 
-    // Hash new password
-    const hashedPassword = await hashPassword(password);
+    // Hash new password (MD5)
+    const hashedPassword = hashPassword(password);
 
     // Update password and clear token
     await db.query(
-      `UPDATE users 
-       SET password = ?, reset_token = NULL, reset_token_expiry = NULL 
-       WHERE id = ?`,
-      [hashedPassword, user.id]
+      `UPDATE xxafmc_users
+       SET PASSWORD = ?, RESET_TOKEN = NULL, RESET_EXPIRY = NULL
+       WHERE USER_ID = ?`,
+      [hashedPassword, user.USER_ID]
     );
 
-    res.status(200).json({
+    return res.status(200).json({
+      success: true,
       message: "Password reset successful",
     });
   } catch (err) {
     console.log("Reset Password Error:", err);
-    res.status(500).json({ message: "Internal server error" });
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+
+/**
+ * CHANGE PASSWORD
+ */
+exports.changePassword = async (req, res) => {
+  try {
+    const { oldPassword, newPassword, confirmPassword } = req.body;
+    const username = req.user?.username || req.user?.user_name;
+
+    // Validation
+    if (!username || !oldPassword || !newPassword || !confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "All fields are required",
+      });
+    }
+
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "New password and confirm password do not match",
+      });
+    }
+
+    // Fetch user
+    const [users] = await db.query(
+      `SELECT user_id, user_name, password
+       FROM xxafmc_users
+       WHERE UPPER(user_name) = UPPER(?)`,
+      [username]
+    );
+
+    if (users.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    const user = users[0];
+
+    // Compare old password
+    const isOldPasswordValid = comparePassword(oldPassword, user.password);
+
+    if (!isOldPasswordValid) {
+      return res.status(400).json({
+        success: false,
+        message: "Old password is incorrect",
+      });
+    }
+
+    // Prevent same password reuse
+    const isSamePassword = comparePassword(newPassword, user.password);
+
+    if (isSamePassword) {
+      return res.status(400).json({
+        success: false,
+        message: "New password cannot be same as old password",
+      });
+    }
+
+    // MD5 hash new password
+    const hashedPassword = hashPassword(newPassword);
+
+    // Update password
+   await db.query(
+  `UPDATE xxafmc_users 
+   SET password = ?
+   WHERE user_id = ?`,
+  [hashedPassword, user.user_id]
+);
+
+    return res.status(200).json({
+      success: true,
+      message: "Password changed successfully",
+    });
+  } catch (error) {
+    console.error("Error in changePassword:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
   }
 };
