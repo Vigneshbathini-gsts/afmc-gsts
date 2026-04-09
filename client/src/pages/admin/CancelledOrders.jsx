@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { FaSearch, FaUndoAlt, FaBan, FaChevronLeft, FaChevronRight } from "react-icons/fa";
 import { cancelledOrdersAPI } from "../../services/api";
 import OrderDetailsModal from "../../components/OrderDetailsModal";
@@ -18,7 +18,7 @@ export default function CancelledOrders() {
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage] = useState(10);
 
   const openOrderDetails = (orderNumber) => {
     console.log("Opening details for order:", orderNumber);
@@ -26,7 +26,7 @@ export default function CancelledOrders() {
     setIsModalOpen(true);
   };
 
-  const fetchCancelledOrders = async () => {
+  const fetchCancelledOrders = useCallback(async () => {
     try {
       setLoading(true);
       const res = await cancelledOrdersAPI.getCancelledOrders(filters);
@@ -38,11 +38,11 @@ export default function CancelledOrders() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters]);
 
   useEffect(() => {
     fetchCancelledOrders();
-  }, []);
+  }, [fetchCancelledOrders]);
 
   const handleChange = (e) => {
     setFilters({ ...filters, [e.target.name]: e.target.value });

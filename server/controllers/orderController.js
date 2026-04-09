@@ -1,45 +1,44 @@
-// order controller
-const pool = require("../config/db");
+const { getAdminOrderHistory, getOrderDetails } = require("../models/orderModel");
 
-/**
- * GET ORDER DETAILS BY ORDER NUMBER
- */
-exports.getOrderDetailsByOrderNumber = async (req, res) => {
+exports.fetchAdminOrderHistory = async (req, res) => {
   try {
-    const { orderNumber } = req.params;
+    const { from = null, to = null, username = null, app_user = null } = req.query;
 
-    if (!orderNumber) {
-      return res.status(400).json({
-        success: false,
-        message: "Order number is required",
-      });
-    }
+    const data = await getAdminOrderHistory({
+      from,
+      to,
+      username,
+      appUser: app_user,
+    });
 
-    const query = `
-      SELECT 
-          xkn.item_name,
-          xkn.status,
-          xod.quantity,
-          IFNULL(xod.type, 'NA') AS type
-      FROM xxafmc_order_details xod
-      JOIN xxafmc_kitchen_notification xkn
-          ON xod.order_id = xkn.ordernumber
-         AND xod.item_id = xkn.item_id
-      WHERE xkn.ordernumber = ?
-    `;
-
-    const [rows] = await pool.query(query, [orderNumber]);
-console.log("Order Details Query Result:", rows);
-    return res.status(200).json({
+    res.status(200).json({
       success: true,
-      count: rows.length,
-      data: rows,
+      data,
     });
   } catch (error) {
-    console.error("Error fetching order details:", error);
-    return res.status(500).json({
+    console.error("Failed to fetch admin order history:", error);
+    res.status(500).json({
       success: false,
-      message: "Server error while fetching order details",
+      message: "Unable to fetch order history.",
+      error: error.message,
+    });
+  }
+};
+
+exports.fetchOrderDetails = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const data = await getOrderDetails(id);
+
+    res.status(200).json({
+      success: true,
+      data,
+    });
+  } catch (error) {
+    console.error("Failed to fetch order details:", error);
+    res.status(500).json({
+      success: false,
+      message: "Unable to fetch order details.",
       error: error.message,
     });
   }
