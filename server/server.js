@@ -21,13 +21,29 @@ const authRoutes = require("./routes/authRoutes");
 const reportRoutes = require("./routes/reportRoutes");
 const cocktailRoutes = require("./routes/cocktailRoutes");
 const userRoutes = require("./routes/userRoutes");
+const orderRoutes = require("./routes/orderRoutes");
 
 app.use("/api/auth", authRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/cocktails", cocktailRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/orders", orderRoutes);
+const priceRoutes = require("./routes/priceRoutes");
+app.use("/api/price", priceRoutes);
+
+const offerRoutes = require("./routes/offerRoutes");
+app.use("/api/offers", offerRoutes);
+
+const inventoryRoutes = require("./routes/inventoryRoutes");
+app.use("/api/inventory", inventoryRoutes);
+
+const profitRoutes = require("./routes/profitRoutes");
+app.use("/api/profit", profitRoutes);
+
+const notificationRoutes = require("./routes/notificationRoutes");
+app.use("/api/notifications", notificationRoutes);
 
 const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => {
-  console.log(`Server listening on port ${PORT}`);
-});
+app.listen(PORT, () =>
+  console.log(`Server listening on port ${PORT}`)
+);

@@ -24,7 +24,6 @@ export default function Login() {
   const [showOutletDropdown, setShowOutletDropdown] = useState(false);
 
   const navigate = useNavigate();
-
   const fetchUserRole = async () => {
     if (!email.trim()) return;
 

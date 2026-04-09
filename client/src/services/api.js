@@ -35,7 +35,7 @@ api.interceptors.response.use(
       !window.location.pathname.includes("/login")
     ) {
       localStorage.removeItem("token");
-      localStorage.removeItem("user");
+      localStorage.removeItem("authUser");
       window.location.href = "/login";
     }
     return Promise.reject(err);
@@ -47,12 +47,16 @@ api.interceptors.response.use(
 // ================================
 export const authAPI = {
   login: (credentials) => api.post("/auth/login", credentials),
-   getRole: (data) => api.post("/auth/get-role", data),
+  getRole: (data) => api.post("/auth/get-role", data),
   register: (userData) => api.post("/auth/register", userData),
   getProfile: () => api.get("/auth/profile"),
   changePassword: (data) => api.put("/auth/change-password", data),
   logout: () => api.post("/auth/logout"),
 };
+
+
+
+
 
 // ================================
 // USER MANAGEMENT API (Admin)
@@ -102,7 +106,21 @@ export const itemAPI = {
 // INVENTORY API
 // ================================
 export const inventoryAPI = {
-  getAll: () => api.get("/inventory"),
+  getAll: (params) => api.get("/inventory", { params }),
+  getCategories: () => api.get("/inventory/categories"),
+  getItems: (params) => api.get("/inventory/items", { params }),
+  getSubCategories: (params) => api.get("/inventory/subcategories", { params }),
+  getBarTypes: () => api.get("/inventory/bar-types"),
+  createWithImage: (formData) =>
+    api.post("/inventory", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }),
+  updateImage: (itemCode, formData) =>
+    api.put(`/inventory/${itemCode}/image`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }),
+  getStockInReport: (params) => api.get("/inventory/stock-in-report", { params }),
+  getStockOutReport: (params) => api.get("/inventory/stock-out-report", { params }),
   getById: (id) => api.get(`/inventory/${id}`),
   addStock: (data) => api.post("/inventory/add-stock", data),
   updateStock: (id, data) => api.put(`/inventory/${id}`, data),
@@ -132,7 +150,7 @@ export const orderAPI = {
   getAttendantOrders: () => api.get("/orders/attendant"),
 
   // Admin
-  getOrderHistory: () => api.get("/orders/history"),
+  getOrderHistory: (params) => api.get("/orders/history", { params }),
 };
 
 // ================================
@@ -151,28 +169,35 @@ export const reportAPI = {
   getCancelledOrdersReport: () => api.get("/reports/cancelled-orders"),
 };
 
+
+
 // ================================
 // OFFERS API
 // ================================
-export const offerAPI = {
-  getAll: () => api.get("/offers"),
-  create: (data) => api.post("/offers", data),
-  update: (id, data) => api.put(`/offers/${id}`, data),
-  delete: (id) => api.delete(`/offers/${id}`),
+export const offersAPI = {
+  getAllOffers: () => api.get("/offers"),
+  getOfferById: (id) => api.get(`/offers/${id}`),
+  createOffer: (data) => api.post('/offers', data),
+  updateOffer: (id, data) => api.put(`/offers/${id}`, data),
+  getAllItemsForOffer: () => api.get("/offers/items"),
 };
 
 // ================================
 // PRICE MANAGEMENT API
 // ================================
+
 export const priceAPI = {
-  updatePrice: (id, data) => api.put(`/items/${id}/price`, data),
+  getItemByBarcode: (barcode) => api.get(`/price/barcode/${barcode}`),
+  updateItemPrice: (data) => api.put("/price/price-update", data),
 };
 
 // ================================
 // PROFIT MANAGEMENT API
 // ================================
 export const profitAPI = {
-  getProfitData: () => api.get("/profit"),
+  getProfitData: () => api.get("/profit/report"),
+  updateMemberPricing: (data) => api.put("/profit/member", data),
+  updateNonMemberPricing: (data) => api.put("/profit/non-member", data),
 };
 
 // ================================
@@ -205,5 +230,15 @@ export const cocktailAPI = {
     }),
   delete: (id) => api.delete(`/cocktails/${id}`),
 };
+
+//Notification API
+
+export const notificationAPI = {
+  getStockOutNotifications: () => api.get("/notifications/stock-out"),
+  markStockOutRead: (itemCode) =>
+    api.put(`/notifications/stock-out/read/${itemCode}`),
+};
+
+
 
 export default api;

@@ -1,6 +1,7 @@
 import React from "react";
-import { FaBars, FaBell, FaUtensils } from "react-icons/fa";
+import { FaBars, FaUtensils } from "react-icons/fa";
 import UserMenuDropdown from "../common/UserMenuDropdown";
+import StockNotificationBell from "../common/StockNotificationBell";
 
 export default function AdminNavbar({ onMenuClick }) {
   return (
@@ -30,12 +31,8 @@ export default function AdminNavbar({ onMenuClick }) {
 
         {/* Right */}
         <div className="flex items-center gap-4">
-          <button className="relative p-3 rounded-xl bg-gray-100 hover:bg-gray-200 transition">
-            <FaBell className="text-gray-700" />
-            <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full"></span>
-          </button>
-
-          <UserMenuDropdown username="Admin" />
+          <StockNotificationBell />
+          <UserMenuDropdown />
         </div>
       </div>
     </header>

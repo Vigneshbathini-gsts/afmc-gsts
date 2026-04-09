@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Download, Search } from "lucide-react";
+import { FaDownload, FaSearch } from "react-icons/fa";
 import api from "../../../services/api";
 import Stackreporttab from "./Stackreporttab";
 import { exportTableToPdf } from "../../../utils/pdfExport";
@@ -188,10 +188,10 @@ export default function Orderitemdetails() {
 
         <div className="flex justify-end gap-3 mb-4">
           <button onClick={handleSearch} className="btn">
-            <Search size={16}/> {loading ? "Loading..." : "Search"}
+            <FaSearch size={16}/> {loading ? "Loading..." : "Search"}
           </button>
           <button onClick={exportPdf} className="btn">
-            <Download size={16}/> Download
+            <FaDownload size={16}/> Download
           </button>
         </div>
 

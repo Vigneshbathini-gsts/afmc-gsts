@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Search, Download } from "lucide-react";
+import { FaDownload, FaSearch } from "react-icons/fa";
 import api from "../../../services/api";
 import Stackreporttab from "./Stackreporttab";
 import { exportTableToPdf } from "../../../utils/pdfExport";
@@ -241,11 +241,11 @@ export default function OrderTransactionUI() {
 
         <div className="flex justify-end gap-3 mb-4">
           <button className="btn" onClick={handleSearch} disabled={loading}>
-            <Search size={16} />
+            <FaSearch size={16} />
             {loading ? "Loading..." : "Search"}
           </button>
           <button className="btn" onClick={exportPdf} disabled={!data.length}>
-            <Download size={16} />
+            <FaDownload size={16} />
             Download
           </button>
         </div>

@@ -11,13 +11,48 @@ import {
 } from "react-icons/fa";
 
 const menuItems = [
-  { title: "Inventory Management", icon: <FaChartBar />, color: "bg-blue-500/20 text-blue-600" },
-  { title: "Stock Reports", icon: <FaTable />, color: "bg-slate-500/20 text-slate-600", path: "/admin/stock-reports" },
-  { title: "Offers", icon: <FaTags />, color: "bg-teal-500/20 text-teal-600" },
-  { title: "Item Price", icon: <FaDollarSign />, color: "bg-green-500/20 text-green-600" },
-  { title: "Stock In/Out Report", icon: <FaExchangeAlt />, color: "bg-olive-500/20 text-green-700" },
-  { title: "Profit Management", icon: <FaCoins />, color: "bg-gray-500/20 text-gray-700" },
-  { title: "Cocktails/Mocktails", icon: <FaWineGlassAlt />, color: "bg-yellow-600/20 text-yellow-700",path: "/admin/cocktailmanag"},
+  {
+    title: "Inventory Management",
+    icon: <FaChartBar />,
+    color: "bg-blue-500/20 text-blue-600",
+    path: "/admin/inventory",
+  },
+  {
+    title: "Stock Reports",
+    icon: <FaTable />,
+    color: "bg-slate-500/20 text-slate-600",
+    path: "/admin/stock-reports",
+  },
+  {
+    title: "Offers",
+    icon: <FaTags />,
+    color: "bg-teal-500/20 text-teal-600",
+    path: "/admin/offers",
+  },
+  {
+    title: "Item Price",
+    icon: <FaDollarSign />,
+    color: "bg-green-500/20 text-green-600",
+    path: "/admin/price-update",
+  },
+  {
+    title: "Stock In/Out Report",
+    icon: <FaExchangeAlt />,
+    color: "bg-olive-500/20 text-green-700",
+    path: "/admin/stock-in-out-report",
+  },
+  {
+    title: "Profit Management",
+    icon: <FaCoins />,
+    color: "bg-gray-500/20 text-gray-700",
+    path: "/admin/profit-management",
+  },
+  {
+    title: "Cocktails/Mocktails",
+    icon: <FaWineGlassAlt />,
+    color: "bg-yellow-600/20 text-yellow-700",
+    path: "/admin/cocktail-management",
+  },
 ];
 
 export default function Dashboard() {
@@ -36,7 +71,9 @@ export default function Dashboard() {
               onClick={() => item.path && navigate(item.path)}
               className="flex items-center gap-5 p-6 rounded-2xl bg-white/70 backdrop-blur-md border border-white/40 shadow-md hover:shadow-xl hover:scale-[1.02] transition-all cursor-pointer"
             >
-              <div className={`w-14 h-14 flex items-center justify-center rounded-full ${item.color}`}>
+              <div
+                className={`w-14 h-14 flex items-center justify-center rounded-full ${item.color}`}
+              >
                 <span className="text-xl">{item.icon}</span>
               </div>
 
