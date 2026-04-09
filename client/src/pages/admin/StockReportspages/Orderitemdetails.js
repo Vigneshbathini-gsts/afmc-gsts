@@ -95,7 +95,6 @@ export default function Orderitemdetails() {
       const res = await api.get("/reports/orderitem", {
         params: buildQueryParams(activeFilters),
       });
-
       if (res.data.success) {
         setData(res.data.data || []);
       }
@@ -138,7 +137,9 @@ export default function Orderitemdetails() {
     exportTableToPdf({
       title: "Order Item Details Report",
       fileName: "order-item-details-report.pdf",
-      subtitle: `From: ${appliedFilters.fromDate || "All"}   To: ${appliedFilters.toDate || "All"}`,
+      subtitle: `From: ${appliedFilters.fromDate || "All"}   To: ${
+        appliedFilters.toDate || "All"
+      }`,
       headers: [
         "Item",
         "Qty",
@@ -162,78 +163,81 @@ export default function Orderitemdetails() {
     });
   };
 
-  // ---------------- UI ----------------
   return (
-    <div className="p-6 bg-gray-100 min-h-screen">
-      <div className="bg-white p-6 rounded-xl shadow">
-        <Stackreporttab />
+    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-rose-50 to-white relative">
+      <div className="absolute top-16 left-12 w-72 h-72 bg-[#d70652]/10 rounded-full blur-3xl"></div>
+      <div className="absolute bottom-20 right-20 w-80 h-80 bg-[#ff025e]/10 rounded-full blur-3xl"></div>
 
-        <div className="flex justify-end gap-3 mb-4">
-          <button onClick={() => setShowFilterModal(true)} className="btn">
-            <FaFilter size={16}/> Filters
-          </button>
-          <button onClick={handleSearch} className="btn">
-            <FaSearch size={16}/> {loading ? "Loading..." : "Search"}
-          </button>
-          <button onClick={exportPdf} className="btn">
-            <FaDownload size={16}/> Download
-          </button>
-        </div>
+      <div className="relative z-10 p-6">
+        <div className="bg-white p-6 rounded-xl shadow">
+          <Stackreporttab />
 
-        {error && (
-          <p className="mb-4 text-sm text-red-600">{error}</p>
-        )}
-
-        {!hasSearched ? (
-          <div className="rounded-lg border border-dashed border-gray-300 p-8 text-center text-gray-500">
-            Select filters and click Search to view data.
+          <div className="flex justify-end gap-3 mb-4">
+            <button onClick={() => setShowFilterModal(true)} className="btn">
+              <FaFilter size={16} /> Filters
+            </button>
+            <button onClick={handleSearch} className="btn">
+              <FaSearch size={16} /> {loading ? "Loading..." : "Search"}
+            </button>
+            <button onClick={exportPdf} className="btn">
+              <FaDownload size={16} /> Download
+            </button>
           </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full border">
-              <thead className="bg-gray-200">
-                <tr>
-                  <th className="th">Item</th>
-                  <th className="th">Qty</th>
-                  {/* <th className="th">Price</th> */}
-                  <th className="th">Total Profit</th>
-                  {/* <th className="th">Unit Profit</th> */}
-                  <th className="th">Prep Charges</th>
-                  {/* <th className="th">Profit %</th> */}
-                  <th className="th">Total</th>
-                </tr>
-              </thead>
 
-              <tbody>
-                {data.length ? (
-                  data.map((row, i) => (
-                    <tr
-                      key={i}
-                      className={`text-center border-t ${
-                        !row.item_id ? "font-bold text-red-600" : ""
-                      }`}
-                    >
-                      <td className="td">{row.item_name || "-"}</td>
-                      <td className="td">{formatQuantity(row.quantity)}</td>
-                      {/* <td className="td">{row.price ? formatNumber(row.price) : "-"}</td> */}
-                      <td className="td">{row.total_profit ? formatNumber(row.total_profit) : "-"}</td>
-                      <td className="td">{row.unit_profit ? formatNumber(row.unit_profit) : "-"}</td>
-                      {/* <td className="td">{row.food_pr_charges ? formatNumber(row.food_pr_charges) : "-"}</td> */}
-                      {/* <td className="td">{row.totalprofit ? `${formatNumber(row.totalprofit,0)}%` : "-"}</td> */}
-                      <td className="td">{row.subtotal ? formatNumber(row.subtotal) : "-"}</td>
-                    </tr>
-                  ))
-                ) : (
+          {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
+
+          {!hasSearched ? (
+            <div className="rounded-lg border border-dashed border-gray-300 p-8 text-center text-gray-500">
+              Select filters and click Search to view data.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full border">
+                <thead className="bg-gray-200">
                   <tr>
-                    <td className="td text-center" colSpan="8">
-                      No data found.
-                    </td>
+                    <th className="th">Item</th>
+                    <th className="th">Qty</th>
+                    <th className="th">Total Profit</th>
+                    <th className="th">Prep Charges</th>
+                    <th className="th">Total</th>
                   </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
+                </thead>
+                <tbody>
+                  {data.length ? (
+                    data.map((row, i) => (
+                      <tr
+                        key={i}
+                        className={`text-center border-t ${
+                          !row.item_id ? "font-bold text-red-600" : ""
+                        }`}
+                      >
+                        <td className="td">{row.item_name || "-"}</td>
+                        <td className="td">{formatQuantity(row.quantity)}</td>
+                        <td className="td">
+                          {row.total_profit ? formatNumber(row.total_profit) : "-"}
+                        </td>
+                        <td className="td">
+                          {row.food_pr_charges
+                            ? formatNumber(row.food_pr_charges)
+                            : "-"}
+                        </td>
+                        <td className="td">
+                          {row.subtotal ? formatNumber(row.subtotal) : "-"}
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td className="td text-center" colSpan="5">
+                        No data found.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
 
       {showFilterModal && (
@@ -251,18 +255,18 @@ export default function Orderitemdetails() {
                 onClick={() => setShowFilterModal(false)}
                 className="rounded-full p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
               >
-                <FaTimes size={18}/>
+                <FaTimes size={18} />
               </button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="label">From Date</label>
-                <input type="date" name="fromDate" value={filters.fromDate} onChange={handleChange} className="input"/>
+                <input type="date" name="fromDate" value={filters.fromDate} onChange={handleChange} className="input" />
               </div>
               <div>
                 <label className="label">To Date</label>
-                <input type="date" name="toDate" value={filters.toDate} onChange={handleChange} className="input"/>
+                <input type="date" name="toDate" value={filters.toDate} onChange={handleChange} className="input" />
               </div>
               <div>
                 <label className="label">Item Name</label>
@@ -307,7 +311,7 @@ export default function Orderitemdetails() {
                 Cancel
               </button>
               <button type="button" onClick={handleSearch} className="btn">
-                <FaSearch size={16}/> {loading ? "Loading..." : "Apply Filters"}
+                <FaSearch size={16} /> {loading ? "Loading..." : "Apply Filters"}
               </button>
             </div>
           </div>
@@ -315,34 +319,12 @@ export default function Orderitemdetails() {
       )}
 
       <style>{`
-        .input {
-          padding: 8px;
-          border: 1px solid #ccc;
-          border-radius: 6px;
-          width: 100%;
-        }
-        .label {
-          display: block;
-          margin-bottom: 8px;
-          font-size: 14px;
-          font-weight: 600;
-          color: #374151;
-        }
-        .btn {
-          display:flex;
-          gap:5px;
-          align-items:center;
-          background:#6b5f5f;
-          color:white;
-          padding:8px 14px;
-          border-radius:20px;
-        }
-        .btn-secondary {
-          background:#e5e7eb;
-          color:#374151;
-        }
-        .th { padding:10px }
-        .td { padding:10px }
+        .input { padding: 8px; border: 1px solid #ccc; border-radius: 6px; width: 100%; }
+        .label { display: block; margin-bottom: 8px; font-size: 14px; font-weight: 600; color: #374151; }
+        .btn { display: flex; gap: 5px; align-items: center; background: #6b5f5f; color: white; padding: 8px 14px; border-radius: 20px; }
+        .btn-secondary { background: #e5e7eb; color: #374151; }
+        .th { padding: 10px }
+        .td { padding: 10px }
       `}</style>
     </div>
   );

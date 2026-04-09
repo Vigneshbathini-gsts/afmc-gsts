@@ -6,14 +6,10 @@ import { exportTableToPdf } from "../../../utils/pdfExport";
 
 const buildQueryParams = (filters) => {
   const params = {};
-
   Object.entries(filters).forEach(([key, value]) => {
     const trimmed = typeof value === "string" ? value.trim() : value;
-    if (trimmed) {
-      params[key] = trimmed;
-    }
+    if (trimmed) params[key] = trimmed;
   });
-
   return params;
 };
 
@@ -147,7 +143,9 @@ export default function OrderTransactionUI() {
     exportTableToPdf({
       title: "Order Transaction Details Report",
       fileName: "order-transaction-details-report.pdf",
-      subtitle: `From: ${appliedFilters.fromDate || "All"}   To: ${appliedFilters.toDate || "All"}`,
+      subtitle: `From: ${appliedFilters.fromDate || "All"}   To: ${
+        appliedFilters.toDate || "All"
+      }`,
       headers: [
         "Order Number",
         "User",
@@ -174,111 +172,95 @@ export default function OrderTransactionUI() {
   };
 
   return (
-    <div className="p-6 bg-gray-100 min-h-screen">
-      <div className="bg-white rounded-2xl shadow p-6">
-        <Stackreporttab />
+    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-rose-50 to-white relative">
+      <div className="absolute top-16 left-12 w-72 h-72 bg-[#d70652]/10 rounded-full blur-3xl"></div>
+      <div className="absolute bottom-20 right-20 w-80 h-80 bg-[#ff025e]/10 rounded-full blur-3xl"></div>
 
-        <div className="flex justify-end gap-3 mb-4">
-          <button className="btn" onClick={() => setShowFilterModal(true)}>
-            <FaFilter size={16} />
-            Filters
-          </button>
-          <button className="btn" onClick={handleSearch} disabled={loading}>
-            <FaSearch size={16} />
-            {loading ? "Loading..." : "Search"}
-          </button>
-          <button className="btn" onClick={exportPdf} disabled={!data.length}>
-            <FaDownload size={16} />
-            Download
-          </button>
-        </div>
+      <div className="relative z-10 p-6">
+        <div className="bg-white rounded-2xl shadow p-6">
+          <Stackreporttab />
 
-        {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
-
-        {!hasSearched ? (
-          <div className="rounded-lg border border-dashed border-gray-300 p-8 text-center text-gray-500">
-            Enter filters and click Search to view data.
+          <div className="flex justify-end gap-3 mb-4">
+            <button className="btn" onClick={() => setShowFilterModal(true)}>
+              <FaFilter size={16} />
+              Filters
+            </button>
+            <button className="btn" onClick={handleSearch} disabled={loading}>
+              <FaSearch size={16} />
+              {loading ? "Loading..." : "Search"}
+            </button>
+            <button className="btn" onClick={exportPdf} disabled={!data.length}>
+              <FaDownload size={16} />
+              Download
+            </button>
           </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full border rounded-lg">
-              <thead className="bg-gray-200">
-                <tr>
-                  <th className="th">Order Number</th>
-                  {/* <th className="th">User</th> */}
-                  {/* <th className="th">Kitchen</th> */}
-                  <th className="th">Item Name</th>
-                  <th className="th">Quantity</th>
-                  <th className="th">Profit %</th>
-                  <th className="th">Total Profit</th>
-                  <th className="th">Preparation Charges</th>
-                  <th className="th">Subtotal</th>
-                </tr>
-              </thead>
-              <tbody>
-                {!data.length && !loading ? (
-                  <tr className="text-center border-t">
-                    <td className="td" colSpan="9">
-                      No data found.
-                    </td>
+
+          {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
+
+          {!hasSearched ? (
+            <div className="rounded-lg border border-dashed border-gray-300 p-8 text-center text-gray-500">
+              Enter filters and click Search to view data.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full border rounded-lg">
+                <thead className="bg-gray-200">
+                  <tr>
+                    <th className="th">Order Number</th>
+                    <th className="th">Item Name</th>
+                    <th className="th">Quantity</th>
+                    <th className="th">Profit %</th>
+                    <th className="th">Total Profit</th>
+                    <th className="th">Preparation Charges</th>
+                    <th className="th">Subtotal</th>
                   </tr>
-                ) : (
-                  data.map((row, index) => (
-                    <tr
-                      key={row.ORDER_LINE_ID || `${row.ORDER_NUM || "total"}-${index}`}
-                      className="text-center border-t"
-                    >
-                      <td className="td">{row.ORDER_NUM || "-"}</td>
-                      {/* <td className="td">{row.FIRST_NAME || "-"}</td> */}
-                      {/* <td
-                        className="td"
-                        dangerouslySetInnerHTML={{
-                          __html: row.PUBMED_NAME || "-",
-                        }}
-                      /> */}
-                      <td
-                        className="td"
-                        dangerouslySetInnerHTML={{
-                          __html: row.ITEM_NAME || "-",
-                        }}
-                      />
-                      <td
-                        className="td"
-                        dangerouslySetInnerHTML={{
-                          __html: row.QUANTITY || "-",
-                        }}
-                      />
-                      <td
-                        className="td"
-                        dangerouslySetInnerHTML={{
-                          __html: row.TOTALPERCENT || "-",
-                        }}
-                      />
-                      <td
-                        className="td"
-                        dangerouslySetInnerHTML={{
-                          __html: row.TOTAL_PROFIT || "-",
-                        }}
-                      />
-                      <td
-                        className="td"
-                        dangerouslySetInnerHTML={{
-                          __html: row.FOOD_PR_CHARGES || "-",
-                        }}
-                      />
-                      <td
-                        className="td"
-                        dangerouslySetInnerHTML={{
-                          __html: row.SUBTOTAL || "-",
-                        }}
-                      />
+                </thead>
+                <tbody>
+                  {!data.length && !loading ? (
+                    <tr className="text-center border-t">
+                      <td className="td" colSpan="7">
+                        No data found.
+                      </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
+                  ) : (
+                    data.map((row, index) => (
+                      <tr
+                        key={row.ORDER_LINE_ID || `${row.ORDER_NUM || "total"}-${index}`}
+                        className="text-center border-t"
+                      >
+                        <td className="td">{row.ORDER_NUM || "-"}</td>
+                        <td
+                          className="td"
+                          dangerouslySetInnerHTML={{ __html: row.ITEM_NAME || "-" }}
+                        />
+                        <td
+                          className="td"
+                          dangerouslySetInnerHTML={{ __html: row.QUANTITY || "-" }}
+                        />
+                        <td
+                          className="td"
+                          dangerouslySetInnerHTML={{ __html: row.TOTALPERCENT || "-" }}
+                        />
+                        <td
+                          className="td"
+                          dangerouslySetInnerHTML={{ __html: row.TOTAL_PROFIT || "-" }}
+                        />
+                        <td
+                          className="td"
+                          dangerouslySetInnerHTML={{ __html: row.FOOD_PR_CHARGES || "-" }}
+                        />
+                        <td
+                          className="td"
+                          dangerouslySetInnerHTML={{ __html: row.SUBTOTAL || "-" }}
+                        />
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
 
       {showFilterModal && (
@@ -303,46 +285,20 @@ export default function OrderTransactionUI() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="label">From Date</label>
-                <input
-                  type="date"
-                  name="fromDate"
-                  value={filters.fromDate}
-                  onChange={handleChange}
-                  className="input"
-                />
+                <input type="date" name="fromDate" value={filters.fromDate} onChange={handleChange} className="input" />
               </div>
               <div>
                 <label className="label">To Date</label>
-                <input
-                  type="date"
-                  name="toDate"
-                  value={filters.toDate}
-                  onChange={handleChange}
-                  className="input"
-                />
+                <input type="date" name="toDate" value={filters.toDate} onChange={handleChange} className="input" />
               </div>
               <div>
                 <label className="label">Order Number</label>
-                <input
-                  placeholder="Enter order number"
-                  name="orderNumber"
-                  value={filters.orderNumber}
-                  onChange={handleChange}
-                  className="input"
-                />
+                <input placeholder="Enter order number" name="orderNumber" value={filters.orderNumber} onChange={handleChange} className="input" />
               </div>
               <div>
                 <label className="label">Item Name</label>
-                <select
-                  name="itemNames"
-                  value={filters.itemNames}
-                  onChange={handleChange}
-                  className="input"
-                  disabled={filtersLoading}
-                >
-                  <option value="">
-                    {filtersLoading ? "Loading items..." : "Select Item Name"}
-                  </option>
+                <select name="itemNames" value={filters.itemNames} onChange={handleChange} className="input" disabled={filtersLoading}>
+                  <option value="">{filtersLoading ? "Loading items..." : "Select Item Name"}</option>
                   {filterOptions.itemNames.map((itemName) => (
                     <option key={itemName} value={itemName}>
                       {itemName}
@@ -352,16 +308,8 @@ export default function OrderTransactionUI() {
               </div>
               <div>
                 <label className="label">User Name</label>
-                <select
-                  name="userName"
-                  value={filters.userName}
-                  onChange={handleChange}
-                  className="input"
-                  disabled={filtersLoading}
-                >
-                  <option value="">
-                    {filtersLoading ? "Loading users..." : "Select User Name"}
-                  </option>
+                <select name="userName" value={filters.userName} onChange={handleChange} className="input" disabled={filtersLoading}>
+                  <option value="">{filtersLoading ? "Loading users..." : "Select User Name"}</option>
                   {filterOptions.userNames.map((userName) => (
                     <option key={userName} value={userName}>
                       {userName}
@@ -371,16 +319,8 @@ export default function OrderTransactionUI() {
               </div>
               <div>
                 <label className="label">Kitchen Name</label>
-                <select
-                  name="kitchenName"
-                  value={filters.kitchenName}
-                  onChange={handleChange}
-                  className="input"
-                  disabled={filtersLoading}
-                >
-                  <option value="">
-                    {filtersLoading ? "Loading kitchens..." : "Select Kitchen Name"}
-                  </option>
+                <select name="kitchenName" value={filters.kitchenName} onChange={handleChange} className="input" disabled={filtersLoading}>
+                  <option value="">{filtersLoading ? "Loading kitchens..." : "Select Kitchen Name"}</option>
                   {filterOptions.kitchenNames.map((kitchenName) => (
                     <option key={kitchenName} value={kitchenName}>
                       {kitchenName}
@@ -407,46 +347,13 @@ export default function OrderTransactionUI() {
       )}
 
       <style>{`
-        .input {
-          padding: 10px;
-          border: 1px solid #ccc;
-          border-radius: 8px;
-          width: 100%;
-        }
-        .label {
-          display: block;
-          margin-bottom: 8px;
-          font-size: 14px;
-          font-weight: 600;
-          color: #374151;
-        }
-        .btn {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          background: #6b5f5f;
-          color: white;
-          padding: 8px 16px;
-          border-radius: 20px;
-          border: none;
-        }
-        .btn-secondary {
-          background: #e5e7eb;
-          color: #374151;
-        }
-        .btn:disabled {
-          opacity: 0.6;
-          cursor: not-allowed;
-        }
-        .th {
-          padding: 10px;
-          text-align: center;
-          white-space: nowrap;
-        }
-        .td {
-          padding: 10px;
-          white-space: nowrap;
-        }
+        .input { padding: 10px; border: 1px solid #ccc; border-radius: 8px; width: 100%; }
+        .label { display: block; margin-bottom: 8px; font-size: 14px; font-weight: 600; color: #374151; }
+        .btn { display: flex; align-items: center; gap: 6px; background: #6b5f5f; color: white; padding: 8px 16px; border-radius: 20px; border: none; }
+        .btn-secondary { background: #e5e7eb; color: #374151; }
+        .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .th { padding: 10px; text-align: center; white-space: nowrap; }
+        .td { padding: 10px; white-space: nowrap; }
       `}</style>
     </div>
   );
