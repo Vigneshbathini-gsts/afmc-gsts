@@ -28,7 +28,7 @@
   },
   "scripts": {
     "postinstall": "node scripts/fix-html5-qrcode-sourcemaps.js",
-    "start": "react-scripts start",
+    "start": "node scripts/start-react-scripts.js",
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"

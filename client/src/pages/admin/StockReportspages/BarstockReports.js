@@ -123,11 +123,11 @@ export default function BarstockReports() {
               >
                 <td className="p-3">{item.item_code}</td>
                 <td className="p-3">{item.item_name}</td>
-                <td className="p-3">{item.unit_price || "-"}</td>
-                <td className="p-3">{item.total_price || "-"}</td>
-                <td className="p-3">{item.AVAILABLE_STOCK || 0}</td>
-                <td className="p-3">{item.RESERVED_STOCK || 0}</td>
-                <td className="p-3">{item.A_C_UNIT || "-"}</td>
+                <td className="p-3">{item.unit_price ?? "-"}</td>
+                <td className="p-3">{item.total_price ?? "-"}</td>
+                <td className="p-3">{item.AVAILABLE_STOCK ?? 0}</td>
+                <td className="p-3">{item.RESERVED_STOCK ?? 0}</td>
+                <td className="p-3">{item.A_C_UNIT ?? "-"}</td>
               </tr>
             ))}
 
