@@ -380,7 +380,23 @@ const stockOutBarcodeExists = async (executor, barcode) => {
   return Number(rows[0]?.cnt || 0) > 0;
 };
 
-const stockOutBarcodeExistsInDb = async (barcode) => stockOutBarcodeExists(db, barcode);
+const stockOutRecordExists = async (executor, barcode) => {
+  const sql = `
+    SELECT COUNT(1) AS cnt
+    FROM xxafmc_stock_out
+    WHERE BARCODE = ?
+  `;
+  const [rows] = await executor.execute(sql, [Number(barcode)]);
+  return Number(rows[0]?.cnt || 0) > 0;
+};
+
+const stockOutBarcodeExistsInDb = async (barcode) => {
+  const [transactionExists, stockOutExists] = await Promise.all([
+    stockOutBarcodeExists(db, barcode),
+    stockOutRecordExists(db, barcode),
+  ]);
+  return transactionExists || stockOutExists;
+};
 
 const parseVolumeToNumber = (volume) => {
   if (!volume) return null;
@@ -638,7 +654,11 @@ const addStockOutTransactions = async (payload) => {
         throw error;
       }
 
-      const alreadyConsumed = await stockOutBarcodeExists(connection, numericBarcode);
+      const [alreadyConsumedByTxn, alreadyConsumedByStockOut] = await Promise.all([
+        stockOutBarcodeExists(connection, numericBarcode),
+        stockOutRecordExists(connection, numericBarcode),
+      ]);
+      const alreadyConsumed = alreadyConsumedByTxn || alreadyConsumedByStockOut;
       if (alreadyConsumed) {
         const error = new Error("BARCODE_ALREADY_USED");
         error.code = "BARCODE_ALREADY_USED";
