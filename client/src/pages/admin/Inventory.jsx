@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FaArrowLeft, FaChevronDown, FaPlus, FaSearch, FaPen } from "react-icons/fa";
+import { FaArrowLeft, FaChevronDown, FaPlus, FaSearch, FaPen, FaTrash } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { inventoryAPI } from "../../services/api";
 
@@ -58,6 +58,8 @@ export default function Inventory() {
     batchId: "",
     prepCharges: "N",
   });
+  const [stockRows, setStockRows] = useState([]);
+  const [stockRowSearch, setStockRowSearch] = useState("");
   const categoryDropdownRef = useRef(null);
   const itemDropdownRef = useRef(null);
 
@@ -213,6 +215,13 @@ export default function Inventory() {
     return `${yyyy}-${mm}-${dd}`;
   };
 
+  const formatDisplayDate = (value) => {
+    if (!value) return "";
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return String(value);
+    return `${parsed.getMonth() + 1}/${parsed.getDate()}/${parsed.getFullYear()}`;
+  };
+
   const openAddModal = () => {
     setFormValues({
       itemName: "",
@@ -261,6 +270,8 @@ export default function Inventory() {
 
   const openStockModal = (row) => {
     setStockError("");
+    setStockRows([]);
+    setStockRowSearch("");
     setStockForm({
       itemCode: row.item_code,
       itemName: row.item_name,
@@ -276,6 +287,13 @@ export default function Inventory() {
     setShowStockModal(true);
   };
 
+  const closeStockModal = () => {
+    setShowStockModal(false);
+    setStockError("");
+    setStockRows([]);
+    setStockRowSearch("");
+  };
+
   const openImageModal = (row) => {
     setImageError("");
     setImageForm({
@@ -287,7 +305,7 @@ export default function Inventory() {
     setShowImageModal(true);
   };
 
-  const handleAddStock = async () => {
+  const handleStageStock = () => {
     if (!stockForm.itemCode || !stockForm.rate || !stockForm.barcode || !stockForm.transactionDate) {
       setStockError("Item code, barcode, rate, and transaction date are required.");
       return;
@@ -313,21 +331,72 @@ export default function Inventory() {
       return;
     }
 
+    setStockError("");
+    const normalizedBarcode = String(stockForm.barcode).trim();
+
+    if (stockRows.some((row) => row.barcode === normalizedBarcode)) {
+      setStockError("This barcode is already staged.");
+      return;
+    }
+
+    setStockRows((current) => [
+      ...current,
+      {
+        itemCode: stockForm.itemCode,
+        itemName: stockForm.itemName,
+        quantity: 1,
+        barcode: normalizedBarcode,
+        batchName: `${stockForm.itemName}-1-${stockForm.volume || ""}-${formatDisplayDate(
+          stockForm.transactionDate
+        )}`,
+        rate: stockForm.rate,
+        transactionDate: stockForm.transactionDate,
+        displayTransactionDate: formatDisplayDate(stockForm.transactionDate),
+        volume: stockForm.volume,
+        acUnit: stockForm.acUnit,
+        prepCharges: stockForm.prepCharges,
+      },
+    ]);
+
+    setStockForm((prev) => ({
+      ...prev,
+      barcode: "",
+    }));
+  };
+
+  const handleDeleteStockRow = (barcode) => {
+    setStockRows((current) => current.filter((row) => row.barcode !== barcode));
+  };
+
+  const handleCancelStockRows = () => {
+    setStockRows([]);
+    setStockRowSearch("");
+    setStockError("");
+  };
+
+  const handleAddStock = async () => {
+    if (stockRows.length === 0) {
+      setStockError("Add at least one stock row before saving.");
+      return;
+    }
+
     setStockSaving(true);
     setStockError("");
     try {
       await inventoryAPI.addStock({
-        itemCode: stockForm.itemCode,
-        quantity: 1,
-        transactionDate: stockForm.transactionDate,
-        volume: stockForm.volume,
-        barcode: stockForm.barcode,
-        rate: stockForm.rate,
-        prepCharges: stockForm.prepCharges,
-        acUnit: stockForm.acUnit,
-        createdBy: "ADMIN",
+        items: stockRows.map((row) => ({
+          itemCode: row.itemCode,
+          quantity: 1,
+          transactionDate: row.transactionDate,
+          volume: row.volume,
+          barcode: row.barcode,
+          rate: row.rate,
+          prepCharges: row.prepCharges,
+          acUnit: row.acUnit,
+          createdBy: "ADMIN",
+        })),
       });
-      setShowStockModal(false);
+      closeStockModal();
       fetchInventory();
     } catch (err) {
       console.error("Failed to add stock:", err);
@@ -336,6 +405,23 @@ export default function Inventory() {
       setStockSaving(false);
     }
   };
+
+  const filteredStockRows = useMemo(() => {
+    const query = stockRowSearch.trim().toLowerCase();
+    if (!query) return stockRows;
+    return stockRows.filter((row) =>
+      [
+        row.itemName,
+        row.barcode,
+        row.batchName,
+        row.volume,
+        row.rate,
+        row.displayTransactionDate,
+      ]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(query))
+    );
+  }, [stockRowSearch, stockRows]);
 
   const handleUpdateImage = async () => {
     if (!imageForm.itemCode || !imageForm.image) {
@@ -657,31 +743,31 @@ export default function Inventory() {
       </div>
 
       {showStockModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-5xl rounded-3xl bg-white/95 shadow-2xl border border-white/70 backdrop-blur-md p-8 relative">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/40 px-4 py-6">
+          <div className="mx-auto w-full max-w-5xl rounded-3xl bg-white/95 shadow-2xl border border-white/70 backdrop-blur-md p-8 relative max-h-[calc(100vh-3rem)] overflow-y-auto">
             <button
               type="button"
-              onClick={() => setShowStockModal(false)}
+              onClick={closeStockModal}
               className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"
               aria-label="Close"
             >
               X
             </button>
 
-            <div className="flex items-center justify-between mb-6">
+            <div className="sticky top-0 z-10 -mx-8 mb-6 flex items-center justify-between border-b border-gray-100 bg-white/95 px-8 py-4 backdrop-blur-md">
               <h2 className="text-xl font-semibold text-gray-800">Item Transaction</h2>
               <div className="flex items-center gap-3">
                 <button
                   type="button"
                   onClick={handleAddStock}
-                  disabled={stockSaving}
+                  disabled={stockSaving || stockRows.length === 0}
                   className="px-6 py-2.5 rounded-full bg-green-600 text-white font-semibold disabled:opacity-70"
                 >
                   {stockSaving ? "Saving..." : "Add"}
                 </button>
                 <button
                   type="button"
-                  onClick={() => setShowStockModal(false)}
+                  onClick={closeStockModal}
                   className="px-6 py-2.5 rounded-full bg-gray-600 text-white font-semibold"
                 >
                   Back
@@ -822,6 +908,97 @@ export default function Inventory() {
                   />
                   Y
                 </label>
+              </div>
+            </div>
+
+            <div className="mt-8 rounded-3xl border border-gray-200 bg-white shadow-sm">
+              <div className="min-h-[140px] border-b border-gray-100 bg-[radial-gradient(circle_at_center,rgba(215,6,82,0.06),transparent_42%)]"></div>
+
+              <div className="flex flex-wrap items-center justify-between gap-4 p-4">
+                <button
+                  type="button"
+                  onClick={handleCancelStockRows}
+                  className="rounded-full bg-gray-600 px-5 py-2.5 text-white font-semibold"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleStageStock}
+                  className="inline-flex items-center gap-2 rounded-full bg-green-600 px-5 py-2.5 text-white font-semibold"
+                >
+                  <FaPlus />
+                  Add Stock
+                </button>
+              </div>
+
+              <div className="flex items-center gap-3 border-t border-gray-100 px-4 py-3">
+                <FaSearch className="text-gray-400" />
+                <input
+                  type="text"
+                  value={stockRowSearch}
+                  onChange={(e) => setStockRowSearch(e.target.value)}
+                  placeholder="Search staged rows"
+                  className="w-40 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 outline-none"
+                />
+                <button
+                  type="button"
+                  className="rounded-xl px-3 py-2 text-sm font-medium text-gray-700"
+                >
+                  Go
+                </button>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 text-gray-600">
+                    <tr>
+                      <th className="px-4 py-3 text-left font-medium">Item Name</th>
+                      <th className="px-4 py-3 text-left font-medium">Quantity</th>
+                      <th className="px-4 py-3 text-left font-medium">Barcode</th>
+                      <th className="px-4 py-3 text-left font-medium">Batchname</th>
+                      <th className="px-4 py-3 text-left font-medium">Rate</th>
+                      <th className="px-4 py-3 text-left font-medium">Transaction Date</th>
+                      <th className="px-4 py-3 text-left font-medium">Volume</th>
+                      <th className="px-4 py-3 text-left font-medium">Delete</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredStockRows.length === 0 ? (
+                      <tr>
+                        <td colSpan="8" className="px-4 py-8 text-center text-gray-500">
+                          No staged stock rows yet.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredStockRows.map((row) => (
+                        <tr key={row.barcode} className="border-t border-gray-100">
+                          <td className="px-4 py-3">{row.itemName}</td>
+                          <td className="px-4 py-3">{row.quantity}</td>
+                          <td className="px-4 py-3">{row.barcode}</td>
+                          <td className="px-4 py-3">{row.batchName}</td>
+                          <td className="px-4 py-3">{row.rate}</td>
+                          <td className="px-4 py-3">{row.displayTransactionDate}</td>
+                          <td className="px-4 py-3">{row.volume}</td>
+                          <td className="px-4 py-3">
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteStockRow(row.barcode)}
+                              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-red-600 hover:bg-red-50"
+                            >
+                              <FaTrash />
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="px-4 py-3 text-right text-sm text-gray-500">
+                {filteredStockRows.length}-{stockRows.length}
               </div>
             </div>
           </div>

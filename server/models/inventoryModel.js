@@ -152,7 +152,6 @@ const requiresVolume = (acUnit) => {
 };
 
 const validateStockInItem = (item) => {
-  const numericQuantity = Number(item.quantity ?? 1);
   const numericRate = Number(item.rate);
   const normalizedBarcode = sanitizeBarcode(item.barcode);
 
@@ -161,13 +160,8 @@ const validateStockInItem = (item) => {
     !Number.isFinite(numericRate) ||
     numericRate <= 0 ||
     !item.transactionDate ||
-    !normalizedBarcode ||
-    numericQuantity <= 0
+    !normalizedBarcode
   ) {
-    return false;
-  }
-
-  if (!Number.isFinite(numericQuantity) || !Number.isInteger(numericQuantity)) {
     return false;
   }
 
@@ -298,7 +292,7 @@ const getInventoryItemByCode = async (itemCode) => {
   return rows && rows.length ? rows[0] : null;
 };
 
-const getStockOutItemByBarcode = async (barcode) => {
+const getStockOutItemByBarcode = async (barcode, executor = db) => {
   const sql = `
     SELECT
       xit.ITEM_CODE AS item_code,
@@ -308,15 +302,25 @@ const getStockOutItemByBarcode = async (barcode) => {
       xit.VOLUME AS volume,
       xit.BATCH_NAME AS batch_name,
       IFNULL(xit.PEGS, 0) AS pegs,
-      IFNULL(xi.STOCK_QUANTITY, 0) AS available_stock
+      IFNULL(xi.STOCK_QUANTITY, 0) AS available_stock,
+      CASE
+        WHEN IFNULL(xit.PEGS, 0) > 0 THEN IFNULL(xi.STOCK_QUANTITY, 0) * IFNULL(xit.PEGS, 0)
+        ELSE IFNULL(xi.STOCK_QUANTITY, 0)
+      END AS available_quantity
     FROM xxafmc_items_transactions xit
     JOIN xxafmc_inventory xi ON xi.ITEM_CODE = xit.ITEM_CODE
     WHERE xit.BARCODE = ?
       AND xit.FLAG = 'IN'
+      AND NOT EXISTS (
+        SELECT 1
+        FROM xxafmc_items_transactions used_txn
+        WHERE used_txn.BARCODE = xit.BARCODE
+          AND used_txn.FLAG = 'OUT'
+      )
     ORDER BY xit.TRANSACTION_ID DESC
     LIMIT 1
   `;
-  const [rows] = await db.execute(sql, [Number(barcode)]);
+  const [rows] = await executor.execute(sql, [Number(barcode)]);
   return rows && rows.length ? rows[0] : null;
 };
 
@@ -364,6 +368,19 @@ const barcodeExistsInDb = async (barcode) => {
   const [rows] = await db.execute(sql, [barcode]);
   return Number(rows[0]?.cnt || 0) > 0;
 };
+
+const stockOutBarcodeExists = async (executor, barcode) => {
+  const sql = `
+    SELECT COUNT(1) AS cnt
+    FROM xxafmc_items_transactions
+    WHERE BARCODE = ?
+      AND FLAG = 'OUT'
+  `;
+  const [rows] = await executor.execute(sql, [Number(barcode)]);
+  return Number(rows[0]?.cnt || 0) > 0;
+};
+
+const stockOutBarcodeExistsInDb = async (barcode) => stockOutBarcodeExists(db, barcode);
 
 const parseVolumeToNumber = (volume) => {
   if (!volume) return null;
@@ -463,7 +480,7 @@ const addStockTransactions = async (payload) => {
       } = item;
 
       const normalizedBarcode = sanitizeBarcode(barcode);
-      const numericQuantity = Number(quantity ?? 1);
+      const numericQuantity = 1;
 
       if (!validateStockInItem({ ...item, barcode: normalizedBarcode })) {
         const error = new Error("INVALID_DATA");
@@ -574,6 +591,14 @@ const addStockOutTransactions = async (payload) => {
     throw error;
   }
 
+  const barcodes = items.map((item) => sanitizeBarcode(item.barcode));
+  const uniqueBarcodes = new Set(barcodes);
+  if (uniqueBarcodes.size !== barcodes.length) {
+    const error = new Error("INVALID_DATA");
+    error.code = "INVALID_DATA";
+    throw error;
+  }
+
   const connection = await db.getConnection();
   let stockOutLockAcquired = false;
   let transactionLockAcquired = false;
@@ -606,10 +631,17 @@ const addStockOutTransactions = async (payload) => {
         throw error;
       }
 
-      const stockItem = await getStockOutItemByBarcode(numericBarcode);
+      const stockItem = await getStockOutItemByBarcode(numericBarcode, connection);
       if (!stockItem) {
         const error = new Error("ITEM_NOT_FOUND");
         error.code = "ITEM_NOT_FOUND";
+        throw error;
+      }
+
+      const alreadyConsumed = await stockOutBarcodeExists(connection, numericBarcode);
+      if (alreadyConsumed) {
+        const error = new Error("BARCODE_ALREADY_USED");
+        error.code = "BARCODE_ALREADY_USED";
         throw error;
       }
 
@@ -623,6 +655,7 @@ const addStockOutTransactions = async (payload) => {
       }
 
       const totalValue = Number(stockItem.unit_price || 0) * numericQuantity;
+      const creationTimestamp = new Date().toISOString();
 
       await connection.execute(
         `
@@ -641,7 +674,7 @@ const addStockOutTransactions = async (payload) => {
           numericQuantity,
           totalValue,
           numericBarcode,
-          normalizedTransactionDate,
+          creationTimestamp,
           Number(stockItem.pegs || 0),
           stockItem.ac_unit || "Nos",
           stockItem.volume || "",
@@ -675,7 +708,7 @@ const addStockOutTransactions = async (payload) => {
           "OUT",
           numericBarcode,
           createdBy || "SYSTEM",
-          normalizedTransactionDate,
+          creationTimestamp,
         ]
       );
 
@@ -764,6 +797,7 @@ module.exports = {
   getBarTypes,
   getStockOutItemByBarcode,
   barcodeExistsInDb,
+  stockOutBarcodeExistsInDb,
   addStockTransactions,
   addStockOutTransactions,
   getItemImageInfo,

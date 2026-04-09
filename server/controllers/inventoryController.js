@@ -145,6 +145,10 @@ exports.getStockOutItemByBarcode = async (req, res) => {
 
     const item = await inventoryModel.getStockOutItemByBarcode(barcode);
     if (!item) {
+      const barcodeAlreadyUsed = await inventoryModel.stockOutBarcodeExistsInDb(barcode);
+      if (barcodeAlreadyUsed) {
+        return res.status(409).json({ success: false, message: "Barcode already used" });
+      }
       return res.status(404).json({ success: false, message: "Item not found for this barcode" });
     }
 
@@ -170,6 +174,9 @@ exports.addStockOut = async (req, res) => {
     }
     if (error.code === "INSUFFICIENT_STOCK") {
       return res.status(409).json({ success: false, message: "Insufficient stock" });
+    }
+    if (error.code === "BARCODE_ALREADY_USED") {
+      return res.status(409).json({ success: false, message: "Barcode already used" });
     }
     res.status(500).json({ success: false, message: "Failed to create stock-out transactions" });
   }
