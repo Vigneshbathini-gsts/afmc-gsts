@@ -146,14 +146,14 @@ export const orderAPI = {
 
   // User
   getMyOrders: () => api.get("/orders/my-orders"),
-  getActiveOrders: () => api.get("/orders/active"),
+  getActiveOrders: (params) => api.get("/orders/active", { params }),
 
   // Kitchen
   getKitchenOrders: () => api.get("/orders/kitchen"),
   markPrepared: (id, data) => api.put(`/orders/${id}/prepare`, data),
 
   // Attendant
-  getAttendantOrders: () => api.get("/orders/attendant"),
+  getAttendantOrders: (params) => api.get("/orders/attendant", { params }),
 
   // Admin
   getOrderHistory: (params) => api.get("/orders/history", { params }),

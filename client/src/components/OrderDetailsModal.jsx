@@ -2,6 +2,16 @@ import React, { useEffect, useState } from "react";
 import { FaTimes, FaBoxOpen } from "react-icons/fa";
 import { orderAPI } from "../services/api";
 
+const getStatusClassName = (status) => {
+  const normalizedStatus = String(status || "").toLowerCase();
+
+  if (normalizedStatus === "cancelled") return "text-red-600";
+  if (normalizedStatus === "completed") return "text-green-600";
+  if (normalizedStatus === "received") return "text-blue-600";
+  if (normalizedStatus === "preparing") return "text-amber-500";
+  return "text-gray-500";
+};
+
 export default function OrderDetailsModal({ isOpen, onClose, orderNumber }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -49,7 +59,7 @@ export default function OrderDetailsModal({ isOpen, onClose, orderNumber }) {
           </div>
           <div>
             <h2 className="text-xl font-bold text-gray-800">
-              Order Details
+              Ordered Item Status
             </h2>
             <p className="text-sm text-gray-500">
               Order Number: <span className="font-semibold">{orderNumber}</span>
@@ -68,34 +78,26 @@ export default function OrderDetailsModal({ isOpen, onClose, orderNumber }) {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full border border-gray-200 rounded-xl overflow-hidden">
-              <thead className="bg-[#d70652] text-white">
+            <table className="w-full overflow-hidden rounded-xl border border-gray-200">
+              <thead className="bg-gray-50 text-gray-700">
                 <tr>
                   <th className="px-4 py-3 text-left">Item Name</th>
+                  <th className="px-4 py-3 text-left">Status</th>
                   <th className="px-4 py-3 text-left">Quantity</th>
                   <th className="px-4 py-3 text-left">Type</th>
-                  <th className="px-4 py-3 text-left">Status</th>
                 </tr>
               </thead>
               <tbody>
                 {items.map((item, index) => (
                   <tr key={index} className="border-t hover:bg-gray-50">
                     <td className="px-4 py-3">{item.item_name}</td>
-                    <td className="px-4 py-3">{item.quantity}</td>
-                    <td className="px-4 py-3">{item.type}</td>
                     <td className="px-4 py-3">
-                      <span
-                        className={`font-semibold ${
-                          item.status?.toLowerCase() === "cancelled"
-                            ? "text-red-600"
-                            : item.status?.toLowerCase() === "completed"
-                            ? "text-green-600"
-                            : "text-yellow-600"
-                        }`}
-                      >
-                        {item.status}
+                      <span className={`font-semibold ${getStatusClassName(item.status)}`}>
+                        {item.status || "Received"}
                       </span>
                     </td>
+                    <td className="px-4 py-3">{item.quantity}</td>
+                    <td className="px-4 py-3">{item.type || "NA"}</td>
                   </tr>
                 ))}
               </tbody>
