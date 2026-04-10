@@ -7,6 +7,7 @@ export default function BarstockReports() {
   const rowsPerPage = 15;
   const requestInFlight = useRef(false);
   const [searchParams] = useSearchParams();
+
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [itemName, setItemName] = useState(searchParams.get("itemName") || "");
@@ -19,7 +20,9 @@ export default function BarstockReports() {
 
   const fetchData = useCallback(
     async ({ reset = false, nextPage = 0 } = {}) => {
-      if (requestInFlight.current) return;
+      if (requestInFlight.current) {
+        return;
+      }
 
       try {
         requestInFlight.current = true;
@@ -47,7 +50,9 @@ export default function BarstockReports() {
         setHasMore(newData.length === rowsPerPage);
       } catch (err) {
         console.error("Error fetching data:", err);
-        if (reset) setData([]);
+        if (reset) {
+          setData([]);
+        }
         setHasMore(false);
       } finally {
         requestInFlight.current = false;
@@ -60,8 +65,12 @@ export default function BarstockReports() {
   useEffect(() => {
     const nextItemName = searchParams.get("itemName") || "";
     const nextItemCode = searchParams.get("itemCode") || "";
+
     setItemName(nextItemName);
-    setActiveFilters({ itemName: nextItemName, itemCode: nextItemCode });
+    setActiveFilters({
+      itemName: nextItemName,
+      itemCode: nextItemCode,
+    });
     setPage(0);
     setHasMore(true);
     setData([]);
@@ -74,6 +83,7 @@ export default function BarstockReports() {
   const handleSearch = () => {
     setPage(0);
     setHasMore(true);
+    setData([]);
     setActiveFilters({
       itemName: itemName.trim(),
       itemCode: "",
@@ -82,7 +92,12 @@ export default function BarstockReports() {
 
   const handleScroll = (event) => {
     const { scrollTop, clientHeight, scrollHeight } = event.currentTarget;
-    if (scrollTop + clientHeight >= scrollHeight - 80 && !loading && hasMore) {
+
+    if (
+      scrollTop + clientHeight >= scrollHeight - 80 &&
+      !loading &&
+      hasMore
+    ) {
       fetchData({ nextPage: page });
     }
   };
@@ -103,6 +118,7 @@ export default function BarstockReports() {
             onChange={(e) => setItemName(e.target.value)}
             className="w-64 rounded-lg border px-4 py-2"
           />
+
           <button
             onClick={handleSearch}
             className="rounded-lg bg-blue-500 px-4 py-2 text-white"
@@ -127,6 +143,7 @@ export default function BarstockReports() {
                 <th className="p-3">A/C Unit</th>
               </tr>
             </thead>
+
             <tbody>
               {data.map((item, index) => (
                 <tr
@@ -142,6 +159,7 @@ export default function BarstockReports() {
                   <td className="p-3">{item.A_C_UNIT ?? "-"}</td>
                 </tr>
               ))}
+
               {!loading && !data.length && (
                 <tr>
                   <td className="p-3 text-center" colSpan="7">
@@ -151,6 +169,7 @@ export default function BarstockReports() {
               )}
             </tbody>
           </table>
+
           {loading && <p className="p-3 text-center">Loading...</p>}
           {!loading && data.length > 0 && !hasMore && (
             <p className="p-3 text-center">No more data</p>

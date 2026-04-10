@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { FaDownload, FaFilter, FaSearch, FaTimes } from "react-icons/fa";
+import { FaDownload, FaSearch } from "react-icons/fa";
 import api from "../../../services/api";
 import Stackreporttab from "./Stackreporttab";
 import { exportTableToPdf } from "../../../utils/pdfExport";
@@ -46,7 +46,6 @@ export default function Orderitemdetails() {
     kitchenNames: [],
   });
   const [filtersLoading, setFiltersLoading] = useState(false);
-  const [showFilterModal, setShowFilterModal] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -100,6 +99,9 @@ export default function Orderitemdetails() {
       }
     } catch (err) {
       console.error(err);
+      setError(
+        err.response?.data?.message || "Unable to fetch item details report."
+      );
       setData([]);
     } finally {
       setLoading(false);
@@ -118,17 +120,7 @@ export default function Orderitemdetails() {
     setAppliedFilters(nextFilters);
     setHasSearched(true);
     setError("");
-    setShowFilterModal(false);
     await fetchData(nextFilters);
-  };
-
-  const clearFilters = () => {
-    setFilters(initialFilters);
-    setAppliedFilters(initialFilters);
-    setData([]);
-    setHasSearched(false);
-    setError("");
-    setShowFilterModal(false);
   };
 
   const exportPdf = () => {
@@ -172,14 +164,80 @@ export default function Orderitemdetails() {
         <div className="bg-white p-6 rounded-xl shadow">
           <Stackreporttab />
 
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mt-5 mb-5">
+            <input
+              type="date"
+              name="fromDate"
+              value={filters.fromDate}
+              onChange={handleChange}
+              className="input"
+            />
+            <input
+              type="date"
+              name="toDate"
+              value={filters.toDate}
+              onChange={handleChange}
+              className="input"
+            />
+            <select
+              name="itemNames"
+              value={filters.itemNames}
+              onChange={handleChange}
+              className="input"
+              disabled={filtersLoading}
+            >
+              <option value="">
+                {filtersLoading ? "Loading items..." : "Select Item Name"}
+              </option>
+              {filterOptions.itemNames.map((itemName) => (
+                <option key={itemName} value={itemName}>
+                  {itemName}
+                </option>
+              ))}
+            </select>
+            <select
+              name="kitchenName"
+              value={filters.kitchenName}
+              onChange={handleChange}
+              className="input"
+              disabled={filtersLoading}
+            >
+              <option value="">
+                {filtersLoading ? "Loading kitchens..." : "Select Kitchen Name"}
+              </option>
+              {filterOptions.kitchenNames.map((kitchenName) => (
+                <option key={kitchenName} value={kitchenName}>
+                  {kitchenName}
+                </option>
+              ))}
+            </select>
+            <select
+              name="userName"
+              value={filters.userName}
+              onChange={handleChange}
+              className="input"
+              disabled={filtersLoading}
+            >
+              <option value="">
+                {filtersLoading ? "Loading users..." : "Select User Name"}
+              </option>
+              {filterOptions.userNames.map((userName) => (
+                <option key={userName} value={userName}>
+                  {userName}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <div className="flex justify-end gap-3 mb-4">
-            <button onClick={() => setShowFilterModal(true)} className="btn">
-              <FaFilter size={16} /> Filters
-            </button>
-            <button onClick={handleSearch} className="btn">
+            <button onClick={handleSearch} className="btn" disabled={loading}>
               <FaSearch size={16} /> {loading ? "Loading..." : "Search"}
             </button>
-            <button onClick={exportPdf} className="btn">
+            <button
+              onClick={exportPdf}
+              className="btn"
+              disabled={!data.length}
+            >
               <FaDownload size={16} /> Download
             </button>
           </div>
@@ -206,7 +264,7 @@ export default function Orderitemdetails() {
                   {data.length ? (
                     data.map((row, i) => (
                       <tr
-                        key={i}
+                        key={row.item_id || `${row.item_name || "row"}-${i}`}
                         className={`text-center border-t ${
                           !row.item_id ? "font-bold text-red-600" : ""
                         }`}
@@ -240,89 +298,10 @@ export default function Orderitemdetails() {
         </div>
       </div>
 
-      {showFilterModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-3xl rounded-2xl bg-white p-6 shadow-2xl">
-            <div className="mb-5 flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-semibold text-gray-800">Filter Report</h2>
-                <p className="text-sm text-gray-500">
-                  Choose the filters you want to apply to the item details report.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowFilterModal(false)}
-                className="rounded-full p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
-              >
-                <FaTimes size={18} />
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="label">From Date</label>
-                <input type="date" name="fromDate" value={filters.fromDate} onChange={handleChange} className="input" />
-              </div>
-              <div>
-                <label className="label">To Date</label>
-                <input type="date" name="toDate" value={filters.toDate} onChange={handleChange} className="input" />
-              </div>
-              <div>
-                <label className="label">Item Name</label>
-                <select name="itemNames" value={filters.itemNames} onChange={handleChange} className="input" disabled={filtersLoading}>
-                  <option value="">{filtersLoading ? "Loading items..." : "Select Item Name"}</option>
-                  {filterOptions.itemNames.map((itemName) => (
-                    <option key={itemName} value={itemName}>
-                      {itemName}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="label">Kitchen Name</label>
-                <select name="kitchenName" value={filters.kitchenName} onChange={handleChange} className="input" disabled={filtersLoading}>
-                  <option value="">{filtersLoading ? "Loading kitchens..." : "Select Kitchen Name"}</option>
-                  {filterOptions.kitchenNames.map((kitchenName) => (
-                    <option key={kitchenName} value={kitchenName}>
-                      {kitchenName}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="label">User Name</label>
-                <select name="userName" value={filters.userName} onChange={handleChange} className="input" disabled={filtersLoading}>
-                  <option value="">{filtersLoading ? "Loading users..." : "Select User Name"}</option>
-                  {filterOptions.userNames.map((userName) => (
-                    <option key={userName} value={userName}>
-                      {userName}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="mt-6 flex justify-end gap-3">
-              <button type="button" onClick={clearFilters} className="btn btn-secondary">
-                Clear
-              </button>
-              <button type="button" onClick={() => setShowFilterModal(false)} className="btn btn-secondary">
-                Cancel
-              </button>
-              <button type="button" onClick={handleSearch} className="btn">
-                <FaSearch size={16} /> {loading ? "Loading..." : "Apply Filters"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       <style>{`
         .input { padding: 8px; border: 1px solid #ccc; border-radius: 6px; width: 100%; }
-        .label { display: block; margin-bottom: 8px; font-size: 14px; font-weight: 600; color: #374151; }
         .btn { display: flex; gap: 5px; align-items: center; background: #6b5f5f; color: white; padding: 8px 14px; border-radius: 20px; }
-        .btn-secondary { background: #e5e7eb; color: #374151; }
+        .btn:disabled { opacity: 0.6; cursor: not-allowed; }
         .th { padding: 10px }
         .td { padding: 10px }
       `}</style>
