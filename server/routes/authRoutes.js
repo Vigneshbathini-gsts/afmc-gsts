@@ -10,6 +10,7 @@ router.post("/register", authController.createUser);
 // Route for user login
 router.post("/login", authController.loginUser);
 router.post("/get-role", authController.getUserRole);
+router.post("/change-password",authMiddleware, authController.changePassword);
 router.post("/forgot-password", authController.forgotPassword);
 router.post("/reset-password", authController.resetPassword);
 

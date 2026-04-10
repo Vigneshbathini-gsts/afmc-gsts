@@ -19,9 +19,15 @@ app.get("/", (req, res) => {
 
 const authRoutes = require("./routes/authRoutes");
 const reportRoutes = require("./routes/reportRoutes");
+const cocktailRoutes = require("./routes/cocktailRoutes");
+const userRoutes = require("./routes/userRoutes");
+const orderRoutes = require("./routes/orderRoutes");
 
 app.use("/api/auth", authRoutes);
 app.use("/api/reports", reportRoutes);
+app.use("/api/cocktails", cocktailRoutes);
+app.use("/api/users", userRoutes);
+app.use("/api/orders", orderRoutes);
 const priceRoutes = require("./routes/priceRoutes");
 app.use("/api/price", priceRoutes);
 
@@ -36,6 +42,9 @@ app.use("/api/profit", profitRoutes);
 
 const notificationRoutes = require("./routes/notificationRoutes");
 app.use("/api/notifications", notificationRoutes);
+
+const cancelledOrdersRoutes = require("./routes/cancelledOrdersRoutes");
+app.use("/api/cancelled-orders", cancelledOrdersRoutes);
 
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () =>

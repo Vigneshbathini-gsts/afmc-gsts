@@ -10,6 +10,7 @@ export default function UserMenuDropdown({ username }) {
   const navigate = useNavigate();
   const { user, clearUser } = useAuth();
   const displayName = username || user?.username || "User";
+  console.log("UserMenuDropdown Rendered with username:", displayName);
 
   const handleLogout = () => {
     localStorage.removeItem("token");

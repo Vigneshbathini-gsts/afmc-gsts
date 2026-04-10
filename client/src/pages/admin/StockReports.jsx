@@ -123,27 +123,48 @@ export default function StockReports() {
     );
     cursorY += 10;
 
-    const tableRows = rows.map((row) => [
-      row.item_code,
-      row.item_name,
-      formatReportDate(row.creation_date),
-      row.ac_unit || "Nos",
-      row.stock,
-      row.total_price ?? row.totalprice ?? 0,
-    ]);
+    const isStockIn = activeTab === "in";
+    const tableRows = rows.map((row) =>
+      isStockIn
+        ? [
+            row.item_code,
+            row.item_name,
+            row.batch_id || "-",
+            formatReportDate(row.creation_date),
+            row.ac_unit || "Nos",
+            row.stock,
+            row.total_price ?? row.totalprice ?? 0,
+          ]
+        : [
+            row.item_code,
+            row.item_name,
+            formatReportDate(row.creation_date),
+            row.ac_unit || "Nos",
+            row.stock,
+            row.total_price ?? row.totalprice ?? 0,
+          ]
+    );
 
     autoTable(doc, {
       startY: cursorY + 10,
-      head: [
-        [
-          "Item Code",
-          "Item Name",
-          "Transaction Date",
-          "A/c Unit",
-          "Stock",
-          "Total Price",
-        ],
-      ],
+      head: isStockIn
+        ? [[
+            "Item Code",
+            "Item Name",
+            "Batch ID",
+            "Transaction Date",
+            "A/c Unit",
+            "Stock",
+            "Total Price",
+          ]]
+        : [[
+            "Item Code",
+            "Item Name",
+            "Transaction Date",
+            "A/c Unit",
+            "Stock",
+            "Total Price",
+          ]],
       body: tableRows,
       styles: {
         font: "helvetica",
@@ -155,12 +176,24 @@ export default function StockReports() {
         textColor: [60, 60, 60],
       },
       columnStyles: {
-        0: { cellWidth: 60 },
-        1: { cellWidth: 150 },
-        2: { cellWidth: 90 },
-        3: { cellWidth: 60 },
-        4: { cellWidth: 50 },
-        5: { cellWidth: 70 },
+        ...(isStockIn
+          ? {
+              0: { cellWidth: 55 },
+              1: { cellWidth: 110 },
+              2: { cellWidth: 70 },
+              3: { cellWidth: 85 },
+              4: { cellWidth: 55 },
+              5: { cellWidth: 45 },
+              6: { cellWidth: 65 },
+            }
+          : {
+              0: { cellWidth: 60 },
+              1: { cellWidth: 150 },
+              2: { cellWidth: 90 },
+              3: { cellWidth: 60 },
+              4: { cellWidth: 50 },
+              5: { cellWidth: 70 },
+            }),
       },
       margin: { left: marginX, right: marginX },
     });
@@ -270,6 +303,9 @@ export default function StockReports() {
                 <tr>
                   <th className="px-4 py-3 text-left font-medium">Item Code</th>
                   <th className="px-4 py-3 text-left font-medium">Item Name</th>
+                  {activeTab === "in" && (
+                    <th className="px-4 py-3 text-left font-medium">Batch ID</th>
+                  )}
                   <th className="px-4 py-3 text-left font-medium">
                     Transaction Date
                   </th>
@@ -281,13 +317,13 @@ export default function StockReports() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan="6" className="px-4 py-6 text-center text-gray-500">
+                    <td colSpan={activeTab === "in" ? 7 : 6} className="px-4 py-6 text-center text-gray-500">
                       Loading report...
                     </td>
                   </tr>
                 ) : rows.length === 0 ? (
                   <tr>
-                    <td colSpan="6" className="px-4 py-6 text-center text-gray-500">
+                    <td colSpan={activeTab === "in" ? 7 : 6} className="px-4 py-6 text-center text-gray-500">
                       No records found.
                     </td>
                   </tr>
@@ -296,6 +332,9 @@ export default function StockReports() {
                     <tr key={`${row.item_code}-${idx}`} className="border-t border-gray-100">
                       <td className="px-4 py-3">{row.item_code}</td>
                       <td className="px-4 py-3">{row.item_name}</td>
+                      {activeTab === "in" && (
+                        <td className="px-4 py-3">{row.batch_id || "-"}</td>
+                      )}
                       <td className="px-4 py-3">
                         {formatDisplayDate(row.creation_date)}
                       </td>

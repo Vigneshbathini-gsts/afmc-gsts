@@ -5,12 +5,23 @@ const generateResetToken = () => {
   return crypto.randomBytes(32).toString("hex");
 };
 
-const hashPassword = async (password) => {
-  const salt = await bcrypt.genSalt(10);
-  return await bcrypt.hash(password, salt);
+const hashPassword = (password) => {
+  return crypto.createHash("md5").update(password).digest("hex").toUpperCase();
+};
+
+const comparePassword = (plainPassword, storedPassword) => {
+  const hashedInput = hashPassword(plainPassword);
+  console.log("Comparing Passwords:", {
+    plainPassword,
+    hashedInput,
+    storedPassword,
+  });
+
+  return hashedInput === storedPassword.toUpperCase();
 };
 
 module.exports = {
   generateResetToken,
   hashPassword,
+  comparePassword,
 };

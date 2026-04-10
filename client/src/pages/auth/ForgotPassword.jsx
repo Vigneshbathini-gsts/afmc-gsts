@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import axios from "axios";
 import { FaEnvelope, FaArrowLeft } from "react-icons/fa";
 import { Link } from "react-router-dom";
+import { authAPI } from "../../services/api";
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
@@ -22,10 +22,9 @@ export default function ForgotPassword() {
     try {
       setLoading(true);
 
-      const res = await axios.post(
-        "http://localhost:5000/api/auth/forgot-password",
-        { email }
-      );
+      const res = await authAPI.forgotPassword({ email });
+
+      console.log("Forgot Password Response:", res.data);
 
       setMessage(res.data.message);
       setEmail("");

@@ -25,7 +25,7 @@ export default function Stackreporttab() {
   const isOverviewPage = location.pathname === "/admin/stock-reports";
 
   return (
-    <div className="w-full">
+    <div className="w-full relative z-10">
       <div className="flex justify-between items-center gap-4 mb-4">
         <button
           onClick={() => navigate("/admin/dashboard")}

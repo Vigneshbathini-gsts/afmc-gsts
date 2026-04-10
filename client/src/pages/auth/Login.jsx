@@ -10,9 +10,11 @@ import {
   FaIceCream,
   FaCoffee,
   FaCookieBite,
+  FaUtensils,
 } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { authAPI } from "../../services/api";
+import { useAuth } from "../../context/AuthContext";
 
 export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
@@ -22,6 +24,7 @@ export default function Login() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showOutletDropdown, setShowOutletDropdown] = useState(false);
+  const { setUser } = useAuth();
 
   const navigate = useNavigate();
   const fetchUserRole = async () => {
@@ -55,22 +58,20 @@ export default function Login() {
         password,
         outletType,
       });
-    // console.log(response.data);
+      // console.log(response.data);
       if (response.data?.success) {
         localStorage.setItem("token", response.data.token);
-        localStorage.setItem("user", JSON.stringify(response.data.user));
+        setUser(response.data.user);
         navigate(response.data.redirectPath);
-        console.log(response.data);
         return;
       }
-      console.log(response.data);
       setError(response.data?.message || "Login failed");
     } catch (loginError) {
       console.error("Error during login:", loginError);
       setError(
         loginError.response?.data?.message ||
-          loginError.response?.data?.error ||
-          "Login failed. Please check your credentials."
+        loginError.response?.data?.error ||
+        "Login failed. Please check your credentials."
       );
     } finally {
       setLoading(false);
@@ -122,8 +123,9 @@ export default function Login() {
               <div className="mt-12 relative w-72 h-72">
                 <div className="absolute inset-0 rounded-full bg-[#d70652]/10 blur-3xl"></div>
                 <div className="absolute inset-8 rounded-full border border-[#ff025e]/30 bg-white/60 backdrop-blur-sm shadow-xl"></div>
-                <div className="absolute top-16 left-16 text-4xl font-semibold text-[#d70652] animate-bounce-slow">
-                  AFMC
+
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <FaUtensils className="text-[#d70652] animate-bounce-slow drop-shadow-lg" size={80} />
                 </div>
               </div>
             </div>
