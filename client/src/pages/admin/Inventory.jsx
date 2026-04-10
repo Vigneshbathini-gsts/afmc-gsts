@@ -7,6 +7,18 @@ const requiresVolume = (acUnit) => String(acUnit || "").trim().toUpperCase() !==
 
 const isValidBarcode = (value) => /^\d{4,32}$/.test(String(value || "").trim());
 
+const getCurrentUsername = () => {
+  try {
+    const rawUser =
+      localStorage.getItem("user") || localStorage.getItem("authUser");
+    if (!rawUser) return "ADMIN";
+    const user = JSON.parse(rawUser);
+    return user?.username || user?.email || user?.user_name || user?.name || "ADMIN";
+  } catch (_error) {
+    return "ADMIN";
+  }
+};
+
 export default function Inventory() {
   const navigate = useNavigate();
   const [categories, setCategories] = useState([]);
@@ -26,6 +38,10 @@ export default function Inventory() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showStockModal, setShowStockModal] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
+  const [addCategoryFilter, setAddCategoryFilter] = useState("");
+  const [isAddCategoryDropdownOpen, setIsAddCategoryDropdownOpen] = useState(false);
+  const [subCategoryFilter, setSubCategoryFilter] = useState("");
+  const [isSubCategoryDropdownOpen, setIsSubCategoryDropdownOpen] = useState(false);
   const [formValues, setFormValues] = useState({
     itemName: "",
     description: "",
@@ -60,8 +76,12 @@ export default function Inventory() {
   });
   const [stockRows, setStockRows] = useState([]);
   const [stockRowSearch, setStockRowSearch] = useState("");
+  const [inventorySearchInput, setInventorySearchInput] = useState("");
   const categoryDropdownRef = useRef(null);
   const itemDropdownRef = useRef(null);
+  const addCategoryDropdownRef = useRef(null);
+  const subCategoryDropdownRef = useRef(null);
+  const searchRef = useRef("");
 
   const fetchCategories = async () => {
     try {
@@ -101,17 +121,23 @@ export default function Inventory() {
       const params = {
         categoryId: (options.categoryId ?? categoryId) || undefined,
         itemCode: (options.itemCode ?? itemCode) || undefined,
-        q: (options.search ?? search) || undefined,
+        q: (options.search ?? searchRef.current) || undefined,
       };
       const response = await inventoryAPI.getAll(params);
-      setInventory(response.data.data || []);
+      const rows = response.data.data || [];
+      setInventory(
+        rows.filter((row) => {
+          if (row?.sub_category == null) return true;
+          return ![14, 15].includes(Number(row.sub_category));
+        })
+      );
     } catch (err) {
       console.error("Failed to load inventory:", err);
       setError("Failed to load inventory.");
     } finally {
       setLoading(false);
     }
-  }, [categoryId, itemCode, search]);
+  }, [categoryId, itemCode]);
 
   const fetchBarTypes = async () => {
     try {
@@ -142,7 +168,11 @@ export default function Inventory() {
 
   useEffect(() => {
     fetchInventory({ categoryId, itemCode, search });
-  }, [fetchInventory, categoryId, itemCode, search]);
+  }, [fetchInventory, categoryId, itemCode]);
+
+  useEffect(() => {
+    searchRef.current = search;
+  }, [search]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -158,6 +188,20 @@ export default function Inventory() {
         !itemDropdownRef.current.contains(event.target)
       ) {
         setIsItemDropdownOpen(false);
+      }
+
+      if (
+        addCategoryDropdownRef.current &&
+        !addCategoryDropdownRef.current.contains(event.target)
+      ) {
+        setIsAddCategoryDropdownOpen(false);
+      }
+
+      if (
+        subCategoryDropdownRef.current &&
+        !subCategoryDropdownRef.current.contains(event.target)
+      ) {
+        setIsSubCategoryDropdownOpen(false);
       }
     };
 
@@ -207,6 +251,43 @@ export default function Inventory() {
     [items, itemCode]
   );
 
+  const filteredAddCategories = useMemo(() => {
+    const query = addCategoryFilter.trim().toLowerCase();
+    if (!query) return cleanedCategories;
+
+    return cleanedCategories.filter((category) =>
+      String(category.category_name || "").toLowerCase().includes(query)
+    );
+  }, [addCategoryFilter, cleanedCategories]);
+
+  const filteredAddSubCategories = useMemo(() => {
+    const query = subCategoryFilter.trim().toLowerCase();
+    const cleanedSubCategories = subCategories.filter(
+      (sub) => String(sub.sub_category_name || "").trim() !== ""
+    );
+    if (!query) return cleanedSubCategories;
+
+    return cleanedSubCategories.filter((sub) =>
+      String(sub.sub_category_name || "").toLowerCase().includes(query)
+    );
+  }, [subCategoryFilter, subCategories]);
+
+  const selectedAddCategory = useMemo(
+    () =>
+      cleanedCategories.find(
+        (category) => String(category.category_id) === String(formValues.categoryId)
+      ),
+    [cleanedCategories, formValues.categoryId]
+  );
+
+  const selectedAddSubCategory = useMemo(
+    () =>
+      subCategories.find(
+        (sub) => String(sub.sub_category_id) === String(formValues.subCategory)
+      ),
+    [formValues.subCategory, subCategories]
+  );
+
   const formatDate = (date) => {
     const d = date instanceof Date ? date : new Date(date);
     const mm = String(d.getMonth() + 1).padStart(2, "0");
@@ -232,12 +313,41 @@ export default function Inventory() {
       prepCharges: "N",
       image: null,
     });
+    setAddCategoryFilter("");
+    setIsAddCategoryDropdownOpen(false);
+    setSubCategoryFilter("");
+    setIsSubCategoryDropdownOpen(false);
     setShowAddModal(true);
   };
 
   const handleCreateItem = async () => {
-    if (!formValues.itemName || !formValues.categoryId) {
+    const trimmedItemName = String(formValues.itemName || "").trim();
+    const duplicateItem = items.some(
+      (item) => String(item.item_name || "").trim().toLowerCase() === trimmedItemName.toLowerCase()
+    );
+
+    if (!trimmedItemName || !formValues.categoryId) {
       setError("Item name and category are required.");
+      return;
+    }
+
+    if (!formValues.subCategory) {
+      setError("Sub category is required.");
+      return;
+    }
+
+    if (!formValues.acUnit) {
+      setError("Accounting unit is required.");
+      return;
+    }
+
+    if (!formValues.prepCharges) {
+      setError("Preparation charges selection is required.");
+      return;
+    }
+
+    if (duplicateItem) {
+      setError("Item name already exists.");
       return;
     }
 
@@ -245,13 +355,13 @@ export default function Inventory() {
     setError("");
     try {
       const formData = new FormData();
-      formData.append("itemName", formValues.itemName);
+      formData.append("itemName", trimmedItemName);
       formData.append("description", formValues.description);
       formData.append("categoryId", formValues.categoryId);
       formData.append("subCategory", formValues.subCategory);
       formData.append("acUnit", formValues.acUnit);
       formData.append("prepCharges", formValues.prepCharges);
-      formData.append("createdBy", "ADMIN");
+      formData.append("createdBy", getCurrentUsername());
       if (formValues.image) {
         formData.append("image", formValues.image);
       }
@@ -305,7 +415,7 @@ export default function Inventory() {
     setShowImageModal(true);
   };
 
-  const handleStageStock = () => {
+  const handleStageStock = async () => {
     if (!stockForm.itemCode || !stockForm.rate || !stockForm.barcode || !stockForm.transactionDate) {
       setStockError("Item code, barcode, rate, and transaction date are required.");
       return;
@@ -331,11 +441,24 @@ export default function Inventory() {
       return;
     }
 
-    setStockError("");
     const normalizedBarcode = String(stockForm.barcode).trim();
 
     if (stockRows.some((row) => row.barcode === normalizedBarcode)) {
       setStockError("This barcode is already staged.");
+      return;
+    }
+
+    setStockError("");
+
+    try {
+      const response = await inventoryAPI.checkBarcodeExists(normalizedBarcode);
+      if (response.data?.exists) {
+        setStockError("This barcode already exists.");
+        return;
+      }
+    } catch (err) {
+      console.error("Failed to verify barcode:", err);
+      setStockError("Unable to verify barcode uniqueness.");
       return;
     }
 
@@ -393,7 +516,7 @@ export default function Inventory() {
           rate: row.rate,
           prepCharges: row.prepCharges,
           acUnit: row.acUnit,
-          createdBy: "ADMIN",
+          createdBy: getCurrentUsername(),
         })),
       });
       closeStockModal();
@@ -647,15 +770,18 @@ export default function Inventory() {
                   <FaSearch className="text-gray-400" />
                   <input
                     type="text"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
+                    value={inventorySearchInput}
+                    onChange={(e) => setInventorySearchInput(e.target.value)}
                     placeholder="Search item"
                     className="w-full bg-transparent outline-none text-gray-800 placeholder:text-gray-400"
                   />
                 </div>
                 <button
                   type="button"
-                  onClick={() => fetchInventory({ search })}
+                  onClick={() => {
+                    setSearch(inventorySearchInput.trim());
+                    fetchInventory({ search: inventorySearchInput.trim() });
+                  }}
                   className="px-5 py-3 rounded-2xl bg-[#5b5b5b] text-white font-semibold flex items-center gap-2 shadow hover:shadow-md"
                 >
                   <FaSearch />
@@ -1050,44 +1176,144 @@ export default function Inventory() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Category
                 </label>
-                <select
-                  value={formValues.categoryId}
-                  onChange={(e) =>
-                    setFormValues((prev) => ({
-                      ...prev,
-                      categoryId: e.target.value,
-                      subCategory: "",
-                    }))
-                  }
-                  className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-800"
-                >
-                  <option value="">Select Category</option>
-                  {categories.map((category) => (
-                    <option key={category.category_id} value={category.category_id}>
-                      {category.category_name}
-                    </option>
-                  ))}
-                </select>
+                <div className="relative" ref={addCategoryDropdownRef}>
+                  <button
+                    type="button"
+                    onClick={() => setIsAddCategoryDropdownOpen((prev) => !prev)}
+                    className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-left text-gray-800 focus:border-[#ff025e] focus:ring-2 focus:ring-[#ff025e]/20 flex items-center justify-between"
+                  >
+                    <span className="truncate">
+                      {selectedAddCategory?.category_name || "Select Category"}
+                    </span>
+                    <FaChevronDown
+                      className={`text-gray-400 transition-transform ${
+                        isAddCategoryDropdownOpen ? "rotate-180" : ""
+                      }`}
+                    />
+                  </button>
+
+                  {isAddCategoryDropdownOpen && (
+                    <div className="absolute z-30 mt-2 w-full rounded-2xl border border-gray-200 bg-white shadow-2xl overflow-hidden">
+                      <div className="border-b border-gray-100 p-3">
+                        <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2">
+                          <FaSearch className="text-gray-400" />
+                          <input
+                            type="text"
+                            value={addCategoryFilter}
+                            onChange={(e) => setAddCategoryFilter(e.target.value)}
+                            placeholder="Search category name"
+                            className="w-full bg-transparent text-sm text-gray-800 outline-none placeholder:text-gray-400"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="max-h-72 overflow-y-auto py-2">
+                        {filteredAddCategories.length === 0 ? (
+                          <div className="px-4 py-3 text-sm text-gray-500">
+                            No matching categories found.
+                          </div>
+                        ) : (
+                          filteredAddCategories.map((category) => (
+                            <button
+                              key={category.category_id}
+                              type="button"
+                              onClick={() => {
+                                setFormValues((prev) => ({
+                                  ...prev,
+                                  categoryId: category.category_id,
+                                  subCategory: "",
+                                }));
+                                setAddCategoryFilter(category.category_name || "");
+                                setSubCategoryFilter("");
+                                setIsAddCategoryDropdownOpen(false);
+                              }}
+                              className={`w-full px-4 py-2.5 text-left text-sm hover:bg-[#ff025e]/5 ${
+                                String(formValues.categoryId) === String(category.category_id)
+                                  ? "bg-[#ff025e]/10 font-medium text-[#d70652]"
+                                  : "text-gray-700"
+                              }`}
+                            >
+                              {category.category_name}
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Sub Category
                 </label>
-                <select
-                  value={formValues.subCategory}
-                  onChange={(e) =>
-                    setFormValues((prev) => ({ ...prev, subCategory: e.target.value }))
-                  }
-                  className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-800"
-                >
-                  <option value="">Select Sub Category</option>
-                  {subCategories.map((sub) => (
-                    <option key={sub.sub_category_id} value={sub.sub_category_id}>
-                      {sub.sub_category_name}
-                    </option>
-                  ))}
-                </select>
+                <div className="relative" ref={subCategoryDropdownRef}>
+                  <button
+                    type="button"
+                    onClick={() => setIsSubCategoryDropdownOpen((prev) => !prev)}
+                    disabled={!formValues.categoryId}
+                    className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-left text-gray-800 focus:border-[#ff025e] focus:ring-2 focus:ring-[#ff025e]/20 flex items-center justify-between disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <span className="truncate">
+                      {selectedAddSubCategory?.sub_category_name ||
+                        (formValues.categoryId
+                          ? "Select Sub Category"
+                          : "Select Category First")}
+                    </span>
+                    <FaChevronDown
+                      className={`text-gray-400 transition-transform ${
+                        isSubCategoryDropdownOpen ? "rotate-180" : ""
+                      }`}
+                    />
+                  </button>
+
+                  {isSubCategoryDropdownOpen && formValues.categoryId && (
+                    <div className="absolute z-30 mt-2 w-full rounded-2xl border border-gray-200 bg-white shadow-2xl overflow-hidden">
+                      <div className="border-b border-gray-100 p-3">
+                        <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2">
+                          <FaSearch className="text-gray-400" />
+                          <input
+                            type="text"
+                            value={subCategoryFilter}
+                            onChange={(e) => setSubCategoryFilter(e.target.value)}
+                            placeholder="Search sub category"
+                            className="w-full bg-transparent text-sm text-gray-800 outline-none placeholder:text-gray-400"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="max-h-72 overflow-y-auto py-2">
+                        {filteredAddSubCategories.length === 0 ? (
+                          <div className="px-4 py-3 text-sm text-gray-500">
+                            No matching sub categories found.
+                          </div>
+                        ) : (
+                          filteredAddSubCategories.map((sub) => (
+                            <button
+                              key={sub.sub_category_id}
+                              type="button"
+                              onClick={() => {
+                                setFormValues((prev) => ({
+                                  ...prev,
+                                  subCategory: sub.sub_category_id,
+                                }));
+                                setSubCategoryFilter(sub.sub_category_name || "");
+                                setIsSubCategoryDropdownOpen(false);
+                              }}
+                              className={`w-full px-4 py-2.5 text-left text-sm hover:bg-[#ff025e]/5 ${
+                                String(formValues.subCategory) === String(sub.sub_category_id)
+                                  ? "bg-[#ff025e]/10 font-medium text-[#d70652]"
+                                  : "text-gray-700"
+                              }`}
+                            >
+                              {sub.sub_category_name}
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="md:col-span-1">
