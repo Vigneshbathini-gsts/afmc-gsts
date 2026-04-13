@@ -141,13 +141,13 @@ export default function RegisterMember() {
       <div className="mx-auto max-w-7xl">
         {/* Header with back navigation */}
         <div className="mb-6 flex items-center justify-between">
-          <button
+          {/* <button
             onClick={handleCancel}
             className="group flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-medium text-stone-600 shadow-sm transition-all hover:bg-stone-50 hover:text-stone-900"
           >
             <ChevronsLeft size={16} className="transition-transform group-hover:-translate-x-0.5" />
             Back to Dashboard
-          </button>
+          </button> */}
           <div className="flex items-center gap-2">
             <div className="h-2 w-2 rounded-full bg-emerald-500"></div>
             <span className="text-xs font-medium text-stone-400">New Order</span>
