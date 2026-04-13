@@ -1,26 +1,38 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FaArrowLeft, FaChevronDown, FaPlus, FaSearch, FaPen, FaTrash } from "react-icons/fa";
+import { FaArrowLeft, FaChevronDown, FaPlus, FaSearch, FaPen, FaTrash,FaCamera } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
+import BarcodeScanner from "../../components/common/BarcodeScanner";
 import { inventoryAPI } from "../../services/api";
+import { useAuth } from "../../context/AuthContext";
+
 
 const requiresVolume = (acUnit) => String(acUnit || "").trim().toUpperCase() !== "NOS";
 
 const isValidBarcode = (value) => /^\d{4,32}$/.test(String(value || "").trim());
 
-const getCurrentUsername = () => {
-  try {
-    const rawUser =
-      localStorage.getItem("user") || localStorage.getItem("authUser");
-    if (!rawUser) return "ADMIN";
-    const user = JSON.parse(rawUser);
-    return user?.username || user?.email || user?.user_name || user?.name || "ADMIN";
-  } catch (_error) {
-    return "ADMIN";
-  }
-};
+// const getCurrentUsername = () => {
+//   try {
+//     const rawUser =
+//       localStorage.getItem("user") || localStorage.getItem("authUser");
+//     if (!rawUser) return "";
+//     const user = JSON.parse(rawUser);
+//     console.log("user", user);
+//     const Username =  user?.username || user?.email || user?.user_name || user?.name || "ADMIN";
+//     console.log("userq", Username);
+//     return Username
+//   } catch (_error) {
+//     return "ADMIN";
+//   }
+// };
+// console.log("created",currentLoggedInUser());
 
 export default function Inventory() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  console.log("user", user);
+const currentLoggedInUser =
+    user?.username || user?.email || user?.user_name || user?.name || "";
+  console.log("currentLoggedInUser", currentLoggedInUser);
   const [categories, setCategories] = useState([]);
   const [subCategories, setSubCategories] = useState([]);
   const [items, setItems] = useState([]);
@@ -42,6 +54,7 @@ export default function Inventory() {
   const [isAddCategoryDropdownOpen, setIsAddCategoryDropdownOpen] = useState(false);
   const [subCategoryFilter, setSubCategoryFilter] = useState("");
   const [isSubCategoryDropdownOpen, setIsSubCategoryDropdownOpen] = useState(false);
+ 
   const [formValues, setFormValues] = useState({
     itemName: "",
     description: "",
@@ -56,6 +69,7 @@ export default function Inventory() {
   const [stockError, setStockError] = useState("");
   const [imageSaving, setImageSaving] = useState(false);
   const [imageError, setImageError] = useState("");
+  const [scannerOpen, setScannerOpen] = useState(false);
   const [imageForm, setImageForm] = useState({
     itemCode: "",
     itemName: "",
@@ -279,7 +293,6 @@ export default function Inventory() {
       ),
     [cleanedCategories, formValues.categoryId]
   );
-
   const selectedAddSubCategory = useMemo(
     () =>
       subCategories.find(
@@ -361,7 +374,8 @@ export default function Inventory() {
       formData.append("subCategory", formValues.subCategory);
       formData.append("acUnit", formValues.acUnit);
       formData.append("prepCharges", formValues.prepCharges);
-      formData.append("createdBy", getCurrentUsername());
+      console.log("createdBy", currentLoggedInUser)
+      formData.append("createdBy", currentLoggedInUser);
       if (formValues.image) {
         formData.append("image", formValues.image);
       }
@@ -415,8 +429,10 @@ export default function Inventory() {
     setShowImageModal(true);
   };
 
-  const handleStageStock = async () => {
-    if (!stockForm.itemCode || !stockForm.rate || !stockForm.barcode || !stockForm.transactionDate) {
+  const stageStockRow = useCallback(async (barcodeValue = stockForm.barcode) => {
+    const normalizedBarcode = String(barcodeValue || "").trim();
+
+    if (!stockForm.itemCode || !stockForm.rate || !normalizedBarcode || !stockForm.transactionDate) {
       setStockError("Item code, barcode, rate, and transaction date are required.");
       return;
     }
@@ -431,7 +447,7 @@ export default function Inventory() {
       return;
     }
 
-    if (!isValidBarcode(stockForm.barcode)) {
+    if (!isValidBarcode(normalizedBarcode)) {
       setStockError("Barcode must be 4 to 32 digits.");
       return;
     }
@@ -440,8 +456,6 @@ export default function Inventory() {
       setStockError("Volume is required for the selected type.");
       return;
     }
-
-    const normalizedBarcode = String(stockForm.barcode).trim();
 
     if (stockRows.some((row) => row.barcode === normalizedBarcode)) {
       setStockError("This barcode is already staged.");
@@ -485,7 +499,25 @@ export default function Inventory() {
       ...prev,
       barcode: "",
     }));
+  }, [stockForm, stockRows]);
+
+  const handleStageStock = async () => {
+    await stageStockRow(stockForm.barcode);
   };
+
+  const handleScannerClose = useCallback(() => {
+    setScannerOpen(false);
+  }, []);
+
+  const handleScan = useCallback(
+    async (scannedValue) => {
+      const normalizedBarcode = String(scannedValue || "").trim();
+      setScannerOpen(false);
+      setStockForm((prev) => ({ ...prev, barcode: normalizedBarcode }));
+      await stageStockRow(normalizedBarcode);
+    },
+    [stageStockRow]
+  );
 
   const handleDeleteStockRow = (barcode) => {
     setStockRows((current) => current.filter((row) => row.barcode !== barcode));
@@ -516,7 +548,7 @@ export default function Inventory() {
           rate: row.rate,
           prepCharges: row.prepCharges,
           acUnit: row.acUnit,
-          createdBy: getCurrentUsername(),
+          createdBy: currentLoggedInUser,
         })),
       });
       closeStockModal();
@@ -1038,6 +1070,14 @@ export default function Inventory() {
             </div>
 
             <div className="mt-8 rounded-3xl border border-gray-200 bg-white shadow-sm">
+              <button
+                             type="button"
+                             onClick={() => setScannerOpen(true)}
+                             className="flex items-center gap-2 rounded-2xl bg-[#d70652] px-5 py-3 font-semibold text-white shadow hover:shadow-md"
+                           >
+                             <FaCamera />
+                             Scan
+                           </button>
               <div className="min-h-[140px] border-b border-gray-100 bg-[radial-gradient(circle_at_center,rgba(215,6,82,0.06),transparent_42%)]"></div>
 
               <div className="flex flex-wrap items-center justify-between gap-4 p-4">
@@ -1499,6 +1539,7 @@ export default function Inventory() {
           </div>
         </div>
       )}
+       <BarcodeScanner isOpen={scannerOpen} onClose={handleScannerClose} onScan={handleScan} />
     </div>
   );
 }

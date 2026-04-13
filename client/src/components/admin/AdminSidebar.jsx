@@ -1,5 +1,6 @@
 import React from "react";
 import { NavLink } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
 import {
   FaTachometerAlt,
   FaBoxes,
@@ -10,6 +11,9 @@ import {
 } from "react-icons/fa";
 
 export default function AdminSidebar({ isOpen, onClose }) {
+  const { user } = useAuth();
+  const isInventoryOnlyUser = Number(user?.roleId) === 80;
+
   const navLinkClass = ({ isActive }) =>
     `flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
       isActive
@@ -56,40 +60,57 @@ export default function AdminSidebar({ isOpen, onClose }) {
           </NavLink>
 
           <NavLink
-            to="/admin/add-item"
+            to="/admin/inventory"
             className={navLinkClass}
             onClick={onClose}
           >
             <FaBoxes />
-            Add Stock
+            Inventory
           </NavLink>
 
-          <NavLink
-            to="/admin/users"
-            className={navLinkClass}
-            onClick={onClose}
-          >
-            <FaUserPlus />
-            Add User
-          </NavLink>
+          {!isInventoryOnlyUser && (
+            <NavLink
+              to="/admin/add-item"
+              className={navLinkClass}
+              onClick={onClose}
+            >
+              <FaBoxes />
+              Add Stock
+            </NavLink>
+          )}
 
-          <NavLink
-            to="/admin/order-history"
-            className={navLinkClass}
-            onClick={onClose}
-          >
-            <FaHistory />
-            Order History
-          </NavLink>
+          {!isInventoryOnlyUser && (
+            <NavLink
+              to="/admin/users"
+              className={navLinkClass}
+              onClick={onClose}
+            >
+              <FaUserPlus />
+              Add User
+            </NavLink>
+          )}
 
-          <NavLink
-            to="/admin/cancelled-orders"
-            className={navLinkClass}
-            onClick={onClose}
-          >
-            <FaBan />
-            Cancelled Orders
-          </NavLink>
+          {!isInventoryOnlyUser && (
+            <NavLink
+              to="/admin/order-history"
+              className={navLinkClass}
+              onClick={onClose}
+            >
+              <FaHistory />
+              Order History
+            </NavLink>
+          )}
+
+          {!isInventoryOnlyUser && (
+            <NavLink
+              to="/admin/cancelled-orders"
+              className={navLinkClass}
+              onClick={onClose}
+            >
+              <FaBan />
+              Cancelled Orders
+            </NavLink>
+          )}
         </div>
       </aside>
     </>
