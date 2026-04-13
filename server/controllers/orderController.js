@@ -1,4 +1,62 @@
-const { getAdminOrderHistory, getOrderDetails } = require("../models/orderModel");
+const {
+  getActiveOrders,
+  getAdminOrderHistory,
+  getOrderDetails,
+  getNonMemberByPhone,
+  saveNonMember,
+} = require("../models/orderModel");
+
+exports.fetchActiveOrders = async (req, res) => {
+  try {
+    const { from = null, to = null, search = null } = req.query;
+    const appUser = req.user?.username || null;
+
+    const data = await getActiveOrders({
+      from,
+      to,
+      search,
+      appUser,
+    });
+
+    res.status(200).json({
+      success: true,
+      data,
+    });
+  } catch (error) {
+    console.error("Failed to fetch active orders:", error);
+    res.status(500).json({
+      success: false,
+      message: "Unable to fetch active orders.",
+      error: error.message,
+    });
+  }
+};
+
+exports.fetchAttendantOrders = async (req, res) => {
+  try {
+    const { from = null, to = null, search = null } = req.query;
+    const appUser = req.user?.username || null;
+
+    const data = await getActiveOrders({
+      from,
+      to,
+      search,
+      appUser,
+    });
+
+    res.status(200).json({
+      success: true,
+      data,
+    });
+  } catch (error) {
+    console.error("Failed to fetch attendant active orders:", error);
+    res.status(500).json({
+      success: false,
+      message: "Unable to fetch attendant active orders.",
+      error: error.message,
+    });
+  }
+};
 
 exports.fetchAdminOrderHistory = async (req, res) => {
   try {
@@ -39,6 +97,67 @@ exports.fetchOrderDetails = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Unable to fetch order details.",
+      error: error.message,
+    });
+  }
+};
+
+exports.lookupNonMember = async (req, res) => {
+  try {
+    const { phone = "" } = req.query;
+    const normalizedPhone = String(phone).trim();
+
+    if (!normalizedPhone) {
+      return res.status(400).json({
+        success: false,
+        message: "Phone number is required.",
+      });
+    }
+
+    const data = await getNonMemberByPhone(normalizedPhone);
+
+    res.status(200).json({
+      success: true,
+      data,
+    });
+  } catch (error) {
+    console.error("Failed to lookup non-member:", error);
+    res.status(500).json({
+      success: false,
+      message: "Unable to lookup non-member.",
+      error: error.message,
+    });
+  }
+};
+
+exports.createOrUpdateNonMember = async (req, res) => {
+  try {
+    const { firstName, lastName, phoneNumber } = req.body || {};
+    const createdBy = req.user?.username || req.user?.userId || "SYSTEM";
+    const data = await saveNonMember({
+      firstName,
+      lastName,
+      phoneNumber,
+      createdBy,
+    });
+
+    res.status(200).json({
+      success: true,
+      data,
+    });
+  } catch (error) {
+    console.error("Failed to save non-member:", error);
+
+    if (error.code === "INVALID_DATA") {
+      return res.status(400).json({
+        success: false,
+        message: "Phone number and first name are required.",
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: "Unable to save non-member.",
       error: error.message,
     });
   }

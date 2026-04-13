@@ -1,1 +1,3 @@
-export default function OrderHistory(){ return <div>OrderHistory</div>; }
+export default function OrderHistory() {
+  return null;
+}

@@ -38,7 +38,7 @@ export default function AttendantSidebar({ isOpen, onClose }) {
 
                 <div className="p-4 space-y-3">
                     <NavLink
-                        to="/attendant/dashboard"
+                        to="/attendant/register-member"
                         className={navLinkClass}
                         onClick={onClose}
                     >
@@ -47,7 +47,7 @@ export default function AttendantSidebar({ isOpen, onClose }) {
                     </NavLink>
 
                     <NavLink
-                        to="/attendant/cart"
+                        to="/attendant/active-orders"
                         className={navLinkClass}
                         onClick={onClose}
                     >
@@ -56,7 +56,7 @@ export default function AttendantSidebar({ isOpen, onClose }) {
                     </NavLink>
 
                     <NavLink
-                        to="/attendant/order-history"
+                        to="/attendant/order-status"
                         className={navLinkClass}
                         onClick={onClose}
                     >

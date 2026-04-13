@@ -6,8 +6,8 @@ export default function ActiveOrders() {
   return (
     <ActiveOrdersView
       title="Active Orders"
-      backPath="/user/dashboard"
-      fetchOrders={orderAPI.getActiveOrders}
+      backPath="/attendant/dashboard"
+      fetchOrders={orderAPI.getAttendantOrders}
     />
   );
 }
