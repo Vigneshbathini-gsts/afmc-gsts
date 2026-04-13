@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronsLeft } from "lucide-react";
+import { ChevronsLeft, UserPlus, Phone, User, Users } from "lucide-react";
 import { orderAPI } from "../../services/api";
 
 export default function RegisterMember() {
@@ -137,114 +137,246 @@ export default function RegisterMember() {
         : "border-blue-200 bg-blue-50 text-blue-700";
 
   return (
-    <div className="min-h-screen bg-[#efe7dc] p-3 sm:p-5">
-      <div className="relative min-h-[calc(100vh-2rem)] overflow-hidden rounded-[26px] border border-[#ded1c1] bg-[linear-gradient(180deg,#fcfaf7_0%,#f4ede4_100%)] shadow-[0_20px_60px_rgba(78,56,30,0.08)]">
-        <div
-          className="absolute inset-0 opacity-[0.12]"
-          style={{
-            backgroundImage:
-              "radial-gradient(circle at 50% 35%, rgba(165, 128, 83, 0.18), transparent 28%), linear-gradient(180deg, rgba(139, 94, 60, 0.10), rgba(139, 94, 60, 0.03))",
-          }}
-        />
+    <div className="min-h-screen bg-gradient-to-br from-stone-50 to-stone-100 p-4 md:p-6">
+      <div className="mx-auto max-w-7xl">
+        {/* Header with back navigation */}
+        <div className="mb-6 flex items-center justify-between">
+          <button
+            onClick={handleCancel}
+            className="group flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-medium text-stone-600 shadow-sm transition-all hover:bg-stone-50 hover:text-stone-900"
+          >
+            <ChevronsLeft size={16} className="transition-transform group-hover:-translate-x-0.5" />
+            Back to Dashboard
+          </button>
+          <div className="flex items-center gap-2">
+            <div className="h-2 w-2 rounded-full bg-emerald-500"></div>
+            <span className="text-xs font-medium text-stone-400">New Order</span>
+          </div>
+        </div>
 
-        <div className="relative flex min-h-[calc(100vh-2rem)] items-center justify-center px-4 py-8 sm:px-8">
-          <div className="w-full max-w-6xl rounded-[30px] border border-[#e7dbce] bg-white/70 p-6 backdrop-blur-sm sm:p-10">
-            <div className="mx-auto flex max-w-5xl flex-col gap-10 lg:min-h-[520px] lg:justify-between">
-              <div className="flex flex-col gap-4">
-                <p className="text-sm font-semibold uppercase tracking-[0.3em] text-[#a2643d]">
-                  New Order
-                </p>
-                <div className="max-w-xl">
-                  <h1 className="text-3xl font-semibold text-[#3e3124] sm:text-4xl">
-                    Capture non-member details
-                  </h1>
-                  <p className="mt-3 text-base text-[#6f5f52]">
-                    Start with the phone number. If the customer already exists,
-                    the saved first and last name will appear automatically.
+        {/* Main Card */}
+        <div className="overflow-hidden rounded-2xl bg-white shadow-lg shadow-stone-200/50">
+          <div className="grid lg:grid-cols-2">
+            {/* Left Column - Illustration / Info */}
+            <div className="relative hidden overflow-hidden bg-gradient-to-br from-rose-50 to-amber-50 p-8 lg:block">
+              <div className="absolute right-0 top-0 -mr-16 -mt-16 h-64 w-64 rounded-full bg-rose-100/50 blur-3xl"></div>
+              <div className="absolute bottom-0 left-0 -mb-16 -ml-16 h-64 w-64 rounded-full bg-amber-100/50 blur-3xl"></div>
+              
+              <div className="relative flex h-full flex-col justify-between">
+                <div>
+                  <div className="mb-8 inline-flex rounded-xl bg-white/60 p-3 backdrop-blur-sm">
+                    <UserPlus className="h-8 w-8 text-rose-500" />
+                  </div>
+                  <h2 className="text-3xl font-bold tracking-tight text-stone-800">
+                    Guest Checkout
+                  </h2>
+                  <p className="mt-4 text-stone-600">
+                    Create an order for a non-member customer. Their information will be saved for future visits.
                   </p>
                 </div>
+
+                {/* Clean SVG Illustration */}
+                <div className="my-8 flex justify-center">
+                  <svg
+                    width="260"
+                    height="220"
+                    viewBox="0 0 300 250"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="drop-shadow-lg"
+                  >
+                    <g>
+                      {/* Profile Card Background */}
+                      <rect
+                        x="60"
+                        y="80"
+                        width="180"
+                        height="140"
+                        rx="20"
+                        fill="white"
+                        stroke="#F43F5E"
+                        strokeWidth="2"
+                        strokeOpacity="0.3"
+                      />
+                      <rect
+                        x="60"
+                        y="80"
+                        width="180"
+                        height="50"
+                        rx="20"
+                        fill="#F43F5E"
+                        fillOpacity="0.1"
+                      />
+
+                      {/* Avatar Circle */}
+                      <circle cx="150" cy="105" r="28" fill="#F43F5E" fillOpacity="0.2" stroke="#F43F5E" strokeWidth="2" />
+                      <circle cx="150" cy="97" r="10" fill="#F43F5E" fillOpacity="0.8" />
+                      <path d="M133 118 C133 108, 167 108, 167 118" stroke="#F43F5E" strokeWidth="2.5" strokeLinecap="round" fill="none" />
+
+                      {/* Form Fields Placeholder */}
+                      <rect x="85" y="145" width="130" height="8" rx="4" fill="#E5E7EB" />
+                      <rect x="85" y="162" width="100" height="8" rx="4" fill="#E5E7EB" />
+                      <rect x="85" y="179" width="120" height="8" rx="4" fill="#E5E7EB" />
+
+                      {/* Checkmark Badge */}
+                      <circle cx="220" cy="100" r="16" fill="#10B981" fillOpacity="0.15" stroke="#10B981" strokeWidth="1.5" />
+                      <path d="M214 100 L218 104 L226 96" stroke="#10B981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+
+                      {/* Phone Icon connecting */}
+                      <circle cx="85" cy="195" r="12" fill="#FBBF24" fillOpacity="0.15" stroke="#FBBF24" strokeWidth="1.5" />
+                      <path d="M80 191 L83 188 L87 192 L84 195 L80 191Z" fill="#FBBF24" fillOpacity="0.8" />
+                      <path d="M83 188 L86 185" stroke="#FBBF24" strokeWidth="1.5" strokeLinecap="round" />
+
+                      {/* Decorative dots */}
+                      <circle cx="70" cy="70" r="3" fill="#F43F5E" fillOpacity="0.3" />
+                      <circle cx="230" cy="70" r="2" fill="#FBBF24" fillOpacity="0.4" />
+                      <circle cx="250" cy="150" r="2.5" fill="#10B981" fillOpacity="0.3" />
+                      <circle cx="55" cy="160" r="2" fill="#F43F5E" fillOpacity="0.25" />
+                    </g>
+                  </svg>
+                </div>
+
+                {/* Steps */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3 text-sm text-stone-500">
+                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-rose-100 text-xs font-bold text-rose-600">1</div>
+                    <span>Enter phone number to check for existing customer</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-sm text-stone-500">
+                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-rose-100 text-xs font-bold text-rose-600">2</div>
+                    <span>Name fields auto-fill if customer exists</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-sm text-stone-500">
+                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-rose-100 text-xs font-bold text-rose-600">3</div>
+                    <span>Review and proceed to order creation</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column - Form */}
+            <div className="p-6 md:p-8 lg:p-10">
+              <div className="mb-6">
+                <p className="text-xs font-semibold uppercase tracking-wider text-rose-500">
+                  Customer Information
+                </p>
+                <h3 className="mt-1 text-xl font-semibold text-stone-800">Capture Details</h3>
+                <p className="mt-1 text-sm text-stone-500">
+                  Start with the phone number. If the customer already exists, the saved name will appear automatically.
+                </p>
               </div>
 
-              <div className="mx-auto w-full max-w-[520px] space-y-5">
-                <div className="space-y-2">
-                  <label className="block text-sm font-semibold uppercase tracking-[0.18em] text-[#6f5f52]">
-                    Phone Number
+              <div className="space-y-6">
+                {/* Phone Number Field */}
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-stone-700">
+                    Phone Number <span className="text-rose-500">*</span>
                   </label>
-                  <input
-                    value={form.phoneNumber}
-                    onChange={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        phoneNumber: event.target.value.replace(/\D/g, "").slice(0, 10),
-                      }))
-                    }
-                    placeholder="Phone Number"
-                    className="h-[72px] w-full rounded-2xl border border-[#c5b7a5] bg-white/90 px-5 text-[20px] text-[#4f4235] outline-none transition focus:border-[#d70652] focus:ring-2 focus:ring-[#d70652]/15"
-                  />
-                  {lookupLoading ? (
-                    <p className="text-sm text-[#8b7764]">Checking existing customer...</p>
-                  ) : null}
+                  <div className="relative">
+                    <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
+                      <Phone size={18} className="text-stone-400" />
+                    </div>
+                    <input
+                      value={form.phoneNumber}
+                      onChange={(event) =>
+                        setForm((current) => ({
+                          ...current,
+                          phoneNumber: event.target.value.replace(/\D/g, "").slice(0, 10),
+                        }))
+                      }
+                      placeholder="Enter 10-digit mobile number"
+                      className="h-12 w-full rounded-xl border border-stone-200 bg-stone-50 pl-10 pr-4 text-stone-800 placeholder:text-stone-400 focus:border-rose-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-rose-500/20"
+                    />
+                  </div>
+                  {lookupLoading && (
+                    <p className="mt-1.5 flex items-center gap-1.5 text-xs text-rose-500">
+                      <span className="inline-block h-3 w-3 animate-pulse rounded-full bg-rose-400"></span>
+                      Checking existing customer...
+                    </p>
+                  )}
                 </div>
 
-                <div className="space-y-2">
-                  <label className="block text-sm font-semibold uppercase tracking-[0.18em] text-[#6f5f52]">
-                    First Name
+                {/* First Name Field */}
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-stone-700">
+                    First Name <span className="text-rose-500">*</span>
                   </label>
-                  <input
-                    value={form.firstName}
-                    onChange={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        firstName: event.target.value,
-                      }))
-                    }
-                    placeholder="First Name"
-                    className="h-[72px] w-full rounded-2xl border border-[#c5b7a5] bg-white/90 px-5 text-[20px] text-[#4f4235] outline-none transition focus:border-[#d70652] focus:ring-2 focus:ring-[#d70652]/15"
-                  />
+                  <div className="relative">
+                    <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
+                      <User size={18} className="text-stone-400" />
+                    </div>
+                    <input
+                      value={form.firstName}
+                      onChange={(event) =>
+                        setForm((current) => ({
+                          ...current,
+                          firstName: event.target.value,
+                        }))
+                      }
+                      placeholder="First name"
+                      className="h-12 w-full rounded-xl border border-stone-200 bg-stone-50 pl-10 pr-4 text-stone-800 placeholder:text-stone-400 focus:border-rose-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-rose-500/20"
+                    />
+                  </div>
                 </div>
 
-                <div className="space-y-2">
-                  <label className="block text-sm font-semibold uppercase tracking-[0.18em] text-[#6f5f52]">
+                {/* Last Name Field */}
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-stone-700">
                     Last Name
                   </label>
-                  <input
-                    value={form.lastName}
-                    onChange={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        lastName: event.target.value,
-                      }))
-                    }
-                    placeholder="Last Name"
-                    className="h-[72px] w-full rounded-2xl border border-[#c5b7a5] bg-white/90 px-5 text-[20px] text-[#4f4235] outline-none transition focus:border-[#d70652] focus:ring-2 focus:ring-[#d70652]/15"
-                  />
+                  <div className="relative">
+                    <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
+                      <Users size={18} className="text-stone-400" />
+                    </div>
+                    <input
+                      value={form.lastName}
+                      onChange={(event) =>
+                        setForm((current) => ({
+                          ...current,
+                          lastName: event.target.value,
+                        }))
+                      }
+                      placeholder="Last name"
+                      className="h-12 w-full rounded-xl border border-stone-200 bg-stone-50 pl-10 pr-4 text-stone-800 placeholder:text-stone-400 focus:border-rose-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-rose-500/20"
+                    />
+                  </div>
                 </div>
 
-                {status.message ? (
-                  <div className={`rounded-2xl border px-4 py-3 text-sm ${statusClassName}`}>
+                {/* Status Message */}
+                {status.message && (
+                  <div className={`rounded-xl border px-4 py-3 text-sm ${statusClassName}`}>
                     {status.message}
                   </div>
-                ) : null}
-              </div>
+                )}
 
-              <div className="flex w-full items-center justify-between pt-2">
-                <button
-                  type="button"
-                  onClick={handleCancel}
-                  className="inline-flex items-center gap-2 rounded-full bg-[#7d756f] px-7 py-4 text-[18px] font-semibold text-white transition hover:bg-[#6e6660]"
-                >
-                  <ChevronsLeft size={20} />
-                  Cancel
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleProceed}
-                  disabled={submitLoading}
-                  className="rounded-full bg-[#d70652] px-8 py-4 text-[18px] font-semibold text-white transition hover:bg-[#b90546] disabled:cursor-not-allowed disabled:bg-[#d7b6c2]"
-                >
-                  {submitLoading ? "Saving..." : "Proceed"}
-                </button>
+                {/* Action Buttons */}
+                <div className="flex items-center justify-end gap-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={handleCancel}
+                    className="rounded-full border border-stone-200 bg-white px-6 py-2.5 text-sm font-medium text-stone-600 transition-all hover:bg-stone-50 hover:text-stone-900"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleProceed}
+                    disabled={submitLoading}
+                    className="rounded-full bg-rose-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-rose-700 hover:shadow-md disabled:cursor-not-allowed disabled:bg-rose-300"
+                  >
+                    {submitLoading ? (
+                      <span className="flex items-center gap-2">
+                        <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                        Saving...
+                      </span>
+                    ) : (
+                      "Proceed to Order"
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
