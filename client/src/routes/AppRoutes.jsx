@@ -61,10 +61,6 @@ import UserOrderHistory from "../pages/user/OrderHistory";
 
 
 import OutletDashboard from "../pages/kitchen/outlet/dashboard";
-import OutletOrderHistory from "../pages/kitchen/outlet/OrderHistory";
-import OutletOrders from "../pages/kitchen/outlet/Orders";
-import OutletPrepareOrder from "../pages/kitchen/outlet/PrepareOrder";
-
 
 // Optional for now (later if needed)
 // import BarLayout from "../layouts/BarLayout";
@@ -81,6 +77,7 @@ import StorekeeperEditItem from "../pages/storekeeper/EditItem";
 import BarstockReports from "../pages/admin/StockReportspages/BarstockReports";
 import Ordertransactiondetails from "../pages/admin/StockReportspages/Ordertransactiondetails";
 import Orderitemdetails from "../pages/admin/StockReportspages/Orderitemdetails";
+import OutletOrderDetails from "../pages/kitchen/OutletOrderDetails";
 
 
 export default function AppRoutes() {
@@ -93,7 +90,7 @@ export default function AppRoutes() {
       <Route path="/unauthorized" element={<Unauthorized />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password/:token" element={<ResetPassword />} />
-      
+
 
       {/* ================= ADMIN ================= */}
       <Route
@@ -116,7 +113,7 @@ export default function AppRoutes() {
         <Route path="reports" element={<Reports />} />
         <Route path="users" element={<UserManagement />} />
         <Route path="offers" element={<Offers />} />
-        <Route path="offers/create" element={<OfferCreate/>} />
+        <Route path="offers/create" element={<OfferCreate />} />
         <Route path="offers/edit/:id" element={<OfferEdit />} />
 
 
@@ -175,10 +172,8 @@ export default function AppRoutes() {
           </ProtectedRoute>
         }
       >
-        <Route path="dashboard" element={<OutletDashboard outletType="KITCHEN" />} />
-        <Route path="orders" element={<OutletOrders outletType="KITCHEN" />} />
-        <Route path="prepare-order/:id" element={<OutletPrepareOrder outletType="KITCHEN" />} />
-        <Route path="order-history" element={<OutletOrderHistory outletType="KITCHEN" />} />
+        <Route path="dashboard" element={<OutletDashboard />} />
+        <Route path="order-details" element={<OutletOrderDetails />} />
       </Route>
 
       <Route
@@ -189,10 +184,8 @@ export default function AppRoutes() {
           </ProtectedRoute>
         }
       >
-        <Route path="dashboard" element={<OutletDashboard outletType="BAR" />} />
-        <Route path="orders" element={<OutletOrders outletType="BAR" />} />
-        <Route path="prepare-order/:id" element={<OutletPrepareOrder outletType="BAR" />} />
-        <Route path="order-history" element={<OutletOrderHistory outletType="BAR" />} />
+        <Route path="dashboard" element={<OutletDashboard />} />
+        <Route path="order-details" element={<OutletOrderDetails />} />
       </Route>
 
       {/* ================= STOREKEEPER ================= */}

@@ -5,12 +5,14 @@ const AUTH_USER_STORAGE_KEY = "authUser";
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const storedUser = localStorage.getItem(AUTH_USER_STORAGE_KEY);
 
     if (!storedUser) {
       setUser(null);
+      setIsLoading(false);
       return;
     }
 
@@ -20,12 +22,14 @@ export function AuthProvider({ children }) {
       localStorage.removeItem(AUTH_USER_STORAGE_KEY);
       setUser(null);
     }
+    setIsLoading(false);
   }, []);
 
   const setAuthenticatedUser = (userData) => {
     if (!userData) {
       localStorage.removeItem(AUTH_USER_STORAGE_KEY);
       setUser(null);
+      setIsLoading(false);
       return;
     }
 
@@ -42,16 +46,18 @@ export function AuthProvider({ children }) {
 
     localStorage.setItem(AUTH_USER_STORAGE_KEY, JSON.stringify(normalizedUser));
     setUser(normalizedUser);
+    setIsLoading(false);
   };
 
   const clearUser = () => {
     localStorage.removeItem(AUTH_USER_STORAGE_KEY);
     setUser(null);
+    setIsLoading(false);
   };
 
   const value = useMemo(
-    () => ({ user, setUser: setAuthenticatedUser, clearUser }),
-    [user]
+    () => ({ user, isLoading, setUser: setAuthenticatedUser, clearUser }),
+    [user, isLoading]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

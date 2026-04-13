@@ -43,6 +43,15 @@ app.use("/api/cancelled-orders", cancelledOrdersRoutes);
 const orderRoutes = require("./routes/orderRoutes");
 app.use("/api/orders", orderRoutes);
 
+const barOrdersRoutes = require("./routes/barOrdersRoutes");
+app.use("/api/bar-orders", barOrdersRoutes);
+
+const collectionRoutes = require("./routes/collectionRoutes");
+app.use("/api/collection", collectionRoutes);
+
+const cocktailRoutes = require("./routes/cocktailRoutes");
+app.use("/api/cocktails", cocktailRoutes);
+
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () =>
   console.log(`Server listening on port ${PORT}`)

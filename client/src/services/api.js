@@ -162,7 +162,27 @@ export const reportAPI = {
   getCancelledOrdersReport: () => api.get("/reports/cancelled-orders"),
 };
 
+export const barOrdersAPI = {
+  getOrders: (kitchen) => api.get(`/bar-orders?kitchen=${kitchen}`),
+  updateStatus: (data) => api.put("/bar-orders/status", data),
+  getOrderItems: (data) => api.post("/bar-orders/items", data),
+  processScan: (data) => api.post("/bar-orders/scan", data),
+  cancelItem: (data) => api.put("/bar-orders/cancel", data),
+};
 
+// ================================
+// COLLECTION API (Barcode Scan Collection)
+// ================================
+export const collectionAPI = {
+  getByOrder: (orderNumber) => api.get(`/collection/${orderNumber}`),
+  add: (data) => api.post("/collection", data),
+  update: (id, data) => api.put(`/collection/${id}`, data),
+  delete: (id) => api.delete(`/collection/${id}`),
+  clear: (orderNumber) => api.delete(`/collection/${orderNumber}/clear`),
+  getScannedQuantity: (orderNumber, itemCode) =>
+    api.get(`/collection/${orderNumber}/item/${itemCode}`),
+  getSummary: (orderNumber) => api.get(`/collection/${orderNumber}/summary`),
+};
 
 // ================================
 // OFFERS API
@@ -198,6 +218,8 @@ export const profitAPI = {
 // ================================
 export const cocktailAPI = {
   getAll: () => api.get("/cocktails"),
+  getById: (id, orderNumber) =>
+    api.get(`/cocktails/${id}`, { params: { orderNumber } }),
   create: (data) => api.post("/cocktails", data),
   update: (id, data) => api.put(`/cocktails/${id}`, data),
   delete: (id) => api.delete(`/cocktails/${id}`),

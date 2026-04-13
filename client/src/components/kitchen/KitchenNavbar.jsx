@@ -1,5 +1,5 @@
 import React from "react";
-import { FaBars, FaShoppingCart } from "react-icons/fa";
+import { FaBars, FaBell } from "react-icons/fa";
 import UserMenuDropdown from "../common/UserMenuDropdown";
 
 export default function KitchenNavbar({ onMenuClick }) {
@@ -26,7 +26,7 @@ export default function KitchenNavbar({ onMenuClick }) {
         {/* Right */}
         <div className="flex items-center gap-4">
           <button className="relative p-3 rounded-xl bg-gray-100 hover:bg-gray-200 transition">
-            <FaShoppingCart className="text-gray-700" />
+            <FaBell className="text-gray-700" />
             <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full"></span>
           </button>
 
