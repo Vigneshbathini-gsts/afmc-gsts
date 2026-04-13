@@ -58,7 +58,7 @@ export default function Login() {
         password,
         outletType,
       });
-      // console.log(response.data);
+       console.log(response.data);
       if (response.data?.success) {
         localStorage.setItem("token", response.data.token);
         setUser(response.data.user);

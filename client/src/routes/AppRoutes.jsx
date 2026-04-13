@@ -103,36 +103,188 @@ export default function AppRoutes() {
       <Route
         path="/admin"
         element={
-          <ProtectedRoute allowedRoles={[10]}>
+          <ProtectedRoute allowedRoles={[10,80]}>
             <AdminLayout />
           </ProtectedRoute>
         }
       >
-        <Route path="dashboard" element={<AdminDashboard />} />
+        <Route
+          path="dashboard"
+          element={
+            <ProtectedRoute allowedRoles={[10, 80]}>
+              <AdminDashboard />
+            </ProtectedRoute>
+          }
+        />
         <Route path="inventory" element={<Inventory />} />
-        <Route path="stock-reports" element={<Navigate to="barstock" replace />} />
-        <Route path="stock-reports/barstock" element={<BarstockReports />} />
-        <Route path="stock-reports/order-transaction" element={<Ordertransactiondetails />} />
-        <Route path="stock-reports/order-item" element={<Orderitemdetails />} />
-        <Route path="stock-in-out-report" element={<StockReports />} />
-        <Route path="add-item" element={<AddItem />} />
-        <Route path="edit-item" element={<EditItem />} />
-        <Route path="reports" element={<Reports />} />
-        <Route path="users" element={<UserManagement />} />
-        <Route path="users/:id" element={<UserEdit />} />
-        <Route path="offers" element={<Offers />} />
-        <Route path="offers/create" element={<OfferCreate/>} />
-        <Route path="offers/edit/:id" element={<OfferEdit />} />
-
-
-        <Route path="price-update" element={<PriceUpdate />} />
-        <Route path="profit-management" element={<ProfitManagement />} />
-        <Route path="cocktailmanag" element={<CocktailManagement />} />
-        <Route path="cocktail-management" element={<CocktailManagement />} />
-        <Route path="cocktail-create" element={<CocktailCreate />} />
-        <Route path="cocktail-edit" element={<CocktailEdit />} />
-        <Route path="order-history" element={<AdminOrderHistory />} />
-        <Route path="cancelled-orders" element={<CancelledOrders />} />
+        <Route
+          path="stock-reports"
+          element={
+            <ProtectedRoute allowedRoles={[10]}>
+              <Navigate to="barstock" replace />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="stock-reports/barstock"
+          element={
+            <ProtectedRoute allowedRoles={[10]}>
+              <BarstockReports />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="stock-reports/order-transaction"
+          element={
+            <ProtectedRoute allowedRoles={[10]}>
+              <Ordertransactiondetails />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="stock-reports/order-item"
+          element={
+            <ProtectedRoute allowedRoles={[10]}>
+              <Orderitemdetails />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="stock-in-out-report"
+          element={
+            <ProtectedRoute allowedRoles={[10]}>
+              <StockReports />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="add-item"
+          element={
+            <ProtectedRoute allowedRoles={[10]}>
+              <AddItem />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="edit-item"
+          element={
+            <ProtectedRoute allowedRoles={[10]}>
+              <EditItem />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="reports"
+          element={
+            <ProtectedRoute allowedRoles={[10]}>
+              <Reports />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="users"
+          element={
+            <ProtectedRoute allowedRoles={[10]}>
+              <UserManagement />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="users/:id"
+          element={
+            <ProtectedRoute allowedRoles={[10]}>
+              <UserEdit />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="offers"
+          element={
+            <ProtectedRoute allowedRoles={[10]}>
+              <Offers />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="offers/create"
+          element={
+            <ProtectedRoute allowedRoles={[10]}>
+              <OfferCreate />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="offers/edit/:id"
+          element={
+            <ProtectedRoute allowedRoles={[10]}>
+              <OfferEdit />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="price-update"
+          element={
+            <ProtectedRoute allowedRoles={[10]}>
+              <PriceUpdate />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="profit-management"
+          element={
+            <ProtectedRoute allowedRoles={[10]}>
+              <ProfitManagement />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="cocktailmanag"
+          element={
+            <ProtectedRoute allowedRoles={[10]}>
+              <CocktailManagement />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="cocktail-management"
+          element={
+            <ProtectedRoute allowedRoles={[10]}>
+              <CocktailManagement />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="cocktail-create"
+          element={
+            <ProtectedRoute allowedRoles={[10]}>
+              <CocktailCreate />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="cocktail-edit"
+          element={
+            <ProtectedRoute allowedRoles={[10]}>
+              <CocktailEdit />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="order-history"
+          element={
+            <ProtectedRoute allowedRoles={[10]}>
+              <AdminOrderHistory />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="cancelled-orders"
+          element={
+            <ProtectedRoute allowedRoles={[10]}>
+              <CancelledOrders />
+            </ProtectedRoute>
+          }
+        />
       </Route>
 
       {/* ================= ATTENDANT ================= */}
