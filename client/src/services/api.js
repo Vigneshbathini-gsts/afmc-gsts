@@ -154,6 +154,11 @@ export const orderAPI = {
 
   // Attendant
   getAttendantOrders: (params) => api.get("/orders/attendant", { params }),
+  lookupNonMember: (phone) =>
+    api.get("/orders/non-member", {
+      params: { phone },
+    }),
+  saveNonMember: (data) => api.post("/orders/non-member", data),
 
   // Admin
   getOrderHistory: (params) => api.get("/orders/history", { params }),

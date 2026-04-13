@@ -360,8 +360,81 @@ async function getOrderDetails(orderNumber) {
   return rows;
 }
 
+async function getNonMemberByPhone(phoneNumber) {
+  const safePhone = String(phoneNumber ?? "").trim();
+  if (!safePhone) {
+    return null;
+  }
+
+  const [rows] = await db.execute(
+    `
+      SELECT
+        ID AS id,
+        FIRST_NAME AS first_name,
+        LAST_NAME AS last_name,
+        PHONE_NUMBER AS phone_number
+      FROM xxafmc_non_members
+      WHERE TRIM(PHONE_NUMBER) = ?
+      LIMIT 1
+    `,
+    [safePhone]
+  );
+
+  return rows[0] || null;
+}
+
+async function saveNonMember({ firstName, lastName, phoneNumber, createdBy }) {
+  const safePhone = String(phoneNumber ?? "").trim();
+  const safeFirstName = String(firstName ?? "").trim();
+  const safeLastName = String(lastName ?? "").trim();
+  const today = new Date().toISOString().slice(0, 10);
+
+  if (!safePhone || !safeFirstName) {
+    const error = new Error("INVALID_DATA");
+    error.code = "INVALID_DATA";
+    throw error;
+  }
+
+  const existing = await getNonMemberByPhone(safePhone);
+  if (existing) {
+    return {
+      id: existing.id,
+      first_name: existing.first_name || safeFirstName,
+      last_name: existing.last_name || safeLastName,
+      phone_number: safePhone,
+      existed: true,
+    };
+  }
+
+  const safeCreatedBy = String(createdBy ?? "").trim() || "SYSTEM";
+  const [nextIdRows] = await db.execute(
+    "SELECT IFNULL(MAX(ID), 0) + 1 AS next_id FROM xxafmc_non_members"
+  );
+  const nextId = Number(nextIdRows[0]?.next_id || 1);
+
+  await db.execute(
+    `
+      INSERT INTO xxafmc_non_members
+        (ID, FIRST_NAME, LAST_NAME, PHONE_NUMBER, CREATED_BY, CREATION_DATE)
+      VALUES
+        (?, ?, ?, ?, ?, ?)
+    `,
+    [nextId, safeFirstName, safeLastName, safePhone, safeCreatedBy, today]
+  );
+
+  return {
+    id: nextId,
+    first_name: safeFirstName,
+    last_name: safeLastName,
+    phone_number: safePhone,
+    existed: false,
+  };
+}
+
 module.exports = {
   getActiveOrders,
   getAdminOrderHistory,
   getOrderDetails,
+  getNonMemberByPhone,
+  saveNonMember,
 };

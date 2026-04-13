@@ -43,7 +43,8 @@ import AttendantCart from "../pages/attendant/Cart";
 import AttendantConfirmOrder from "../pages/attendant/ConfirmOrder";
 import AttendantPayment from "../pages/attendant/Payment";
 import AttendantInvoice from "../pages/attendant/Invoice";
-import AttendantOrderHistory from "../pages/attendant/OrderHistory";
+import AttendantActiveOrders from "../pages/attendant/ActiveOrders";
+import AttendantOrderStatus from "../pages/attendant/OrderStatus";
 
 // User Pages
 import UserDashboard from "../pages/user/Dashboard";
@@ -55,7 +56,7 @@ import UserConfirmOrder from "../pages/user/ConfirmOrder";
 import UserPayment from "../pages/user/Payment";
 import UserInvoice from "../pages/user/Invoice";
 import ActiveOrders from "../pages/user/ActiveOrders";
-import UserOrderHistory from "../pages/user/OrderHistory";
+import UserOrderStatus from "../pages/user/OrderStatus";
 
 // Kitchen Pages
 
@@ -149,7 +150,8 @@ export default function AppRoutes() {
         <Route path="confirm-order" element={<AttendantConfirmOrder />} />
         <Route path="payment" element={<AttendantPayment />} />
         <Route path="invoice" element={<AttendantInvoice />} />
-        <Route path="order-history" element={<AttendantOrderHistory />} />
+        <Route path="active-orders" element={<AttendantActiveOrders />} />
+        <Route path="order-status" element={<AttendantOrderStatus />} />
       </Route>
 
       {/* ================= USER ================= */}
@@ -162,6 +164,7 @@ export default function AppRoutes() {
         }
       >
         <Route path="dashboard" element={<UserDashboard />} />
+        <Route path="dashboard-Page" element={<UserDashboard />} />
         <Route path="snacks" element={<Snacks />} />
         <Route path="drinks" element={<Drinks />} />
         <Route path="item/:id" element={<ItemDetails />} />
@@ -170,7 +173,7 @@ export default function AppRoutes() {
         <Route path="payment" element={<UserPayment />} />
         <Route path="invoice" element={<UserInvoice />} />
         <Route path="active-orders" element={<ActiveOrders />} />
-        <Route path="order-history" element={<UserOrderHistory />} />
+        <Route path="order-status" element={<UserOrderStatus />} />
       </Route>
 
       {/* ================= OUTLETS ================= */}

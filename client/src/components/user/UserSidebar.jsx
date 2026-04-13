@@ -4,7 +4,7 @@ import {
   FaTimes,
   FaTachometerAlt,
   FaClipboardList,
-  FaHistory,
+  FaInfoCircle,
 } from "react-icons/fa";
 
 export default function UserSidebar({ isOpen, onClose }) {
@@ -55,12 +55,12 @@ export default function UserSidebar({ isOpen, onClose }) {
           </NavLink>
 
           <NavLink
-            to="/user/order-history"
+            to="/user/order-status"
             className={navLinkClass}
             onClick={onClose}
           >
-            <FaHistory />
-            Order History
+            <FaInfoCircle />
+            Order Status
           </NavLink>
         </div>
       </aside>
