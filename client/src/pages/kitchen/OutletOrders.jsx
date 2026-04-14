@@ -16,7 +16,7 @@ export default function OutletOrders({ kitchenType = "Bar" }) {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
-console.log("Rendering OutletOrders with kitchenType:", kitchenType);
+    console.log("Rendering OutletOrders with kitchenType:", kitchenType);
 
     const navigate = useNavigate();
     const rowsPerPage = 8;
@@ -76,9 +76,53 @@ console.log("Rendering OutletOrders with kitchenType:", kitchenType);
         }
     };
 
-    const handleCancelClick = (order) => {
-        if (order.CAN_CANCEL !== "Y") return;
-        alert(`Cancel order ${order.ORDERNUMBER}`);
+    const handleCancelClick = async (order) => {
+        // Early return if order cannot be cancelled
+        if (order.CAN_CANCEL !== "Y") {
+            alert("This order cannot be cancelled.");
+            return;
+        }
+
+        // Confirm with user before cancelling
+        const confirmed = window.confirm(
+            `Are you sure you want to cancel Order ${order.ORDERNUMBER}?\n\n` +
+            `Customer: ${order.FIRST_NAME}\n` +
+            `Status: ${order.STATUS}\n\n` +
+            `This action cannot be undone.`
+        );
+
+        if (!confirmed) return;
+
+        try {
+            const resp = await barOrdersAPI.cancelOrder({
+                ORDERNUMBER: order.ORDERNUMBER,
+            });
+
+            // Check response properly - handle both response.data and direct response
+            const isSuccess = resp?.data?.success || resp?.success;
+            const message = resp?.data?.message || resp?.message;
+
+            if (isSuccess) {
+                alert(message || `Order ${order.ORDERNUMBER} cancelled successfully.`);
+                // Refresh the orders list to reflect the cancellation
+                await fetchOrders(); // Assuming you have this function
+            } else {
+                alert(message || `Failed to cancel order ${order.ORDERNUMBER}.`);
+            }
+        } catch (error) {
+            console.error("Error cancelling order:", error);
+
+            // Handle different error scenarios
+            if (error.response?.status === 404) {
+                alert(`Order ${order.ORDERNUMBER} not found. It may have been already processed.`);
+            } else if (error.response?.status === 409) {
+                alert(`Order ${order.ORDERNUMBER} is currently being processed. Please try again.`);
+            } else if (error.response?.data?.message) {
+                alert(error.response.data.message);
+            } else {
+                alert(`Failed to cancel order ${order.ORDERNUMBER}. Please try again.`);
+            }
+        }
     };
 
     const getStatusClasses = (status) => {
@@ -217,3 +261,4 @@ console.log("Rendering OutletOrders with kitchenType:", kitchenType);
         </div>
     );
 }
+

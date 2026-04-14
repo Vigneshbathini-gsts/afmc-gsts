@@ -10,5 +10,7 @@ router.put("/cancel", authMiddleware, KitchenOrdersController.cancelBarOrderItem
 router.get("/active", authMiddleware, KitchenOrdersController.getActiveBarOrders);
 router.put("/notifications/read", authMiddleware, KitchenOrdersController.markNotificationAsRead);
 router.get("/cocktail/:itemId", authMiddleware, KitchenOrdersController.getCocktailDetailsById);
+router.put("/order/cancel", authMiddleware, KitchenOrdersController.cancelOrder);
+router.put("/order/cancel/line-item", authMiddleware, KitchenOrdersController.cancelBarOrderItem);
 
 module.exports = router;

@@ -1,0 +1,56 @@
+[33md931835[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmainbkp4[m[33m, [m[1;31morigin/mainbkp4[m[33m)[m kitchen
+[33mf8533cf[m[33m ([m[1;31morigin/feature-kitchenNotification[m[33m, [m[1;32mfeature-kitchenNotification[m[33m)[m kitchen
+[33m63a67ee[m kitchen dropdown
+[33m2761f0e[m kitchen notification
+[33m2d100ab[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/feature-enduser[m[33m, [m[1;31morigin/HEAD[m[33m)[m register member
+[33md868318[m[33m ([m[1;31morigin/feature-userdashboard[m[33m)[m registered member
+[33mb5036c2[m user dashboard & active orders & new order- vignesh
+[33mc9656eb[m[33m ([m[1;31morigin/feature-kitchen[m[33m, [m[1;32mfeature-kitchen[m[33m)[m kitchen flow
+[33m785be31[m end user active orders
+[33m3e2b482[m[33m ([m[1;31morigin/main-bkp3[m[33m, [m[1;31morigin/feature-inventory[m[33m, [m[1;32mmain[m[33m)[m inventory
+[33m1ae25cf[m stock reports & cocktail mocktail
+[33mc426212[m[33m ([m[1;31morigin/feature_branch_order[m[33m)[m new
+[33mc937afa[m sai- v
+[33m6656cab[m changes
+[33m55d10ea[m[33m ([m[1;31morigin/afmc-sai-orderhistory[m[33m)[m sai- cocktail/m & order history
+[33mf228987[m[33m ([m[1;31morigin/main-bkp2[m[33m)[m Merge cancelorder into main
+[33m28af3b6[m[33m ([m[1;31morigin/features-addstock[m[33m)[m add stock & inventory
+[33m79da15a[m add stock in progress 5pm
+[33m16f7c04[m add stock in progress
+[33mee30e2b[m order histroy
+[33m8c30930[m in progress
+[33me272050[m[33m ([m[1;31morigin/cancelorder[m[33m, [m[1;32mcancelorder[m[33m)[m canelorder/frogotpwrd/chnagepwd/protectedroutes
+[33mbe07fc3[m[33m ([m[1;31morigin/afmc-sai[m[33m)[m all codes
+[33m5defc87[m merged code
+[33m564354e[m user pages
+[33m03ae743[m cocktail pages
+[33m10b4221[m add stock inprogress
+[33me36fd4b[m[33m ([m[1;31morigin/profitmng[m[33m, [m[1;32mprofitmng[m[33m)[m notification
+[33m17c5722[m profit management and dashboard notification-ajay
+[33me9c8c3c[m notify
+[33m80a7811[m afmc sai branch code- stock reports
+[33mad7c885[m merge afmc-sai into main
+[33m3f4d9f3[m profitmgt
+[33m098dde2[m stock report page
+[33mc31a6c4[m stock report pages
+[33m7501bdc[m profit
+[33m60f5a4d[m[33m ([m[1;31morigin/main-bkp[m[33m)[m ajay - forgot pwd/ offers / item price
+[33ma1808ab[m[33m ([m[1;31morigin/features/forgotpassword[m[33m, [m[1;32mprofmanagement[m[33m, [m[1;32mfeatures/forgotpassword[m[33m)[m offer creation done
+[33mef7792a[m offer creation done
+[33mc19d539[m[33m ([m[1;31morigin/feature-dashboard[m[33m)[m inventory and stock in/out reports
+[33m629b9ed[m offer creation
+[33m7db881b[m Item price
+[33mc2a110a[m Merge branch 'main' into features/forgotpassword[O
+[33mffc5480[m merged main into afmc-sai
+[33m8cf869b[m dashboard update
+[33m5bd28b8[m frogot password
+[33m6cb0d2e[m dashboard - vignesh
+[33mfcae477[m pushed all code
+[33mbe1df93[m[33m ([m[1;31morigin/temp-backup[m[33m, [m[1;32mtemp-backup[m[33m)[m Login and navigation--ajay
+[33m8f89498[m login page
+[33m4376f1e[m not need code
+[33m98ae6ec[m dashboard
+[33m9cc159e[m sai changed
+[33mc513897[m your message
+[33m3bade51[m Initial local backup
+[33m3671962[m[33m ([m[1;31morigin/afmc-ajay[m[33m)[m initial commit

@@ -1,3 +1,4 @@
+
 // axios instance goes here
 import axios from "axios";
 
@@ -143,17 +144,23 @@ export const orderAPI = {
   getOrderDetails: (id) => api.get(`/orders/${id}`),
   updateStatus: (id, data) => api.put(`/orders/${id}/status`, data),
   cancelOrder: (id, data) => api.put(`/orders/${id}/cancel`, data),
+  
 
   // User
   getMyOrders: () => api.get("/orders/my-orders"),
-  getActiveOrders: () => api.get("/orders/active"),
+  getActiveOrders: (params) => api.get("/orders/active", { params }),
 
   // Kitchen
   getKitchenOrders: () => api.get("/orders/kitchen"),
   markPrepared: (id, data) => api.put(`/orders/${id}/prepare`, data),
 
   // Attendant
-  getAttendantOrders: () => api.get("/orders/attendant"),
+  getAttendantOrders: (params) => api.get("/orders/attendant", { params }),
+  lookupNonMember: (phone) =>
+    api.get("/orders/non-member", {
+      params: { phone },
+    }),
+  saveNonMember: (data) => api.post("/orders/non-member", data),
 
   // Admin
   getOrderHistory: (params) => api.get("/orders/history", { params }),
@@ -181,11 +188,11 @@ export const barOrdersAPI = {
   getOrderItems: (data) => api.post("/bar-orders/items", data),
   processScan: (data) => api.post("/bar-orders/scan", data),
   cancelItem: (data) => api.put("/bar-orders/cancel", data),
+  cancelOrder: (data) => api.put("/bar-orders/order/cancel", data), // Add this line
   getActiveOrders: () => api.get("/bar-orders/active"),
   markNotificationAsRead: (data) => api.put("/bar-orders/notifications/read", data),
-getCocktailDetailsById: (itemId, orderNumber) => api.get(`/bar-orders/cocktail/${itemId}?orderNumber=${orderNumber}`),
+  getCocktailDetailsById: (itemId, orderNumber) => api.get(`/bar-orders/cocktail/${itemId}?orderNumber=${orderNumber}`),
 };
-
 // ================================
 // COLLECTION API (Barcode Scan Collection)
 // ================================
