@@ -267,290 +267,7 @@ ORDER BY xod.ORDER_LINE_ID ASC;
   }
 };
 
-exports.processBarcodeScan = async (req, res) => {
-  let connection;
-  try {
-    const { ORDERNUMBER, BARCODE, QUANTITY = 1, KITCHEN = "Bar" } = req.body;
 
-    console.log("========== BARCODE SCAN START ==========");
-    console.log("Request body:", { ORDERNUMBER, BARCODE, QUANTITY, KITCHEN });
-
-    if (!ORDERNUMBER || !BARCODE) {
-      return res.status(400).json({
-        success: false,
-        message: "Order number and barcode are required",
-      });
-    }
-
-    const requestedQty = Number(QUANTITY) || 1;
-    
-    connection = await pool.getConnection();
-    await connection.beginTransaction();
-
-    // STEP 1: Get item from stock_out and inventory
-    const [itemRows] = await connection.query(
-      `
-      SELECT 
-        xso.ITEM_CODE,
-        xso.STOCK_QUANTITY,
-        xso.UNIT_PRICE,
-        xso.\`A/C_UNIT\` AS ac_unit,
-        xso.PEGS,
-        xso.BARCODE,
-        xi.CATEGORY_ID,
-        xi.ITEM_NAME,
-        xi.SUB_CATEGORY,
-        xi.PROFIT,
-        xi.NON_MEMBER_PROFIT,
-        xi.PR_CHARGES,
-        xi.FOOD_PR_CHARGES
-      FROM xxafmc_stock_out xso
-      LEFT JOIN xxafmc_inventory xi ON xso.ITEM_CODE = xi.ITEM_CODE
-      WHERE xso.BARCODE = ?
-      LIMIT 1
-      `,
-      [BARCODE]
-    );
-    
-    if (itemRows.length === 0) {
-      await connection.rollback();
-      return res.status(404).json({
-        success: false,
-        message: "Barcode not found in inventory",
-      });
-    }
-
-    const item = itemRows[0];
-    const categoryId = Number(item.CATEGORY_ID) || 0;
-    const scanItemCode = item.ITEM_CODE;
-
-    // STEP 2: Validate Kitchen/Bar match (from Oracle package)
-    if (KITCHEN === "Bar" && categoryId === 14) {
-      await connection.rollback();
-      return res.status(400).json({
-        success: false,
-        message: "Scanned Barcode is for Kitchen",
-      });
-    }
-
-    if (KITCHEN === "Kitchen" && categoryId === 10) {
-      await connection.rollback();
-      return res.status(400).json({
-        success: false,
-        message: "Scanned Barcode is for Bar",
-      });
-    }
-
-    const stockQuantity = Number(item.STOCK_QUANTITY) || 0;
-    const unitPrice = Number(item.UNIT_PRICE) || 0;
-    const profitPercent = Number(item.PROFIT) || 0;
-    const nonMemberProfit = Number(item.NON_MEMBER_PROFIT) || 0;
-    const prCharges = Number(item.PR_CHARGES) || 0;
-    const foodPrCharges = Number(item.FOOD_PR_CHARGES) || 0;
-    const pegsFromStock = Number(item.PEGS) || 1;
-    const acUnit = (item.ac_unit || "").toString();
-
-    // STEP 3: Check stock
-    if (stockQuantity <= 0) {
-      await connection.rollback();
-      return res.status(400).json({
-        success: false,
-        message: `Scanned Barcode ${BARCODE} has no stock in ${KITCHEN}`,
-      });
-    }
-
-    // STEP 4: Find parent item (like Oracle's SELECT with UNION)
-    const [parentRows] = await connection.query(
-      `
-      SELECT inventory_item_code, 'cocktail' AS source_type
-      FROM (
-        SELECT inventory_item_code
-        FROM xxafmc_custom_cocktails_mocktails_details
-        WHERE order_number = ? AND item_code = ?
-        UNION ALL
-        SELECT inventory_item_code
-        FROM xxafmc_custom_cocktails_mocktails_details_dummy
-        WHERE order_number = ? AND item_code = ?
-        UNION ALL
-        SELECT CAST(item_id AS CHAR)
-        FROM xxafmc_order_details
-        WHERE order_id = ? AND item_id = ?
-      ) x
-      LIMIT 1
-      `,
-      [ORDERNUMBER, scanItemCode, ORDERNUMBER, scanItemCode, ORDERNUMBER, scanItemCode]
-    );
-
-    const parentItem = parentRows.length > 0 ? parentRows[0].inventory_item_code : String(scanItemCode);
-    const isCocktailIngredient = parentRows.length > 0 && parentRows[0].source_type === 'cocktail';
-
-    // STEP 5: Get user role (like Oracle)
-    const [userRows] = await connection.query(
-      `SELECT DISTINCT xu.ROLE_ID FROM xxafmc_users xu
-       JOIN xxafmc_kitchen_notification xkn ON xu.USER_ID = xkn.USER_NAME
-       WHERE xkn.ORDERNUMBER = ? LIMIT 1`,
-      [ORDERNUMBER]
-    );
-    const roleId = userRows.length > 0 ? Number(userRows[0].ROLE_ID) : null;
-
-    // STEP 6: Get ordered quantity (like Oracle's cursor)
-    const [orderQuantityRows] = await connection.query(
-      `
-      SELECT SUM(quantity) AS total_quantity
-      FROM (
-        SELECT DISTINCT x.item_code, (x.pegs * x.quantity) AS quantity
-        FROM xxafmc_custom_cocktails_mocktails_details x
-        JOIN xxafmc_order_details xo ON x.inventory_item_code = xo.item_id
-        WHERE x.order_number = ? AND x.item_code = ?
-        UNION ALL
-        SELECT DISTINCT x.item_code, (x.pegs * x.quantity) AS quantity
-        FROM xxafmc_custom_cocktails_mocktails_details_dummy x
-        JOIN xxafmc_order_details xo ON x.inventory_item_code = xo.item_id
-        WHERE x.order_number = ? AND x.item_code = ?
-        UNION ALL
-        SELECT xi.item_code, (CASE WHEN xo.type = 'Large' THEN 2 ELSE 1 END * xo.quantity) AS quantity
-        FROM xxafmc_order_details xo
-        JOIN xxafmc_inventory xi ON xi.item_code = xo.item_id
-        WHERE xo.order_id = ? AND xi.unit_price IS NOT NULL AND xi.item_code = ?
-      ) a
-      `,
-      [ORDERNUMBER, scanItemCode, ORDERNUMBER, scanItemCode, ORDERNUMBER, scanItemCode]
-    );
-
-    const orderedQty = Number(orderQuantityRows[0]?.total_quantity || 0);
-
-    // STEP 7: Get sub_category for price calculation (like Oracle)
-    let subCategory = null;
-    const [subCategoryRows] = await connection.query(
-      `
-      SELECT subcategory
-      FROM xxafmc_order_details
-      WHERE item_id = ? AND order_id = ?
-      LIMIT 1
-      `,
-      [scanItemCode, ORDERNUMBER]
-    );
-    subCategory = subCategoryRows.length > 0 ? Number(subCategoryRows[0].subcategory) : null;
-
-    // STEP 8: Check for free item (like Oracle)
-    const [freeItemRows] = await connection.query(
-      `
-      SELECT item_id, price
-      FROM xxafmc_order_details
-      WHERE order_id = ? AND item_id = ? AND barcode IS NOT NULL AND free_item_quantity IS NULL
-      LIMIT 1
-      `,
-      [ORDERNUMBER, scanItemCode]
-    );
-
-    const isFreeItem = freeItemRows.length > 0 && Number(freeItemRows[0].price) === 0;
-
-    // STEP 9: Calculate price (like Oracle)
-    let calculatedPrice = unitPrice;
-    let isFree = false;
-
-    if (isFreeItem && Number(scanItemCode) === Number(freeItemRows[0].item_id)) {
-      calculatedPrice = 0;
-      isFree = true;
-      await connection.query(
-        `
-        UPDATE xxafmc_order_details
-        SET free_item_quantity = '1'
-        WHERE order_id = ? AND item_id = ? AND barcode IS NOT NULL
-        `,
-        [ORDERNUMBER, scanItemCode]
-      );
-    } else {
-      const pricePerPeg = pegsFromStock > 0 ? unitPrice / pegsFromStock : unitPrice;
-      
-      if (subCategory && [14, 15].includes(subCategory)) {
-        // Cocktail/Mocktail price calculation
-        if (roleId === 20) {
-          const profit = pricePerPeg + (pricePerPeg * profitPercent / 100) + foodPrCharges;
-          calculatedPrice = Number(profit).toFixed(2);
-        } else {
-          const profit = pricePerPeg + (pricePerPeg * nonMemberProfit / 100) + prCharges;
-          calculatedPrice = Number(profit).toFixed(2);
-        }
-      } else {
-        // Regular item price calculation
-        if (roleId === 20) {
-          const profit = pricePerPeg + (pricePerPeg * profitPercent / 100) + foodPrCharges;
-          calculatedPrice = Number(profit).toFixed(2);
-        } else {
-          const profit = pricePerPeg + (pricePerPeg * nonMemberProfit / 100) + prCharges;
-          calculatedPrice = Number(profit).toFixed(2);
-        }
-      }
-    }
-
-    // STEP 10: Get cocktail ingredients (like Oracle's cursor c_ord_dt)
-    let ingredientsToInsert = [];
-    
-    if (isCocktailIngredient) {
-      const [ingredients] = await connection.query(
-        `
-        SELECT 
-          item_code,
-          item_name,
-          (pegs * quantity) AS total_quantity,
-          inventory_item_code
-        FROM xxafmc_custom_cocktails_mocktails_details
-        WHERE order_number = ? AND inventory_item_code = ?
-        UNION ALL
-        SELECT 
-          item_code,
-          item_name,
-          (pegs * quantity) AS total_quantity,
-          inventory_item_code
-        FROM xxafmc_custom_cocktails_mocktails_details_dummy
-        WHERE order_number = ? AND inventory_item_code = ?
-        `,
-        [ORDERNUMBER, parentItem, ORDERNUMBER, parentItem]
-      );
-      ingredientsToInsert = ingredients;
-    }
-
-    await connection.commit();
-
-    // STEP 11: Return complete data (frontend will handle state)
-    return res.status(201).json({
-      success: true,
-      message: "Barcode scanned successfully",
-      data: {
-        itemCode: scanItemCode,
-        itemName: item.ITEM_NAME,
-        categoryId: categoryId,
-        subCategory: subCategory,
-        stockQuantity: stockQuantity,
-        unitPrice: unitPrice,
-        calculatedPrice: calculatedPrice,
-        orderedQuantity: orderedQty,
-        requestedQuantity: requestedQty,
-        barcode: BARCODE,
-        remainingToScan: orderedQty > 0 ? orderedQty : 0,
-        isFreeItem: isFree,
-        isCocktailIngredient: isCocktailIngredient,
-        ingredients: ingredientsToInsert,
-        parentItem: parentItem,
-        pegs: pegsFromStock,
-        roleId: roleId,
-        acUnit: acUnit
-      },
-    });
-
-  } catch (error) {
-    if (connection) await connection.rollback();
-    console.error("Error processing barcode scan:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to process barcode scan",
-      error: error.message,
-    });
-  } finally {
-    if (connection) connection.release();
-  }
-};
 
 
 exports.cancelOrder = async (req, res) => {
@@ -950,5 +667,292 @@ exports.getCocktailDetailsById = async (req, res) => {
       message: "Failed to fetch cocktail details",
       error: error.message,
     });
+  }
+};
+
+
+
+exports.processBarcodeScan = async (req, res) => {
+  let connection;
+  try {
+    const { ORDERNUMBER, BARCODE, QUANTITY = 1, KITCHEN = "Bar" } = req.body;
+
+    console.log("========== BARCODE SCAN START ==========");
+    console.log("Request body:", { ORDERNUMBER, BARCODE, QUANTITY, KITCHEN });
+
+    if (!ORDERNUMBER || !BARCODE) {
+      return res.status(400).json({
+        success: false,
+        message: "Order number and barcode are required",
+      });
+    }
+
+    const requestedQty = Number(QUANTITY) || 1;
+    
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    // STEP 1: Get item from stock_out and inventory
+    const [itemRows] = await connection.query(
+      `
+      SELECT 
+        xso.ITEM_CODE,
+        xso.STOCK_QUANTITY,
+        xso.UNIT_PRICE,
+        xso.\`A/C_UNIT\` AS ac_unit,
+        xso.PEGS,
+        xso.BARCODE,
+        xi.CATEGORY_ID,
+        xi.ITEM_NAME,
+        xi.SUB_CATEGORY,
+        xi.PROFIT,
+        xi.NON_MEMBER_PROFIT,
+        xi.PR_CHARGES,
+        xi.FOOD_PR_CHARGES
+      FROM xxafmc_stock_out xso
+      LEFT JOIN xxafmc_inventory xi ON xso.ITEM_CODE = xi.ITEM_CODE
+      WHERE xso.BARCODE = ?
+      LIMIT 1
+      `,
+      [BARCODE]
+    );
+    
+    if (itemRows.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({
+        success: false,
+        message: "Barcode not found in inventory",
+      });
+    }
+
+    const item = itemRows[0];
+    const categoryId = Number(item.CATEGORY_ID) || 0;
+    const scanItemCode = item.ITEM_CODE;
+
+    // STEP 2: Validate Kitchen/Bar match (from Oracle package)
+    if (KITCHEN === "Bar" && categoryId === 14) {
+      await connection.rollback();
+      return res.status(400).json({
+        success: false,
+        message: "Scanned Barcode is for Kitchen",
+      });
+    }
+
+    if (KITCHEN === "Kitchen" && categoryId === 10) {
+      await connection.rollback();
+      return res.status(400).json({
+        success: false,
+        message: "Scanned Barcode is for Bar",
+      });
+    }
+
+    const stockQuantity = Number(item.STOCK_QUANTITY) || 0;
+    const unitPrice = Number(item.UNIT_PRICE) || 0;
+    const profitPercent = Number(item.PROFIT) || 0;
+    const nonMemberProfit = Number(item.NON_MEMBER_PROFIT) || 0;
+    const prCharges = Number(item.PR_CHARGES) || 0;
+    const foodPrCharges = Number(item.FOOD_PR_CHARGES) || 0;
+    const pegsFromStock = Number(item.PEGS) || 1;
+    const acUnit = (item.ac_unit || "").toString();
+
+    // STEP 3: Check stock
+    if (stockQuantity <= 0) {
+      await connection.rollback();
+      return res.status(400).json({
+        success: false,
+        message: `Scanned Barcode ${BARCODE} has no stock in ${KITCHEN}`,
+      });
+    }
+
+    // STEP 4: Find parent item (like Oracle's SELECT with UNION)
+    const [parentRows] = await connection.query(
+      `
+      SELECT inventory_item_code, 'cocktail' AS source_type
+      FROM (
+        SELECT inventory_item_code
+        FROM xxafmc_custom_cocktails_mocktails_details
+        WHERE order_number = ? AND item_code = ?
+        UNION ALL
+        SELECT inventory_item_code
+        FROM xxafmc_custom_cocktails_mocktails_details_dummy
+        WHERE order_number = ? AND item_code = ?
+        UNION ALL
+        SELECT CAST(item_id AS CHAR)
+        FROM xxafmc_order_details
+        WHERE order_id = ? AND item_id = ?
+      ) x
+      LIMIT 1
+      `,
+      [ORDERNUMBER, scanItemCode, ORDERNUMBER, scanItemCode, ORDERNUMBER, scanItemCode]
+    );
+
+    const parentItem = parentRows.length > 0 ? parentRows[0].inventory_item_code : String(scanItemCode);
+    const isCocktailIngredient = parentRows.length > 0 && parentRows[0].source_type === 'cocktail';
+
+    // STEP 5: Get user role (like Oracle)
+    const [userRows] = await connection.query(
+      `SELECT DISTINCT xu.ROLE_ID FROM xxafmc_users xu
+       JOIN xxafmc_kitchen_notification xkn ON xu.USER_ID = xkn.USER_NAME
+       WHERE xkn.ORDERNUMBER = ? LIMIT 1`,
+      [ORDERNUMBER]
+    );
+    const roleId = userRows.length > 0 ? Number(userRows[0].ROLE_ID) : null;
+
+    // STEP 6: Get ordered quantity (like Oracle's cursor)
+    const [orderQuantityRows] = await connection.query(
+      `
+      SELECT SUM(quantity) AS total_quantity
+      FROM (
+        SELECT DISTINCT x.item_code, (x.pegs * x.quantity) AS quantity
+        FROM xxafmc_custom_cocktails_mocktails_details x
+        JOIN xxafmc_order_details xo ON x.inventory_item_code = xo.item_id
+        WHERE x.order_number = ? AND x.item_code = ?
+        UNION ALL
+        SELECT DISTINCT x.item_code, (x.pegs * x.quantity) AS quantity
+        FROM xxafmc_custom_cocktails_mocktails_details_dummy x
+        JOIN xxafmc_order_details xo ON x.inventory_item_code = xo.item_id
+        WHERE x.order_number = ? AND x.item_code = ?
+        UNION ALL
+        SELECT xi.item_code, (CASE WHEN xo.type = 'Large' THEN 2 ELSE 1 END * xo.quantity) AS quantity
+        FROM xxafmc_order_details xo
+        JOIN xxafmc_inventory xi ON xi.item_code = xo.item_id
+        WHERE xo.order_id = ? AND xi.unit_price IS NOT NULL AND xi.item_code = ?
+      ) a
+      `,
+      [ORDERNUMBER, scanItemCode, ORDERNUMBER, scanItemCode, ORDERNUMBER, scanItemCode]
+    );
+
+    const orderedQty = Number(orderQuantityRows[0]?.total_quantity || 0);
+
+    // STEP 7: Get sub_category for price calculation (like Oracle)
+    let subCategory = null;
+    const [subCategoryRows] = await connection.query(
+      `
+      SELECT subcategory
+      FROM xxafmc_order_details
+      WHERE item_id = ? AND order_id = ?
+      LIMIT 1
+      `,
+      [scanItemCode, ORDERNUMBER]
+    );
+    subCategory = subCategoryRows.length > 0 ? Number(subCategoryRows[0].subcategory) : null;
+
+    // STEP 8: Check for free item (like Oracle)
+    const [freeItemRows] = await connection.query(
+      `
+      SELECT item_id, price
+      FROM xxafmc_order_details
+      WHERE order_id = ? AND item_id = ? AND barcode IS NOT NULL AND free_item_quantity IS NULL
+      LIMIT 1
+      `,
+      [ORDERNUMBER, scanItemCode]
+    );
+
+    const isFreeItem = freeItemRows.length > 0 && Number(freeItemRows[0].price) === 0;
+
+    // STEP 9: Calculate price (like Oracle)
+    let calculatedPrice = unitPrice;
+    let isFree = false;
+
+    if (isFreeItem && Number(scanItemCode) === Number(freeItemRows[0].item_id)) {
+      calculatedPrice = 0;
+      isFree = true;
+      await connection.query(
+        `
+        UPDATE xxafmc_order_details
+        SET free_item_quantity = '1'
+        WHERE order_id = ? AND item_id = ? AND barcode IS NOT NULL
+        `,
+        [ORDERNUMBER, scanItemCode]
+      );
+    } else {
+      const pricePerPeg = pegsFromStock > 0 ? unitPrice / pegsFromStock : unitPrice;
+      
+      if (subCategory && [14, 15].includes(subCategory)) {
+        // Cocktail/Mocktail price calculation
+        if (roleId === 20) {
+          const profit = pricePerPeg + (pricePerPeg * profitPercent / 100) + foodPrCharges;
+          calculatedPrice = Number(profit).toFixed(2);
+        } else {
+          const profit = pricePerPeg + (pricePerPeg * nonMemberProfit / 100) + prCharges;
+          calculatedPrice = Number(profit).toFixed(2);
+        }
+      } else {
+        // Regular item price calculation
+        if (roleId === 20) {
+          const profit = pricePerPeg + (pricePerPeg * profitPercent / 100) + foodPrCharges;
+          calculatedPrice = Number(profit).toFixed(2);
+        } else {
+          const profit = pricePerPeg + (pricePerPeg * nonMemberProfit / 100) + prCharges;
+          calculatedPrice = Number(profit).toFixed(2);
+        }
+      }
+    }
+
+    // STEP 10: Get cocktail ingredients (like Oracle's cursor c_ord_dt)
+    let ingredientsToInsert = [];
+    
+    if (isCocktailIngredient) {
+      const [ingredients] = await connection.query(
+        `
+        SELECT 
+          item_code,
+          item_name,
+          (pegs * quantity) AS total_quantity,
+          inventory_item_code
+        FROM xxafmc_custom_cocktails_mocktails_details
+        WHERE order_number = ? AND inventory_item_code = ?
+        UNION ALL
+        SELECT 
+          item_code,
+          item_name,
+          (pegs * quantity) AS total_quantity,
+          inventory_item_code
+        FROM xxafmc_custom_cocktails_mocktails_details_dummy
+        WHERE order_number = ? AND inventory_item_code = ?
+        `,
+        [ORDERNUMBER, parentItem, ORDERNUMBER, parentItem]
+      );
+      ingredientsToInsert = ingredients;
+    }
+
+    await connection.commit();
+
+    // STEP 11: Return complete data (frontend will handle state)
+    return res.status(201).json({
+      success: true,
+      message: "Barcode scanned successfully",
+      data: {
+        itemCode: scanItemCode,
+        itemName: item.ITEM_NAME,
+        categoryId: categoryId,
+        subCategory: subCategory,
+        stockQuantity: stockQuantity,
+        unitPrice: unitPrice,
+        calculatedPrice: calculatedPrice,
+        orderedQuantity: orderedQty,
+        requestedQuantity: requestedQty,
+        barcode: BARCODE,
+        remainingToScan: orderedQty > 0 ? orderedQty : 0,
+        isFreeItem: isFree,
+        isCocktailIngredient: isCocktailIngredient,
+        ingredients: ingredientsToInsert,
+        parentItem: parentItem,
+        pegs: pegsFromStock,
+        roleId: roleId,
+        acUnit: acUnit
+      },
+    });
+
+  } catch (error) {
+    if (connection) await connection.rollback();
+    console.error("Error processing barcode scan:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to process barcode scan",
+      error: error.message,
+    });
+  } finally {
+    if (connection) connection.release();
   }
 };
