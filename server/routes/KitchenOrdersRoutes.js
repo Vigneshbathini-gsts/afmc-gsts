@@ -6,6 +6,8 @@ router.get("/", authMiddleware, KitchenOrdersController.getOrders);
 router.put("/status", authMiddleware, KitchenOrdersController.updateBarOrderStatus);
 router.post("/items", authMiddleware, KitchenOrdersController.getOrderItems);
 router.post("/scan", authMiddleware, KitchenOrdersController.processBarcodeScan);
+router.get("/scanned-items/:orderNumber", authMiddleware, KitchenOrdersController.getScannedItemsFromSession);
+router.delete("/scanned-items/:orderNumber", authMiddleware, KitchenOrdersController.clearScannedItemsFromSession);
 router.put("/cancel", authMiddleware, KitchenOrdersController.cancelBarOrderItem);
 router.get("/active", authMiddleware, KitchenOrdersController.getActiveBarOrders);
 router.put("/notifications/read", authMiddleware, KitchenOrdersController.markNotificationAsRead);

@@ -56,23 +56,34 @@ export default function OutletOrderDetails() {
   const isMountedRef = useRef(true);
   const isManualScanRef = useRef(false);
 
-  // Fetch order items only - no scanned items from DB
+  // Fetch order items and scanned items from session
   const fetchOrderItems = useCallback(async () => {
     if (!orderData?.ORDERNUMBER) return;
 
     try {
       setLoading(true);
-      const res = await barOrdersAPI.getOrderItems({
+      
+      // Fetch order items
+      const itemsRes = await barOrdersAPI.getOrderItems({
         ORDERNUMBER: orderData.ORDERNUMBER,
         KITCHEN: department,
       });
-      const itemsData = res.data?.data || res.data || [];
+      const itemsData = itemsRes.data?.data || itemsRes.data || [];
+      
+      // Fetch scanned items from session
+      const scannedRes = await barOrdersAPI.getScannedItems(orderData.ORDERNUMBER);
+      const scannedData = scannedRes.data?.data || [];
+      
       if (isMountedRef.current) {
         setItems(itemsData);
+        setScannedItems(scannedData);
       }
     } catch (error) {
-      console.error("Error fetching order items:", error);
-      if (isMountedRef.current) setItems([]);
+      console.error("Error fetching order data:", error);
+      if (isMountedRef.current) {
+        setItems([]);
+        setScannedItems([]);
+      }
     } finally {
       if (isMountedRef.current) setLoading(false);
     }
@@ -82,15 +93,11 @@ export default function OutletOrderDetails() {
     isMountedRef.current = true;
     if (orderData?.ORDERNUMBER) {
       fetchOrderItems();
-      // Clear scanned items state when new order loads
-      setScannedItems([]);
     }
 
     return () => {
       isMountedRef.current = false;
       if (scannerRef.current) stopScanner();
-      // Clear scanned items when leaving page
-      setScannedItems([]);
     };
   }, [orderData?.ORDERNUMBER, fetchOrderItems]);
 
@@ -168,18 +175,10 @@ export default function OutletOrderDetails() {
         return;
       }
 
-      // Add to state (no database)
-      const newScannedItem = {
-        id: Date.now(),
-        itemCode: scanData.itemCode,
-        itemName: scanData.itemName,
-        scanQuantity: qty || 1,
-        itemPrice: scanData.calculatedPrice,
-        barcode: scannedBarcode,
-        scannedAt: new Date().toISOString()
-      };
-      
-      setScannedItems(prev => [...prev, newScannedItem]);
+      // Refetch scanned items from session after successful scan
+      const scannedRes = await barOrdersAPI.getScannedItems(orderData.ORDERNUMBER);
+      const scannedData = scannedRes.data?.data || [];
+      setScannedItems(scannedData);
 
       setScanMessage(`✓ ${scanData.itemName} validated for order ${orderData?.ORDERNUMBER}.`);
       setItemCode(scanData.itemCode || "");
@@ -378,7 +377,6 @@ export default function OutletOrderDetails() {
           STATUS: "Completed",
         });
         alert("Order completed successfully!");
-        setScannedItems([]); // Clear state
         navigate(-1);
       } catch (error) {
         console.error("Error completing order:", error);
@@ -400,7 +398,6 @@ export default function OutletOrderDetails() {
           }
         }
         alert("Order cancelled successfully!");
-        setScannedItems([]); // Clear state
         navigate(-1);
       } catch (error) {
         console.error("Error cancelling order:", error);
@@ -411,11 +408,17 @@ export default function OutletOrderDetails() {
     }
   };
 
-  // Clear all scanned items
-  const handleClearScannedItems = () => {
+  // Clear all scanned items from session
+  const handleClearScannedItems = async () => {
     if (window.confirm("Are you sure you want to clear all scanned items history?")) {
-      setScannedItems([]);
-      alert("Scanned items cleared successfully!");
+      try {
+        await barOrdersAPI.clearScannedItems(orderData.ORDERNUMBER);
+        setScannedItems([]);
+        alert("Scanned items cleared successfully!");
+      } catch (error) {
+        console.error("Error clearing scanned items:", error);
+        alert("Failed to clear scanned items. Please try again.");
+      }
     }
   };
 

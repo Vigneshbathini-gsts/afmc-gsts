@@ -143,6 +143,50 @@ exports.updateBarOrderStatus = async (req, res) => {
     let result;
 
     if (normalizedStatus === "Completed") {
+      // First, get scanned items from session and insert into database
+      const sessionKey = `scannedItems_${ORDERNUMBER}_${req.user?.username || 'unknown'}`;
+      const scannedItems = req.session[sessionKey] || [];
+
+      if (scannedItems.length > 0) {
+        // Insert all scanned items into order_scan_collection
+        const insertPromises = scannedItems.map(item => {
+          return pool.query(
+            `
+            INSERT INTO order_scan_collection
+              (collection_name, order_number, item_code, item_name, scan_quantity, item_price, barcode, inventory_item_code, extra_data)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `,
+            [
+              "S_COLLECTION",
+              ORDERNUMBER,
+              item.itemCode,
+              item.itemName,
+              item.scanQuantity,
+              item.itemPrice,
+              item.barcode,
+              item.parentItem || item.itemCode,
+              JSON.stringify({
+                categoryId: item.categoryId,
+                subCategory: item.subCategory,
+                isFreeItem: item.isFreeItem,
+                isCocktailIngredient: item.isCocktailIngredient,
+                ingredients: item.ingredients,
+                pegs: item.pegs,
+                roleId: item.roleId,
+                acUnit: item.acUnit,
+                scannedAt: item.scannedAt
+              }),
+            ]
+          );
+        });
+
+        await Promise.all(insertPromises);
+
+        // Clear the session after successful insertion
+        delete req.session[sessionKey];
+      }
+
+      // Then update the order status
       [result] = await pool.query(
         `
         UPDATE xxafmc_kitchen_notification a
@@ -522,7 +566,34 @@ exports.processBarcodeScan = async (req, res) => {
 
     await connection.commit();
 
-    // STEP 11: Return complete data (frontend will handle state)
+    // STEP 11: Store scanned item in session
+    const sessionKey = `scannedItems_${ORDERNUMBER}_${req.user?.username || 'unknown'}`;
+    if (!req.session[sessionKey]) {
+      req.session[sessionKey] = [];
+    }
+
+    const scannedItem = {
+      id: Date.now(),
+      itemCode: scanItemCode,
+      itemName: item.ITEM_NAME,
+      scanQuantity: requestedQty,
+      itemPrice: calculatedPrice,
+      barcode: BARCODE,
+      scannedAt: new Date().toISOString(),
+      categoryId: categoryId,
+      subCategory: subCategory,
+      isFreeItem: isFree,
+      isCocktailIngredient: isCocktailIngredient,
+      ingredients: ingredientsToInsert,
+      parentItem: parentItem,
+      pegs: pegsFromStock,
+      roleId: roleId,
+      acUnit: acUnit
+    };
+
+    req.session[sessionKey].push(scannedItem);
+
+    // STEP 12: Return complete data
     return res.status(201).json({
       success: true,
       message: "Barcode scanned successfully",
@@ -558,6 +629,46 @@ exports.processBarcodeScan = async (req, res) => {
     });
   } finally {
     if (connection) connection.release();
+  }
+};
+
+exports.getScannedItemsFromSession = async (req, res) => {
+  try {
+    const { orderNumber } = req.params;
+    const sessionKey = `scannedItems_${orderNumber}_${req.user?.username || 'unknown'}`;
+    const scannedItems = req.session[sessionKey] || [];
+
+    return res.status(200).json({
+      success: true,
+      data: scannedItems,
+    });
+  } catch (error) {
+    console.error("Error getting scanned items from session:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to get scanned items",
+      error: error.message,
+    });
+  }
+};
+
+exports.clearScannedItemsFromSession = async (req, res) => {
+  try {
+    const { orderNumber } = req.params;
+    const sessionKey = `scannedItems_${orderNumber}_${req.user?.username || 'unknown'}`;
+    delete req.session[sessionKey];
+
+    return res.status(200).json({
+      success: true,
+      message: "Scanned items cleared from session",
+    });
+  } catch (error) {
+    console.error("Error clearing scanned items from session:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to clear scanned items",
+      error: error.message,
+    });
   }
 };
 

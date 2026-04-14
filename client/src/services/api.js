@@ -8,6 +8,7 @@ const api = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
+  withCredentials: true,
 });
 
 // ================================
@@ -185,6 +186,8 @@ export const barOrdersAPI = {
   updateStatus: (data) => api.put("/bar-orders/status", data),
   getOrderItems: (data) => api.post("/bar-orders/items", data),
   processScan: (data) => api.post("/bar-orders/scan", data),
+  getScannedItems: (orderNumber) => api.get(`/bar-orders/scanned-items/${orderNumber}`),
+  clearScannedItems: (orderNumber) => api.delete(`/bar-orders/scanned-items/${orderNumber}`),
   cancelItem: (data) => api.put("/bar-orders/cancel", data),
   getActiveOrders: () => api.get("/bar-orders/active"),
   markNotificationAsRead: (data) => api.put("/bar-orders/notifications/read", data),
