@@ -112,6 +112,7 @@ exports.getOrders = async (req, res) => {
 };
 
 exports.updateBarOrderStatus = async (req, res) => {
+  let connection;
   try {
     const { ORDERNUMBER, KITCHEN = "Bar", STATUS = "Preparing" } = req.body;
     const appUser = req.user?.username || req.body.appUser || "";
@@ -147,47 +148,50 @@ exports.updateBarOrderStatus = async (req, res) => {
       const sessionKey = `scannedItems_${ORDERNUMBER}_${req.user?.username || 'unknown'}`;
       const scannedItems = req.session[sessionKey] || [];
 
+      connection = await pool.getConnection();
+      await connection.beginTransaction();
+
+      // Insert scanned items + update status atomically to avoid partial/dirty state.
       if (scannedItems.length > 0) {
-        // Insert all scanned items into order_scan_collection
-        const insertPromises = scannedItems.map(item => {
-          return pool.query(
-            `
-            INSERT INTO order_scan_collection
-              (collection_name, order_number, item_code, item_name, scan_quantity, item_price, barcode, inventory_item_code, extra_data)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            `,
-            [
-              "S_COLLECTION",
-              ORDERNUMBER,
-              item.itemCode,
-              item.itemName,
-              item.scanQuantity,
-              item.itemPrice,
-              item.barcode,
-              item.parentItem || item.itemCode,
-              JSON.stringify({
-                categoryId: item.categoryId,
-                subCategory: item.subCategory,
-                isFreeItem: item.isFreeItem,
-                isCocktailIngredient: item.isCocktailIngredient,
-                ingredients: item.ingredients,
-                pegs: item.pegs,
-                roleId: item.roleId,
-                acUnit: item.acUnit,
-                scannedAt: item.scannedAt
-              }),
-            ]
+        const placeholders = scannedItems.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?)").join(", ");
+        const values = [];
+
+        for (const item of scannedItems) {
+          values.push(
+            "S_COLLECTION",
+            ORDERNUMBER,
+            item.itemCode,
+            item.itemName,
+            item.scanQuantity,
+            item.itemPrice,
+            item.barcode,
+            item.parentItem || item.itemCode,
+            JSON.stringify({
+              categoryId: item.categoryId,
+              subCategory: item.subCategory,
+              isFreeItem: item.isFreeItem,
+              isCocktailIngredient: item.isCocktailIngredient,
+              ingredients: item.ingredients,
+              pegs: item.pegs,
+              roleId: item.roleId,
+              acUnit: item.acUnit,
+              scannedAt: item.scannedAt,
+            })
           );
-        });
+        }
 
-        await Promise.all(insertPromises);
-
-        // Clear the session after successful insertion
-        delete req.session[sessionKey];
+        await connection.query(
+          `
+          INSERT INTO order_scan_collection
+            (collection_name, order_number, item_code, item_name, scan_quantity, item_price, barcode, inventory_item_code, extra_data)
+          VALUES ${placeholders}
+          `,
+          values
+        );
       }
 
       // Then update the order status
-      [result] = await pool.query(
+      [result] = await connection.query(
         `
         UPDATE xxafmc_kitchen_notification a
         JOIN xxafmc_inventory inv ON a.item_id = inv.item_code
@@ -199,6 +203,11 @@ exports.updateBarOrderStatus = async (req, res) => {
         `,
         [ORDERNUMBER, categoryName]
       );
+
+      await connection.commit();
+
+      // Clear the session only after commit succeeds.
+      delete req.session[sessionKey];
     } else {
       [result] = await pool.query(
         `
@@ -223,12 +232,17 @@ exports.updateBarOrderStatus = async (req, res) => {
         : "No status update required",
     });
   } catch (error) {
+    if (connection) {
+      try { await connection.rollback(); } catch (_) {}
+    }
     console.error("Error updating bar order status:", error);
     return res.status(500).json({
       success: false,
       message: "Failed to update order status",
       error: error.message,
     });
+  } finally {
+    if (connection) connection.release();
   }
 };
 
@@ -471,6 +485,15 @@ exports.processBarcodeScan = async (req, res) => {
     );
 
     const orderedQty = Number(orderQuantityRows[0]?.total_quantity || 0);
+
+    // Validate that the scanned barcode/item belongs to this order.
+    if (orderedQty <= 0) {
+      await connection.rollback();
+      return res.status(400).json({
+        success: false,
+        message: `Scanned item does not belong to order ${ORDERNUMBER}`,
+      });
+    }
 
     // STEP 7: Get sub_category for price calculation (like Oracle)
     let subCategory = null;
