@@ -183,6 +183,7 @@ export const barOrdersAPI = {
   cancelItem: (data) => api.put("/bar-orders/cancel", data),
   getActiveOrders: () => api.get("/bar-orders/active"),
   markNotificationAsRead: (data) => api.put("/bar-orders/notifications/read", data),
+getCocktailDetailsById: (itemId, orderNumber) => api.get(`/bar-orders/cocktail/${itemId}?orderNumber=${orderNumber}`),
 };
 
 // ================================

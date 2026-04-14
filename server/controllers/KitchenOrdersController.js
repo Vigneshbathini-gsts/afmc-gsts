@@ -230,7 +230,7 @@ ORDER BY xod.ORDER_LINE_ID ASC;
 
     const [rows] = await pool.query(query, params);
 
-    // console.log(`Fetched ${rows.length} rows for ${KITCHEN}`);
+    // console.log(`Fetched ${rows.length} rows for ${KITCHEN},`,rows);
 
     const formattedData = rows.map((row) => ({
       ORDER_LINE_ID: row.ORDER_LINE_ID,
@@ -652,6 +652,110 @@ exports.markNotificationAsRead = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to update notification",
+    });
+  }
+};
+
+
+
+// Get cocktail/mocktail details by ID for ingredient modal
+exports.getCocktailDetailsById = async (req, res) => {
+  try {
+    const { itemId } = req.params;
+    const { orderNumber } = req.query; // You might need order number too
+
+    if (!itemId) {
+      return res.status(400).json({
+        success: false,
+        message: "Item ID is required",
+      });
+    }
+
+    // Get cocktail basic info first
+    const [cocktailInfo] = await pool.query(
+      `
+      SELECT 
+        xi.ITEM_CODE,
+        xi.ITEM_NAME,
+        xi.SUB_CATEGORY
+      FROM xxafmc_inventory xi
+      WHERE xi.ITEM_CODE = ?
+      `,
+      [itemId]
+    );
+
+    if (cocktailInfo.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Cocktail/Mocktail not found",
+      });
+    }
+
+    // Get ingredients - based on your SQL logic
+    const [ingredients] = await pool.query(
+      `
+      SELECT DISTINCT 
+        XCMD.ITEM_NAME,
+        XCMD.ITEM_CODE,
+        XCMD.PEGS,
+        XCMD.QUANTITY
+      FROM xxafmc_order_details XOD
+      JOIN xxafmc_custom_cocktails_mocktails_details XCMD ON XOD.ITEM_ID = XCMD.INVENTORY_ITEM_CODE
+      WHERE XCMD.ORDER_NUMBER = ?
+        AND XCMD.INVENTORY_ITEM_CODE = ?
+      
+      UNION
+      
+      SELECT DISTINCT 
+        XCMD.ITEM_NAME,
+        XCMD.ITEM_CODE,
+        XCMD.PEGS,
+        XCMD.QUANTITY
+      FROM xxafmc_order_details XOD
+      JOIN xxafmc_cocktails_mocktails_details XCMD ON XOD.ITEM_ID = XCMD.INVENTORY_ITEM_CODE
+      WHERE XOD.ORDER_ID = ?
+        AND XCMD.INVENTORY_ITEM_CODE = ?
+        AND NOT EXISTS (
+          SELECT 1 
+          FROM xxafmc_custom_cocktails_mocktails_details X 
+          WHERE X.INVENTORY_ITEM_CODE = XCMD.INVENTORY_ITEM_CODE
+            AND X.ORDER_NUMBER = ?
+        )
+      `,
+      [orderNumber, itemId, orderNumber, itemId, orderNumber]
+    );
+
+    if (ingredients.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "No ingredients found for this cocktail/mocktail",
+      });
+    }
+
+    // Format response to match your frontend's expected structure
+    const response = {
+      success: true,
+      data: {
+        ITEM_CODE: cocktailInfo[0].ITEM_CODE,
+        ITEM_NAME: cocktailInfo[0].ITEM_NAME,
+        SUB_CATEGORY: cocktailInfo[0].SUB_CATEGORY,
+        details: ingredients.map(ing => ({
+          ITEM_CODE: ing.ITEM_CODE,
+          ITEM_NAME: ing.ITEM_NAME,
+          PEGS: ing.PEGS,
+          QUANTITY: ing.QUANTITY || 1
+        }))
+      }
+    };
+
+    res.status(200).json(response);
+
+  } catch (error) {
+    console.error("Error fetching cocktail details:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch cocktail details",
+      error: error.message,
     });
   }
 };

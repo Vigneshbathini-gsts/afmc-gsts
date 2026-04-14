@@ -13,7 +13,7 @@ import {
 } from "react-icons/fa";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import { barOrdersAPI, cocktailAPI } from "../../services/api";
+import { barOrdersAPI } from "../../services/api";
 import { Html5Qrcode } from "html5-qrcode";
 
 export default function OutletOrderDetails() {
@@ -302,35 +302,35 @@ export default function OutletOrderDetails() {
     initScanner();
   }, [scanning, autoProcessScan, processingScan]);
 
-  const handleItemClick = async (item) => {
-    if (!item.LINK_ENABLED || item.LINK_ENABLED !== "Y") return;
+ const handleItemClick = async (item) => {
+  if (!item.LINK_ENABLED || item.LINK_ENABLED !== "Y") return;
+  try {
+    // Pass both item ID and order number
+    const res = await barOrdersAPI.getCocktailDetailsById(item.ITEM_ID, orderData?.ORDERNUMBER);
+    const cocktail = res.data?.data;
+    const ingredients = Array.isArray(cocktail?.details)
+      ? cocktail.details.map((detail) => ({
+          item_code: detail.ITEM_CODE,
+          item_name: detail.ITEM_NAME,
+          pegs: detail.PEGS,
+          quantity: detail.QUANTITY || 1,
+        }))
+      : [];
 
-    try {
-      const res = await cocktailAPI.getById(item.ITEM_ID);
-      const cocktail = res.data?.data;
-      const ingredients = Array.isArray(cocktail?.details)
-        ? cocktail.details.map((detail) => ({
-            item_code: detail.ITEM_CODE,
-            item_name: detail.ITEM_NAME,
-            pegs: detail.PEGS,
-            quantity: 1,
-          }))
-        : [];
-
-      if (!ingredients.length) {
-        alert("No recipe details found for this item.");
-        return;
-      }
-      setScannedCocktailData({
-        name: cocktail?.ITEM_NAME || item.ITEM_NAME,
-        ingredients,
-      });
-      setShowCocktailModal(true);
-    } catch (error) {
-      console.error("Error fetching cocktail details:", error);
-      alert("Failed to load cocktail details.");
+    if (!ingredients.length) {
+      alert("No recipe details found for this item.");
+      return;
     }
-  };
+    setScannedCocktailData({
+      name: cocktail?.ITEM_NAME || item.ITEM_NAME,
+      ingredients,
+    });
+    setShowCocktailModal(true);
+  } catch (error) {
+    console.error("Error fetching cocktail details:", error);
+    alert("Failed to load cocktail details.");
+  }
+};
 
   const handleCancelItem = async (item) => {
     if (item.CAN_CANCEL !== "Y") {

@@ -9,5 +9,6 @@ router.post("/scan", authMiddleware, KitchenOrdersController.processBarcodeScan)
 router.put("/cancel", authMiddleware, KitchenOrdersController.cancelBarOrderItem);
 router.get("/active", authMiddleware, KitchenOrdersController.getActiveBarOrders);
 router.put("/notifications/read", authMiddleware, KitchenOrdersController.markNotificationAsRead);
+router.get("/cocktail/:itemId", authMiddleware, KitchenOrdersController.getCocktailDetailsById);
 
 module.exports = router;
