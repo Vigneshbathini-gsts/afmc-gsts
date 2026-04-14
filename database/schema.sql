@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS order_scan_collection (
   item_price VARCHAR(255),
   barcode VARCHAR(255),
   inventory_item_code VARCHAR(100),
-  extra_data VARCHAR(255),
+  extra_data LONGTEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_order_scan_order (collection_name, order_number),
   INDEX idx_order_scan_barcode (collection_name, barcode),

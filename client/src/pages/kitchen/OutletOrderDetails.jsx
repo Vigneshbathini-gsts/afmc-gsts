@@ -55,6 +55,8 @@ export default function OutletOrderDetails() {
   const isStoppingRef = useRef(false);
   const isMountedRef = useRef(true);
   const isManualScanRef = useRef(false);
+  const processingScanRef = useRef(false);
+  const clearOnExitStartedRef = useRef(false);
 
   // Fetch order items and scanned items from session
   const fetchOrderItems = useCallback(async () => {
@@ -101,6 +103,35 @@ export default function OutletOrderDetails() {
     };
   }, [orderData?.ORDERNUMBER, fetchOrderItems]);
 
+  // Clear scanned-items session data when the tab is closed.
+  // Note: browser may still cancel the request in some cases, but `keepalive` improves reliability.
+  useEffect(() => {
+    const orderNumber = orderData?.ORDERNUMBER;
+    if (!orderNumber) return;
+
+    const clearOnExit = () => {
+      if (clearOnExitStartedRef.current) return;
+      clearOnExitStartedRef.current = true;
+
+      const token = localStorage.getItem("token");
+      const API = process.env.REACT_APP_API_URL || "http://localhost:5000/api";
+
+      try {
+        fetch(`${API}/bar-orders/scanned-items/${orderNumber}`, {
+          method: "DELETE",
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+          credentials: "include",
+          keepalive: true,
+        });
+      } catch (e) {
+        // best-effort only
+      }
+    };
+
+    window.addEventListener("pagehide", clearOnExit);
+    return () => window.removeEventListener("pagehide", clearOnExit);
+  }, [orderData?.ORDERNUMBER]);
+
   // Helper function to get scanned quantity for an item
   const getScannedQuantityByItemCode = useCallback((itemCode) => {
     return scannedItems
@@ -114,14 +145,15 @@ export default function OutletOrderDetails() {
   }, [scannedItems]);
 
   const handleBarcodeBlur = async () => {
-    if (barcode && barcode.trim() !== "" && !processingScan && !scanning && isManualScanRef.current) {
+    if (barcode && barcode.trim() !== "" && !processingScanRef.current && !scanning && isManualScanRef.current) {
+      isManualScanRef.current = false;
       await autoProcessScan(barcode);
     }
     isManualScanRef.current = false;
   };
 
   const handleBarcodeKeyPress = async (e) => {
-    if (e.key === "Enter" && barcode && barcode.trim() !== "" && !processingScan && !scanning) {
+    if (e.key === "Enter" && barcode && barcode.trim() !== "" && !processingScanRef.current && !scanning) {
       e.preventDefault();
       isManualScanRef.current = true;
       await autoProcessScan(barcode);
@@ -141,7 +173,8 @@ export default function OutletOrderDetails() {
   };
 
   const autoProcessScan = useCallback(async (scannedBarcode) => {
-    if (!scannedBarcode || processingScan) return;
+    if (!scannedBarcode || processingScanRef.current) return;
+    processingScanRef.current = true;
 
     setProcessingScan(true);
     setScanError("");
@@ -221,8 +254,10 @@ export default function OutletOrderDetails() {
       setTimeout(() => {
         if (isMountedRef.current) setScanError("");
       }, 3000);
+    } finally {
+      processingScanRef.current = false;
     }
-  }, [orderData, department, qty, processingScan, getScannedQuantityByItemCode, isBarcodeScanned]);
+  }, [orderData, department, qty, getScannedQuantityByItemCode, isBarcodeScanned]);
 
   const startScanner = async () => {
     try {
