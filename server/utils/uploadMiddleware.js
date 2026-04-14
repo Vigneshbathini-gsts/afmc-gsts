@@ -2,35 +2,34 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 
-// Upload folder path
-const uploadPath = path.join(__dirname, "../uploads");
+const configuredUploadPath =
+  process.env.AFMC_IMAGE_UPLOAD_PATH || "/var/www/AFMCIMAGES";
+const uploadPath = path.resolve(configuredUploadPath);
 
-// Create uploads folder if not exists
 if (!fs.existsSync(uploadPath)) {
   fs.mkdirSync(uploadPath, { recursive: true });
 }
 
-// Storage config
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, uploadPath);
   },
   filename: function (req, file, cb) {
-    const uniqueName = Date.now() + path.extname(file.originalname);
+    const sanitizedOriginalName = file.originalname.replace(/\s+/g, "_");
+    const uniqueName = `${Date.now()}_${sanitizedOriginalName}`;
     cb(null, uniqueName);
   },
 });
 
-// File filter (only images)
 const fileFilter = (req, file, cb) => {
-  const allowedTypes = /jpeg|jpg|png|webp/;
+  const allowedTypes = /jpeg|jpg|png|webp|jfif/;
   const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
   const mimetype = allowedTypes.test(file.mimetype);
 
   if (extname && mimetype) {
     return cb(null, true);
   } else {
-    cb(new Error("Only image files are allowed!"));
+    cb(new Error("Only image files are allowed: jpg, jpeg, png, webp, jfif"));
   }
 };
 
@@ -39,5 +38,12 @@ const upload = multer({
   limits: { fileSize: 2 * 1024 * 1024 }, // 2MB
   fileFilter,
 });
+
+const publicBaseUrl =
+  process.env.AFMC_IMAGE_PUBLIC_BASE_URL ||
+  "https://afmc.globalsparkteksolutions.com/AFMCIMAGES";
+
+upload.uploadPath = uploadPath;
+upload.publicBaseUrl = publicBaseUrl.replace(/\/+$/, "");
 
 module.exports = upload;

@@ -1,133 +1,168 @@
-// cocktail controller
-const pool = require("../config/db");
+const {
+  getCocktailItems,
+  getCocktailIngredientOptions,
+  getCocktailIngredientPricing,
+  getCocktailItemById,
+  createCocktailItem,
+  updateCocktailItem,
+} = require("../models/cocktailModel");
 
-exports.getAll = async (req, res) => {
+const getAuditUserName = (req) =>
+  req.user?.username ||
+  req.body?.createdBy ||
+  req.body?.updatedBy ||
+  "SYSTEM";
+
+const getCocktails = async (req, res) => {
   try {
-    const [rows] = await pool.query(`
-      SELECT
-        cm.cocktail_mocktail_id AS id,
-        cm.COCKTAIL_MOCKTAIL_NAME AS name,
-        xi.category_id,
-        xi.sub_category,
-        GROUP_CONCAT(
-          JSON_OBJECT(
-            'item_code', cmd.item_code,
-            'item_name', xi2.item_name,
-            'pegs', cmd.pegs,
-            'quantity', cmd.quantity
-          )
-        ) AS ingredients_json
-      FROM xxafmc_custom_cocktails_mocktails cm
-      JOIN xxafmc_inventory xi ON cm.inventory_item_code = xi.item_code
-      LEFT JOIN (
-        SELECT * FROM xxafmc_custom_cocktails_mocktails_details
-        UNION ALL
-        SELECT * FROM xxafmc_custom_cocktails_mocktails_details_dummy
-      ) cmd ON cm.cocktail_mocktail_id = cmd.cocktail_mocktail_id
-      LEFT JOIN xxafmc_inventory xi2 ON cmd.item_code = xi2.item_code
-      GROUP BY cm.cocktail_mocktail_id, cm.COCKTAIL_MOCKTAIL_NAME, xi.category_id, xi.sub_category
-    `);
+    const rows = await getCocktailItems(req.query.search);
 
-    const cocktails = rows.map(row => ({
-      id: row.id,
-      name: row.name,
-      category_id: row.category_id,
-      sub_category: row.sub_category,
-      ingredients: row.ingredients_json ? JSON.parse(`[${row.ingredients_json}]`) : []
-    }));
-
-    res.status(200).json(cocktails);
+    res.json({
+      success: true,
+      count: rows.length,
+      data: rows,
+    });
   } catch (error) {
-    console.error("Error fetching cocktails:", error);
+    console.error("Cocktail fetch error:", error);
     res.status(500).json({
-      message: "Failed to fetch cocktails",
+      success: false,
+      message: "Error fetching cocktail items",
       error: error.message,
     });
   }
 };
 
-exports.getById = async (req, res) => {
+const getCocktailById = async (req, res) => {
   try {
-    const { id } = req.params;
-    const { orderNumber } = req.query;
+    const itemId = Number(req.params.id);
 
-    // Get cocktail name and type from inventory
-    const [inventoryRows] = await pool.query(
-      `SELECT item_name, category_id, sub_category FROM xxafmc_inventory WHERE item_code = ?`,
-      [id]
-    );
-
-    if (inventoryRows.length === 0) {
-      return res.status(404).json({
-        message: "Cocktail not found in inventory",
+    if (!Number.isInteger(itemId) || itemId <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid item id is required",
       });
     }
 
-    const { item_name: cocktailName, category_id, sub_category } = inventoryRows[0];
-    const type = category_id === 14 ? "Kitchen" : "Bar";
+    const row = await getCocktailItemById(itemId);
 
-    // Get ingredients from details tables; limit to the current order if provided
-    const detailQuery = `
-      SELECT DISTINCT
-        cmd.item_code,
-        xi.item_name,
-        cmd.pegs,
-        cmd.quantity
-      FROM (
-        SELECT item_code, pegs, quantity
-        FROM xxafmc_custom_cocktails_mocktails_details
-        WHERE inventory_item_code = ?
-        ${orderNumber ? "AND order_number = ?" : ""}
-        UNION ALL
-        SELECT item_code, pegs, quantity
-        FROM xxafmc_custom_cocktails_mocktails_details_dummy
-        WHERE inventory_item_code = ?
-        ${orderNumber ? "AND order_number = ?" : ""}
-      ) cmd
-      JOIN xxafmc_inventory xi ON cmd.item_code = xi.item_code
-    `;
+    if (!row) {
+      return res.status(404).json({
+        success: false,
+        message: "Cocktail item not found",
+      });
+    }
 
-    const queryParams = orderNumber
-      ? [id, orderNumber, id, orderNumber]
-      : [id, id];
-
-    const [detailRows] = await pool.query(detailQuery, queryParams);
-
-    const ingredients = detailRows.map(row => ({
-      item_code: row.item_code,
-      item_name: row.item_name,
-      pegs: row.pegs,
-      quantity: row.quantity
-    }));
-
-    const cocktail = {
-      id: id,
-      name: cocktailName,
-      type: type,
-      ingredients: ingredients
-    };
-
-    res.status(200).json(cocktail);
+    return res.json({
+      success: true,
+      data: row,
+    });
   } catch (error) {
-    console.error("Error fetching cocktail:", error);
-    res.status(500).json({
-      message: "Failed to fetch cocktail",
+    console.error("Cocktail item fetch error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Error fetching cocktail item",
       error: error.message,
     });
   }
 };
 
-exports.create = async (req, res) => {
-  // Implement if needed
-  res.status(501).json({ message: "Not implemented" });
+const getCocktailIngredients = async (req, res) => {
+  try {
+    const rows = await getCocktailIngredientOptions(req.query.search);
+
+    return res.json({
+      success: true,
+      count: rows.length,
+      data: rows,
+    });
+  } catch (error) {
+    console.error("Cocktail ingredient fetch error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Error fetching cocktail ingredients",
+      error: error.message,
+    });
+  }
 };
 
-exports.update = async (req, res) => {
-  // Implement if needed
-  res.status(501).json({ message: "Not implemented" });
+const getCocktailIngredientPrice = async (req, res) => {
+  try {
+    const data = await getCocktailIngredientPricing(
+      req.query.itemCode,
+      req.query.pegs
+    );
+
+    return res.json({
+      success: true,
+      data,
+    });
+  } catch (error) {
+    console.error("Cocktail ingredient price error:", error);
+    return res.status(400).json({
+      success: false,
+      message: error.message || "Error calculating ingredient price",
+    });
+  }
 };
 
-exports.delete = async (req, res) => {
-  // Implement if needed
-  res.status(501).json({ message: "Not implemented" });
+const createCocktail = async (req, res) => {
+  try {
+    const result = await createCocktailItem(req.body, {
+      userName: getAuditUserName(req),
+      imageFile: req.file || null,
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "Cocktail item created successfully",
+      data: result,
+    });
+  } catch (error) {
+    console.error("Cocktail create error:", error);
+    return res.status(400).json({
+      success: false,
+      message: error.message || "Error creating cocktail item",
+    });
+  }
+};
+
+const updateCocktail = async (req, res) => {
+  try {
+    const itemId = Number(req.params.id);
+
+    if (!Number.isInteger(itemId) || itemId <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid item id is required",
+      });
+    }
+
+    const result = await updateCocktailItem(itemId, req.body, {
+      userName: getAuditUserName(req),
+      imageFile: req.file || null,
+    });
+
+    return res.json({
+      success: true,
+      message: "Cocktail item updated successfully",
+      data: result,
+    });
+  } catch (error) {
+    console.error("Cocktail update error:", error);
+    const statusCode = error.message === "Cocktail item not found" ? 404 : 400;
+
+    return res.status(statusCode).json({
+      success: false,
+      message: error.message || "Error updating cocktail item",
+    });
+  }
+};
+
+module.exports = {
+  getCocktails,
+  getCocktailIngredients,
+  getCocktailIngredientPrice,
+  getCocktailById,
+  createCocktail,
+  updateCocktail,
 };

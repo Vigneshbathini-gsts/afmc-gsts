@@ -13,7 +13,7 @@ import {
 } from "react-icons/fa";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import { barOrdersAPI, cocktailAPI, collectionAPI } from "../../services/api";
+import { barOrdersAPI, cocktailAPI } from "../../services/api";
 import { Html5Qrcode } from "html5-qrcode";
 
 export default function OutletOrderDetails() {
@@ -31,9 +31,8 @@ export default function OutletOrderDetails() {
   }, [user]);
 
   const [items, setItems] = useState([]);
-  const [scannedItems, setScannedItems] = useState([]);
+  const [scannedItems, setScannedItems] = useState([]); // Store scanned items in state only
   const [loading, setLoading] = useState(true);
-  const [loadingScanned, setLoadingScanned] = useState(false);
   const [barcode, setBarcode] = useState("");
   const [scanning, setScanning] = useState(false);
   const [itemCode, setItemCode] = useState("");
@@ -48,7 +47,6 @@ export default function OutletOrderDetails() {
   const [scanSuccess, setScanSuccess] = useState(false);
   const [completing, setCompleting] = useState(false);
   const [cancelling, setCancelling] = useState(false);
-  const [clearing, setClearing] = useState(false);
 
   const [scannedCocktailData, setScannedCocktailData] = useState(null);
   const [showCocktailModal, setShowCocktailModal] = useState(false);
@@ -59,6 +57,7 @@ export default function OutletOrderDetails() {
   const isMountedRef = useRef(true);
   const isManualScanRef = useRef(false);
 
+  // Fetch order items only - no scanned items from DB
   const fetchOrderItems = useCallback(async () => {
     if (!orderData?.ORDERNUMBER) return;
 
@@ -80,109 +79,33 @@ export default function OutletOrderDetails() {
     }
   }, [orderData?.ORDERNUMBER, department]);
 
-  const fetchScannedItems = useCallback(async () => {
-    if (!orderData?.ORDERNUMBER) return;
-
-    try {
-      setLoadingScanned(true);
-      const res = await collectionAPI.getByOrder(orderData.ORDERNUMBER);
-      const scannedData = res.data?.data || res.data || [];
-      if (isMountedRef.current) {
-        setScannedItems(scannedData);
-        console.log("Fetched scanned items:", scannedData);
-      }
-    } catch (error) {
-      console.error("Error fetching scanned items:", error);
-      if (isMountedRef.current) setScannedItems([]);
-    } finally {
-      if (isMountedRef.current) setLoadingScanned(false);
-    }
-  }, [orderData?.ORDERNUMBER]);
-
-  // Complete order
-  const handleCompleteOrder = async () => {
-    const totalOrderedQty = items.reduce((sum, item) => sum + (item.quantity || 0), 0);
-    const totalScannedQty = scannedItems.reduce((sum, item) => sum + (item.scan_quantity || 0), 0);
-
-    if (totalScannedQty < totalOrderedQty) {
-      alert(`Cannot complete order. Only ${totalScannedQty} of ${totalOrderedQty} items scanned.`);
-      return;
-    }
-
-    if (window.confirm(`Are you sure you want to complete Order #${orderData.ORDERNUMBER}?`)) {
-      try {
-        setCompleting(true);
-        await barOrdersAPI.updateStatus({
-          ORDERNUMBER: orderData.ORDERNUMBER,
-          KITCHEN: department,
-          STATUS: "Completed",
-        });
-        alert("Order completed successfully!");
-        navigate(-1);
-      } catch (error) {
-        console.error("Error completing order:", error);
-        alert("Failed to complete order. Please try again.");
-      } finally {
-        setCompleting(false);
-      }
-    }
-  };
-
-  // Cancel entire order
-  const handleCancelOrder = async () => {
-    if (window.confirm(`Are you sure you want to cancel Order #${orderData.ORDERNUMBER}? This action cannot be undone.`)) {
-      try {
-        setCancelling(true);
-        // Cancel all pending items
-        for (const item of items) {
-          if (item.CAN_CANCEL === "Y") {
-            await barOrdersAPI.cancelItem({ ORDER_LINE_ID: item.ORDER_LINE_ID });
-          }
-        }
-        // Clear scanned collection
-        await collectionAPI.clearCollection(orderData.ORDERNUMBER);
-        alert("Order cancelled successfully!");
-        navigate(-1);
-      } catch (error) {
-        console.error("Error cancelling order:", error);
-        alert("Failed to cancel order. Please try again.");
-      } finally {
-        setCancelling(false);
-      }
-    }
-  };
-
-  // Clear all scanned items
-  const handleClearScannedItems = async () => {
-    if (window.confirm("Are you sure you want to clear all scanned items history?")) {
-      try {
-        setClearing(true);
-        console.log("Clearing scanned items for order:", orderData.ORDERNUMBER);
-        const response = await collectionAPI.clearCollection(orderData.ORDERNUMBER);
-        console.log("Clear response:", response);
-        await fetchScannedItems();
-        alert("Scanned items cleared successfully!");
-      } catch (error) {
-        console.error("Error clearing scanned items:", error);
-        alert("Failed to clear scanned items. Please check console for details.");
-      } finally {
-        setClearing(false);
-      }
-    }
-  };
-
   useEffect(() => {
     isMountedRef.current = true;
     if (orderData?.ORDERNUMBER) {
       fetchOrderItems();
-      fetchScannedItems();
+      // Clear scanned items state when new order loads
+      setScannedItems([]);
     }
-    
+
     return () => {
       isMountedRef.current = false;
       if (scannerRef.current) stopScanner();
+      // Clear scanned items when leaving page
+      setScannedItems([]);
     };
-  }, [orderData?.ORDERNUMBER, fetchOrderItems, fetchScannedItems]);
+  }, [orderData?.ORDERNUMBER, fetchOrderItems]);
+
+  // Helper function to get scanned quantity for an item
+  const getScannedQuantityByItemCode = useCallback((itemCode) => {
+    return scannedItems
+      .filter(item => item.itemCode === itemCode)
+      .reduce((sum, item) => sum + item.scanQuantity, 0);
+  }, [scannedItems]);
+
+  // Helper function to check if barcode already scanned
+  const isBarcodeScanned = useCallback((barcode) => {
+    return scannedItems.some(item => item.barcode === barcode);
+  }, [scannedItems]);
 
   const handleBarcodeBlur = async () => {
     if (barcode && barcode.trim() !== "" && !processingScan && !scanning && isManualScanRef.current) {
@@ -218,6 +141,14 @@ export default function OutletOrderDetails() {
     setScanError("");
     setScanMessage("");
 
+    // Check for duplicate scan in current session
+    if (isBarcodeScanned(scannedBarcode)) {
+      setScanError(`Duplicate scan! Barcode ${scannedBarcode} has already been scanned.`);
+      setProcessingScan(false);
+      setTimeout(() => setScanError(""), 3000);
+      return;
+    }
+
     try {
       const res = await barOrdersAPI.processScan({
         ORDERNUMBER: orderData?.ORDERNUMBER,
@@ -228,13 +159,33 @@ export default function OutletOrderDetails() {
 
       const scanData = res.data?.data || res.data || {};
 
+      // Check if requested quantity exceeds order quantity
+      const currentScannedQty = getScannedQuantityByItemCode(scanData.itemCode);
+      if (currentScannedQty + (qty || 1) > scanData.orderedQuantity) {
+        const remaining = scanData.orderedQuantity - currentScannedQty;
+        setScanError(`Cannot scan ${qty || 1} item(s). Only ${remaining} more item(s) needed for "${scanData.itemName}".`);
+        setProcessingScan(false);
+        setTimeout(() => setScanError(""), 3000);
+        return;
+      }
+
+      // Add to state (no database)
+      const newScannedItem = {
+        id: Date.now(),
+        itemCode: scanData.itemCode,
+        itemName: scanData.itemName,
+        scanQuantity: qty || 1,
+        itemPrice: scanData.calculatedPrice,
+        barcode: scannedBarcode,
+        scannedAt: new Date().toISOString()
+      };
+      
+      setScannedItems(prev => [...prev, newScannedItem]);
+
       setScanMessage(`✓ ${scanData.itemName} validated for order ${orderData?.ORDERNUMBER}.`);
       setItemCode(scanData.itemCode || "");
       setItemName(scanData.itemName || "");
-      setPrice(scanData.calculatedPrice || scanData.unitPrice || "");
-
-      await fetchScannedItems();
-      await fetchOrderItems();
+      setPrice(scanData.calculatedPrice || "");
 
       if (scanData.isCocktailIngredient && scanData.cocktail) {
         setScannedCocktailData(scanData.cocktail);
@@ -261,7 +212,7 @@ export default function OutletOrderDetails() {
         if (isMountedRef.current) setScanError("");
       }, 3000);
     }
-  }, [orderData, department, qty, processingScan, fetchScannedItems, fetchOrderItems]);
+  }, [orderData, department, qty, processingScan, getScannedQuantityByItemCode, isBarcodeScanned]);
 
   const startScanner = async () => {
     try {
@@ -287,10 +238,10 @@ export default function OutletOrderDetails() {
         try {
           const state = scanner.getState();
           if (state === 2) await scanner.stop();
-        } catch (err) {}
+        } catch (err) { }
         try {
           await scanner.clear();
-        } catch (err) {}
+        } catch (err) { }
       }
 
       const video = document.querySelector("#qr-reader video");
@@ -355,13 +306,25 @@ export default function OutletOrderDetails() {
     if (!item.LINK_ENABLED || item.LINK_ENABLED !== "Y") return;
 
     try {
-      const res = await cocktailAPI.getById(item.ITEM_ID, orderData?.ORDERNUMBER);
-      const cocktail = res.data;
-      if (!cocktail?.ingredients?.length) {
+      const res = await cocktailAPI.getById(item.ITEM_ID);
+      const cocktail = res.data?.data;
+      const ingredients = Array.isArray(cocktail?.details)
+        ? cocktail.details.map((detail) => ({
+            item_code: detail.ITEM_CODE,
+            item_name: detail.ITEM_NAME,
+            pegs: detail.PEGS,
+            quantity: 1,
+          }))
+        : [];
+
+      if (!ingredients.length) {
         alert("No recipe details found for this item.");
         return;
       }
-      setScannedCocktailData(cocktail);
+      setScannedCocktailData({
+        name: cocktail?.ITEM_NAME || item.ITEM_NAME,
+        ingredients,
+      });
       setShowCocktailModal(true);
     } catch (error) {
       console.error("Error fetching cocktail details:", error);
@@ -385,8 +348,68 @@ export default function OutletOrderDetails() {
     }
   };
 
+  // Complete order
+  const handleCompleteOrder = async () => {
+    const totalOrderedQty = items.reduce((sum, item) => sum + (item.quantity || 0), 0);
+    const totalScannedQty = scannedItems.reduce((sum, item) => sum + item.scanQuantity, 0);
+
+    if (totalScannedQty < totalOrderedQty) {
+      alert(`Cannot complete order. Only ${totalScannedQty} of ${totalOrderedQty} items scanned.`);
+      return;
+    }
+
+    if (window.confirm(`Are you sure you want to complete Order #${orderData.ORDERNUMBER}?`)) {
+      try {
+        setCompleting(true);
+        await barOrdersAPI.updateStatus({
+          ORDERNUMBER: orderData.ORDERNUMBER,
+          KITCHEN: department,
+          STATUS: "Completed",
+        });
+        alert("Order completed successfully!");
+        setScannedItems([]); // Clear state
+        navigate(-1);
+      } catch (error) {
+        console.error("Error completing order:", error);
+        alert("Failed to complete order. Please try again.");
+      } finally {
+        setCompleting(false);
+      }
+    }
+  };
+
+  // Cancel entire order
+  const handleCancelOrder = async () => {
+    if (window.confirm(`Are you sure you want to cancel Order #${orderData.ORDERNUMBER}? This action cannot be undone.`)) {
+      try {
+        setCancelling(true);
+        for (const item of items) {
+          if (item.CAN_CANCEL === "Y") {
+            await barOrdersAPI.cancelItem({ ORDER_LINE_ID: item.ORDER_LINE_ID });
+          }
+        }
+        alert("Order cancelled successfully!");
+        setScannedItems([]); // Clear state
+        navigate(-1);
+      } catch (error) {
+        console.error("Error cancelling order:", error);
+        alert("Failed to cancel order. Please try again.");
+      } finally {
+        setCancelling(false);
+      }
+    }
+  };
+
+  // Clear all scanned items
+  const handleClearScannedItems = () => {
+    if (window.confirm("Are you sure you want to clear all scanned items history?")) {
+      setScannedItems([]);
+      alert("Scanned items cleared successfully!");
+    }
+  };
+
   const totalOrderedQty = items.reduce((sum, item) => sum + (item.quantity || 0), 0);
-  const totalScannedQty = scannedItems.reduce((sum, item) => sum + (item.scan_quantity || 0), 0);
+  const totalScannedQty = scannedItems.reduce((sum, item) => sum + item.scanQuantity, 0);
   const isComplete = totalScannedQty >= totalOrderedQty && totalOrderedQty > 0;
 
   if (!orderData) {
@@ -431,9 +454,7 @@ export default function OutletOrderDetails() {
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider">Status</label>
-            <div className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${
-              isComplete ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"
-            }`}>
+            <div className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${isComplete ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>
               {isComplete ? "Ready to Complete" : `${totalOrderedQty - totalScannedQty} item(s) remaining`}
             </div>
           </div>
@@ -454,39 +475,47 @@ export default function OutletOrderDetails() {
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item Name</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quantity</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ordered</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Scanned</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Remaining</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
                     <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Cancel</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {loading ? (
-                    <tr><td colSpan="4" className="px-6 py-12 text-center text-gray-500">Loading...</td></tr>
+                    <tr><td colSpan="6" className="px-6 py-12 text-center text-gray-500">Loading...</td></tr>
                   ) : items.length === 0 ? (
-                    <tr><td colSpan="4" className="px-6 py-12 text-center text-gray-500">No pending items found.</td></tr>
+                    <tr><td colSpan="6" className="px-6 py-12 text-center text-gray-500">No pending items found.</td></tr>
                   ) : (
-                    items.map((item, idx) => (
-                      <tr key={item.ORDER_LINE_ID || idx} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 text-sm text-gray-800">
-                          {item.LINK_ENABLED === "Y" ? (
-                            <button onClick={() => handleItemClick(item)} className="text-pink-600 hover:underline">
-                              {item.ITEM_NAME}
+                    items.map((item, idx) => {
+                      const scannedQty = getScannedQuantityByItemCode(item.ITEM_ID);
+                      const remainingQty = item.quantity - scannedQty;
+                      return (
+                        <tr key={item.ORDER_LINE_ID || idx} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 text-sm text-gray-800">
+                            {item.LINK_ENABLED === "Y" ? (
+                              <button onClick={() => handleItemClick(item)} className="text-pink-600 hover:underline">
+                                {item.ITEM_NAME}
+                              </button>
+                            ) : (item.ITEM_NAME)}
+                          </td>
+                          <td className="px-6 py-4 text-sm font-medium">{item.quantity}</td>
+                          <td className="px-6 py-4 text-sm text-green-600 font-medium">{scannedQty}</td>
+                          <td className="px-6 py-4 text-sm text-orange-600 font-medium">{remainingQty}</td>
+                          <td className="px-6 py-4 text-sm text-gray-600">{item.TYPE || "NA"}</td>
+                          <td className="px-6 py-4 text-center">
+                            <button
+                              onClick={() => handleCancelItem(item)}
+                              disabled={item.CAN_CANCEL !== "Y"}
+                              className={`text-lg ${item.CAN_CANCEL === "Y" ? "text-red-400 hover:text-red-600" : "text-gray-300 cursor-not-allowed"}`}
+                            >
+                              <FaTimesCircle />
                             </button>
-                          ) : (item.ITEM_NAME)}
-                        </td>
-                        <td className="px-6 py-4 text-sm font-medium">{item.quantity}</td>
-                        <td className="px-6 py-4 text-sm text-gray-600">{item.TYPE || "NA"}</td>
-                        <td className="px-6 py-4 text-center">
-                          <button
-                            onClick={() => handleCancelItem(item)}
-                            disabled={item.CAN_CANCEL !== "Y"}
-                            className={`text-lg ${item.CAN_CANCEL === "Y" ? "text-red-400 hover:text-red-600" : "text-gray-300 cursor-not-allowed"}`}
-                          >
-                            <FaTimesCircle />
-                          </button>
-                        </td>
-                      </tr>
-                    ))
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -500,7 +529,6 @@ export default function OutletOrderDetails() {
             </div>
             <div className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* LEFT SIDE → Inputs */}
                 <div className="space-y-4">
                   <div>
                     <label className="block text-xs font-medium text-gray-500 mb-1">Barcode</label>
@@ -515,7 +543,6 @@ export default function OutletOrderDetails() {
                       disabled={processingScan}
                     />
                   </div>
-
                   <div>
                     <label className="block text-xs font-medium text-gray-500 mb-1">Quantity</label>
                     <input
@@ -527,7 +554,6 @@ export default function OutletOrderDetails() {
                       disabled={processingScan}
                     />
                   </div>
-
                   <button
                     onClick={scanning ? stopScanner : startScanner}
                     disabled={processingScan}
@@ -535,7 +561,6 @@ export default function OutletOrderDetails() {
                   >
                     <FaCamera /> {scanning ? "Stop Camera" : "Start Camera"}
                   </button>
-
                   {cameraError && <div className="text-sm text-red-600">{cameraError}</div>}
                   {processingScan && (
                     <div className="flex items-center gap-2 text-sm text-blue-600">
@@ -551,8 +576,6 @@ export default function OutletOrderDetails() {
                     <div className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">{scanError}</div>
                   )}
                 </div>
-
-                {/* RIGHT SIDE → CAMERA */}
                 <div>
                   <div className="rounded-lg border border-gray-200 bg-gray-50 p-2 h-full">
                     <div className="relative" style={{ height: "300px" }}>
@@ -571,22 +594,15 @@ export default function OutletOrderDetails() {
 
           {/* Complete/Cancel Buttons and Scanned Items History */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-            {/* Action Buttons */}
             <div className="border-b border-gray-100 px-6 py-4 flex gap-3">
               <button
                 onClick={handleCompleteOrder}
                 disabled={completing || !isComplete}
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium transition shadow-sm ${
-                  isComplete && !completing
-                    ? "bg-green-600 text-white hover:bg-green-700"
-                    : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                }`}
-                title={!isComplete ? `Scan remaining ${totalOrderedQty - totalScannedQty} item(s)` : "Complete Order"}
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium transition shadow-sm ${isComplete && !completing ? "bg-green-600 text-white hover:bg-green-700" : "bg-gray-300 text-gray-500 cursor-not-allowed"}`}
               >
                 {completing ? <FaSpinner className="animate-spin" /> : <FaCheck />}
                 Complete Order
               </button>
-              
               <button
                 onClick={handleCancelOrder}
                 disabled={cancelling}
@@ -597,7 +613,6 @@ export default function OutletOrderDetails() {
               </button>
             </div>
 
-            {/* Scanned Items History Table */}
             <div className="border-b border-gray-100 px-6 py-4 flex items-center justify-between bg-gray-50">
               <div className="flex items-center gap-2">
                 <FaHistory className="text-gray-400" />
@@ -607,10 +622,9 @@ export default function OutletOrderDetails() {
               {scannedItems.length > 0 && (
                 <button
                   onClick={handleClearScannedItems}
-                  disabled={clearing}
-                  className="flex items-center gap-1 px-3 py-1.5 text-xs text-red-600 hover:text-red-700 border border-red-200 rounded-lg hover:bg-red-50 transition disabled:opacity-50"
+                  className="flex items-center gap-1 px-3 py-1.5 text-xs text-red-600 hover:text-red-700 border border-red-200 rounded-lg hover:bg-red-50 transition"
                 >
-                  {clearing ? <FaSpinner className="animate-spin text-xs" /> : <FaTrash className="text-xs" />}
+                  <FaTrash className="text-xs" />
                   Clear All
                 </button>
               )}
@@ -622,28 +636,24 @@ export default function OutletOrderDetails() {
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item Code</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item Name</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Qty</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Price</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Barcode</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {loadingScanned ? (
-                    <tr><td colSpan="6" className="px-4 py-8 text-center text-gray-500">
-                      <FaSpinner className="animate-spin inline mr-2" /> Loading...
-                    </td></tr>
-                  ) : scannedItems.length === 0 ? (
+                  {scannedItems.length === 0 ? (
                     <tr><td colSpan="6" className="px-4 py-8 text-center text-gray-500">No items scanned yet.</td></tr>
                   ) : (
-                    scannedItems.map((item, idx) => (
-                      <tr key={item.id || idx} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 text-sm font-mono text-gray-600">{item.item_code}</td>
-                        <td className="px-4 py-3 text-sm text-gray-800">{item.item_name}</td>
-                        <td className="px-4 py-3 text-sm text-center font-medium">{item.scan_quantity}</td>
+                    scannedItems.map((item) => (
+                      <tr key={item.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 text-sm font-mono text-gray-600">{item.itemCode}</td>
+                        <td className="px-4 py-3 text-sm text-gray-800">{item.itemName}</td>
+                        <td className="px-4 py-3 text-sm text-center font-medium">{item.scanQuantity}</td>
                         <td className="px-4 py-3 text-sm text-gray-500">
-                          {item.created_at ? new Date(item.created_at).toLocaleString() : "-"}
+                          {new Date(item.scannedAt).toLocaleTimeString()}
                         </td>
-                        <td className="px-4 py-3 text-sm text-right font-semibold">₹{item.item_price || "0"}</td>
+                        <td className="px-4 py-3 text-sm text-right font-semibold">₹{item.itemPrice || "0"}</td>
                         <td className="px-4 py-3 text-sm font-mono text-gray-500">{item.barcode}</td>
                       </tr>
                     ))
@@ -658,7 +668,7 @@ export default function OutletOrderDetails() {
         <div className="space-y-6">
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
             <div className="border-b border-gray-100 px-6 py-4">
-              <h2 className="text-base font-semibold text-gray-800">Scanned Item Details</h2>
+              <h2 className="text-base font-semibold text-gray-800">Current Scanned Item</h2>
             </div>
             <div className="p-6 space-y-4">
               <div className="bg-gray-50 rounded-lg p-4">

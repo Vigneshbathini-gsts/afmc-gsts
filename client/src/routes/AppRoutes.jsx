@@ -24,10 +24,13 @@ import EditItem from "../pages/admin/EditItem";
 import Reports from "../pages/admin/Reports";
 import StockReports from "../pages/admin/StockReports";
 import UserManagement from "../pages/admin/UserManagement";
+import UserEdit from "../pages/admin/UserEdit";
 import Offers from "../pages/admin/Offers";
 import PriceUpdate from "../pages/admin/PriceUpdate";
 import ProfitManagement from "../pages/admin/ProfitManagement";
 import CocktailManagement from "../pages/admin/CocktailManagement";
+import CocktailCreate from "../pages/admin/CocktailCreate";
+import CocktailEdit from "../pages/admin/CocktailEdit";
 import AdminOrderHistory from "../pages/admin/OrderHistory";
 import CancelledOrders from "../pages/admin/CancelledOrders";
 import OfferCreate from "../pages/admin/OfferCreate";
@@ -112,6 +115,7 @@ export default function AppRoutes() {
         <Route path="edit-item" element={<EditItem />} />
         <Route path="reports" element={<Reports />} />
         <Route path="users" element={<UserManagement />} />
+        <Route path="users/:id" element={<UserEdit />} />
         <Route path="offers" element={<Offers />} />
         <Route path="offers/create" element={<OfferCreate />} />
         <Route path="offers/edit/:id" element={<OfferEdit />} />
@@ -119,7 +123,10 @@ export default function AppRoutes() {
 
         <Route path="price-update" element={<PriceUpdate />} />
         <Route path="profit-management" element={<ProfitManagement />} />
+        <Route path="cocktailmanag" element={<CocktailManagement />} />
         <Route path="cocktail-management" element={<CocktailManagement />} />
+        <Route path="cocktail-create" element={<CocktailCreate />} />
+        <Route path="cocktail-edit" element={<CocktailEdit />} />
         <Route path="order-history" element={<AdminOrderHistory />} />
         <Route path="cancelled-orders" element={<CancelledOrders />} />
       </Route>

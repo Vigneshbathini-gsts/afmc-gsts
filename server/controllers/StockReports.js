@@ -24,60 +24,43 @@ exports.getStockReport = async (req, res) => {
 
     const query = `
       SELECT
-        stock_summary.item_code,
-        stock_summary.item_name,
-        latest_price.unit_price,
-        stock_summary.total_price,
-        GREATEST(
-          stock_summary.total_stock_quantity - IFNULL(reserved_summary.reserved_stock, 0),
-          0
-        ) AS AVAILABLE_STOCK,
+        inv.item_code,
+        inv.item_name,
+        ROUND(COALESCE(NULLIF(inv.unit_price, 0), latest_price.unit_price, 0), 2) AS unit_price,
+        ROUND(
+          COALESCE(NULLIF(inv.unit_price, 0), latest_price.unit_price, 0)
+          * IFNULL(inv.stock_quantity, 0),
+          2
+        ) AS total_price,
+        GREATEST(IFNULL(inv.stock_quantity, 0) - IFNULL(reserved_summary.reserved_stock, 0), 0) AS AVAILABLE_STOCK,
         IFNULL(reserved_summary.reserved_stock, 0) AS RESERVED_STOCK,
-        inventory_summary.A_C_UNIT
+        COALESCE(NULLIF(inv.\`A/C_UNIT\`, ''), 'Nos') AS A_C_UNIT
       FROM (
         SELECT
-          xso.item_code,
-          xso.item_name,
-          IFNULL(SUM(xso.stock_quantity), 0) AS total_stock_quantity,
-          SUM(
-            CASE
-              WHEN UPPER(xso.\`A/C_UNIT\`) = 'NOS' AND xso.stock_quantity > 0
-                THEN IFNULL(xso.unit_price, 0)
-              ELSE ROUND(
-                (xso.unit_price / IFNULL(NULLIF(xso.pegs, 0), 1))
-                * IFNULL(xso.stock_quantity, xso.pegs),
-                2
-              )
-            END
-          ) AS total_price
-        FROM xxafmc_stock_out xso
-        WHERE (? IS NULL OR UPPER(xso.item_name) LIKE CONCAT('%', UPPER(?), '%'))
-          AND (? IS NULL OR xso.item_code = ?)
-        GROUP BY xso.item_code, xso.item_name
-      ) AS stock_summary
+          item_code,
+          MAX(item_name) AS item_name,
+          MAX(unit_price) AS unit_price,
+          SUM(IFNULL(stock_quantity, 0)) AS stock_quantity,
+          MAX(\`A/C_UNIT\`) AS \`A/C_UNIT\`,
+          MAX(sub_category) AS sub_category
+        FROM xxafmc_inventory
+        GROUP BY item_code
+      ) inv
       LEFT JOIN (
         SELECT
-          latest_rows.item_code,
-          ROUND(MAX(latest_rows.calculated_unit_price), 2) AS unit_price
-        FROM (
-          SELECT
-            rp.item_code,
-            rp.creation_date,
-            rp.unit_price / IFNULL(NULLIF(rp.pegs, 0), 1) AS calculated_unit_price
-          FROM xxafmc_stock_out rp
-        ) AS latest_rows
+          recent_rows.item_code,
+          ROUND(MAX(recent_rows.unit_price / IFNULL(NULLIF(recent_rows.pegs, 0), 1)), 2) AS unit_price
+        FROM xxafmc_stock_out recent_rows
         INNER JOIN (
-          SELECT
-            item_code,
-            MAX(creation_date) AS latest_creation_date
+          SELECT item_code, MAX(creation_date) AS latest_creation_date
           FROM xxafmc_stock_out
           GROUP BY item_code
-        ) AS latest_dates
-          ON latest_dates.item_code = latest_rows.item_code
-         AND latest_dates.latest_creation_date = latest_rows.creation_date
-        GROUP BY latest_rows.item_code
+        ) latest_dates
+          ON latest_dates.item_code = recent_rows.item_code
+         AND latest_dates.latest_creation_date = recent_rows.creation_date
+        GROUP BY recent_rows.item_code
       ) AS latest_price
-        ON latest_price.item_code = stock_summary.item_code
+        ON latest_price.item_code = inv.item_code
       LEFT JOIN (
         SELECT
           xod.item_id,
@@ -90,16 +73,11 @@ exports.getStockReport = async (req, res) => {
           AND xi.order_num IS NULL
         GROUP BY xod.item_id
       ) AS reserved_summary
-        ON reserved_summary.item_id = stock_summary.item_code
-      LEFT JOIN (
-        SELECT
-          inventory.item_code,
-          MAX(inventory.\`A/C_UNIT\`) AS A_C_UNIT
-        FROM xxafmc_inventory inventory
-        GROUP BY inventory.item_code
-      ) AS inventory_summary
-        ON inventory_summary.item_code = stock_summary.item_code
-      ORDER BY stock_summary.item_name ASC
+        ON reserved_summary.item_id = inv.item_code
+      WHERE inv.sub_category NOT IN (14, 15)
+        AND (? IS NULL OR UPPER(inv.item_name) LIKE CONCAT('%', UPPER(?), '%'))
+        AND (? IS NULL OR inv.item_code = ?)
+      ORDER BY inv.item_name ASC
       LIMIT ${limitNum} OFFSET ${offsetNum}
     `;
 

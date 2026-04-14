@@ -1,4 +1,3 @@
-const { Console } = require("winston/lib/winston/transports");
 const pool = require("../config/db");
 
 exports.getOrders = async (req, res) => {
@@ -268,7 +267,6 @@ exports.processBarcodeScan = async (req, res) => {
     console.log("Request body:", { ORDERNUMBER, BARCODE, QUANTITY, KITCHEN });
 
     if (!ORDERNUMBER || !BARCODE) {
-      console.log("Missing required fields");
       return res.status(400).json({
         success: false,
         message: "Order number and barcode are required",
@@ -276,12 +274,11 @@ exports.processBarcodeScan = async (req, res) => {
     }
 
     const requestedQty = Number(QUANTITY) || 1;
-    console.log("Requested quantity:", requestedQty);
     
     connection = await pool.getConnection();
     await connection.beginTransaction();
-    console.log("Database connection established and transaction started");
 
+    // STEP 1: Get item from stock_out and inventory
     const [itemRows] = await connection.query(
       `
       SELECT 
@@ -306,10 +303,7 @@ exports.processBarcodeScan = async (req, res) => {
       [BARCODE]
     );
     
-    console.log(`Queried inventory for barcode ${BARCODE}:`, JSON.stringify(itemRows, null, 2));
-    
     if (itemRows.length === 0) {
-      console.log("Barcode not found in inventory");
       await connection.rollback();
       return res.status(404).json({
         success: false,
@@ -319,243 +313,233 @@ exports.processBarcodeScan = async (req, res) => {
 
     const item = itemRows[0];
     const categoryId = Number(item.CATEGORY_ID) || 0;
-    console.log("Item found:", { 
-      itemCode: item.ITEM_CODE, 
-      itemName: item.ITEM_NAME,
-      categoryId: categoryId,
-      stockQuantity: item.STOCK_QUANTITY,
-      kitchen: KITCHEN 
-    });
-    
-    console.log("Validating kitchen/bar match...");
-    console.log(`KITCHEN: ${KITCHEN}, categoryId: ${categoryId}`);
-    console.log(`Expected: Bar should scan CATEGORY_ID=10 (Liquor), Kitchen should scan CATEGORY_ID=14 (Snacks)`);
+    const scanItemCode = item.ITEM_CODE;
 
-    // CORRECTED VALIDATION LOGIC
-    // Bar (Liquor) should only scan items with CATEGORY_ID = 10
-    if (KITCHEN === "Bar" && categoryId !== 10) {
-      console.log(`Validation failed: Bar user scanned item with CATEGORY_ID=${categoryId}. Expected CATEGORY_ID=10 for Liquor.`);
+    // STEP 2: Validate Kitchen/Bar match (from Oracle package)
+    if (KITCHEN === "Bar" && categoryId === 14) {
       await connection.rollback();
       return res.status(400).json({
         success: false,
-        message: "This barcode is for Kitchen (Snacks). Please scan Liquor items only.",
+        message: "Scanned Barcode is for Kitchen",
       });
     }
 
-    // Kitchen (Snacks) should only scan items with CATEGORY_ID = 14
-    if (KITCHEN === "Kitchen" && categoryId !== 14) {
-      console.log(`Validation failed: Kitchen user scanned item with CATEGORY_ID=${categoryId}. Expected CATEGORY_ID=14 for Snacks.`);
+    if (KITCHEN === "Kitchen" && categoryId === 10) {
       await connection.rollback();
       return res.status(400).json({
         success: false,
-        message: "This barcode is for Bar (Liquor). Please scan Snacks items only.",
+        message: "Scanned Barcode is for Bar",
       });
     }
-    
-    console.log("Kitchen/bar validation passed");
 
     const stockQuantity = Number(item.STOCK_QUANTITY) || 0;
     const unitPrice = Number(item.UNIT_PRICE) || 0;
     const profitPercent = Number(item.PROFIT) || 0;
     const nonMemberProfit = Number(item.NON_MEMBER_PROFIT) || 0;
     const prCharges = Number(item.PR_CHARGES) || 0;
-    const snacksPrCharges = Number(item.FOOD_PR_CHARGES) || 0;
+    const foodPrCharges = Number(item.FOOD_PR_CHARGES) || 0;
     const pegsFromStock = Number(item.PEGS) || 1;
+    const acUnit = (item.ac_unit || "").toString();
 
-    console.log("Converted values:", {
-      stockQuantity,
-      unitPrice,
-      profitPercent,
-      nonMemberProfit,
-      prCharges,
-      snacksPrCharges,
-      pegsFromStock
-    });
-
+    // STEP 3: Check stock
     if (stockQuantity <= 0) {
-      console.log("No stock available");
       await connection.rollback();
       return res.status(400).json({
         success: false,
-        message: `Scanned barcode ${BARCODE} has no stock in ${KITCHEN}`,
+        message: `Scanned Barcode ${BARCODE} has no stock in ${KITCHEN}`,
       });
     }
-    console.log("Stock validation passed");
 
-    console.log("Fetching user role...");
+    // STEP 4: Find parent item (like Oracle's SELECT with UNION)
+    const [parentRows] = await connection.query(
+      `
+      SELECT inventory_item_code, 'cocktail' AS source_type
+      FROM (
+        SELECT inventory_item_code
+        FROM xxafmc_custom_cocktails_mocktails_details
+        WHERE order_number = ? AND item_code = ?
+        UNION ALL
+        SELECT inventory_item_code
+        FROM xxafmc_custom_cocktails_mocktails_details_dummy
+        WHERE order_number = ? AND item_code = ?
+        UNION ALL
+        SELECT CAST(item_id AS CHAR)
+        FROM xxafmc_order_details
+        WHERE order_id = ? AND item_id = ?
+      ) x
+      LIMIT 1
+      `,
+      [ORDERNUMBER, scanItemCode, ORDERNUMBER, scanItemCode, ORDERNUMBER, scanItemCode]
+    );
+
+    const parentItem = parentRows.length > 0 ? parentRows[0].inventory_item_code : String(scanItemCode);
+    const isCocktailIngredient = parentRows.length > 0 && parentRows[0].source_type === 'cocktail';
+
+    // STEP 5: Get user role (like Oracle)
     const [userRows] = await connection.query(
       `SELECT DISTINCT xu.ROLE_ID FROM xxafmc_users xu
        JOIN xxafmc_kitchen_notification xkn ON xu.USER_ID = xkn.USER_NAME
        WHERE xkn.ORDERNUMBER = ? LIMIT 1`,
       [ORDERNUMBER]
     );
-    console.log(`User roles for order ${ORDERNUMBER}:`, userRows);
-
     const roleId = userRows.length > 0 ? Number(userRows[0].ROLE_ID) : null;
-    console.log(`Role ID: ${roleId}`);
 
-    console.log("Fetching scan statistics...");
-    const [totalScannedRows] = await connection.query(
-      `SELECT COALESCE(SUM(scan_quantity), 0) AS qty
-       FROM order_scan_collection
-       WHERE collection_name = 'S_COLLECTION'
-         AND order_number = ? AND item_code = ? AND barcode = ?`,
-      [ORDERNUMBER, item.ITEM_CODE, BARCODE]
-    );
-    
-    const [scanItemRows] = await connection.query(
-      `SELECT COALESCE(SUM(scan_quantity), 0) AS qty
-       FROM order_scan_collection
-       WHERE collection_name = 'S_COLLECTION'
-         AND order_number = ? AND item_code = ?`,
-      [ORDERNUMBER, item.ITEM_CODE]
-    );
-
-    const [barcodeScannedRows] = await connection.query(
-      `SELECT COUNT(1) AS cnt
-       FROM order_scan_collection
-       WHERE collection_name = 'S_COLLECTION'
-         AND order_number = ? AND barcode = ?`,
-      [ORDERNUMBER, BARCODE]
-    );
-    
-    const totalScannedQty = Number(totalScannedRows[0]?.qty || 0);
-    const scanItemQty = Number(scanItemRows[0]?.qty || 0);
-    const barcodeScannedQty = Number(barcodeScannedRows[0]?.cnt || 0);
-    const acUnit = (item.ac_unit || "").toString();
-
-    console.log("Scan statistics:", {
-      totalScannedQty,
-      scanItemQty,
-      barcodeScannedQty,
-      acUnit
-    });
-
-    console.log("Fetching ordered quantity...");
+    // STEP 6: Get ordered quantity (like Oracle's cursor)
     const [orderQuantityRows] = await connection.query(
-      `SELECT SUM(quantity) AS total_quantity
-       FROM xxafmc_order_details
-       WHERE ORDER_ID = ? AND ITEM_ID = ?`,
-      [ORDERNUMBER, item.ITEM_CODE]
+      `
+      SELECT SUM(quantity) AS total_quantity
+      FROM (
+        SELECT DISTINCT x.item_code, (x.pegs * x.quantity) AS quantity
+        FROM xxafmc_custom_cocktails_mocktails_details x
+        JOIN xxafmc_order_details xo ON x.inventory_item_code = xo.item_id
+        WHERE x.order_number = ? AND x.item_code = ?
+        UNION ALL
+        SELECT DISTINCT x.item_code, (x.pegs * x.quantity) AS quantity
+        FROM xxafmc_custom_cocktails_mocktails_details_dummy x
+        JOIN xxafmc_order_details xo ON x.inventory_item_code = xo.item_id
+        WHERE x.order_number = ? AND x.item_code = ?
+        UNION ALL
+        SELECT xi.item_code, (CASE WHEN xo.type = 'Large' THEN 2 ELSE 1 END * xo.quantity) AS quantity
+        FROM xxafmc_order_details xo
+        JOIN xxafmc_inventory xi ON xi.item_code = xo.item_id
+        WHERE xo.order_id = ? AND xi.unit_price IS NOT NULL AND xi.item_code = ?
+      ) a
+      `,
+      [ORDERNUMBER, scanItemCode, ORDERNUMBER, scanItemCode, ORDERNUMBER, scanItemCode]
     );
 
     const orderedQty = Number(orderQuantityRows[0]?.total_quantity || 0);
-    console.log(`Ordered quantity: ${orderedQty}`);
 
-    console.log("Running validation checks...");
-    if (["Nos", "Can", "glass"].includes(acUnit)) {
-      console.log("AC Unit type: Single unit (Nos/Can/glass)");
-      if (barcodeScannedQty >= 1) {
-        console.log("Validation failed: Duplicate scan");
-        await connection.rollback();
-        return res.status(400).json({ success: false, message: `Duplicate bottle scan for ${BARCODE}` });
-      }
-      if (requestedQty > stockQuantity) {
-        console.log("Validation failed: Requested quantity exceeds stock");
-        await connection.rollback();
-        return res.status(400).json({ success: false, message: `Entered quantity is more than the stock for ${BARCODE}` });
-      }
-      if (orderedQty > 0 && orderedQty < scanItemQty + requestedQty) {
-        console.log("Validation failed: Scanned quantity exceeds order");
-        await connection.rollback();
-        return res.status(400).json({ success: false, message: "Scanned quantity is more than order quantity" });
-      }
-    } else {
-      console.log("AC Unit type: Measured unit (Pegs/ml/etc)");
-      if (totalScannedQty + requestedQty > stockQuantity) {
-        console.log(`Validation failed: Total scanned (${totalScannedQty + requestedQty}) exceeds stock (${stockQuantity})`);
-        await connection.rollback();
-        return res.status(400).json({ success: false, message: `Scanned quantity is more than stock for barcode ${BARCODE}` });
-      }
-      if (orderedQty > 0 && orderedQty < scanItemQty + requestedQty) {
-        console.log(`Validation failed: Scanned quantity (${scanItemQty + requestedQty}) exceeds order (${orderedQty})`);
-        await connection.rollback();
-        return res.status(400).json({ success: false, message: "Scanned quantity is more than order quantity" });
-      }
-    }
-    console.log("All validation checks passed");
-
-    console.log("Calculating price...");
-    let calculatedPrice = unitPrice;
-    const pricePerPeg = pegsFromStock > 0 ? unitPrice / pegsFromStock : unitPrice;
-    console.log(`Price per peg: ${pricePerPeg}`);
-    
-    if (roleId === 20) {
-      console.log("Member price calculation");
-      const profit = pricePerPeg + (pricePerPeg * profitPercent / 100) + snacksPrCharges;
-      calculatedPrice = Number(profit).toFixed(2);
-      console.log(`Member profit calculation: pricePerPeg=${pricePerPeg}, profitPercent=${profitPercent}, snacksPrCharges=${snacksPrCharges}, profit=${profit}, calculatedPrice=${calculatedPrice}`);
-    } else {
-      console.log("Non-member price calculation");
-      const profit = pricePerPeg + (pricePerPeg * nonMemberProfit / 100) + prCharges;
-      calculatedPrice = Number(profit).toFixed(2);
-      console.log(`Non-member profit calculation: pricePerPeg=${pricePerPeg}, nonMemberProfit=${nonMemberProfit}, prCharges=${prCharges}, profit=${profit}, calculatedPrice=${calculatedPrice}`);
-    }
-
-    console.log("Inserting into order_scan_collection...");
-    const insertResult = await connection.query(
-      `INSERT INTO order_scan_collection
-        (collection_name, order_number, item_code, item_name, scan_quantity, 
-         item_price, barcode, inventory_item_code, extra_data, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
-      [
-        "S_COLLECTION", ORDERNUMBER, item.ITEM_CODE, item.ITEM_NAME,
-        requestedQty, calculatedPrice, BARCODE, item.ITEM_CODE,
-        JSON.stringify({ kitchen_type: KITCHEN, category_id: categoryId })
-      ]
+    // STEP 7: Get sub_category for price calculation (like Oracle)
+    let subCategory = null;
+    const [subCategoryRows] = await connection.query(
+      `
+      SELECT subcategory
+      FROM xxafmc_order_details
+      WHERE item_id = ? AND order_id = ?
+      LIMIT 1
+      `,
+      [scanItemCode, ORDERNUMBER]
     );
-    console.log("Insert result:", insertResult);
+    subCategory = subCategoryRows.length > 0 ? Number(subCategoryRows[0].subcategory) : null;
+
+    // STEP 8: Check for free item (like Oracle)
+    const [freeItemRows] = await connection.query(
+      `
+      SELECT item_id, price
+      FROM xxafmc_order_details
+      WHERE order_id = ? AND item_id = ? AND barcode IS NOT NULL AND free_item_quantity IS NULL
+      LIMIT 1
+      `,
+      [ORDERNUMBER, scanItemCode]
+    );
+
+    const isFreeItem = freeItemRows.length > 0 && Number(freeItemRows[0].price) === 0;
+
+    // STEP 9: Calculate price (like Oracle)
+    let calculatedPrice = unitPrice;
+    let isFree = false;
+
+    if (isFreeItem && Number(scanItemCode) === Number(freeItemRows[0].item_id)) {
+      calculatedPrice = 0;
+      isFree = true;
+      await connection.query(
+        `
+        UPDATE xxafmc_order_details
+        SET free_item_quantity = '1'
+        WHERE order_id = ? AND item_id = ? AND barcode IS NOT NULL
+        `,
+        [ORDERNUMBER, scanItemCode]
+      );
+    } else {
+      const pricePerPeg = pegsFromStock > 0 ? unitPrice / pegsFromStock : unitPrice;
+      
+      if (subCategory && [14, 15].includes(subCategory)) {
+        // Cocktail/Mocktail price calculation
+        if (roleId === 20) {
+          const profit = pricePerPeg + (pricePerPeg * profitPercent / 100) + foodPrCharges;
+          calculatedPrice = Number(profit).toFixed(2);
+        } else {
+          const profit = pricePerPeg + (pricePerPeg * nonMemberProfit / 100) + prCharges;
+          calculatedPrice = Number(profit).toFixed(2);
+        }
+      } else {
+        // Regular item price calculation
+        if (roleId === 20) {
+          const profit = pricePerPeg + (pricePerPeg * profitPercent / 100) + foodPrCharges;
+          calculatedPrice = Number(profit).toFixed(2);
+        } else {
+          const profit = pricePerPeg + (pricePerPeg * nonMemberProfit / 100) + prCharges;
+          calculatedPrice = Number(profit).toFixed(2);
+        }
+      }
+    }
+
+    // STEP 10: Get cocktail ingredients (like Oracle's cursor c_ord_dt)
+    let ingredientsToInsert = [];
+    
+    if (isCocktailIngredient) {
+      const [ingredients] = await connection.query(
+        `
+        SELECT 
+          item_code,
+          item_name,
+          (pegs * quantity) AS total_quantity,
+          inventory_item_code
+        FROM xxafmc_custom_cocktails_mocktails_details
+        WHERE order_number = ? AND inventory_item_code = ?
+        UNION ALL
+        SELECT 
+          item_code,
+          item_name,
+          (pegs * quantity) AS total_quantity,
+          inventory_item_code
+        FROM xxafmc_custom_cocktails_mocktails_details_dummy
+        WHERE order_number = ? AND inventory_item_code = ?
+        `,
+        [ORDERNUMBER, parentItem, ORDERNUMBER, parentItem]
+      );
+      ingredientsToInsert = ingredients;
+    }
 
     await connection.commit();
-    console.log("Transaction committed successfully");
 
-    const [finalScanRows] = await connection.query(
-      `SELECT COALESCE(SUM(scan_quantity), 0) AS total_scanned
-       FROM order_scan_collection
-       WHERE collection_name = 'S_COLLECTION'
-         AND order_number = ? AND item_code = ?`,
-      [ORDERNUMBER, item.ITEM_CODE]
-    );
-    
-    console.log(`Final scan total: ${finalScanRows[0]?.total_scanned}`);
-    console.log("========== BARCODE SCAN END ==========");
-    
+    // STEP 11: Return complete data (frontend will handle state)
     return res.status(201).json({
       success: true,
       message: "Barcode scanned successfully",
       data: {
-        itemCode: item.ITEM_CODE,
+        itemCode: scanItemCode,
         itemName: item.ITEM_NAME,
         categoryId: categoryId,
+        subCategory: subCategory,
         stockQuantity: stockQuantity,
         unitPrice: unitPrice,
         calculatedPrice: calculatedPrice,
         orderedQuantity: orderedQty,
         requestedQuantity: requestedQty,
-        scannedQuantity: Number(finalScanRows[0]?.total_scanned || 0),
         barcode: BARCODE,
-        remainingToScan: orderedQty > 0 ? orderedQty - Number(finalScanRows[0]?.total_scanned || 0) : 0
+        remainingToScan: orderedQty > 0 ? orderedQty : 0,
+        isFreeItem: isFree,
+        isCocktailIngredient: isCocktailIngredient,
+        ingredients: ingredientsToInsert,
+        parentItem: parentItem,
+        pegs: pegsFromStock,
+        roleId: roleId,
+        acUnit: acUnit
       },
     });
 
   } catch (error) {
-    if (connection) {
-      console.log("Rolling back transaction due to error");
-      await connection.rollback();
-    }
+    if (connection) await connection.rollback();
     console.error("Error processing barcode scan:", error);
-    console.error("Error stack:", error.stack);
     return res.status(500).json({
       success: false,
       message: "Failed to process barcode scan",
       error: error.message,
-      stack: error.stack
     });
   } finally {
-    if (connection) {
-      console.log("Releasing database connection");
-      connection.release();
-    }
+    if (connection) connection.release();
   }
 };
 
@@ -602,6 +586,72 @@ exports.cancelBarOrderItem = async (req, res) => {
       success: false,
       message: "Failed to cancel order item",
       error: error.message,
+    });
+  }
+};
+
+
+exports.getActiveBarOrders = async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT * FROM xxafmc_kitchen_notification WHERE MSG_READ = 'N'`
+    );
+// console.log("Active bar orders:", rows.length);
+    res.status(200).json({
+      success: true,
+      count: rows.length,
+      data: rows,
+    });
+  } catch (error) {
+    console.error("Error fetching kitchen notifications:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch kitchen notifications",
+    });
+  }
+};
+
+
+exports.markNotificationAsRead = async (req, res) => {
+  try {
+    const { notification_id } = req.body;
+    // Validate input
+    if (!notification_id) {
+      return res.status(400).json({
+        success: false,
+        message: "Notification ID is required",
+      });
+    }
+
+    // Update query
+    const [result] = await pool.query(
+      `UPDATE xxafmc_kitchen_notification 
+       SET MSG_READ = 'Y' 
+       WHERE NOTIFICATION_ID = ?`,
+      [notification_id]
+    );
+
+    // Check if any row was updated
+    if (result.affectedRows === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Notification not found",
+      });
+    }
+
+    // Success response
+    res.status(200).json({
+      success: true,
+      message: "Notification marked as read",
+    });
+
+  } catch (error) {
+    console.error("Error updating notification:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Failed to update notification",
     });
   }
 };

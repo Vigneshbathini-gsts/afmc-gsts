@@ -9,7 +9,8 @@ import {
   FaHamburger,
   FaIceCream,
   FaCoffee,
-  FaCookieBite, FaUtensilSpoon, FaUtensils
+  FaCookieBite,
+  FaUtensils,
 } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { authAPI } from "../../services/api";

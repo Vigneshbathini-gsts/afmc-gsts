@@ -15,6 +15,7 @@
     "jspdf": "^2.5.2",
     "jspdf-autotable": "^3.8.4",
     "jwt-decode": "^4.0.0",
+    "lucide-react": "^1.8.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-hook-form": "^7.72.0",
@@ -28,7 +29,9 @@
   },
   "scripts": {
     "postinstall": "node scripts/fix-html5-qrcode-sourcemaps.js",
+    "prestart": "node scripts/fix-html5-qrcode-sourcemaps.js",
     "start": "react-scripts start",
+    "prebuild": "node scripts/fix-html5-qrcode-sourcemaps.js",
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"

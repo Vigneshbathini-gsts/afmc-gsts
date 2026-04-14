@@ -1,39 +1,34 @@
 import React, { useEffect, useRef, useState } from "react";
-import { BrowserMultiFormatReader } from "@zxing/browser";
+import { Html5Qrcode } from "html5-qrcode";
 import { FaTimes } from "react-icons/fa";
 
 export default function BarcodeScanner({ isOpen, onClose, onScan }) {
-  const videoRef = useRef(null);
-  const codeReader = useRef(null);
+  const scannerRef = useRef(null);
   const [error, setError] = useState("");
+  const scannerElementId = "shared-barcode-scanner";
 
   useEffect(() => {
     if (!isOpen) return;
 
-    codeReader.current = new BrowserMultiFormatReader();
-
     const startScanner = async () => {
       try {
-        const devices = await BrowserMultiFormatReader.listVideoInputDevices();
+        setError("");
+        const scanner = new Html5Qrcode(scannerElementId);
+        scannerRef.current = scanner;
 
-        if (devices.length === 0) {
-          setError("No camera found");
-          return;
-        }
-
-        const selectedDeviceId = devices[0].deviceId;
-
-        codeReader.current.decodeFromVideoDevice(
-          selectedDeviceId,
-          videoRef.current,
-          (result, err) => {
-            if (result) {
-              const scannedText = result.getText();
-              onScan(scannedText);
-              stopScanner();
-              onClose();
-            }
-          }
+        await scanner.start(
+          { facingMode: "environment" },
+          {
+            fps: 10,
+            qrbox: { width: 280, height: 180 },
+            aspectRatio: 1.7778,
+          },
+          async (decodedText) => {
+            await stopScanner();
+            onScan(decodedText);
+            onClose();
+          },
+          () => {}
         );
       } catch (err) {
         console.error(err);
@@ -46,17 +41,26 @@ export default function BarcodeScanner({ isOpen, onClose, onScan }) {
     return () => {
       stopScanner();
     };
-  }, [isOpen]);
+  }, [isOpen, onClose, onScan]);
 
-  const stopScanner = () => {
-    if (codeReader.current) {
-      codeReader.current.reset();
+  const stopScanner = async () => {
+    if (!scannerRef.current) {
+      return;
     }
 
-    const stream = videoRef.current?.srcObject;
-    if (stream) {
-      stream.getTracks().forEach((track) => track.stop());
+    try {
+      await scannerRef.current.stop();
+    } catch (_error) {
+      // Ignore stop errors when scanner is already idle.
     }
+
+    try {
+      await scannerRef.current.clear();
+    } catch (_error) {
+      // Ignore clear errors during teardown.
+    }
+
+    scannerRef.current = null;
   };
 
   if (!isOpen) return null;
@@ -68,7 +72,7 @@ export default function BarcodeScanner({ isOpen, onClose, onScan }) {
         <div className="flex items-center justify-between px-5 py-4 border-b">
           <h2 className="text-xl font-bold text-[#d70652]">Scan Barcode</h2>
           <button
-            onClick={() => {
+            onClick={async () => {
               stopScanner();
               onClose();
             }}
@@ -84,7 +88,7 @@ export default function BarcodeScanner({ isOpen, onClose, onScan }) {
             <div className="text-center text-red-500 font-medium">{error}</div>
           ) : (
             <div className="relative rounded-2xl overflow-hidden border shadow">
-              <video ref={videoRef} className="w-full h-[350px] object-cover" />
+              <div id={scannerElementId} className="w-full min-h-[350px] bg-black" />
               <div className="absolute inset-0 border-4 border-[#d70652]/40 pointer-events-none rounded-2xl"></div>
             </div>
           )}

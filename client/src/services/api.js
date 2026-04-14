@@ -64,9 +64,20 @@ export const authAPI = {
 // USER MANAGEMENT API (Admin)
 // ================================
 export const userAPI = {
-  getAll: () => api.get("/users"),
+  getAll: (search = "") =>
+    api.get("/users", {
+      params: search ? { search } : undefined,
+    }),
   getById: (id) => api.get(`/users/${id}`),
+  getRoleOptions: (loginType = "Member") =>
+    api.get("/users/roles/options", {
+      params: { loginType },
+    }),
   create: (userData) => api.post("/users", userData),
+  bulkUpload: (formData) =>
+    api.post("/users/bulk-upload", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }),
   update: (id, userData) => api.put(`/users/${id}`, userData),
   delete: (id) => api.delete(`/users/${id}`),
 };
@@ -102,6 +113,7 @@ export const inventoryAPI = {
   getItems: (params) => api.get("/inventory/items", { params }),
   getSubCategories: (params) => api.get("/inventory/subcategories", { params }),
   getBarTypes: () => api.get("/inventory/bar-types"),
+  checkBarcodeExists: (barcode) => api.get(`/inventory/barcode/${barcode}/exists`),
   createWithImage: (formData) =>
     api.post("/inventory", formData, {
       headers: { "Content-Type": "multipart/form-data" },
@@ -112,6 +124,8 @@ export const inventoryAPI = {
     }),
   getStockInReport: (params) => api.get("/inventory/stock-in-report", { params }),
   getStockOutReport: (params) => api.get("/inventory/stock-out-report", { params }),
+  getStockOutItemByBarcode: (barcode) => api.get(`/inventory/stock-out/barcode/${barcode}`),
+  createStockOut: (data) => api.post("/inventory/stock-out", data),
   getById: (id) => api.get(`/inventory/${id}`),
   addStock: (data) => api.post("/inventory/add-stock", data),
   updateStock: (id, data) => api.put(`/inventory/${id}`, data),
@@ -126,6 +140,7 @@ export const orderAPI = {
   create: (orderData) => api.post("/orders", orderData),
   getAll: () => api.get("/orders"),
   getById: (id) => api.get(`/orders/${id}`),
+  getOrderDetails: (id) => api.get(`/orders/${id}`),
   updateStatus: (id, data) => api.put(`/orders/${id}/status`, data),
   cancelOrder: (id, data) => api.put(`/orders/${id}/cancel`, data),
 
@@ -141,9 +156,7 @@ export const orderAPI = {
   getAttendantOrders: () => api.get("/orders/attendant"),
 
   // Admin
-  getOrderHistory: () => api.get("/orders/history"),
-
-  getOrderDetails: (orderNumber) => api.get(`/orders/details/${orderNumber}`),
+  getOrderHistory: (params) => api.get("/orders/history", { params }),
 };
 
 // ================================
@@ -168,6 +181,8 @@ export const barOrdersAPI = {
   getOrderItems: (data) => api.post("/bar-orders/items", data),
   processScan: (data) => api.post("/bar-orders/scan", data),
   cancelItem: (data) => api.put("/bar-orders/cancel", data),
+  getActiveOrders: () => api.get("/bar-orders/active"),
+  markNotificationAsRead: (data) => api.put("/bar-orders/notifications/read", data),
 };
 
 // ================================
@@ -217,12 +232,24 @@ export const profitAPI = {
 // COCKTAIL / BAR API
 // ================================
 export const cocktailAPI = {
-  getAll: () => api.get("/cocktails"),
-  getById: (id, orderNumber) =>
-    api.get(`/cocktails/${id}`, { params: { orderNumber } }),
-  create: (data) => api.post("/cocktails", data),
-  update: (id, data) => api.put(`/cocktails/${id}`, data),
-  delete: (id) => api.delete(`/cocktails/${id}`),
+  getAll: (params) => api.get("/cocktails", { params }),
+  getById: (id) => api.get(`/cocktails/${id}`),
+  getIngredientOptions: (search = "") =>
+    api.get("/cocktails/ingredients/options", {
+      params: search ? { search } : undefined,
+    }),
+  getIngredientPrice: (itemCode, pegs) =>
+    api.get("/cocktails/ingredients/price", {
+      params: { itemCode, pegs },
+    }),
+  create: (data) =>
+    api.post("/cocktails", data, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }),
+  update: (id, data) =>
+    api.put(`/cocktails/${id}`, data, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }),
 };
 
 //Notification API

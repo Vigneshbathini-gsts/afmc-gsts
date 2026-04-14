@@ -1,15 +1,22 @@
 const express = require("express");
-const router = express.Router();
-const cocktailController = require("../controllers/cocktailController");
+const {
+  getCocktails,
+  getCocktailIngredients,
+  getCocktailIngredientPrice,
+  getCocktailById,
+  createCocktail,
+  updateCocktail,
+} = require("../controllers/cocktailController");
 const authMiddleware = require("../middleware/authMiddleware");
+const upload = require("../utils/uploadMiddleware");
 
-router.get("/", authMiddleware, cocktailController.getAll);
-router.get("/:id", authMiddleware, cocktailController.getById);
-router.post("/", authMiddleware, cocktailController.create);
-router.put("/:id", authMiddleware, cocktailController.update);
-router.delete("/:id", authMiddleware, cocktailController.delete);
+const router = express.Router();
+
+router.get("/", getCocktails);
+router.get("/ingredients/options", getCocktailIngredients);
+router.get("/ingredients/price", getCocktailIngredientPrice);
+router.post("/", authMiddleware, upload.single("image"), createCocktail);
+router.get("/:id", getCocktailById);
+router.put("/:id", authMiddleware, upload.single("image"), updateCocktail);
 
 module.exports = router;
-
-
-

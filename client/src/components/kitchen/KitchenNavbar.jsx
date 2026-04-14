@@ -1,7 +1,7 @@
 import React from "react";
 import { FaBars, FaBell } from "react-icons/fa";
 import UserMenuDropdown from "../common/UserMenuDropdown";
-
+import KitchenOrderBell from "./KitchenOrderBell";
 export default function KitchenNavbar({ onMenuClick }) {
   return (
     <header className="bg-white shadow-md sticky top-0 z-30">
@@ -25,10 +25,7 @@ export default function KitchenNavbar({ onMenuClick }) {
 
         {/* Right */}
         <div className="flex items-center gap-4">
-          <button className="relative p-3 rounded-xl bg-gray-100 hover:bg-gray-200 transition">
-            <FaBell className="text-gray-700" />
-            <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full"></span>
-          </button>
+          <KitchenOrderBell />
 
           <UserMenuDropdown />
         </div>

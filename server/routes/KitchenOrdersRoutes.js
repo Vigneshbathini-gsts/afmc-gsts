@@ -1,0 +1,13 @@
+const express = require("express");
+const router = express.Router();
+const KitchenOrdersController = require("../controllers/KitchenOrdersController");
+const authMiddleware = require("../middleware/authMiddleware");
+router.get("/", authMiddleware, KitchenOrdersController.getOrders);
+router.put("/status", authMiddleware, KitchenOrdersController.updateBarOrderStatus);
+router.post("/items", authMiddleware, KitchenOrdersController.getOrderItems);
+router.post("/scan", authMiddleware, KitchenOrdersController.processBarcodeScan);
+router.put("/cancel", authMiddleware, KitchenOrdersController.cancelBarOrderItem);
+router.get("/active", authMiddleware, KitchenOrdersController.getActiveBarOrders);
+router.put("/notifications/read", authMiddleware, KitchenOrdersController.markNotificationAsRead);
+
+module.exports = router;

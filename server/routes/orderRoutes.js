@@ -1,9 +1,12 @@
-// order routes
 const express = require("express");
-const router = express.Router();
-const orderController = require("../controllers/orderController");
-const authMiddleware = require("../middleware/authMiddleware");
+const {
+  fetchAdminOrderHistory,
+  fetchOrderDetails,
+} = require("../controllers/orderController");
 
-router.get("/details/:orderNumber", authMiddleware, orderController.getOrderDetailsByOrderNumber);
+const router = express.Router();
+
+router.get("/history", fetchAdminOrderHistory);
+router.get("/:id", fetchOrderDetails);
 
 module.exports = router;
