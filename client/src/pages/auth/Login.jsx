@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   FaEnvelope,
   FaLock,
@@ -24,9 +24,36 @@ export default function Login() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showOutletDropdown, setShowOutletDropdown] = useState(false);
-  const { setUser } = useAuth();
+  const { user, isLoading, setUser } = useAuth();
 
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!isLoading && user) {
+      // User is already logged in, redirect to appropriate dashboard
+      const redirectPath = getRedirectPath(user);
+      navigate(redirectPath, { replace: true });
+    }
+  }, [user, isLoading, navigate]);
+
+  const getRedirectPath = (user) => {
+    switch (user.roleId) {
+      case 10:
+        return "/admin/dashboard";
+      case 20:
+        return "/attendant/dashboard";
+      case 30:
+        return "/user/dashboard";
+      case 40:
+        if (user.outletType === "KITCHEN") return "/kitchen/dashboard";
+        if (user.outletType === "BAR") return "/bar/dashboard";
+        return "/kitchen/dashboard"; // default
+      case 50:
+        return "/storekeeper/dashboard";
+      default:
+        return "/";
+    }
+  };
   const fetchUserRole = async () => {
     if (!email.trim()) return;
 
@@ -62,6 +89,7 @@ export default function Login() {
       if (response.data?.success) {
         localStorage.setItem("token", response.data.token);
         setUser(response.data.user);
+        console.log("Login successful, user data:", response.data.user);
         navigate(response.data.redirectPath);
         return;
       }
@@ -77,6 +105,10 @@ export default function Login() {
       setLoading(false);
     }
   };
+
+  if (isLoading) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  }
 
   return (
     <div className="min-h-screen flex bg-gradient-to-br from-pink-50 via-rose-50 to-white">

@@ -180,7 +180,30 @@ export const reportAPI = {
   getCancelledOrdersReport: () => api.get("/reports/cancelled-orders"),
 };
 
+export const barOrdersAPI = {
+  getOrders: (kitchen) => api.get(`/bar-orders?kitchen=${kitchen}`),
+  updateStatus: (data) => api.put("/bar-orders/status", data),
+  getOrderItems: (data) => api.post("/bar-orders/items", data),
+  processScan: (data) => api.post("/bar-orders/scan", data),
+  cancelItem: (data) => api.put("/bar-orders/cancel", data),
+  getActiveOrders: () => api.get("/bar-orders/active"),
+  markNotificationAsRead: (data) => api.put("/bar-orders/notifications/read", data),
+getCocktailDetailsById: (itemId, orderNumber) => api.get(`/bar-orders/cocktail/${itemId}?orderNumber=${orderNumber}`),
+};
 
+// ================================
+// COLLECTION API (Barcode Scan Collection)
+// ================================
+export const collectionAPI = {
+  getByOrder: (orderNumber) => api.get(`/collection/${orderNumber}`),
+  add: (data) => api.post("/collection", data),
+  update: (id, data) => api.put(`/collection/${id}`, data),
+  delete: (id) => api.delete(`/collection/${id}`),
+  clear: (orderNumber) => api.delete(`/collection/${orderNumber}/clear`),
+  getScannedQuantity: (orderNumber, itemCode) =>
+    api.get(`/collection/${orderNumber}/item/${itemCode}`),
+  getSummary: (orderNumber) => api.get(`/collection/${orderNumber}/summary`),
+};
 
 // ================================
 // OFFERS API
@@ -215,7 +238,8 @@ export const profitAPI = {
 // COCKTAIL / BAR API
 // ================================
 export const cocktailAPI = {
-  getAll: () => api.get("/cocktails"),
+  getAll: (params) => api.get("/cocktails", { params }),
+  getById: (id) => api.get(`/cocktails/${id}`),
   getIngredientOptions: (search = "") =>
     api.get("/cocktails/ingredients/options", {
       params: search ? { search } : undefined,
@@ -224,22 +248,14 @@ export const cocktailAPI = {
     api.get("/cocktails/ingredients/price", {
       params: { itemCode, pegs },
     }),
-  getById: (id) => api.get(`/cocktails/${id}`),
   create: (data) =>
     api.post("/cocktails", data, {
-      headers:
-        data instanceof FormData
-          ? { "Content-Type": "multipart/form-data" }
-          : undefined,
+      headers: { "Content-Type": "multipart/form-data" },
     }),
   update: (id, data) =>
     api.put(`/cocktails/${id}`, data, {
-      headers:
-        data instanceof FormData
-          ? { "Content-Type": "multipart/form-data" }
-          : undefined,
+      headers: { "Content-Type": "multipart/form-data" },
     }),
-  delete: (id) => api.delete(`/cocktails/${id}`),
 };
 
 //Notification API

@@ -218,124 +218,83 @@ async function getActiveOrders({
   to = null,
   search = null,
   appUser = null,
+  userId = null,
 }) {
   const query = `
     SELECT
-      xoh.order_num,
-      ROUND(xoh.order_total, 2) AS order_total,
-      xoh.creation_date,
-      DATE_FORMAT(
-        COALESCE(
-          STR_TO_DATE(xoh.order_date, '%m/%d/%Y'),
-          xoh.creation_date
-        ),
-        '%c/%e/%Y'
-      ) AS order_date,
+      oh.order_num,
+      DATE_FORMAT(STR_TO_DATE(oh.order_date, '%m/%d/%Y'), '%c/%e/%Y') AS order_date,
+      STR_TO_DATE(oh.order_date, '%m/%d/%Y') AS creation_date,
+      COALESCE(MAX(nm.first_name), MAX(customer.first_name), '') AS first_name,
+      COALESCE(MAX(nm.phone_number), MAX(customer.phone_number), '') AS phone_number,
+      ROUND(MAX(oh.order_total), 2) AS order_total,
       CASE
-        WHEN COUNT(CASE WHEN xkn.status = 'Cancelled' THEN 1 END) = COUNT(xkn.status)
+        WHEN SUM(CASE WHEN UPPER(IFNULL(od.order_status, '')) = 'CANCELLED' THEN 1 ELSE 0 END) = COUNT(DISTINCT od.order_line_id)
           THEN 'Cancelled'
-        WHEN COUNT(CASE WHEN xkn.status = 'Completed' THEN 1 END) = COUNT(xkn.status)
-          THEN 'Completed'
-        WHEN COUNT(CASE WHEN xkn.status = 'Received' THEN 1 END) > 0
-          THEN 'Received'
-        WHEN COUNT(CASE WHEN xkn.status = 'Preparing' THEN 1 END) > 0
+        WHEN SUM(CASE WHEN kn.status = 'Preparing' THEN 1 ELSE 0 END) > 0
           THEN 'Preparing'
-        ELSE 'Received'
-      END AS status,
-      MAX(
-        IFNULL(
-          (
-            SELECT xnm.first_name
-            FROM xxafmc_non_members xnm
-            WHERE xnm.id = xoh.member_id
-            LIMIT 1
-          ),
-          (
-            SELECT xu2.first_name
-            FROM xxafmc_users xu2
-            WHERE xu2.user_id = xoh.user_id
-            LIMIT 1
-          )
-        )
-      ) AS first_name,
-      MAX(
-        (
-          SELECT xnm.phone_number
-          FROM xxafmc_non_members xnm
-          WHERE xnm.id = xoh.member_id
-          LIMIT 1
-        )
-      ) AS phone_number,
-      CASE
-        WHEN MAX(xkn.status) IN ('Received', 'Preparing') THEN NULL
-        ELSE MAX(xod.payment_status)
-      END AS payment_status
-    FROM xxafmc_order_header xoh
-    JOIN xxafmc_kitchen_notification xkn
-      ON xoh.order_num = xkn.ordernumber
-    JOIN xxafmc_order_details xod
-      ON xkn.ordernumber = xod.order_id
-     AND xkn.item_id = xod.item_id
-    JOIN xxafmc_users xu
-      ON xoh.user_id = xu.user_id
-    WHERE IFNULL(xod.payment_status, '') = ''
-      AND xkn.status IN ('Received', 'Preparing', 'Cancelled', 'Completed')
+        WHEN SUM(CASE WHEN kn.status = 'Received' THEN 1 ELSE 0 END) > 0
+          THEN 'Received'
+        WHEN SUM(CASE WHEN kn.status = 'Completed' THEN 1 ELSE 0 END) > 0
+          THEN 'Completed'
+        ELSE 'Pending'
+      END AS status
+    FROM xxafmc_order_header oh
+    JOIN xxafmc_order_details od
+      ON od.order_id = oh.order_num
+    LEFT JOIN xxafmc_kitchen_notification kn
+      ON kn.ordernumber = od.order_id
+      AND kn.item_id = od.item_id
+    LEFT JOIN xxafmc_users customer
+      ON customer.user_id = oh.user_id
+    LEFT JOIN xxafmc_non_members nm
+      ON nm.id = oh.member_id
+    LEFT JOIN xxafmc_users attendant
+      ON attendant.user_id = kn.user_name
+    WHERE STR_TO_DATE(oh.order_date, '%m/%d/%Y') BETWEEN
+      COALESCE(?, STR_TO_DATE(oh.order_date, '%m/%d/%Y'))
+      AND COALESCE(?, STR_TO_DATE(oh.order_date, '%m/%d/%Y'))
       AND (
         ? IS NULL
         OR ? = ''
-        OR UPPER(xu.user_name) = UPPER(?)
+        OR UPPER(attendant.user_name) = UPPER(?)
       )
-      AND COALESCE(
-        STR_TO_DATE(xoh.order_date, '%m/%d/%Y'),
-        DATE(xoh.creation_date)
-      ) BETWEEN
-        COALESCE(?, COALESCE(STR_TO_DATE(xoh.order_date, '%m/%d/%Y'), DATE(xoh.creation_date)))
-        AND COALESCE(?, COALESCE(STR_TO_DATE(xoh.order_date, '%m/%d/%Y'), DATE(xoh.creation_date)))
+      AND (
+        ? IS NULL
+        OR oh.user_id = ?
+      )
       AND (
         ? IS NULL
         OR ? = ''
-        OR CAST(xoh.order_num AS CHAR) LIKE CONCAT('%', ?, '%')
-        OR UPPER(
-          IFNULL(
-            (
-              SELECT xnm.first_name
-              FROM xxafmc_non_members xnm
-              WHERE xnm.id = xoh.member_id
-              LIMIT 1
-            ),
-            (
-              SELECT xu3.first_name
-              FROM xxafmc_users xu3
-              WHERE xu3.user_id = xoh.user_id
-              LIMIT 1
-            )
-          )
-        ) LIKE CONCAT('%', UPPER(?), '%')
+        OR CAST(oh.order_num AS CHAR) LIKE ?
+        OR UPPER(COALESCE(nm.first_name, customer.first_name, '')) LIKE UPPER(?)
+        OR COALESCE(nm.phone_number, customer.phone_number, '') LIKE ?
       )
-    GROUP BY xoh.order_num, xoh.order_total, xoh.creation_date, xoh.order_date
-    HAVING (
-      COUNT(CASE WHEN xkn.status = 'Cancelled' THEN 1 END) = COUNT(xkn.status)
-      OR COUNT(CASE WHEN xkn.status = 'Received' THEN 1 END) > 0
-      OR COUNT(CASE WHEN xkn.status = 'Preparing' THEN 1 END) > 0
-    )
-    ORDER BY xoh.order_num DESC
+    GROUP BY oh.order_num, oh.order_date
+    HAVING status IN ('Received', 'Preparing', 'Pending')
+    ORDER BY creation_date DESC, oh.order_num DESC
   `;
 
-  const fromDate = from || null;
-  const toDate = to || null;
-  const safeSearch = search?.trim() || null;
-  const safeUser = appUser?.trim() || null;
+  const fromDate = normalizeDate(from, false);
+  const toDate = normalizeDate(to, true);
+  const searchTerm = search?.trim() || null;
+  const searchLike = searchTerm ? `%${searchTerm}%` : null;
+  const normalizedAppUser = appUser?.trim() || null;
+  const normalizedUserId = userId || null;
 
   const [rows] = await db.execute(query, [
-    safeUser,
-    safeUser,
-    safeUser,
     fromDate,
     toDate,
-    safeSearch,
-    safeSearch,
-    safeSearch,
-    safeSearch,
+    normalizedAppUser,
+    normalizedAppUser,
+    normalizedAppUser,
+    normalizedUserId,
+    normalizedUserId,
+    searchTerm,
+    searchTerm,
+    searchLike,
+    searchLike,
+    searchLike,
   ]);
 
   return rows;
@@ -344,16 +303,18 @@ async function getActiveOrders({
 async function getOrderDetails(orderNumber) {
   const query = `
     SELECT
-      xkn.item_name,
-      xkn.status,
-      xod.quantity,
-      IFNULL(NULLIF(xod.type, ''), 'NA') AS type
-    FROM xxafmc_order_details xod
-    JOIN xxafmc_kitchen_notification xkn
-      ON xod.order_id = xkn.ordernumber
-     AND xod.item_id = xkn.item_id
-    WHERE xkn.ordernumber = ?
-    ORDER BY xkn.item_name ASC
+      od.order_line_id,
+      od.order_id AS order_num,
+      od.item_id,
+      COALESCE(xi.item_name, od.item_id) AS item_name,
+      od.quantity,
+      xi.type,
+      COALESCE(NULLIF(od.order_status, ''), 'Pending') AS status
+    FROM xxafmc_order_details od
+    LEFT JOIN xxafmc_inventory xi
+      ON xi.item_code = od.item_id
+    WHERE od.order_id = ?
+    ORDER BY od.order_line_id ASC
   `;
 
   const [rows] = await db.execute(query, [orderNumber]);
@@ -361,80 +322,99 @@ async function getOrderDetails(orderNumber) {
 }
 
 async function getNonMemberByPhone(phoneNumber) {
-  const safePhone = String(phoneNumber ?? "").trim();
-  if (!safePhone) {
-    return null;
-  }
-
   const [rows] = await db.execute(
     `
       SELECT
-        ID AS id,
-        FIRST_NAME AS first_name,
-        LAST_NAME AS last_name,
-        PHONE_NUMBER AS phone_number
+        id,
+        first_name,
+        last_name,
+        phone_number
       FROM xxafmc_non_members
-      WHERE TRIM(PHONE_NUMBER) = ?
+      WHERE phone_number = ?
       LIMIT 1
     `,
-    [safePhone]
+    [phoneNumber]
   );
 
   return rows[0] || null;
 }
 
-async function saveNonMember({ firstName, lastName, phoneNumber, createdBy }) {
-  const safePhone = String(phoneNumber ?? "").trim();
-  const safeFirstName = String(firstName ?? "").trim();
-  const safeLastName = String(lastName ?? "").trim();
-  const today = new Date().toISOString().slice(0, 10);
+async function saveNonMember({ firstName, lastName = "", phoneNumber }) {
+  const normalizedFirstName = String(firstName || "").trim();
+  const normalizedLastName = String(lastName || "").trim();
+  const normalizedPhone = String(phoneNumber || "").trim();
 
-  if (!safePhone || !safeFirstName) {
-    const error = new Error("INVALID_DATA");
+  if (!normalizedFirstName || !normalizedPhone) {
+    const error = new Error("Phone number and first name are required.");
     error.code = "INVALID_DATA";
     throw error;
   }
 
-  const existing = await getNonMemberByPhone(safePhone);
-  if (existing) {
-    return {
-      id: existing.id,
-      first_name: existing.first_name || safeFirstName,
-      last_name: existing.last_name || safeLastName,
-      phone_number: safePhone,
-      existed: true,
-    };
+  const connection = await db.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    const [existingRows] = await connection.execute(
+      `
+        SELECT id
+        FROM xxafmc_non_members
+        WHERE phone_number = ?
+        LIMIT 1
+      `,
+      [normalizedPhone]
+    );
+
+    let nonMemberId = existingRows[0]?.id || null;
+
+    if (nonMemberId) {
+      await connection.execute(
+        `
+          UPDATE xxafmc_non_members
+          SET first_name = ?, last_name = ?
+          WHERE id = ?
+        `,
+        [normalizedFirstName, normalizedLastName, nonMemberId]
+      );
+    } else {
+      const [[nextIdRow]] = await connection.execute(
+        `
+          SELECT COALESCE(MAX(id), 0) + 1 AS nextId
+          FROM xxafmc_non_members
+        `
+      );
+
+      nonMemberId = nextIdRow?.nextId;
+
+      await connection.execute(
+        `
+          INSERT INTO xxafmc_non_members (
+            id,
+            first_name,
+            last_name,
+            phone_number
+          )
+          VALUES (?, ?, ?, ?)
+        `,
+        [nonMemberId, normalizedFirstName, normalizedLastName, normalizedPhone]
+      );
+    }
+
+    await connection.commit();
+
+    return getNonMemberByPhone(normalizedPhone);
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
   }
-
-  const safeCreatedBy = String(createdBy ?? "").trim() || "SYSTEM";
-  const [nextIdRows] = await db.execute(
-    "SELECT IFNULL(MAX(ID), 0) + 1 AS next_id FROM xxafmc_non_members"
-  );
-  const nextId = Number(nextIdRows[0]?.next_id || 1);
-
-  await db.execute(
-    `
-      INSERT INTO xxafmc_non_members
-        (ID, FIRST_NAME, LAST_NAME, PHONE_NUMBER, CREATED_BY, CREATION_DATE)
-      VALUES
-        (?, ?, ?, ?, ?, ?)
-    `,
-    [nextId, safeFirstName, safeLastName, safePhone, safeCreatedBy, today]
-  );
-
-  return {
-    id: nextId,
-    first_name: safeFirstName,
-    last_name: safeLastName,
-    phone_number: safePhone,
-    existed: false,
-  };
 }
 
 module.exports = {
   getActiveOrders,
   getAdminOrderHistory,
-  getOrderDetails,
   getNonMemberByPhone,
+  getOrderDetails,
   saveNonMember,
 };

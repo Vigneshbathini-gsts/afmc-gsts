@@ -19,9 +19,13 @@ export default function ProtectedRoute({
   allowedOutletTypes,
   children,
 }) {
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
   const location = useLocation();
   const token = localStorage.getItem("token");
+
+  if (isLoading) {
+    return <div>Loading...</div>; // Or a proper loading component
+  }
 
   if (!token || !user) {
     return <Navigate to="/login" replace state={{ from: location }} />;

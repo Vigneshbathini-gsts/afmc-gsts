@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   FaArrowLeft,
@@ -35,39 +35,36 @@ export default function OfferEdit() {
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
-  // Fetch Offer Details by ID
-  const fetchOfferDetails = useCallback(async () => {
-    try {
-      setLoadingOffer(true);
-      setError("");
-      const res = await offersAPI.getOfferById(id);
-      const offer = res.data.offer;
-
-
-      setFormData({
-        offerId: offer.offer_id,
-        itemCode: offer.item_code,
-        itemName: offer.item_name || "",
-        offerQuantity: offer.offer_quantity,
-        freeItemCode: offer.free_item_code,
-        freeItemName: offer.free_item || "",
-        freeItemQuantity: offer.free_item_quantity,
-        offerDate: offer.offer_date ? offer.offer_date.split('T')[0] : "",
-        endDate: offer.end_date ? offer.end_date.split('T')[0] : "",
-        message: offer.message || "",
-      });
-
-    } catch (err) {
-      console.error("Fetch Offer Error:", err);
-      setError(err.response?.data?.message || "Failed to fetch offer details");
-    } finally {
-      setLoadingOffer(false);
-    }
-  }, [id]);
-
   useEffect(() => {
+    const fetchOfferDetails = async () => {
+      try {
+        setLoadingOffer(true);
+        setError("");
+        const res = await offersAPI.getOfferById(id);
+        const offer = res.data.offer;
+
+        setFormData({
+          offerId: offer.offer_id,
+          itemCode: offer.item_code,
+          itemName: offer.item_name || "",
+          offerQuantity: offer.offer_quantity,
+          freeItemCode: offer.free_item_code,
+          freeItemName: offer.free_item || "",
+          freeItemQuantity: offer.free_item_quantity,
+          offerDate: offer.offer_date ? offer.offer_date.split("T")[0] : "",
+          endDate: offer.end_date ? offer.end_date.split("T")[0] : "",
+          message: offer.message || "",
+        });
+      } catch (err) {
+        console.error("Fetch Offer Error:", err);
+        setError(err.response?.data?.message || "Failed to fetch offer details");
+      } finally {
+        setLoadingOffer(false);
+      }
+    };
+
     fetchOfferDetails();
-  }, [fetchOfferDetails]);
+  }, [id]);
 
   // Handle End Date Change
   const handleEndDateChange = (e) => {

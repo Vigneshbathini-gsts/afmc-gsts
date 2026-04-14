@@ -22,12 +22,16 @@ const reportRoutes = require("./routes/reportRoutes");
 const cocktailRoutes = require("./routes/cocktailRoutes");
 const userRoutes = require("./routes/userRoutes");
 const orderRoutes = require("./routes/orderRoutes");
+const KitchenOrdersRoutes = require("./routes/KitchenOrdersRoutes");
+const collectionRoutes = require("./routes/collectionRoutes");
 
 app.use("/api/auth", authRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/cocktails", cocktailRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/orders", orderRoutes);
+app.use("/api/bar-orders", KitchenOrdersRoutes);
+app.use("/api/collection", collectionRoutes);
 const priceRoutes = require("./routes/priceRoutes");
 app.use("/api/price", priceRoutes);
 
@@ -46,7 +50,7 @@ app.use("/api/notifications", notificationRoutes);
 const cancelledOrdersRoutes = require("./routes/cancelledOrdersRoutes");
 app.use("/api/cancelled-orders", cancelledOrdersRoutes);
 
-const PORT = process.env.PORT || 4000;
+const PORT = process.env.PORT || 5000;
 app.listen(PORT, () =>
   console.log(`Server listening on port ${PORT}`)
 );

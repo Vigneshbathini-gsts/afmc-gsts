@@ -168,7 +168,7 @@ export default function Inventory() {
 
   useEffect(() => {
     fetchInventory({ categoryId, itemCode, search });
-  }, [fetchInventory, categoryId, itemCode]);
+  }, [fetchInventory, categoryId, itemCode, search]);
 
   useEffect(() => {
     searchRef.current = search;

@@ -1,9 +1,11 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { FaSearch, FaUndoAlt, FaBan, FaChevronLeft, FaChevronRight } from "react-icons/fa";
+import { FaSearch, FaUndoAlt, FaBan, FaChevronLeft, FaChevronRight,FaArrowLeft } from "react-icons/fa";
 import { cancelledOrdersAPI } from "../../services/api";
 import OrderDetailsModal from "../../components/OrderDetailsModal";
+import { useNavigate } from "react-router-dom";
 
 export default function CancelledOrders() {
+  const navigate = useNavigate();
   const [selectedOrderNumber, setSelectedOrderNumber] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const today = new Date().toISOString().split("T")[0];
@@ -83,6 +85,17 @@ export default function CancelledOrders() {
 
   return (
     <div className="p-4 min-h-screen bg-slate-100">
+      {/* Back Button */}
+      <div className="flex justify-end mb-4">
+        <button
+          onClick={() => navigate("/admin/dashboard")}
+          className="flex items-center gap-2 px-3 py-1.5 text-sm bg-gradient-to-r from-[#d70652] to-[#ff025e] hover:from-[#ff025e] hover:to-[#d70652] text-white font-medium rounded-lg shadow-md transition duration-300"
+        >
+          <FaArrowLeft size={14} />
+          Back
+        </button>
+      </div>
+
       {/* Header */}
       <div className="bg-gradient-to-r from-[#d70652] to-[#ff4f81] rounded-2xl shadow-md p-4 mb-5 text-white">
         <h1 className="text-2xl font-bold flex items-center gap-2">
