@@ -464,17 +464,100 @@ exports.processBarcodeScan = async (req, res) => {
       }
     }
 
-    // Price calculation (kept as before - you can keep your existing price block)
-    // ... [Your existing price calculation code here - free item, role 20, etc.] ...
-    // For now assuming you already have calculatedPrice and isFree
 
-    let calculatedPrice = 0;   // ← Replace with your full price logic
-    let isFree = false;
-    // Paste your full price calculation block here (from previous version)
+   // ================= PRICE CALCULATION (FINAL - ORACLE MATCH) =================
+
+// STEP A: Get sub_category from order_details (important)
+let subCategory = null;
+const [subCategoryRows] = await connection.query(
+  `
+  SELECT subcategory
+  FROM xxafmc_order_details
+  WHERE item_id = ? AND order_id = ?
+  LIMIT 1
+  `,
+  [scanItemCode, ORDERNUMBER]
+);
+
+subCategory = subCategoryRows.length > 0 
+  ? Number(subCategoryRows[0].subcategory) 
+  : null;
+
+
+// STEP B: Check FREE ITEM
+const [freeItemRows] = await connection.query(
+  `
+  SELECT item_id, price
+  FROM xxafmc_order_details
+  WHERE order_id = ? 
+    AND item_id = ? 
+    AND barcode IS NOT NULL 
+    AND free_item_quantity IS NULL
+  LIMIT 1
+  `,
+  [ORDERNUMBER, scanItemCode]
+);
+
+const isFreeItem = freeItemRows.length > 0 && Number(freeItemRows[0].price) === 0;
+
+
+// STEP C: Base values
+const unitPrice = Number(item.UNIT_PRICE) || 0;
+const profitPercent = Number(item.PROFIT) || 0;
+const nonMemberProfit = Number(item.NON_MEMBER_PROFIT) || 0;
+const prCharges = Number(item.PR_CHARGES) || 0;
+const foodPrCharges = Number(item.FOOD_PR_CHARGES) || 0;
+const pegsFromStock = Number(item.PEGS) || 1;
+
+
+// STEP D: Calculate price
+let calculatedPrice = unitPrice;
+let isFree = false;
+
+if (isFreeItem && Number(scanItemCode) === Number(freeItemRows[0].item_id)) {
+
+  // ✅ FREE ITEM
+  calculatedPrice = 0;
+  isFree = true;
+
+  await connection.query(
+    `
+    UPDATE xxafmc_order_details
+    SET free_item_quantity = '1'
+    WHERE order_id = ? 
+      AND item_id = ? 
+      AND barcode IS NOT NULL
+    `,
+    [ORDERNUMBER, scanItemCode]
+  );
+
+} else {
+
+  const pricePerPeg = pegsFromStock > 0 
+    ? unitPrice / pegsFromStock 
+    : unitPrice;
+
+  // ✅ SAME logic for both (you had duplicate branches → simplified)
+  if (roleId === 20) {
+    const profit =
+      pricePerPeg +
+      (pricePerPeg * profitPercent / 100) +
+      foodPrCharges;
+
+    calculatedPrice = Number(profit).toFixed(2);
+
+  } else {
+    const profit =
+      pricePerPeg +
+      (pricePerPeg * nonMemberProfit / 100) +
+      prCharges;
+
+    calculatedPrice = Number(profit).toFixed(2);
+  }
+}
 
     await connection.commit();
 
-    // ====================== COMPONENT INSERT LOGIC (Most Important) ======================
     const [componentRows] = await connection.query(`
       SELECT item_code, item_name, quantity AS total_quantity, inventory_item_code, Mix
       FROM (
