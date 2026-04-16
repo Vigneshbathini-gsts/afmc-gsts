@@ -107,11 +107,11 @@ export default function ProfitManagement() {
             <div className="flex justify-end mb-4">
                 <button
                     onClick={() => navigate("/admin/dashboard")}
-                    className="flex items-center gap-2 px-3 py-1.5 text-sm bg-gradient-to-r from-[#d70652] to-[#ff025e] hover:from-[#ff025e] hover:to-[#d70652] text-white font-medium rounded-lg shadow-md transition duration-300"
-                >
+                    className="flex items-center gap-2 px-3 py-1.5 text-sm bg-gradient-to-r from-afmc-maroon to-afmc-maroon2 hover:from-afmc-maroon2 hover:to-afmc-maroon text-white font-medium rounded-lg shadow-md transition duration-300"
+                  >
                     <FaArrowLeft size={14} />
                     Back
-                </button>
+                  </button>
             </div>
 
             <h1 className="text-2xl font-bold text-slate-800 mb-4">

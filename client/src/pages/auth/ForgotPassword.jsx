@@ -36,11 +36,11 @@ export default function ForgotPassword() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center px-4">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-8">
+    <div className="min-h-screen bg-afmc-bg flex items-center justify-center px-4">
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-8 border border-afmc-maroon/10">
         {/* Top Icon */}
         <div className="flex justify-center mb-6">
-          <div className="bg-[#d70652] p-4 rounded-2xl text-white shadow-md">
+          <div className="bg-gradient-to-br from-afmc-maroon to-afmc-maroon2 p-4 rounded-2xl text-white shadow-md">
             <FaEnvelope size={22} />
           </div>
         </div>
@@ -60,7 +60,7 @@ export default function ForgotPassword() {
               Email Address
             </label>
 
-            <div className="flex items-center border border-gray-300 rounded-xl px-4 py-3 focus-within:ring-2 focus-within:ring-[#d70652] focus-within:border-[#d70652] transition">
+            <div className="flex items-center border border-gray-300 rounded-xl px-4 py-3 focus-within:ring-2 focus-within:ring-afmc-maroon focus-within:border-afmc-maroon transition">
               <FaEnvelope className="text-gray-400 mr-3" />
               <input
                 type="email"
@@ -90,7 +90,7 @@ export default function ForgotPassword() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-[#d70652] hover:bg-[#b00543] text-white font-semibold py-3 rounded-xl shadow-md transition disabled:opacity-70"
+            className="w-full bg-afmc-maroon hover:bg-afmc-maroon2 text-white font-semibold py-3 rounded-xl shadow-md transition disabled:opacity-70"
           >
             {loading ? "Sending..." : "Send Reset Link"}
           </button>
@@ -100,7 +100,7 @@ export default function ForgotPassword() {
         <div className="mt-6 text-center">
           <Link
             to="/login"
-            className="inline-flex items-center gap-2 text-sm text-[#d70652] hover:underline font-medium"
+            className="inline-flex items-center gap-2 text-sm text-afmc-maroon hover:text-afmc-maroon2 hover:underline font-medium transition"
           >
             <FaArrowLeft size={12} />
             Back to Login

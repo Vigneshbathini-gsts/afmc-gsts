@@ -43,7 +43,7 @@ export default function OrderDetailsModal({ isOpen, onClose, orderNumber }) {
 
   return (
     <div className="fixed inset-0 bg-black/40 z-[100] flex items-center justify-center px-4">
-      <div className="bg-white w-full max-w-3xl rounded-2xl shadow-2xl p-6 relative animate-fadeIn">
+      <div className="bg-white w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl p-6 relative animate-fadeIn">
         {/* Close Button */}
         <button
           onClick={onClose}
@@ -54,7 +54,7 @@ export default function OrderDetailsModal({ isOpen, onClose, orderNumber }) {
 
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
-          <div className="bg-[#d70652] p-3 rounded-xl text-white">
+          <div className="bg-gradient-to-br from-afmc-maroon to-afmc-maroon2 p-3 rounded-xl text-white">
             <FaBoxOpen />
           </div>
           <div>

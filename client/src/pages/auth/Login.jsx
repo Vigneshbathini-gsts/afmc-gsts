@@ -7,7 +7,6 @@ import {
   FaShieldAlt,
   FaUtensils,
   FaWineGlass,
-  FaCheckCircle,
   FaExclamationTriangle,
   FaArrowRight,
   FaUserShield,

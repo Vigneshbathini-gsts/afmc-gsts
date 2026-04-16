@@ -54,7 +54,7 @@ export default function ChangePasswordModal({ isOpen, onClose }) {
       setTimeout(() => {
         onClose();
         setMessage("");
-          navigate("/login");
+        navigate("/login");
       }, 1200);
     } catch (error) {
       setError(error.response?.data?.message || "Failed to change password");
@@ -65,7 +65,7 @@ export default function ChangePasswordModal({ isOpen, onClose }) {
 
   return (
     <div className="fixed inset-0 bg-black/40 z-[100] flex items-center justify-center px-4">
-      <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-6 relative animate-fadeIn">
+      <div className="bg-white w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl p-6 relative animate-fadeIn">
         {/* Close Button */}
         <button
           onClick={onClose}
@@ -76,7 +76,7 @@ export default function ChangePasswordModal({ isOpen, onClose }) {
 
         {/* Title */}
         <div className="flex items-center gap-3 mb-6">
-          <div className="bg-[#d70652] p-3 rounded-xl text-white">
+          <div className="bg-gradient-to-br from-afmc-maroon to-afmc-maroon2 p-3 rounded-xl text-white">
             <FaLock />
           </div>
           <div>
@@ -109,7 +109,7 @@ export default function ChangePasswordModal({ isOpen, onClose }) {
               name="oldPassword"
               value={formData.oldPassword}
               onChange={handleChange}
-              className="w-full border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-[#d70652]/30"
+              className="w-full border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-afmc-maroon/30"
               placeholder="Enter old password"
               required
             />
@@ -124,7 +124,7 @@ export default function ChangePasswordModal({ isOpen, onClose }) {
               name="newPassword"
               value={formData.newPassword}
               onChange={handleChange}
-              className="w-full border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-[#d70652]/30"
+              className="w-full border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-afmc-maroon/30"
               placeholder="Enter new password"
               required
             />
@@ -139,7 +139,7 @@ export default function ChangePasswordModal({ isOpen, onClose }) {
               name="confirmPassword"
               value={formData.confirmPassword}
               onChange={handleChange}
-              className="w-full border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-[#d70652]/30"
+              className="w-full border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-afmc-maroon/30"
               placeholder="Confirm new password"
               required
             />
@@ -150,7 +150,7 @@ export default function ChangePasswordModal({ isOpen, onClose }) {
             disabled={loading}
             className={`w-full text-white font-semibold py-3 rounded-xl transition ${loading
               ? "bg-gray-400 cursor-not-allowed"
-              : "bg-[#d70652] hover:bg-[#b90545]"
+              : "bg-afmc-maroon hover:bg-afmc-maroon2"
               }`}
           >
             {loading ? "Saving..." : "Save Password"}

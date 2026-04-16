@@ -13,7 +13,7 @@ const defaultItems = [
   { name: "Pizza", color: "bg-red-600", icon: Wine },
   {
     name: "Gym",
-    color: "bg-pink-600",
+    color: "bg-afmc-maroon",
     icon: HeartPulse,
     pending: true,
   },
@@ -50,7 +50,7 @@ function DashboardCard({ item }) {
 
 export default function ServiceDashboardGrid({ items = defaultItems }) {
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-afmc-bg via-white to-afmc-bg2 p-6">
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {items.map((item) => (
           <DashboardCard key={item.name} item={item} />

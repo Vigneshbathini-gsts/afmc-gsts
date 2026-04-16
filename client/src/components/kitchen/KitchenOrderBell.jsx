@@ -47,10 +47,10 @@ export default function KitchenOrderBell({ kitchen = "Bar" }) {
   const handleMarkAsRead = async (notificationId) => {
     console.log("Marking notification as read:", notificationId);
     try {
-  const resp=    await barOrdersAPI.markNotificationAsRead({
+      const resp = await barOrdersAPI.markNotificationAsRead({
         notification_id: notificationId,
       });
-console.log("Mark as read response:", resp);
+      console.log("Mark as read response:", resp);
       setNotifications((prev) =>
         prev.filter((n) => n.NOTIFICATION_ID !== notificationId)
       );
@@ -71,7 +71,7 @@ console.log("Mark as read response:", resp);
       {/* 🔔 Bell Icon */}
       <button
         onClick={() => setOpen(!open)}
-        className="relative p-3 rounded-xl bg-gray-100 hover:bg-gray-200 transition"
+        className="relative p-3 rounded-xl bg-gray-100 hover:bg-afmc-maroon/10 transition"
       >
         <FaBell className="text-gray-700 text-lg" />
         {notifications.length > 0 && (
@@ -83,17 +83,17 @@ console.log("Mark as read response:", resp);
 
       {/* 🔽 Dropdown */}
       {open && (
-        <div className="absolute top-12 right-0 w-96 bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden z-50">
-          <div className="px-4 py-3 bg-gradient-to-r from-[#d70652] to-pink-500 text-white">
+        <div className="absolute top-12 right-0 w-[min(24rem,calc(100vw-1rem))] bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden z-50">
+          <div className="px-4 py-3 bg-gradient-to-r from-afmc-maroon to-afmc-maroon2 text-white">
             <h3 className="font-semibold text-sm">
               New Orders - {kitchen}
             </h3>
-            <p className="text-xs text-pink-100">
+            <p className="text-xs text-white/80">
               {notifications.length} pending order(s)
             </p>
           </div>
 
-          <div className="max-h-80 overflow-y-auto">
+          <div className="max-h-[70vh] overflow-y-auto">
             {notifications.length > 0 ? (
               notifications.map((order) => (
                 <div
@@ -102,7 +102,7 @@ console.log("Mark as read response:", resp);
                   onClick={() => handleOrderClick(order)}
                 >
                   <div className="flex items-start gap-3">
-                    <FaUtensils className="mt-1 text-pink-500" />
+                    <FaUtensils className="mt-1 text-afmc-maroon" />
                     <div className="flex-1">
                       <p className="text-sm font-semibold text-gray-800">
                         Order #{order.ORDERNUMBER}

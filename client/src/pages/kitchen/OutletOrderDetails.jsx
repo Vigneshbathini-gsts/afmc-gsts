@@ -465,7 +465,7 @@ export default function OutletOrderDetails() {
     return (
       <div className="p-6">
         <p className="text-red-500 font-medium">No order selected.</p>
-        <button onClick={() => navigate(`/${department.toLowerCase()}/dashboard`)} className="mt-4 px-4 py-2 bg-pink-600 text-white rounded-xl">
+        <button onClick={() => navigate(`/${department.toLowerCase()}/dashboard`)} className="mt-4 px-4 py-2 bg-afmc-maroon hover:bg-afmc-maroon2 transition text-white rounded-xl">
           Back to Orders
         </button>
       </div>
@@ -606,7 +606,7 @@ export default function OutletOrderDetails() {
                   <button
                     onClick={scanning ? stopScanner : startScanner}
                     disabled={processingScan}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-pink-600 text-white font-medium hover:bg-pink-700 disabled:opacity-50"
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-afmc-maroon hover:bg-afmc-maroon2 transition text-white font-medium disabled:opacity-50"
                   >
                     <FaCamera /> {scanning ? "Stop Camera" : "Start Camera"}
                   </button>
@@ -767,7 +767,7 @@ export default function OutletOrderDetails() {
                 </tbody>
               </table>
               <div className="mt-6 flex gap-3">
-                <button onClick={() => setShowCocktailModal(false)} className="flex-1 px-4 py-2 bg-pink-600 text-white rounded-lg">
+                <button onClick={() => setShowCocktailModal(false)} className="flex-1 px-4 py-2 bg-afmc-maroon hover:bg-afmc-maroon2 transition text-white rounded-lg">
                   Confirm Scan
                 </button>
               </div>
