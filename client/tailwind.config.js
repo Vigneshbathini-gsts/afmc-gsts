@@ -25,7 +25,11 @@ module.exports = {
       boxShadow: {
         afmc: "0 8px 40px rgba(107,26,79,0.12)",
       },
+      backgroundImage: {
+  "app-bg": "url('../public/images/amfc_bg.png')",
+}
     },
+    
   },
   plugins: [],
 }

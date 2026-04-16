@@ -649,18 +649,15 @@ const styles = {
     background: `radial-gradient(circle, rgba(218,165,32,0.18) 0%, transparent 70%)`,
     animation: "crestPulse 4s ease-in-out infinite",
   },
-  crestCircle: {
-    width: 148,
-    height: 148,
-    borderRadius: "50%",
-    background: "rgba(255,255,255,0.06)",
-    border: `1.5px solid rgba(218,165,32,0.4)`,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    position: "relative",
-    zIndex: 1,
-  },
+ crestImg: {
+  position: "absolute",   // ✅ force perfect centering
+  top: "50%",
+  left: "50%",
+  transform: "translate(-50%, -50%)", // ✅ true center
+  width: "70%",           // adjust visually (try 65–75%)
+  height: "70%",
+  objectFit: "contain",
+},
   crestImg: { width: 118, height: 118, objectFit: "contain" },
   crestFallback: { alignItems: "center", justifyContent: "center" },
   orgName: {
@@ -979,4 +976,5 @@ const styles = {
     marginTop: 16,
     letterSpacing: "0.05em",
   },
+  
 };
