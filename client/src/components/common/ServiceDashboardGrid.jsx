@@ -1,16 +1,17 @@
 import React from "react";
 import { HeartPulse, Scissors, Wine } from "lucide-react";
+import {useNavigate } from 'react-router-dom';
 
 const defaultItems = [
-  { name: "Pubmed", color: "bg-blue-600", icon: Wine },
-  { name: "Synapse", color: "bg-slate-600", icon: Wine },
-  { name: "Blue Room", color: "bg-teal-600", icon: Wine },
-  { name: "Silver Room", color: "bg-green-600", icon: Wine },
-  { name: "Grove", color: "bg-green-800", icon: Wine },
-  { name: "Tapovan", color: "bg-gray-600", icon: Wine },
-  { name: "Madhuban", color: "bg-yellow-700", icon: Wine },
-  { name: "Lounge Room", color: "bg-orange-600", icon: Wine },
-  { name: "Pizza", color: "bg-red-600", icon: Wine },
+  { name: "Pubmed", color: "bg-blue-600", icon: Wine ,Path : "/attendant/Enduserbar"},
+  { name: "Synapse", color: "bg-slate-600", icon: Wine,Path : "/attendant/EnduserMocktail" },
+  { name: "Blue Room", color: "bg-teal-600", icon: Wine,Path : "/attendant/Snackveg" },
+  { name: "Silver Room", color: "bg-green-600", icon: Wine,Path : "/attendant/Snacknonveg" },
+  { name: "Grove", color: "bg-green-800", icon: Wine,Path : "/attendant/Drinkharddrink" },
+  { name: "Tapovan", color: "bg-gray-600", icon: Wine,Path : "/attendant/menudash" },
+  { name: "Madhuban", color: "bg-yellow-700", icon: Wine,Path : "/attendant/menudash" },
+  { name: "Lounge Room", color: "bg-orange-600", icon: Wine ,Path : "/attendant/menudash"},
+  { name: "Pizza", color: "bg-red-600", icon: Wine,Path : "/attendant/menudash" },
   {
     name: "Gym",
     color: "bg-pink-600",
@@ -26,9 +27,18 @@ const defaultItems = [
 ];
 
 function DashboardCard({ item }) {
+  const navigate = useNavigate();
   const Icon = item.icon;
+  const handleclick = (item) => {
+    console.log("handle cliked");
+    console.log(item.Path);
+    if (item.Path) {
+      navigate(item.Path)
+    }
+  }
 
   return (
+    <div onClick={()=>handleclick(item)}>
     <div className="flex items-center gap-4 rounded-xl border bg-white p-5 shadow-sm transition hover:shadow-md">
       <div
         className={`flex h-14 w-14 items-center justify-center rounded-full text-white ${item.color}`}
@@ -44,7 +54,8 @@ function DashboardCard({ item }) {
           </p>
         )}
       </div>
-    </div>
+      </div>
+      </div>
   );
 }
 

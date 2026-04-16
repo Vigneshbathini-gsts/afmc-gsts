@@ -85,6 +85,12 @@ import StorekeeperEditItem from "../pages/storekeeper/EditItem";
 import BarstockReports from "../pages/admin/StockReportspages/BarstockReports";
 import Ordertransactiondetails from "../pages/admin/StockReportspages/Ordertransactiondetails";
 import Orderitemdetails from "../pages/admin/StockReportspages/Orderitemdetails";
+import MenuDashboard from "../components/common/MenuDashboard";
+import EnduserOther from './../components/common/ENDUSERFLOW/EnduserOther';
+import EnduserMocktail from './../components/common/ENDUSERFLOW/EnduserMocktail';
+import Snackveg from "../components/common/ENDUSERFLOW/Snackveg";
+import Snacknonveg from './../components/common/ENDUSERFLOW/Snacknonveg';
+import Drinkharddrink from "../components/common/ENDUSERFLOW/Drinkharddrink";
 
 
 export default function AppRoutes() {
@@ -297,6 +303,7 @@ export default function AppRoutes() {
         }
       >
         <Route path="dashboard" element={<AttendantDashboard />} />
+        <Route path="menudash" element={<MenuDashboard />} />
         <Route path="register-member" element={<RegisterMember />} />
         <Route path="cart" element={<AttendantCart />} />
         <Route path="confirm-order" element={<AttendantConfirmOrder />} />
@@ -304,6 +311,16 @@ export default function AppRoutes() {
         <Route path="invoice" element={<AttendantInvoice />} />
         <Route path="active-orders" element={<AttendantActiveOrders />} />
         <Route path="order-status" element={<AttendantOrderStatus />} />
+
+
+         {/* --------------------------------------------------------------- */}
+        <Route path="Enduserbar" element={<EnduserOther />} />
+        <Route path="EnduserMocktail" element={<EnduserMocktail />} />
+        <Route path="Snackveg" element={<Snackveg />} />
+        <Route path="Snacknonveg" element={<Snacknonveg />} />
+        <Route path="Drinkharddrink" element={<Drinkharddrink />} />
+
+        {/* ----------------------------------------------------------------- */}
       </Route>
 
       {/* ================= USER ================= */}
@@ -317,6 +334,7 @@ export default function AppRoutes() {
       >
         <Route path="dashboard" element={<UserDashboard />} />
         <Route path="dashboard-Page" element={<UserDashboard />} />
+        <Route path="menudash" element={<MenuDashboard />} />
         <Route path="snacks" element={<Snacks />} />
         <Route path="drinks" element={<Drinks />} />
         <Route path="item/:id" element={<ItemDetails />} />
@@ -326,6 +344,11 @@ export default function AppRoutes() {
         <Route path="invoice" element={<UserInvoice />} />
         <Route path="active-orders" element={<ActiveOrders />} />
         <Route path="order-status" element={<UserOrderStatus />} />
+
+       
+
+
+
       </Route>
 
       {/* ================= OUTLETS ================= */}
