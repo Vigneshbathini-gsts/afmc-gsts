@@ -3,11 +3,11 @@ import { HeartPulse, Scissors, Wine } from "lucide-react";
 import {useNavigate } from 'react-router-dom';
 
 const defaultItems = [
-  { name: "Pubmed", color: "bg-blue-600", icon: Wine ,Path : "/attendant/Enduserbar"},
-  { name: "Synapse", color: "bg-slate-600", icon: Wine,Path : "/attendant/EnduserMocktail" },
-  { name: "Blue Room", color: "bg-teal-600", icon: Wine,Path : "/attendant/Snackveg" },
-  { name: "Silver Room", color: "bg-green-600", icon: Wine,Path : "/attendant/Snacknonveg" },
-  { name: "Grove", color: "bg-green-800", icon: Wine,Path : "/attendant/Drinkharddrink" },
+  { name: "Pubmed", color: "bg-blue-600", icon: Wine ,Path : "/attendant/menudash"},
+  { name: "Synapse", color: "bg-slate-600", icon: Wine,Path : "/attendant/menudash" },
+  { name: "Blue Room", color: "bg-teal-600", icon: Wine,Path : "/attendant/menudash" },
+  { name: "Silver Room", color: "bg-green-600", icon: Wine,Path : "/attendant/menudash" },
+  { name: "Grove", color: "bg-green-800", icon: Wine,Path : "/attendant/menudash" },
   { name: "Tapovan", color: "bg-gray-600", icon: Wine,Path : "/attendant/menudash" },
   { name: "Madhuban", color: "bg-yellow-700", icon: Wine,Path : "/attendant/menudash" },
   { name: "Lounge Room", color: "bg-orange-600", icon: Wine ,Path : "/attendant/menudash"},

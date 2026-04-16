@@ -1,11 +1,8 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { ChevronsLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import EnduserOther from "./ENDUSERFLOW/EnduserOther";
-import EnduserMocktail from "./ENDUSERFLOW/EnduserMocktail";
-import Drinkharddrink from "./ENDUSERFLOW/Drinkharddrink";
-import Snackveg from "./ENDUSERFLOW/Snackveg";
-import Snacknonveg from "./ENDUSERFLOW/Snacknonveg";
+
+const BASEAPI = "https://afmc.globalsparkteksolutions.com/AFMCIMAGES/";
 
 const menuConfig = {
   drinks: {
@@ -15,7 +12,7 @@ const menuConfig = {
         label: "Soft Drinks",
         categories: [
           { key: "Others", label: "Others" },
-          { key: "Mocktail", label: "Mocktail" },
+          { key: "Mocktail", label: "Mocktails" },
         ],
       },
       hard: {
@@ -32,12 +29,26 @@ const menuConfig = {
         categories: [],
       },
       nonVeg: {
-        label: "Non Veg",
+        label: "Non-Veg",
         categories: [],
       },
     },
   },
 };
+
+const hardDrinkCategories = [
+  { label: "Beer", value: "beer" },
+  { label: "Brandy", value: "brandy" },
+  { label: "Breezer", value: "breezer" },
+  { label: "Vodka", value: "vodka" },
+  { label: "Gin", value: "gin" },
+  { label: "Rum", value: "rum" },
+  { label: "Whisky", value: "whisky" },
+  { label: "Wine", value: "wine" },
+  { label: "Liquor", value: "liquor" },
+  { label: "Tequila", value: "tequila" },
+  { label: "Cocktail", value: "cocktail" },
+];
 
 function TabButton({ active, label, onClick }) {
   return (
@@ -74,6 +85,357 @@ function CategoryButton({ active, label, onClick }) {
   );
 }
 
+function MenuGrid({ items, showStockStatus = false }) {
+  return (
+    <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+      {items.map((item, index) => (
+        <div
+          key={`${item.item_name}-${index}`}
+          className="flex items-center gap-3 rounded-xl border border-stone-200 bg-white p-4 shadow-[0_4px_16px_rgba(0,0,0,0.08)]"
+        >
+          <img
+            src={`${BASEAPI}${item.image || "default.jpg"}`}
+            alt={item.item_name}
+            className="h-10 w-10 rounded-lg object-cover"
+          />
+          <div>
+            <div className="text-sm font-semibold text-gray-900">
+              {item.item_name}
+            </div>
+            {showStockStatus && item.stock_status && (
+              <div className="mt-1 text-xs font-medium text-red-600">
+                {item.stock_status}
+              </div>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function FilterShell({ leftFilter, rightFilter, children }) {
+  return (
+    <div className="space-y-6 rounded-2xl bg-[#f5f5f5] p-5">
+      <div className="grid gap-4 md:grid-cols-2">
+        {leftFilter}
+        {rightFilter}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function SelectField({
+  label,
+  value,
+  onChange,
+  options,
+  placeholder,
+  disabled = false,
+}) {
+  return (
+    <label className="block">
+      <div className="mb-2 text-base font-medium text-gray-700">{label}</div>
+      <select
+        value={value}
+        onChange={onChange}
+        disabled={disabled}
+        className="w-full rounded-md border border-stone-300 bg-white px-4 py-3 text-sm text-gray-800 outline-none transition disabled:cursor-not-allowed disabled:bg-stone-100 focus:border-[#5a8c59] focus:ring-2 focus:ring-[#5a8c59]/20"
+      >
+        <option value="">{placeholder}</option>
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function EnduserOtherSection() {
+  const [data, setData] = useState([]);
+  const [error, setError] = useState("");
+  const [selectedItem, setSelectedItem] = useState("");
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const response = await fetch("http://localhost:5000/api/menubar");
+        const result = await response.json();
+        setData(result.data || []);
+      } catch (fetchError) {
+        console.log("error", fetchError);
+        setError(fetchError.message);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  const visibleItems = useMemo(() => {
+    if (!selectedItem) {
+      return data;
+    }
+
+    return data.filter((item) => item.item_name === selectedItem);
+  }, [data, selectedItem]);
+
+  if (error) {
+    return <div>{error}</div>;
+  }
+
+  return (
+    <FilterShell
+      leftFilter={
+        <SelectField
+          label="Category"
+          value=""
+          onChange={() => {}}
+          options={[]}
+          placeholder="All Categories"
+          disabled
+        />
+      }
+      rightFilter={
+        <SelectField
+          label="Item Name"
+          value={selectedItem}
+          onChange={(event) => setSelectedItem(event.target.value)}
+          options={data.map((item) => item.item_name)}
+          placeholder="Select Item"
+        />
+      }
+    >
+      <MenuGrid items={visibleItems} />
+    </FilterShell>
+  );
+}
+
+function EnduserMocktailSection() {
+  const [data, setData] = useState([]);
+  const [error, setError] = useState("");
+  const [selectedItem, setSelectedItem] = useState("");
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const response = await fetch("http://localhost:5000/api/fetchmocktail");
+        const result = await response.json();
+        setData(result.data || []);
+      } catch (fetchError) {
+        console.log("error", fetchError);
+        setError(fetchError.message);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  const visibleItems = useMemo(() => {
+    if (!selectedItem) {
+      return data;
+    }
+
+    return data.filter((item) => item.item_name === selectedItem);
+  }, [data, selectedItem]);
+
+  if (error) {
+    return <div>{error}</div>;
+  }
+
+  return (
+    <FilterShell
+      leftFilter={
+        <div className="hidden md:block" />
+      }
+      rightFilter={
+        <SelectField
+          label="Item Name"
+          value={selectedItem}
+          onChange={(event) => setSelectedItem(event.target.value)}
+          options={data.map((item) => item.item_name)}
+          placeholder="Select Item"
+        />
+      }
+    >
+      <MenuGrid items={visibleItems} />
+    </FilterShell>
+  );
+}
+
+function DrinkHardDrinkSection() {
+  const [data, setData] = useState([]);
+  const [error, setError] = useState("");
+  const [category, setCategory] = useState("beer");
+  const [selectedItem, setSelectedItem] = useState("");
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const response = await fetch(
+          `http://localhost:5000/api/Drinkhard${category}`
+        );
+        const result = await response.json();
+        setData(result.data || []);
+      } catch (fetchError) {
+        console.log("error", fetchError);
+        setError(fetchError.message);
+      }
+    };
+
+    fetchData();
+  }, [category]);
+
+  const visibleItems = useMemo(() => {
+    if (!selectedItem) {
+      return data;
+    }
+
+    return data.filter((item) => item.item_name === selectedItem);
+  }, [data, selectedItem]);
+
+  if (error) {
+    return <div>{error}</div>;
+  }
+
+  return (
+    <div className="space-y-6 rounded-2xl bg-[#f5f5f5] p-5">
+      <div className="flex flex-wrap gap-3">
+        {hardDrinkCategories.map((item) => (
+          <CategoryButton
+            key={item.value}
+            active={category === item.value}
+            label={item.label}
+            onClick={() => {
+              setCategory(item.value);
+              setSelectedItem("");
+            }}
+          />
+        ))}
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="hidden md:block" />
+        <SelectField
+          label="Item Name"
+          value={selectedItem}
+          onChange={(event) => setSelectedItem(event.target.value)}
+          options={data.map((item) => item.item_name)}
+          placeholder="Select Item"
+        />
+      </div>
+
+      <MenuGrid items={visibleItems} showStockStatus />
+    </div>
+  );
+}
+
+function SnackVegSection() {
+  const [data, setData] = useState([]);
+  const [error, setError] = useState("");
+  const [selectedItem, setSelectedItem] = useState("");
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const response = await fetch("http://localhost:5000/api/Snacksveg");
+        const result = await response.json();
+        setData(result.data || []);
+      } catch (fetchError) {
+        console.log("error", fetchError);
+        setError(fetchError.message);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  const visibleItems = useMemo(() => {
+    if (!selectedItem) {
+      return data;
+    }
+
+    return data.filter((item) => item.item_name === selectedItem);
+  }, [data, selectedItem]);
+
+  if (error) {
+    return <div>{error}</div>;
+  }
+
+  return (
+    <FilterShell
+      leftFilter={
+        <div className="hidden md:block" />
+      }
+      rightFilter={
+        <SelectField
+          label="Item Name"
+          value={selectedItem}
+          onChange={(event) => setSelectedItem(event.target.value)}
+          options={data.map((item) => item.item_name)}
+          placeholder="Select Item"
+        />
+      }
+    >
+      <MenuGrid items={visibleItems} />
+    </FilterShell>
+  );
+}
+
+function SnackNonVegSection() {
+  const [data, setData] = useState([]);
+  const [error, setError] = useState("");
+  const [selectedItem, setSelectedItem] = useState("");
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const response = await fetch("http://localhost:5000/api/Snakcnonveg");
+        const result = await response.json();
+        setData(result.data || []);
+      } catch (fetchError) {
+        console.log("error", fetchError);
+        setError(fetchError.message);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  const visibleItems = useMemo(() => {
+    if (!selectedItem) {
+      return data;
+    }
+
+    return data.filter((item) => item.item_name === selectedItem);
+  }, [data, selectedItem]);
+
+  if (error) {
+    return <div>{error}</div>;
+  }
+
+  return (
+    <FilterShell
+      leftFilter={
+        <div className="hidden md:block" />
+      }
+      rightFilter={
+        <SelectField
+          label="Item Name"
+          value={selectedItem}
+          onChange={(event) => setSelectedItem(event.target.value)}
+          options={data.map((item) => item.item_name)}
+          placeholder="Select Item"
+        />
+      }
+    >
+      <MenuGrid items={visibleItems} showStockStatus />
+    </FilterShell>
+  );
+}
+
 function MenuDashboard() {
   const navigate = useNavigate();
   const [mainTab, setMainTab] = useState("drinks");
@@ -90,21 +452,21 @@ function MenuDashboard() {
   const renderedContent = useMemo(() => {
     if (mainTab === "drinks" && drinkSection === "soft") {
       return softDrinkCategory === "Mocktail" ? (
-        <EnduserMocktail />
+        <EnduserMocktailSection />
       ) : (
-        <EnduserOther />
+        <EnduserOtherSection />
       );
     }
 
     if (mainTab === "drinks" && drinkSection === "hard") {
-      return <Drinkharddrink />;
+      return <DrinkHardDrinkSection />;
     }
 
     if (mainTab === "snacks" && snackSection === "veg") {
-      return <Snackveg />;
+      return <SnackVegSection />;
     }
 
-    return <Snacknonveg />;
+    return <SnackNonVegSection />;
   }, [drinkSection, mainTab, snackSection, softDrinkCategory]);
 
   const handleMainTabChange = (tabKey) => {
@@ -125,10 +487,6 @@ function MenuDashboard() {
     if (sectionKey === "soft") {
       setSoftDrinkCategory("Others");
     }
-  };
-
-  const handleSnackSectionChange = (sectionKey) => {
-    setSnackSection(sectionKey);
   };
 
   return (
@@ -170,7 +528,7 @@ function MenuDashboard() {
                     onClick={() =>
                       mainTab === "drinks"
                         ? handleDrinkSectionChange(sectionKey)
-                        : handleSnackSectionChange(sectionKey)
+                        : setSnackSection(sectionKey)
                     }
                   />
                 )
