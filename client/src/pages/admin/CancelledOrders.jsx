@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { FaSearch, FaUndoAlt, FaBan, FaChevronLeft, FaChevronRight,FaArrowLeft } from "react-icons/fa";
+import { FaSearch, FaUndoAlt, FaBan, FaChevronLeft, FaChevronRight, FaArrowLeft, FaDownload } from "react-icons/fa";
 import { cancelledOrdersAPI } from "../../services/api";
 import OrderDetailsModal from "../../components/OrderDetailsModal";
 import { useNavigate } from "react-router-dom";
+import { exportTableToPdf } from "../../utils/pdfExport";
 
 export default function CancelledOrders() {
   const navigate = useNavigate();
@@ -65,6 +66,40 @@ export default function CancelledOrders() {
     }, 100);
   };
 
+  const handleDownload = () => {
+    if (!orders.length) {
+      alert("No data to download");
+      return;
+    }
+
+    // Format date for display
+    const formatDate = (dateString) => {
+      if (!dateString) return "-";
+      const date = new Date(dateString);
+      return date.toLocaleDateString();
+    };
+
+    exportTableToPdf({
+      title: "Cancelled Orders Report",
+      fileName: `cancelled-orders-${new Date().toISOString().split("T")[0]}.pdf`,
+      subtitle: `From: ${formatDate(filters.fromDate)}   To: ${formatDate(filters.toDate)}`,
+      headers: [
+        "Order Number",
+        "Status",
+        "Order Date",
+        "Customer Name",
+        "Pubmed"
+      ],
+      rows: orders.map((order) => [
+        order?.ORDER_NUM ?? "",
+        order?.status ?? "",
+        order?.ORDER_DATE ?? "",
+        order?.FIRST_NAME ?? "",
+        order?.pubmed_name ?? "",
+      ]),
+    });
+  };
+
   // Pagination logic
   const totalPages = Math.ceil(orders.length / rowsPerPage);
   const startIndex = (currentPage - 1) * rowsPerPage;
@@ -86,7 +121,14 @@ export default function CancelledOrders() {
   return (
     <div className="p-4 min-h-screen bg-slate-100">
       {/* Back Button */}
-      <div className="flex justify-end mb-4">
+      <div className="flex justify-end mb-4 gap-3">
+        <button
+          onClick={handleDownload}
+          className="flex items-center gap-2 px-3 py-1.5 text-sm bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg shadow-md transition duration-300"
+        >
+          <FaDownload size={14} />
+          Download PDF
+        </button>
         <button
           onClick={() => navigate("/admin/dashboard")}
           className="flex items-center gap-2 px-3 py-1.5 text-sm bg-gradient-to-r from-[#d70652] to-[#ff025e] hover:from-[#ff025e] hover:to-[#d70652] text-white font-medium rounded-lg shadow-md transition duration-300"
@@ -157,26 +199,6 @@ export default function CancelledOrders() {
               Reset
             </button>
           </div>
-
-          {/* Rows per page */}
-          {/* <div>
-            <label className="block mb-1 text-sm font-medium text-slate-700">
-              Rows Per Page
-            </label>
-            <select
-              value={rowsPerPage}
-              onChange={(e) => {
-                setRowsPerPage(Number(e.target.value));
-                setCurrentPage(1);
-              }}
-              className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#d70652]"
-            >
-              <option value={5}>5</option>
-              <option value={10}>10</option>
-              <option value={20}>20</option>
-              <option value={50}>50</option>
-            </select>
-          </div> */}
         </div>
       </form>
 
@@ -262,18 +284,38 @@ export default function CancelledOrders() {
                   {/* Page Numbers */}
                   {[...Array(totalPages)].map((_, index) => {
                     const pageNumber = index + 1;
-                    return (
-                      <button
-                        key={pageNumber}
-                        onClick={() => handlePageChange(pageNumber)}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium border transition ${currentPage === pageNumber
-                            ? "bg-[#d70652] text-white border-[#d70652]"
-                            : "bg-white text-slate-700 hover:bg-slate-50 border-slate-300"
+                    // Show limited page numbers for better UI
+                    if (
+                      pageNumber === 1 ||
+                      pageNumber === totalPages ||
+                      (pageNumber >= currentPage - 2 && pageNumber <= currentPage + 2)
+                    ) {
+                      return (
+                        <button
+                          key={pageNumber}
+                          onClick={() => handlePageChange(pageNumber)}
+                          className={`px-4 py-2 rounded-lg text-sm font-medium border transition ${
+                            currentPage === pageNumber
+                              ? "bg-[#d70652] text-white border-[#d70652]"
+                              : "bg-white text-slate-700 hover:bg-slate-50 border-slate-300"
                           }`}
-                      >
-                        {pageNumber}
-                      </button>
-                    );
+                        >
+                          {pageNumber}
+                        </button>
+                      );
+                    }
+                    // Add ellipsis
+                    if (
+                      (pageNumber === currentPage - 3 && currentPage > 3) ||
+                      (pageNumber === currentPage + 3 && currentPage < totalPages - 2)
+                    ) {
+                      return (
+                        <span key={pageNumber} className="px-2">
+                          ...
+                        </span>
+                      );
+                    }
+                    return null;
                   })}
 
                   {/* Next */}

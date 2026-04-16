@@ -2,7 +2,9 @@ import React from "react";
 import { NavLink } from "react-router-dom";
 import {
   FaTimes,
-  FaBell,
+  FaUtensils,
+ FaHistory,
+  FaBan,
 } from "react-icons/fa";
 
 export default function KitchenSidebar({ isOpen, onClose }) {
@@ -35,9 +37,17 @@ export default function KitchenSidebar({ isOpen, onClose }) {
         </div>
 
         <div className="p-4 space-y-3">
-          <NavLink to="/kitchen/dashboard" className={navLinkClass} onClick={onClose}>
-            <FaBell />
-            Pubmed / Dashboard
+          <NavLink to="/bar/dashboard" className={navLinkClass} onClick={onClose}>
+            <FaUtensils />
+            Pubmed
+          </NavLink>
+          <NavLink to="/bar/order-history" className={navLinkClass} onClick={onClose}>
+            <FaHistory />
+            Order History
+          </NavLink>
+          <NavLink to="/bar/cancelled-orders" className={navLinkClass} onClick={onClose}>
+            <FaBan />
+            Cancelled Orders
           </NavLink>
         </div>
       </aside>
