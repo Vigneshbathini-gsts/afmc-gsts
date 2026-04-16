@@ -32,21 +32,7 @@ function Drinkharddrink() {
 
   return (
     <div style={{ padding: "20px", background: "#f5f5f5" }}>
-      
-      {/* Top Tabs */}
-      <div style={styles.tabContainer}>
-        <div style={styles.tab}>Drinks</div>
-        <div style={styles.tab}>Snacks</div>
-      </div>
-
-      {/* Sub Tabs */}
-      <div style={styles.tabContainer}>
-        <div style={styles.tab}>Soft Drinks</div>
-        <div style={{ ...styles.tab, ...styles.activeTab }}>
-          Hard Drinks
-        </div>
-      </div>
-
+    
       {/* ✅ Category Tabs */}
       <div style={styles.categoryTabs}>
         {categories.map((cat) => (
