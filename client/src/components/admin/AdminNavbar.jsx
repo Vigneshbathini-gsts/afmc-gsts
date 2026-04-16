@@ -3,9 +3,14 @@ import { FaBars, FaUtensils } from "react-icons/fa";
 import { useLocation } from "react-router-dom";
 import UserMenuDropdown from "../common/UserMenuDropdown";
 import StockNotificationBell from "../common/StockNotificationBell";
+import logo from "../../assets/AFMC_Logo.png";
+
+const afmclogo = logo;
+
 
 export default function AdminNavbar({ onMenuClick }) {
   const location = useLocation();
+  // const afmclogo= "../../assets/AFMC-logo.png";
 
   // Show bell only on admin dashboard page
   const showNotificationBell = location.pathname === "/admin/dashboard";
@@ -23,8 +28,8 @@ export default function AdminNavbar({ onMenuClick }) {
           </button>
 
           <div className="flex items-center gap-3">
-            <div className="bg-gradient-to-br from-afmc-maroon to-afmc-maroon2 p-3 rounded-xl text-white shadow">
-              <FaUtensils />
+            <div className="rounded-xl">
+              <img src={afmclogo} alt="AFMC Logo" className="w-8 h-10" />
             </div>
             <div className="min-w-0">
               <h1 className="text-lg md:text-xl font-bold text-gray-800 truncate">

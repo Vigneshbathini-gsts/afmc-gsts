@@ -73,9 +73,9 @@ export default function UserMenuDropdown({ username }) {
 
           <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-red-50 text-red-600"
+            className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-afmc-maroon/5 text-gray-700"
           >
-            <FaSignOutAlt />
+            <FaSignOutAlt className="text-afmc-maroon" />
             Sign Out
           </button>
         </div>

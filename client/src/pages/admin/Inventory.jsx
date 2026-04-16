@@ -613,9 +613,8 @@ export default function Inventory() {
                     {selectedCategory?.category_name || "All Categories"}
                   </span>
                   <FaChevronDown
-                    className={`text-gray-400 transition-transform ${
-                      isCategoryDropdownOpen ? "rotate-180" : ""
-                    }`}
+                    className={`text-gray-400 transition-transform ${isCategoryDropdownOpen ? "rotate-180" : ""
+                      }`}
                   />
                 </button>
 
@@ -642,11 +641,10 @@ export default function Inventory() {
                           setCategoryFilter("");
                           setIsCategoryDropdownOpen(false);
                         }}
-                        className={`w-full px-4 py-2.5 text-left text-sm hover:bg-afmc-maroon2/5 ${
-                          !categoryId
-                            ? "bg-afmc-maroon2/10 font-medium text-afmc-maroon"
-                            : "text-gray-700"
-                        }`}
+                        className={`w-full px-4 py-2.5 text-left text-sm hover:bg-afmc-maroon2/5 ${!categoryId
+                          ? "bg-afmc-maroon2/10 font-medium text-afmc-maroon"
+                          : "text-gray-700"
+                          }`}
                       >
                         All Categories
                       </button>
@@ -665,11 +663,10 @@ export default function Inventory() {
                               setCategoryFilter(category.category_name || "");
                               setIsCategoryDropdownOpen(false);
                             }}
-                            className={`w-full px-4 py-2.5 text-left text-sm hover:bg-afmc-maroon2/5 ${
-                              String(categoryId) === String(category.category_id)
-                                ? "bg-afmc-maroon2/10 font-medium text-afmc-maroon"
-                                : "text-gray-700"
-                            }`}
+                            className={`w-full px-4 py-2.5 text-left text-sm hover:bg-afmc-maroon2/5 ${String(categoryId) === String(category.category_id)
+                              ? "bg-afmc-maroon2/10 font-medium text-afmc-maroon"
+                              : "text-gray-700"
+                              }`}
                           >
                             {category.category_name}
                           </button>
@@ -695,9 +692,8 @@ export default function Inventory() {
                     {selectedItem?.item_name || "All Items"}
                   </span>
                   <FaChevronDown
-                    className={`text-gray-400 transition-transform ${
-                      isItemDropdownOpen ? "rotate-180" : ""
-                    }`}
+                    className={`text-gray-400 transition-transform ${isItemDropdownOpen ? "rotate-180" : ""
+                      }`}
                   />
                 </button>
 
@@ -724,9 +720,8 @@ export default function Inventory() {
                           setItemFilter("");
                           setIsItemDropdownOpen(false);
                         }}
-                        className={`w-full px-4 py-2.5 text-left text-sm hover:bg-afmc-maroon2/5 ${
-                          !itemCode ? "bg-afmc-maroon2/10 font-medium text-afmc-maroon" : "text-gray-700"
-                        }`}
+                        className={`w-full px-4 py-2.5 text-left text-sm hover:bg-afmc-maroon2/5 ${!itemCode ? "bg-afmc-maroon2/10 font-medium text-afmc-maroon" : "text-gray-700"
+                          }`}
                       >
                         All Items
                       </button>
@@ -745,11 +740,10 @@ export default function Inventory() {
                               setItemFilter(item.item_name || "");
                               setIsItemDropdownOpen(false);
                             }}
-                            className={`w-full px-4 py-2.5 text-left text-sm hover:bg-afmc-maroon2/5 ${
-                              itemCode === item.item_code
-                                ? "bg-afmc-maroon2/10 font-medium text-afmc-maroon"
-                                : "text-gray-700"
-                            }`}
+                            className={`w-full px-4 py-2.5 text-left text-sm hover:bg-afmc-maroon2/5 ${itemCode === item.item_code
+                              ? "bg-afmc-maroon2/10 font-medium text-afmc-maroon"
+                              : "text-gray-700"
+                              }`}
                           >
                             {item.item_name}
                           </button>
@@ -762,9 +756,23 @@ export default function Inventory() {
             </div>
 
             <div className="flex flex-col gap-3">
+
+              {/* 🔼 Move this block to TOP (no style change) */}
+              <button
+                type="button"
+                onClick={openAddModal}
+                className="w-full lg:w-auto px-5 py-3 rounded-2xl border border-afmc-maroon text-afmc-maroon font-semibold flex items-center gap-2 hover:bg-afmc-maroon/5 transition"
+              >
+                <FaPlus />
+                Add New Item
+              </button>
+
+              {/* Existing Search Label */}
               <label className="block text-sm font-medium text-gray-700">
                 Search
               </label>
+
+              {/* Existing Search Input + Button */}
               <div className="flex items-center gap-3">
                 <div className="flex-1 flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3">
                   <FaSearch className="text-gray-400" />
@@ -776,6 +784,7 @@ export default function Inventory() {
                     className="w-full bg-transparent outline-none text-gray-800 placeholder:text-gray-400"
                   />
                 </div>
+
                 <button
                   type="button"
                   onClick={() => {
@@ -788,14 +797,7 @@ export default function Inventory() {
                   Search
                 </button>
               </div>
-              <button
-                type="button"
-                onClick={openAddModal}
-                className="w-full lg:w-auto px-5 py-3 rounded-2xl border border-afmc-maroon text-afmc-maroon font-semibold flex items-center gap-2 hover:bg-afmc-maroon/5 transition"
-              >
-                <FaPlus />
-                Add New Item
-              </button>
+
             </div>
           </div>
 
@@ -1186,9 +1188,8 @@ export default function Inventory() {
                       {selectedAddCategory?.category_name || "Select Category"}
                     </span>
                     <FaChevronDown
-                      className={`text-gray-400 transition-transform ${
-                        isAddCategoryDropdownOpen ? "rotate-180" : ""
-                      }`}
+                      className={`text-gray-400 transition-transform ${isAddCategoryDropdownOpen ? "rotate-180" : ""
+                        }`}
                     />
                   </button>
 
@@ -1227,11 +1228,10 @@ export default function Inventory() {
                                 setSubCategoryFilter("");
                                 setIsAddCategoryDropdownOpen(false);
                               }}
-                              className={`w-full px-4 py-2.5 text-left text-sm hover:bg-afmc-maroon2/5 ${
-                                String(formValues.categoryId) === String(category.category_id)
-                                  ? "bg-afmc-maroon2/10 font-medium text-afmc-maroon"
-                                  : "text-gray-700"
-                              }`}
+                              className={`w-full px-4 py-2.5 text-left text-sm hover:bg-afmc-maroon2/5 ${String(formValues.categoryId) === String(category.category_id)
+                                ? "bg-afmc-maroon2/10 font-medium text-afmc-maroon"
+                                : "text-gray-700"
+                                }`}
                             >
                               {category.category_name}
                             </button>
@@ -1261,9 +1261,8 @@ export default function Inventory() {
                           : "Select Category First")}
                     </span>
                     <FaChevronDown
-                      className={`text-gray-400 transition-transform ${
-                        isSubCategoryDropdownOpen ? "rotate-180" : ""
-                      }`}
+                      className={`text-gray-400 transition-transform ${isSubCategoryDropdownOpen ? "rotate-180" : ""
+                        }`}
                     />
                   </button>
 
@@ -1300,11 +1299,10 @@ export default function Inventory() {
                                 setSubCategoryFilter(sub.sub_category_name || "");
                                 setIsSubCategoryDropdownOpen(false);
                               }}
-                              className={`w-full px-4 py-2.5 text-left text-sm hover:bg-afmc-maroon2/5 ${
-                                String(formValues.subCategory) === String(sub.sub_category_id)
-                                  ? "bg-afmc-maroon2/10 font-medium text-afmc-maroon"
-                                  : "text-gray-700"
-                              }`}
+                              className={`w-full px-4 py-2.5 text-left text-sm hover:bg-afmc-maroon2/5 ${String(formValues.subCategory) === String(sub.sub_category_id)
+                                ? "bg-afmc-maroon2/10 font-medium text-afmc-maroon"
+                                : "text-gray-700"
+                                }`}
                             >
                               {sub.sub_category_name}
                             </button>
