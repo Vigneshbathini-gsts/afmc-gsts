@@ -164,6 +164,8 @@ function EnduserOtherSection() {
       try {
         const response = await fetch("http://localhost:5000/api/menubar");
         const result = await response.json();
+        console.log("1",result.data);
+
         setData(result.data || []);
       } catch (fetchError) {
         console.log("error", fetchError);
@@ -223,6 +225,7 @@ function EnduserMocktailSection() {
       try {
         const response = await fetch("http://localhost:5000/api/fetchmocktail");
         const result = await response.json();
+        console.log("2",result.data);
         setData(result.data || []);
       } catch (fetchError) {
         console.log("error", fetchError);
@@ -278,6 +281,7 @@ function DrinkHardDrinkSection() {
           `http://localhost:5000/api/Drinkhard${category}`
         );
         const result = await response.json();
+        console.log("3",result.data);
         setData(result.data || []);
       } catch (fetchError) {
         console.log("error", fetchError);
@@ -342,6 +346,7 @@ function SnackVegSection() {
       try {
         const response = await fetch("http://localhost:5000/api/Snacksveg");
         const result = await response.json();
+        console.log("4",result.data);
         setData(result.data || []);
       } catch (fetchError) {
         console.log("error", fetchError);
@@ -394,6 +399,7 @@ function SnackNonVegSection() {
       try {
         const response = await fetch("http://localhost:5000/api/Snakcnonveg");
         const result = await response.json();
+        console.log("5",result.data);
         setData(result.data || []);
       } catch (fetchError) {
         console.log("error", fetchError);
@@ -437,6 +443,7 @@ function SnackNonVegSection() {
 }
 
 function MenuDashboard() {
+  console.log("hello");
   const navigate = useNavigate();
   const [mainTab, setMainTab] = useState("drinks");
   const [drinkSection, setDrinkSection] = useState("soft");

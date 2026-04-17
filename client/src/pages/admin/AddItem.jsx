@@ -188,9 +188,9 @@ export default function AddItem() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-rose-50 to-white relative overflow-hidden">
-      <div className="absolute top-16 left-12 w-72 h-72 rounded-full bg-[#d70652]/10 blur-3xl"></div>
-      <div className="absolute bottom-20 right-20 w-80 h-80 rounded-full bg-[#ff025e]/10 blur-3xl"></div>
+    <div className="min-h-screen bg-gradient-to-br from-afmc-bg via-white to-afmc-bg2 relative overflow-hidden">
+      <div className="absolute top-16 left-12 w-72 h-72 rounded-full bg-afmc-maroon/10 blur-3xl"></div>
+      <div className="absolute bottom-20 right-20 w-80 h-80 rounded-full bg-afmc-maroon2/10 blur-3xl"></div>
 
       <div className="relative z-10 p-8">
         <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
@@ -254,7 +254,7 @@ export default function AddItem() {
               <button
                 type="button"
                 onClick={() => setScannerOpen(true)}
-                className="flex items-center gap-2 rounded-2xl bg-[#d70652] px-5 py-3 font-semibold text-white shadow hover:shadow-md"
+                className="flex items-center gap-2 rounded-2xl bg-afmc-maroon px-5 py-3 font-semibold text-white shadow hover:bg-afmc-maroon2 hover:shadow-md transition"
               >
                 <FaCamera />
                 Scan

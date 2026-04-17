@@ -171,17 +171,17 @@ export default function OfferCreate() {
   const handleDashboard = () => navigate("/admin/dashboard");
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-rose-50 to-white relative p-6 md:p-8">
+    <div className="min-h-screen bg-gradient-to-br from-afmc-bg via-white to-afmc-bg2 relative p-6 md:p-8">
       {/* Background Blobs */}
-      <div className="absolute top-20 left-20 w-72 h-72 bg-[#d70652]/10 rounded-full blur-3xl"></div>
-      <div className="absolute bottom-20 right-20 w-80 h-80 bg-[#ff025e]/10 rounded-full blur-3xl"></div>
+      <div className="absolute top-20 left-20 w-72 h-72 bg-afmc-maroon/10 rounded-full blur-3xl"></div>
+      <div className="absolute bottom-20 right-20 w-80 h-80 bg-afmc-maroon2/10 rounded-full blur-3xl"></div>
 
       <div className="relative max-w-5xl mx-auto">
         {/* Header */}
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5 mb-8">
           <div>
             <h1 className="text-3xl font-bold text-gray-800 flex items-center gap-3">
-              <span className="w-12 h-12 rounded-2xl bg-[#d70652] text-white flex items-center justify-center shadow-lg">
+              <span className="w-12 h-12 rounded-2xl bg-gradient-to-br from-afmc-maroon to-afmc-maroon2 text-white flex items-center justify-center shadow-lg">
                 <FaGift />
               </span>
               Create Offer
@@ -257,7 +257,7 @@ export default function OfferCreate() {
                         key={item.item_code}
                         type="button"
                         onClick={() => handleSelectItem(item)}
-                        className="w-full text-left px-4 py-3 hover:bg-pink-50 transition border-b border-gray-100 last:border-b-0"
+                        className="w-full text-left px-4 py-3 hover:bg-afmc-maroon/5 transition border-b border-gray-100 last:border-b-0"
                       >
                         <p className="font-medium text-gray-800">{item.item_name}</p>
                        
@@ -321,7 +321,7 @@ export default function OfferCreate() {
                         key={item.item_code}
                         type="button"
                         onClick={() => handleSelectFreeItem(item)}
-                        className="w-full text-left px-4 py-3 hover:bg-pink-50 transition border-b border-gray-100 last:border-b-0"
+                        className="w-full text-left px-4 py-3 hover:bg-afmc-maroon/5 transition border-b border-gray-100 last:border-b-0"
                       >
                         <p className="font-medium text-gray-800">{item.item_name}</p>
                       </button>
@@ -395,7 +395,7 @@ export default function OfferCreate() {
               type="button"
               onClick={handleSave}
               disabled={saving}
-              className="flex-1 bg-[#d70652] hover:bg-[#b00543] text-white font-semibold py-3 rounded-2xl shadow-md transition flex items-center justify-center gap-2 disabled:opacity-70"
+              className="flex-1 bg-afmc-maroon hover:bg-afmc-maroon2 text-white font-semibold py-3 rounded-2xl shadow-md transition flex items-center justify-center gap-2 disabled:opacity-70"
             >
               <FaSave />
               {saving ? "Creating..." : "Create Offer"}

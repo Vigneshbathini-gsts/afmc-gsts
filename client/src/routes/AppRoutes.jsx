@@ -57,6 +57,12 @@ import UserPayment from "../pages/user/Payment";
 import UserInvoice from "../pages/user/Invoice";
 import ActiveOrders from "../pages/user/ActiveOrders";
 import UserOrderStatus from "../pages/user/OrderStatus";
+import MenuDashboard from "../components/common/MenuDashboard";
+import EnduserOther from "../components/common/ENDUSERFLOW/EnduserOther";
+import EnduserMocktail from "../components/common/ENDUSERFLOW/EnduserMocktail";
+import Snackveg from "../components/common/ENDUSERFLOW/Snackveg";
+import Snacknonveg from "../components/common/ENDUSERFLOW/Snacknonveg";
+import Drinkharddrink from "../components/common/ENDUSERFLOW/Drinkharddrink";
 
 // Kitchen Pages
 
@@ -65,10 +71,6 @@ import UserOrderStatus from "../pages/user/OrderStatus";
 
 
 import OutletDashboard from "../pages/kitchen/outlet/dashboard";
-import OutletOrderHistory from "../pages/kitchen/outlet/OrderHistory";
-import OutletOrders from "../pages/kitchen/outlet/Orders";
-import OutletPrepareOrder from "../pages/kitchen/outlet/PrepareOrder";
-
 
 // Optional for now (later if needed)
 // import BarLayout from "../layouts/BarLayout";
@@ -85,12 +87,7 @@ import StorekeeperEditItem from "../pages/storekeeper/EditItem";
 import BarstockReports from "../pages/admin/StockReportspages/BarstockReports";
 import Ordertransactiondetails from "../pages/admin/StockReportspages/Ordertransactiondetails";
 import Orderitemdetails from "../pages/admin/StockReportspages/Orderitemdetails";
-import MenuDashboard from "../components/common/MenuDashboard";
-import EnduserOther from './../components/common/ENDUSERFLOW/EnduserOther';
-import EnduserMocktail from './../components/common/ENDUSERFLOW/EnduserMocktail';
-import Snackveg from "../components/common/ENDUSERFLOW/Snackveg";
-import Snacknonveg from './../components/common/ENDUSERFLOW/Snacknonveg';
-import Drinkharddrink from "../components/common/ENDUSERFLOW/Drinkharddrink";
+import OutletOrderDetails from "../pages/kitchen/OutletOrderDetails";
 
 
 export default function AppRoutes() {
@@ -103,7 +100,7 @@ export default function AppRoutes() {
       <Route path="/unauthorized" element={<Unauthorized />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password/:token" element={<ResetPassword />} />
-      
+
 
       {/* ================= ADMIN ================= */}
       <Route
@@ -123,174 +120,29 @@ export default function AppRoutes() {
           }
         />
         <Route path="inventory" element={<Inventory />} />
-        <Route
-          path="stock-reports"
-          element={
-            <ProtectedRoute allowedRoles={[10]}>
-              <Navigate to="barstock" replace />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="stock-reports/barstock"
-          element={
-            <ProtectedRoute allowedRoles={[10]}>
-              <BarstockReports />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="stock-reports/order-transaction"
-          element={
-            <ProtectedRoute allowedRoles={[10]}>
-              <Ordertransactiondetails />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="stock-reports/order-item"
-          element={
-            <ProtectedRoute allowedRoles={[10]}>
-              <Orderitemdetails />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="stock-in-out-report"
-          element={
-            <ProtectedRoute allowedRoles={[10]}>
-              <StockReports />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="add-item"
-          element={
-            <ProtectedRoute allowedRoles={[10]}>
-              <AddItem />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="edit-item"
-          element={
-            <ProtectedRoute allowedRoles={[10]}>
-              <EditItem />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="reports"
-          element={
-            <ProtectedRoute allowedRoles={[10]}>
-              <Reports />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="users"
-          element={
-            <ProtectedRoute allowedRoles={[10]}>
-              <UserManagement />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="users/:id"
-          element={
-            <ProtectedRoute allowedRoles={[10]}>
-              <UserEdit />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="offers"
-          element={
-            <ProtectedRoute allowedRoles={[10]}>
-              <Offers />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="offers/create"
-          element={
-            <ProtectedRoute allowedRoles={[10]}>
-              <OfferCreate />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="offers/edit/:id"
-          element={
-            <ProtectedRoute allowedRoles={[10]}>
-              <OfferEdit />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="price-update"
-          element={
-            <ProtectedRoute allowedRoles={[10]}>
-              <PriceUpdate />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="profit-management"
-          element={
-            <ProtectedRoute allowedRoles={[10]}>
-              <ProfitManagement />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="cocktailmanag"
-          element={
-            <ProtectedRoute allowedRoles={[10]}>
-              <CocktailManagement />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="cocktail-management"
-          element={
-            <ProtectedRoute allowedRoles={[10]}>
-              <CocktailManagement />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="cocktail-create"
-          element={
-            <ProtectedRoute allowedRoles={[10]}>
-              <CocktailCreate />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="cocktail-edit"
-          element={
-            <ProtectedRoute allowedRoles={[10]}>
-              <CocktailEdit />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="order-history"
-          element={
-            <ProtectedRoute allowedRoles={[10]}>
-              <AdminOrderHistory />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="cancelled-orders"
-          element={
-            <ProtectedRoute allowedRoles={[10]}>
-              <CancelledOrders />
-            </ProtectedRoute>
-          }
-        />
+        <Route path="stock-reports" element={<Navigate to="barstock" replace />} />
+        <Route path="stock-reports/barstock" element={<BarstockReports />} />
+        <Route path="stock-reports/order-transaction" element={<Ordertransactiondetails />} />
+        <Route path="stock-reports/order-item" element={<Orderitemdetails />} />
+        <Route path="stock-in-out-report" element={<StockReports />} />
+        <Route path="add-item" element={<AddItem />} />
+        <Route path="edit-item" element={<EditItem />} />
+        <Route path="reports" element={<Reports />} />
+        <Route path="users" element={<UserManagement />} />
+        <Route path="users/:id" element={<UserEdit />} />
+        <Route path="offers" element={<Offers />} />
+        <Route path="offers/create" element={<OfferCreate />} />
+        <Route path="offers/edit/:id" element={<OfferEdit />} />
+
+
+        <Route path="price-update" element={<PriceUpdate />} />
+        <Route path="profit-management" element={<ProfitManagement />} />
+        <Route path="cocktailmanag" element={<CocktailManagement />} />
+        <Route path="cocktail-management" element={<CocktailManagement />} />
+        <Route path="cocktail-create" element={<CocktailCreate />} />
+        <Route path="cocktail-edit" element={<CocktailEdit />} />
+        <Route path="order-history" element={<AdminOrderHistory />} />
+        <Route path="cancelled-orders" element={<CancelledOrders />} />
       </Route>
 
       {/* ================= ATTENDANT ================= */}
@@ -360,10 +212,8 @@ export default function AppRoutes() {
           </ProtectedRoute>
         }
       >
-        <Route path="dashboard" element={<OutletDashboard outletType="KITCHEN" />} />
-        <Route path="orders" element={<OutletOrders outletType="KITCHEN" />} />
-        <Route path="prepare-order/:id" element={<OutletPrepareOrder outletType="KITCHEN" />} />
-        <Route path="order-history" element={<OutletOrderHistory outletType="KITCHEN" />} />
+        <Route path="dashboard" element={<OutletDashboard />} />
+        <Route path="order-details" element={<OutletOrderDetails />} />
       </Route>
 
       <Route
@@ -374,10 +224,8 @@ export default function AppRoutes() {
           </ProtectedRoute>
         }
       >
-        <Route path="dashboard" element={<OutletDashboard outletType="BAR" />} />
-        <Route path="orders" element={<OutletOrders outletType="BAR" />} />
-        <Route path="prepare-order/:id" element={<OutletPrepareOrder outletType="BAR" />} />
-        <Route path="order-history" element={<OutletOrderHistory outletType="BAR" />} />
+        <Route path="dashboard" element={<OutletDashboard />} />
+        <Route path="order-details" element={<OutletOrderDetails />} />
       </Route>
 
       {/* ================= STOREKEEPER ================= */}

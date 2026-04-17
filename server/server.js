@@ -2,6 +2,8 @@ const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
 const path = require("path");
+const session = require("express-session");
+const MySQLSession = require("express-mysql-session");
 
 dotenv.config();
 
@@ -9,7 +11,51 @@ const app = express();
 
 require("./config/db");
 
-app.use(cors());
+const MySQLStore = MySQLSession(session);
+const sessionStore = new MySQLStore({
+  host: process.env.DB_HOST,
+  port: process.env.DB_PORT || 3306,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
+  clearExpired: true,
+  checkExpirationInterval: 15 * 60 * 1000, // 15 min
+  expiration: 24 * 60 * 60 * 1000, // 24 hours
+  createDatabaseTable: true,
+  schema: {
+    tableName: process.env.SESSION_TABLE_NAME || "sessions",
+    columnNames: {
+      session_id: "session_id",
+      expires: "expires",
+      data: "data",
+    },
+  },
+});
+
+app.use(
+  session({
+    store: sessionStore,
+    name: process.env.SESSION_COOKIE_NAME || "afmc.sid",
+    secret: process.env.SESSION_SECRET || "your-secret-key",
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: process.env.NODE_ENV === "production",
+      httpOnly: true,
+      sameSite: "lax",
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    },
+  })
+);
+
+app.use(
+  cors({
+    origin: process.env.CORS_ORIGIN
+      ? process.env.CORS_ORIGIN.split(",").map((s) => s.trim())
+      : ["http://localhost:3000", "http://localhost:5173"],
+    credentials: true,
+  })
+);
 app.use(express.json());
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
@@ -22,82 +68,28 @@ const reportRoutes = require("./routes/reportRoutes");
 const cocktailRoutes = require("./routes/cocktailRoutes");
 const userRoutes = require("./routes/userRoutes");
 const orderRoutes = require("./routes/orderRoutes");
-const menuroutesbeer = require('./routes/MenuRoutesbeer');
-const Mocktailuser = require('./routes/MenuRoutesbeer')
-app.use("/api", Mocktailuser);
-app.use("/api", menuroutesbeer);
+const KitchenOrdersRoutes = require("./routes/KitchenOrdersRoutes");
+const collectionRoutes = require("./routes/collectionRoutes");
+const priceRoutes = require("./routes/priceRoutes");
+const offerRoutes = require("./routes/offerRoutes");
+const inventoryRoutes = require("./routes/inventoryRoutes");
+const profitRoutes = require("./routes/profitRoutes");
+const notificationRoutes = require("./routes/notificationRoutes");
+const cancelledOrdersRoutes = require("./routes/cancelledOrdersRoutes");
 
 app.use("/api/auth", authRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/cocktails", cocktailRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/orders", orderRoutes);
-const priceRoutes = require("./routes/priceRoutes");
+app.use("/api/bar-orders", KitchenOrdersRoutes);
+app.use("/api/collection", collectionRoutes);
 app.use("/api/price", priceRoutes);
-
-const offerRoutes = require("./routes/offerRoutes");
 app.use("/api/offers", offerRoutes);
-
-
-const Snacksveg = require("./routes/MenuRoutesbeer");
-app.use("/api", Snacksveg);
-
-const inventoryRoutes = require("./routes/inventoryRoutes");
 app.use("/api/inventory", inventoryRoutes);
-
-const profitRoutes = require("./routes/profitRoutes");
 app.use("/api/profit", profitRoutes);
-
-const notificationRoutes = require("./routes/notificationRoutes");
 app.use("/api/notifications", notificationRoutes);
-
-const cancelledOrdersRoutes = require("./routes/cancelledOrdersRoutes");
 app.use("/api/cancelled-orders", cancelledOrdersRoutes);
 
-const Stacknonveg = require('./routes/MenuRoutesbeer');
-app.use('/api', Stacknonveg);
-
-const Drinkhardbeer = require('./routes/MenuRoutesbeer');
-app.use('/api', Drinkhardbeer);
-
-const Drinkhardbrandy = require('./routes/MenuRoutesbeer');
-app.use('/api', Drinkhardbrandy);
-
-const Drinkhardbreezer = require('./routes/MenuRoutesbeer');
-app.use('/api', Drinkhardbreezer);
-
-const Drinkhardvodka = require('./routes/MenuRoutesbeer');
-app.use('/api', Drinkhardvodka);
-
-const DrinkhardGin = require('./routes/MenuRoutesbeer');
-app.use('/api', DrinkhardGin);
-
-const DrinkhardRum = require('./routes/MenuRoutesbeer');
-app.use('/api', DrinkhardRum);
-
-
-const DrinkhardWhisky = require('./routes/MenuRoutesbeer');
-app.use('/api', DrinkhardWhisky);
-
-const DrinkhardWine = require('./routes/MenuRoutesbeer');
-app.use('/api', DrinkhardWine);
-
-
-const DrinkhardLiquor = require('./routes/MenuRoutesbeer');
-app.use('/api', DrinkhardLiquor);
-
-const DrinkhardTequila = require('./routes/MenuRoutesbeer');
-app.use('/api', DrinkhardTequila);
-
-const DrinkhardCocktail = require('./routes/MenuRoutesbeer');
-app.use('/api', DrinkhardCocktail);
-
-
-
-
-
-
-const PORT = process.env.PORT || 4000;
-app.listen(PORT, () =>
-  console.log(`Server listening on port ${PORT}`)
-);
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));

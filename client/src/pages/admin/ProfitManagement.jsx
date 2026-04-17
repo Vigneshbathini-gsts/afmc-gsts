@@ -1,9 +1,12 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { FaArrowLeft } from "react-icons/fa";
 import { profitAPI } from "../../services/api";
 
 const categoryOptions = ["Liquor", "Snacks"];
 
 export default function ProfitManagement() {
+    const navigate = useNavigate();
     const [reportData, setReportData] = useState([]);
     const [loading, setLoading] = useState(false);
 
@@ -101,6 +104,16 @@ export default function ProfitManagement() {
 
     return (
         <div className="p-4 min-h-screen bg-slate-100">
+            <div className="flex justify-end mb-4">
+                <button
+                    onClick={() => navigate("/admin/dashboard")}
+                    className="flex items-center gap-2 px-3 py-1.5 text-sm bg-gradient-to-r from-afmc-maroon to-afmc-maroon2 hover:from-afmc-maroon2 hover:to-afmc-maroon text-white font-medium rounded-lg shadow-md transition duration-300"
+                  >
+                    <FaArrowLeft size={14} />
+                    Back
+                  </button>
+            </div>
+
             <h1 className="text-2xl font-bold text-slate-800 mb-4">
                 Profit Management
             </h1>

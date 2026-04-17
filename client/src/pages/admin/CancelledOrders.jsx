@@ -1,9 +1,11 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { FaSearch, FaUndoAlt, FaBan, FaChevronLeft, FaChevronRight } from "react-icons/fa";
+import { FaSearch, FaUndoAlt, FaBan, FaChevronLeft, FaChevronRight,FaArrowLeft } from "react-icons/fa";
 import { cancelledOrdersAPI } from "../../services/api";
 import OrderDetailsModal from "../../components/OrderDetailsModal";
+import { useNavigate } from "react-router-dom";
 
 export default function CancelledOrders() {
+  const navigate = useNavigate();
   const [selectedOrderNumber, setSelectedOrderNumber] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const today = new Date().toISOString().split("T")[0];
@@ -82,14 +84,25 @@ export default function CancelledOrders() {
   };
 
   return (
-    <div className="p-4 min-h-screen bg-slate-100">
+    <div className="p-4 min-h-screen bg-gradient-to-br from-afmc-bg via-white to-afmc-bg2">
+      {/* Back Button */}
+      <div className="flex justify-end mb-4">
+        <button
+          onClick={() => navigate("/admin/dashboard")}
+          className="flex items-center gap-2 px-3 py-1.5 text-sm bg-gradient-to-r from-afmc-maroon to-afmc-maroon2 hover:from-afmc-maroon2 hover:to-afmc-maroon text-white font-medium rounded-lg shadow-md transition duration-300"
+        >
+          <FaArrowLeft size={14} />
+          Back
+        </button>
+      </div>
+
       {/* Header */}
-      <div className="bg-gradient-to-r from-[#d70652] to-[#ff4f81] rounded-2xl shadow-md p-4 mb-5 text-white">
+      <div className="bg-gradient-to-r from-afmc-maroon to-afmc-maroon2 rounded-2xl shadow-md p-4 mb-5 text-white">
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <FaBan />
           Cancelled Orders Report
         </h1>
-        <p className="text-sm text-pink-100 mt-1">
+        <p className="text-sm text-white/80 mt-1">
           View fully cancelled food orders
         </p>
       </div>
@@ -109,7 +122,7 @@ export default function CancelledOrders() {
               name="fromDate"
               value={filters.fromDate}
               onChange={handleChange}
-              className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#d70652]"
+              className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-afmc-maroon"
             />
           </div>
 
@@ -122,14 +135,14 @@ export default function CancelledOrders() {
               name="toDate"
               value={filters.toDate}
               onChange={handleChange}
-              className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#d70652]"
+              className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-afmc-maroon"
             />
           </div>
 
           <div className="flex gap-2">
             <button
               type="submit"
-              className="bg-[#d70652] hover:bg-[#b30545] text-white text-sm px-4 py-2 rounded-md transition flex items-center gap-2"
+              className="bg-afmc-maroon hover:bg-afmc-maroon2 text-white text-sm px-4 py-2 rounded-md transition flex items-center gap-2"
             >
               <FaSearch />
               Search
@@ -156,7 +169,7 @@ export default function CancelledOrders() {
                 setRowsPerPage(Number(e.target.value));
                 setCurrentPage(1);
               }}
-              className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#d70652]"
+              className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-afmc-maroon"
             >
               <option value={5}>5</option>
               <option value={10}>10</option>
@@ -199,7 +212,7 @@ export default function CancelledOrders() {
                     currentOrders.map((row, index) => (
                       <tr key={index} className="hover:bg-slate-50">
                         <td
-                          className="border px-3 py-2 text-[#d70652] font-semibold cursor-pointer hover:underline"
+                          className="border px-3 py-2 text-afmc-maroon font-semibold cursor-pointer hover:underline"
                           onClick={() => openOrderDetails(row.ORDER_NUM)}
                         >
                           {row.ORDER_NUM}
@@ -254,7 +267,7 @@ export default function CancelledOrders() {
                         key={pageNumber}
                         onClick={() => handlePageChange(pageNumber)}
                         className={`px-4 py-2 rounded-lg text-sm font-medium border transition ${currentPage === pageNumber
-                            ? "bg-[#d70652] text-white border-[#d70652]"
+                            ? "bg-afmc-maroon text-white border-afmc-maroon"
                             : "bg-white text-slate-700 hover:bg-slate-50 border-slate-300"
                           }`}
                       >

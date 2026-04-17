@@ -390,10 +390,14 @@ const syncInventoryUnitPrice = async (connection, inventoryItemCode) => {
 const createCocktailItem = async (payload, options = {}) => {
   const data = validatePayload(payload);
   const userName = normalizeText(options.userName) || "SYSTEM";
-  const imagePath = options.imageFile
-    ? `${AFMC_IMAGE_PUBLIC_BASE_URL}/${options.imageFile.filename}`
-    : null;
-  const fileName = options.imageFile?.originalname || null;
+  // const imagePath = options.imageFile
+  //   ? `${AFMC_IMAGE_PUBLIC_BASE_URL}/${options.imageFile.filename}`
+  //   : null;
+  // const imagePath = options.imageFile?.filename || null;
+  // const fileName = options.imageFile?.filename || null;
+
+  const imagePath = data.itemName || null;
+  const fileName = data.itemName || null;
   const mimeType = options.imageFile?.mimetype || null;
   const connection = await db.getConnection();
 

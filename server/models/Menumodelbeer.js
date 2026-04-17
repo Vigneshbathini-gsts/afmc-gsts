@@ -42,6 +42,7 @@ ORDER BY
     item_id ASC`;
 
     const [rows] = await pool.execute(query, [itemCode, subCategory]);
+    console.log(rows);
     return rows;
 };
 

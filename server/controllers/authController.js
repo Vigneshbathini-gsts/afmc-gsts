@@ -123,6 +123,15 @@ exports.loginUser = async (req, res) => {
 
     const user = rows[0];
 
+    // Always start a fresh session on login so previous in-session state
+    // (e.g., scanned items) does not carry across logins / closed tabs.
+    if (req.session?.regenerate) {
+      await new Promise((resolve, reject) => {
+        req.session.regenerate((err) => (err ? reject(err) : resolve()));
+      });
+      req.session.loggedInAt = Date.now();
+    }
+
     // If role 40, outlet is mandatory
     if (Number(user.ROLE_ID) === 40 && !outletType) {
       return res.status(400).json({

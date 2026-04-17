@@ -202,9 +202,9 @@ export default function StockReports() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-rose-50 to-white relative">
-      <div className="absolute top-16 left-12 w-72 h-72 bg-[#d70652]/10 rounded-full blur-3xl"></div>
-      <div className="absolute bottom-20 right-20 w-80 h-80 bg-[#ff025e]/10 rounded-full blur-3xl"></div>
+    <div className="min-h-screen bg-gradient-to-br from-afmc-bg via-white to-afmc-bg2 relative">
+      <div className="absolute top-16 left-12 w-72 h-72 bg-afmc-maroon/10 rounded-full blur-3xl"></div>
+      <div className="absolute bottom-20 right-20 w-80 h-80 bg-afmc-maroon2/10 rounded-full blur-3xl"></div>
 
       <div className="p-8 relative z-10">
         <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
@@ -231,7 +231,7 @@ export default function StockReports() {
                 type="date"
                 value={fromDate}
                 onChange={(e) => setFromDate(e.target.value)}
-                className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-800 focus:border-[#ff025e] focus:ring-2 focus:ring-[#ff025e]/20"
+                className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
               />
             </div>
 
@@ -243,7 +243,7 @@ export default function StockReports() {
                 type="date"
                 value={toDate}
                 onChange={(e) => setToDate(e.target.value)}
-                className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-800 focus:border-[#ff025e] focus:ring-2 focus:ring-[#ff025e]/20"
+                className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
               />
             </div>
 
@@ -259,7 +259,7 @@ export default function StockReports() {
             <button
               type="button"
               onClick={downloadPdf}
-              className="ml-auto px-6 py-3 rounded-2xl bg-[#d70652] text-white font-semibold flex items-center gap-2 shadow hover:shadow-md"
+              className="ml-auto px-6 py-3 rounded-2xl bg-afmc-maroon hover:bg-afmc-maroon2 text-white font-semibold flex items-center gap-2 shadow hover:shadow-md transition"
             >
               <FaDownload />
               Download PDF
@@ -272,9 +272,9 @@ export default function StockReports() {
               onClick={() => setActiveTab("in")}
               className={`flex-1 py-3 text-sm font-semibold ${
                 activeTab === "in"
-                  ? "bg-[#d70652]/10 text-[#d70652] border-b-2 border-[#d70652]"
+                  ? "bg-afmc-maroon/10 text-afmc-maroon border-b-2 border-afmc-maroon"
                   : "text-gray-600"
-              }`}
+                }`}
             >
               Stock In Report
             </button>
@@ -283,9 +283,9 @@ export default function StockReports() {
               onClick={() => setActiveTab("out")}
               className={`flex-1 py-3 text-sm font-semibold ${
                 activeTab === "out"
-                  ? "bg-[#d70652]/10 text-[#d70652] border-b-2 border-[#d70652]"
+                  ? "bg-afmc-maroon/10 text-afmc-maroon border-b-2 border-afmc-maroon"
                   : "text-gray-600"
-              }`}
+                }`}
             >
               Stock Out Report
             </button>

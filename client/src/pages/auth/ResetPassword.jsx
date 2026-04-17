@@ -79,16 +79,16 @@ const ResetPassword = () => {
   };
 
   return (
-    <div className="min-h-screen flex bg-gradient-to-br from-pink-50 via-rose-50 to-white">
-      <div className="hidden lg:flex w-1/2 relative overflow-hidden bg-gradient-to-br from-[#d70652]/10 via-rose-100 to-[#ff025e]/10">
+    <div className="min-h-screen flex bg-gradient-to-br from-afmc-bg via-white to-afmc-bg2">
+      <div className="hidden lg:flex w-1/2 relative overflow-hidden bg-gradient-to-br from-afmc-maroon/10 via-afmc-bg2 to-afmc-maroon2/10">
         <div className="absolute inset-0 opacity-30">
-          <div className="absolute top-20 left-20 h-72 w-72 rounded-full bg-[#d70652] blur-3xl opacity-20"></div>
-          <div className="absolute bottom-20 right-20 h-80 w-80 rounded-full bg-[#ff025e] blur-3xl opacity-20"></div>
+          <div className="absolute top-20 left-20 h-72 w-72 rounded-full bg-afmc-maroon blur-3xl opacity-20"></div>
+          <div className="absolute bottom-20 right-20 h-80 w-80 rounded-full bg-afmc-maroon2 blur-3xl opacity-20"></div>
         </div>
 
         <div className="relative z-10 flex flex-col justify-center p-14 w-full">
           <div className="max-w-xl">
-            <p className="text-[#d70652] uppercase tracking-[0.25em] text-sm mb-4 font-semibold">
+            <p className="text-afmc-maroon uppercase tracking-[0.25em] text-sm mb-4 font-semibold">
               Secure Reset
             </p>
 
@@ -106,17 +106,17 @@ const ResetPassword = () => {
       </div>
 
       <div className="flex w-full lg:w-1/2 items-center justify-center px-6 py-10 bg-white relative">
-        <div className="absolute top-16 right-16 h-40 w-40 rounded-full bg-[#d70652]/10 blur-3xl"></div>
-        <div className="absolute bottom-16 left-16 h-52 w-52 rounded-full bg-[#ff025e]/10 blur-3xl"></div>
+        <div className="absolute top-16 right-16 h-40 w-40 rounded-full bg-afmc-maroon/10 blur-3xl"></div>
+        <div className="absolute bottom-16 left-16 h-52 w-52 rounded-full bg-afmc-maroon2/10 blur-3xl"></div>
 
         <div className="w-full max-w-md relative z-10">
-          <div className="bg-white/80 border border-[#ff025e]/20 shadow-xl rounded-3xl p-8 md:p-10 backdrop-blur-sm">
+          <div className="bg-white/80 border border-afmc-maroon/10 shadow-xl rounded-3xl p-8 md:p-10 backdrop-blur-sm">
             <div className="mb-8 text-center">
-              <div className="inline-flex items-center justify-center bg-gradient-to-br from-[#d70652] to-[#ff025e] p-4 rounded-2xl shadow-lg mb-4">
+              <div className="inline-flex items-center justify-center bg-gradient-to-br from-afmc-maroon to-afmc-maroon2 p-4 rounded-2xl shadow-lg mb-4">
                 <FaKey className="text-white text-2xl" />
               </div>
 
-              <p className="text-[#d70652] text-sm uppercase tracking-[0.25em] mb-2 font-semibold">
+              <p className="text-afmc-maroon text-sm uppercase tracking-[0.25em] mb-2 font-semibold">
                 Reset Password
               </p>
               <h2 className="text-3xl font-bold mb-2 text-gray-800">
@@ -173,7 +173,7 @@ const ResetPassword = () => {
                   <button
                     type="button"
                     onClick={() => setShowPassword((prev) => !prev)}
-                    className="text-gray-400 hover:text-[#d70652]"
+                    className="text-gray-400 hover:text-afmc-maroon"
                   >
                     {showPassword ? <FaEyeSlash /> : <FaEye />}
                   </button>
@@ -197,7 +197,7 @@ const ResetPassword = () => {
                   <button
                     type="button"
                     onClick={() => setShowConfirmPassword((prev) => !prev)}
-                    className="text-gray-400 hover:text-[#d70652]"
+                    className="text-gray-400 hover:text-afmc-maroon"
                   >
                     {showConfirmPassword ? <FaEyeSlash /> : <FaEye />}
                   </button>
@@ -207,7 +207,7 @@ const ResetPassword = () => {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-gradient-to-r from-[#d70652] to-[#ff025e] hover:from-[#ff025e] hover:to-[#d70652] text-white font-bold py-3.5 rounded-2xl shadow-md shadow-[#d70652]/30 transition duration-300 transform hover:scale-[1.01] disabled:opacity-70"
+                className="w-full bg-gradient-to-r from-afmc-maroon to-afmc-maroon2 hover:from-afmc-maroon2 hover:to-afmc-maroon text-white font-bold py-3.5 rounded-2xl shadow-md shadow-afmc-maroon/30 transition duration-300 transform hover:scale-[1.01] disabled:opacity-70"
               >
                 {loading ? "Resetting..." : "Reset Password"}
               </button>
@@ -216,7 +216,7 @@ const ResetPassword = () => {
             <div className="mt-6 text-center">
               <Link
                 to="/login"
-                className="text-sm text-[#d70652] hover:text-[#ff025e] transition font-medium"
+                className="text-sm text-afmc-maroon hover:text-afmc-maroon2 transition font-medium"
               >
                 Back to Login
               </Link>

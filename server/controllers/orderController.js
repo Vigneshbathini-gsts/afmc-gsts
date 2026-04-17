@@ -1,21 +1,22 @@
 const {
   getActiveOrders,
   getAdminOrderHistory,
-  getOrderDetails,
   getNonMemberByPhone,
+  getOrderDetails,
   saveNonMember,
 } = require("../models/orderModel");
 
 exports.fetchActiveOrders = async (req, res) => {
   try {
     const { from = null, to = null, search = null } = req.query;
-    const appUser = req.user?.username || null;
+    const roleId = Number(req.user?.roleId);
+    const userId = roleId === 30 ? req.user?.userId || null : null;
 
     const data = await getActiveOrders({
       from,
       to,
       search,
-      appUser,
+      userId,
     });
 
     res.status(200).json({
@@ -133,12 +134,10 @@ exports.lookupNonMember = async (req, res) => {
 exports.createOrUpdateNonMember = async (req, res) => {
   try {
     const { firstName, lastName, phoneNumber } = req.body || {};
-    const createdBy = req.user?.username || req.user?.userId || "SYSTEM";
     const data = await saveNonMember({
       firstName,
       lastName,
       phoneNumber,
-      createdBy,
     });
 
     res.status(200).json({

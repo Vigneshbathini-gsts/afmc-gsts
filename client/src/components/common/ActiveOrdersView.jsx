@@ -101,9 +101,9 @@ export default function ActiveOrdersView({
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-rose-50 to-white relative overflow-hidden">
-      <div className="absolute top-16 left-10 h-72 w-72 rounded-full bg-[#d70652]/10 blur-3xl"></div>
-      <div className="absolute bottom-10 right-10 h-80 w-80 rounded-full bg-[#ff025e]/10 blur-3xl"></div>
+    <div className="min-h-screen bg-gradient-to-br from-afmc-bg via-white to-afmc-bg2 relative overflow-hidden">
+      <div className="absolute top-16 left-10 h-72 w-72 rounded-full bg-afmc-maroon/10 blur-3xl"></div>
+      <div className="absolute bottom-10 right-10 h-80 w-80 rounded-full bg-afmc-maroon2/10 blur-3xl"></div>
 
       <div className="relative z-10 p-6 md:p-8">
         <div className="mb-8 flex flex-wrap items-center justify-between gap-4">

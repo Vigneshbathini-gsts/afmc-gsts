@@ -75,7 +75,7 @@ export default function StockNotificationBell() {
       {/* Bell Button */}
       <button
         onClick={() => setOpen(!open)}
-        className="relative p-3 rounded-xl bg-gray-100 hover:bg-gray-200 transition"
+        className="relative p-3 rounded-xl bg-gray-100 hover:bg-afmc-maroon/10 transition"
       >
         <FaBell className="text-gray-700 text-lg" />
 
@@ -88,18 +88,18 @@ export default function StockNotificationBell() {
 
       {/* Dropdown */}
       {open && (
-        <div className="absolute top-12 left-3/4 transform -translate-x-1/4 w-80 bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden z-50">
+        <div className="absolute right-0 top-12 w-[min(20rem,calc(100vw-1rem))] bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden z-50">
           {/* Header */}
-          <div className="px-4 py-3 bg-gradient-to-r from-[#d70652] to-pink-500 text-white">
+          <div className="px-4 py-3 bg-gradient-to-r from-afmc-maroon to-afmc-maroon2 text-white">
             <h3 className="font-semibold text-sm">Stock Out Notifications</h3>
-            <p className="text-xs text-pink-100">
+            <p className="text-xs text-white/80">
               {notifications.length} unread item
               {notifications.length !== 1 ? "s" : ""}
             </p>
           </div>
 
           {/* Body */}
-          <div className="max-h-80 overflow-y-auto">
+          <div className="max-h-[70vh] overflow-y-auto">
             {notifications.length > 0 ? (
               notifications.map((note, index) => (
                 <div
@@ -125,7 +125,7 @@ export default function StockNotificationBell() {
                           event.stopPropagation();
                           handleMarkAsRead(note.item_code);
                         }}
-                        className="mt-2 text-xs font-medium text-[#d70652] hover:text-pink-700 transition"
+                        className="mt-2 text-xs font-medium text-afmc-maroon hover:text-afmc-maroon2 transition"
                       >
                         Mark as Read
                       </button>

@@ -41,7 +41,7 @@ export default function Stackreporttab() {
         )}
       </div>
 
-      <div className="flex bg-white/70 backdrop-blur-md border rounded-xl shadow overflow-hidden">
+      <div className="flex bg-white/70 backdrop-blur-md border border-afmc-gold/25 rounded-xl shadow overflow-hidden">
         {tabs.map((tab) => {
           const isActive = location.pathname === tab.path;
 
@@ -51,10 +51,13 @@ export default function Stackreporttab() {
               onClick={() => navigate(tab.path)}
               className={`flex-1 text-center py-4 cursor-pointer transition-all ${
                 isActive
-                  ? "border-b-4 border-green-600 font-semibold text-gray-800"
-                  : "text-gray-500"
+                  ? "relative font-semibold text-afmc-maroon bg-gradient-to-r from-afmc-maroon/5 via-white to-afmc-gold/15"
+                  : "text-gray-600 hover:text-afmc-maroon hover:bg-afmc-maroon/5"
               }`}
             >
+              {isActive && (
+                <span className="pointer-events-none absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r from-afmc-maroon via-afmc-gold to-afmc-maroon2" />
+              )}
               {tab.name}
             </div>
           );
