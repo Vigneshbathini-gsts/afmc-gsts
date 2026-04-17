@@ -226,13 +226,13 @@ export const cocktailAPI = {
     }),
   getById: (id) => api.get(`/cocktails/${id}`),
   create: (data) => {
-     console.log("Request Data:", data);
-    api.post("/cocktails", data, {
-      headers:
-        data instanceof FormData
-          ? { "Content-Type": "multipart/form-data" }
-          : undefined,
-    })
+  console.log("Request Data:", data);
+  return api.post("/cocktails", data, {   // ✅ ADD RETURN
+    headers:
+      data instanceof FormData
+        ? { "Content-Type": "multipart/form-data" }
+        : undefined,
+  });
 },
   update: (id, data) =>
     api.put(`/cocktails/${id}`, data, {
