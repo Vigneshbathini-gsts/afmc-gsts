@@ -994,7 +994,7 @@ exports.getCancelledOrders = async (req, res) => {
 exports.getOrderHistory = async (req, res) => {
   try {
     const { fromDate, toDate, page = 1, limit = 10 } = req.query;
-
+    // console.log("Fetching order history with params:", { fromDate, toDate, page, limit });
     const normalizeDate = (date) => {
       if (!date) return null;
       const d = new Date(date);
@@ -1016,44 +1016,59 @@ exports.getOrderHistory = async (req, res) => {
     const offset = (pageNum - 1) * limitNum;
 
     const query = `
-      SELECT 
-        nm.order_num,
-        nm.order_date,
-        COALESCE(xnm.first_name, xu.first_name) AS first_name,
-        COALESCE(xnm.phone_number, xu.phone_number) AS phone_number,
-        CONCAT(UPPER(LEFT(xp.pubmed_name, 1)), LOWER(SUBSTRING(xp.pubmed_name, 2))) AS pubmed_name,
-        (
-          SELECT 
-            CASE
-              WHEN SUM(CASE WHEN UPPER(kn1.status) = 'PREPARING' THEN 1 ELSE 0 END) > 0 
-                   AND SUM(CASE WHEN UPPER(kn1.status) = 'COMPLETED' THEN 1 ELSE 0 END) > 0 
-              THEN 'PARTIALLY COMPLETED'
+    SELECT 
+  kn.ordernumber AS order_num,
+  nm.order_date,
 
-              WHEN SUM(CASE WHEN UPPER(kn1.status) = 'RECEIVED' THEN 1 ELSE 0 END) > 0 
-                   AND SUM(CASE WHEN UPPER(kn1.status) = 'COMPLETED' THEN 1 ELSE 0 END) > 0 
-              THEN 'PARTIALLY COMPLETED'
+  COALESCE(xnm.first_name, xu.first_name) AS first_name,
+  COALESCE(xnm.phone_number, xu.phone_number) AS phone_number,
 
-              WHEN SUM(CASE WHEN UPPER(kn1.status) IN ('COMPLETED', 'CANCELLED') THEN 1 ELSE 0 END) = COUNT(*) 
-                   AND SUM(CASE WHEN UPPER(kn1.status) = 'CANCELLED' THEN 1 ELSE 0 END) < COUNT(*) 
-              THEN 'COMPLETED'
+  CONCAT(UPPER(LEFT(xp.pubmed_name, 1)), LOWER(SUBSTRING(xp.pubmed_name, 2))) AS pubmed_name,
 
-              WHEN SUM(CASE WHEN UPPER(kn1.status) = 'CANCELLED' THEN 1 ELSE 0 END) = COUNT(*) 
-              THEN 'CANCELLED'
+  CASE
+    WHEN SUM(CASE WHEN UPPER(kn.status) = 'PREPARING' THEN 1 ELSE 0 END) > 0
+         AND SUM(CASE WHEN UPPER(kn.status) = 'COMPLETED' THEN 1 ELSE 0 END) > 0
+    THEN 'PARTIALLY COMPLETED'
 
-              ELSE 'PREPARING'
-            END
-          FROM xxafmc_kitchen_notification kn1
-          WHERE kn1.ordernumber = nm.order_num
-        ) AS status
-      FROM xxafmc_order_header nm
-      LEFT JOIN xxafmc_non_members xnm ON xnm.id = nm.member_id
-      LEFT JOIN xxafmc_users xu ON xu.user_id = nm.user_id
-      JOIN xxafmc_pubmed xp ON xp.pubmed_id = nm.pubmed
-      WHERE STR_TO_DATE(nm.order_date, '%m/%d/%Y') 
-            BETWEEN STR_TO_DATE(?, '%Y-%m-%d') 
-            AND STR_TO_DATE(?, '%Y-%m-%d')
-      ORDER BY nm.order_num DESC
-      LIMIT ? OFFSET ?
+    WHEN SUM(CASE WHEN UPPER(kn.status) = 'RECEIVED' THEN 1 ELSE 0 END) > 0
+         AND SUM(CASE WHEN UPPER(kn.status) = 'COMPLETED' THEN 1 ELSE 0 END) > 0
+    THEN 'PARTIALLY COMPLETED'
+
+    WHEN SUM(CASE WHEN UPPER(kn.status) IN ('COMPLETED','CANCELLED') THEN 1 ELSE 0 END) = COUNT(*)
+    THEN 'COMPLETED'
+
+    WHEN SUM(CASE WHEN UPPER(kn.status) = 'CANCELLED' THEN 1 ELSE 0 END) = COUNT(*)
+    THEN 'CANCELLED'
+
+    ELSE 'PREPARING'
+  END AS status
+
+FROM xxafmc_kitchen_notification kn
+
+LEFT JOIN xxafmc_order_header nm 
+  ON nm.order_num = kn.ordernumber
+
+LEFT JOIN xxafmc_non_members xnm 
+  ON xnm.id = nm.member_id
+
+LEFT JOIN xxafmc_users xu 
+  ON xu.user_id = nm.user_id
+
+JOIN xxafmc_pubmed xp 
+  ON xp.pubmed_id = nm.pubmed
+
+WHERE STR_TO_DATE(nm.order_date, '%m/%d/%Y') 
+      BETWEEN STR_TO_DATE(?, '%Y-%m-%d') 
+      AND STR_TO_DATE(?, '%Y-%m-%d')
+
+GROUP BY kn.ordernumber, nm.order_date, first_name, phone_number, xp.pubmed_name
+
+-- ✅ APEX HAVING (IMPORTANT)
+HAVING 
+  SUM(CASE WHEN UPPER(kn.status) IN ('PREPARING','CANCELLED','RECEIVED') THEN 1 ELSE 0 END) < COUNT(*)
+
+ORDER BY kn.ordernumber DESC
+LIMIT ? OFFSET ?
     `;
 
     const countQuery = `
@@ -1074,6 +1089,7 @@ exports.getOrderHistory = async (req, res) => {
     const queryParams = [from, to, String(limitNum), String(offset)];
 
     const [rows] = await pool.execute(query, queryParams);
+    // console.log(rows);
 
     res.json({
       success: true,
@@ -1092,15 +1108,120 @@ exports.getOrderHistory = async (req, res) => {
 
   } catch (err) {
     console.error("❌ Order History Error:", err);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       message: "Failed to fetch order history",
-      error: process.env.NODE_ENV === 'development' ? err.message : undefined 
+      error: process.env.NODE_ENV === 'development' ? err.message : undefined
     });
   }
 };
 
+exports.getOrderHistoryItemDetails = async (req, res) => {
+  try {
+    const { orderNumber } = req.params;
+    console.log("Fetching item details for order:", orderNumber);
+    if (!orderNumber) {
+      return res.status(400).json({
+        success: false,
+        message: "Order number is required"
+      });
+    }
 
+    // 🔹 Item details query
+    const itemsQuery = `
+      SELECT 
+        xo.order_line_id,
+        xo.order_id,
+        xo.item_id,
+        COALESCE(xo.type, 'NA') AS type,
+        xi.item_name,
+        xo.quantity,
+
+        xo.subtotal,
+        xo.price,
+        IFNULL(xo.food_pr_charges, 0) AS pr_charges,
+
+        xo.created_by,
+        xo.creation_date,
+        xo.last_updated_date,
+        xo.last_updated_by,
+
+        -- ✅ item-level status (avoid duplicates)
+        MAX(xxkn.status) AS status
+
+      FROM xxafmc_order_details xo
+
+      JOIN xxafmc_inventory xi 
+        ON xo.item_id = xi.item_code
+
+      JOIN xxafmc_order_header xoh 
+        ON xo.order_id = xoh.order_num
+
+      JOIN xxafmc_users xu 
+        ON xoh.user_id = xu.user_id
+
+      JOIN xxafmc_role r 
+        ON xu.role_id = r.role_id
+
+      -- ✅ critical join (same as APEX)
+      JOIN xxafmc_kitchen_notification xxkn 
+        ON xxkn.ordernumber = xo.order_id
+       AND xxkn.item_id = xo.item_id
+
+      WHERE xo.order_id = ?
+
+      GROUP BY 
+        xo.order_line_id,
+        xo.order_id,
+        xo.item_id,
+        xo.type,
+        xi.item_name,
+        xo.quantity,
+        xo.subtotal,
+        xo.price,
+        xo.food_pr_charges,
+        xo.created_by,
+        xo.creation_date,
+        xo.last_updated_date,
+        xo.last_updated_by
+    `;
+
+    // 🔹 Total query
+    const totalQuery = `
+      SELECT 
+        SUM(xo.subtotal) AS total_amount
+      FROM xxafmc_order_details xo
+      JOIN xxafmc_kitchen_notification xxkn 
+        ON xxkn.ordernumber = xo.order_id
+       AND xxkn.item_id = xo.item_id
+      WHERE xo.order_id = ?
+    `;
+
+    const [items] = await pool.execute(itemsQuery, [orderNumber]);
+    const [totalResult] = await pool.execute(totalQuery, [orderNumber]);
+
+    const totalAmount = totalResult[0]?.total_amount || 0;
+    console.log(`Fetched ${items.length} items for order ${orderNumber} with total amount ${totalAmount}`);
+    res.json({
+      success: true,
+      data: {
+        orderNumber,
+        items,
+        summary: {
+          totalAmount
+        }
+      }
+    });
+
+  } catch (err) {
+    console.error("❌ Order Item Details Error:", err);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch order item details",
+      error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
+  }
+};
 
 
 exports.getOrderDetailsByOrderNumber = async (req, res) => {
@@ -1108,7 +1229,7 @@ exports.getOrderDetailsByOrderNumber = async (req, res) => {
 
   try {
     const { orderNumber } = req.params;
-    
+
     if (!orderNumber) {
       return res.status(400).json({
         success: false,
@@ -1139,7 +1260,7 @@ exports.getOrderDetailsByOrderNumber = async (req, res) => {
 
     const [rows] = await connection.execute(sql, [orderNumber]);
 
-    
+
     res.json({
       success: true,
       count: rows.length,
@@ -1155,8 +1276,8 @@ exports.getOrderDetailsByOrderNumber = async (req, res) => {
 
   } finally {
     if (connection) {
-      
-      connection.release(); 
+
+      connection.release();
     }
   }
 };

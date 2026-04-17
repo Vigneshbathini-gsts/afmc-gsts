@@ -294,11 +294,10 @@ export default function CancelledOrders() {
                         <button
                           key={pageNumber}
                           onClick={() => handlePageChange(pageNumber)}
-                          className={`px-4 py-2 rounded-lg text-sm font-medium border transition ${
-                            currentPage === pageNumber
+                          className={`px-4 py-2 rounded-lg text-sm font-medium border transition ${currentPage === pageNumber
                               ? "bg-[#d70652] text-white border-[#d70652]"
                               : "bg-white text-slate-700 hover:bg-slate-50 border-slate-300"
-                          }`}
+                            }`}
                         >
                           {pageNumber}
                         </button>

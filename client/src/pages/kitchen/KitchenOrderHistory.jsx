@@ -3,7 +3,7 @@ import jsPDF from 'jspdf';
 import 'jspdf-autotable';   
 import { barOrdersAPI } from '../../services/api';
 
-const OrderHistory = () => {
+const KitchenOrderHistory = () => {
   const [orders, setOrders] = useState([]);
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
@@ -448,4 +448,4 @@ const OrderHistory = () => {
   );
 };
 
-export default OrderHistory;
+export default KitchenOrderHistory;

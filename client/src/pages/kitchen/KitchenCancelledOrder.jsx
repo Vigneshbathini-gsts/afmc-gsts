@@ -3,7 +3,7 @@ import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { barOrdersAPI } from '../../services/api';
 
-const CancelledOrder = () => {
+const KitchenCancelledOrder = () => {
     const [cancelledOrders, setCancelledOrders] = useState([]);
     const [fromDate, setFromDate] = useState('');
     const [toDate, setToDate] = useState('');
@@ -268,4 +268,4 @@ const CancelledOrder = () => {
     );
 };
 
-export default CancelledOrder;
+export default KitchenCancelledOrder;

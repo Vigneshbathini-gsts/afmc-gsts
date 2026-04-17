@@ -194,8 +194,10 @@ export const barOrdersAPI = {
 getCocktailDetailsById: (itemId, orderNumber) => api.get(`/bar-orders/cocktail/${itemId}?orderNumber=${orderNumber}`),
 getCancelledOrders: (params) => api.get("/bar-orders/cancelled-orders", { params }),
 getOrderHistory: (params) => api.get("/bar-orders/order-history", { params }),
-getOrderDetailsByOrderNumber: (orderNumber) => api.get(`/bar-orders/cancelled-order-details/${orderNumber}`)};
+getOrderDetailsByOrderNumber: (orderNumber) => api.get(`/bar-orders/cancelled-order-details/${orderNumber}`),
+getOrderHistoryItemDetails: (orderNumber) => api.get(`/bar-orders/order-history-details/${orderNumber}`),
 
+};
 // ================================
 // COLLECTION API (Barcode Scan Collection)
 // ================================

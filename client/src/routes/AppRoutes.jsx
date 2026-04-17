@@ -61,8 +61,9 @@ import UserOrderStatus from "../pages/user/OrderStatus";
 // Kitchen Pages
 
 import OutletDashboard from "../pages/kitchen/outlet/dashboard";
-import CancelledOrder from "../pages/kitchen/CancelledOrder";
-import OrderHistory from "../pages/kitchen/OrderHistory";
+import KitchenCancelledOrder from "../pages/kitchen/KitchenCancelledOrder";
+import KitchenOrderHistory from "../pages/kitchen/KitchenOrderHistory";
+
 
 
 
@@ -190,8 +191,8 @@ export default function AppRoutes() {
       >
         <Route path="dashboard" element={<OutletDashboard />} />
         <Route path="order-details" element={<OutletOrderDetails />} />
-        <Route path="cancelled-orders" element={<CancelledOrder />} />
-        <Route path="order-history" element={<OrderHistory />} />
+        <Route path="cancelled-orders" element={<KitchenCancelledOrder />} />
+        <Route path="order-history" element={<KitchenOrderHistory />} />
       </Route>
 
       {/* ================= STOREKEEPER ================= */}
