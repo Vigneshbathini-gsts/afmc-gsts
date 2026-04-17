@@ -1,13 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';   
+import 'jspdf-autotable';
 import { barOrdersAPI } from '../../services/api';
 
 const KitchenOrderHistory = () => {
-  const [orders, setOrders] = useState([]);
+  const [orders, setOrders] = useState([]);           // All orders from API
+  const [filteredOrders, setFilteredOrders] = useState([]); // Displayed orders after search
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loadingDetails, setLoadingDetails] = useState(false);
+
   const [pagination, setPagination] = useState({
     currentPage: 1,
     totalPages: 1,
@@ -16,54 +20,58 @@ const KitchenOrderHistory = () => {
     hasNextPage: false,
     hasPrevPage: false
   });
+
   const [orderItemDetails, setOrderItemDetails] = useState({});
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
-  const [loadingDetails, setLoadingDetails] = useState(false);
 
-  // Set default toDate to today's date
-  // useEffect(() => {
-  //   const today = new Date().toISOString().split('T')[0];
-  //   setToDate(today);
-  //   fetchOrderHistory(1);
-  // }, []);
+  // Set default dates
+  useEffect(() => {
+    const today = new Date().toISOString().split('T')[0];
+    setFromDate(today);
+    setToDate(today);
+  }, []);
 
+  // Fetch orders from API (only dates + pagination)
   const fetchOrderHistory = async (page = 1) => {
     setLoading(true);
     try {
       const params = {
-        page: page,
-        limit: pagination.recordsPerPage
+        page,
+        limit: pagination.recordsPerPage,
       };
+
       if (fromDate) params.fromDate = fromDate;
       if (toDate) params.toDate = toDate;
+      // NO search param sent to backend
+
+      console.log("Fetching orders with params:", params);
 
       const response = await barOrdersAPI.getOrderHistory(params);
-      
-      // Handle different response structures
+      console.log("API Response:", response?.data);
+
       let ordersData = [];
       let paginationData = {};
-      
-      if (response.data && response.data.data && Array.isArray(response.data.data)) {
+
+      if (response?.data?.data && Array.isArray(response.data.data)) {
         ordersData = response.data.data;
         paginationData = response.data.pagination || {};
-      } else if (response.data && Array.isArray(response.data)) {
+      } else if (response?.data && Array.isArray(response.data)) {
         ordersData = response.data;
-      } else if (Array.isArray(response)) {
-        ordersData = response;
-      } else {
-        ordersData = [];
       }
-      
+
       setOrders(ordersData);
+
       setPagination(prev => ({
         ...prev,
         currentPage: page,
-        totalPages: paginationData.totalPages || 1,
+        totalPages: paginationData.totalPages || 
+                   Math.ceil((paginationData.totalRecords || ordersData.length) / prev.recordsPerPage) || 1,
         totalRecords: paginationData.totalRecords || ordersData.length,
-        hasNextPage: paginationData.hasNextPage || false,
-        hasPrevPage: paginationData.hasPrevPage || false
+        hasNextPage: paginationData.hasNextPage ?? (page < (paginationData.totalPages || 1)),
+        hasPrevPage: paginationData.hasPrevPage ?? (page > 1)
       }));
+
     } catch (error) {
       console.error('Error fetching order history:', error);
       alert('Failed to fetch order history');
@@ -73,31 +81,64 @@ const KitchenOrderHistory = () => {
     }
   };
 
+  // Frontend Search + Filter Logic
+  const filteredAndSearchedOrders = useMemo(() => {
+    let result = [...orders];
+
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase().trim();
+
+      result = result.filter(order => 
+        (order.order_num && order.order_num.toString().toLowerCase().includes(term)) ||
+        (order.first_name && order.first_name.toLowerCase().includes(term)) ||
+        (order.phone_number && order.phone_number.toLowerCase().includes(term))
+      );
+    }
+
+    return result;
+  }, [orders, searchTerm]);
+
+  // Update displayed orders when search or API data changes
+  useEffect(() => {
+    setFilteredOrders(filteredAndSearchedOrders);
+  }, [filteredAndSearchedOrders]);
+
+  // Fetch when dates change
+  useEffect(() => {
+    if (fromDate && toDate) {
+      fetchOrderHistory(1);
+    }
+  }, [fromDate, toDate]);
+
   const fetchOrderItemDetails = async (orderNumber) => {
-    console.log("=== fetchOrderItemDetails called ===");
-    console.log("Order number:", orderNumber);
-    
+    if (!orderNumber) return;
+
     setLoadingDetails(true);
     try {
-      const response = await barOrdersAPI.getOrderDetailsByOrderNumber(orderNumber);
-      console.log("API Response:", response);
-      const details = response.data.data || [];
-      console.log("Details received:", details);
-      setOrderItemDetails(prev => ({ ...prev, [orderNumber]: details }));
-      return details;
+      const response = await barOrdersAPI.getOrderHistoryItemDetails(orderNumber);
+      
+      let details = [];
+      let summary = null;
+
+      if (response?.data?.data) {
+        details = response.data.data.items || response.data.data;
+        summary = response.data.data.summary || null;
+      } else if (Array.isArray(response?.data)) {
+        details = response.data;
+      }
+
+      setOrderItemDetails(prev => ({
+        ...prev,
+        [orderNumber]: { items: details, summary }
+      }));
     } catch (error) {
       console.error(`Error fetching details for order ${orderNumber}:`, error);
-      return [];
     } finally {
       setLoadingDetails(false);
     }
   };
 
   const handleOrderClick = async (order) => {
-    console.log("=== Order clicked ===");
-    console.log("Order object:", order);
-    console.log("Order number:", order.order_num);
-    
     setSelectedOrder(order);
     setModalOpen(true);
     await fetchOrderItemDetails(order.order_num);
@@ -108,15 +149,11 @@ const KitchenOrderHistory = () => {
     setSelectedOrder(null);
   };
 
-  const handleFilter = () => {
-    fetchOrderHistory(1);
-  };
-
   const handleReset = () => {
-    setFromDate('');
     const today = new Date().toISOString().split('T')[0];
+    setFromDate(today);
     setToDate(today);
-    fetchOrderHistory(1);
+    setSearchTerm('');
   };
 
   const handlePageChange = (newPage) => {
@@ -125,9 +162,11 @@ const KitchenOrderHistory = () => {
     }
   };
 
-  // Download PDF Function
+  // Download PDF (uses filtered orders if search is active)
   const downloadPDF = () => {
-    if (!orders || orders.length === 0) {
+    const dataToExport = searchTerm ? filteredOrders : orders;
+
+    if (!dataToExport || dataToExport.length === 0) {
       alert("No orders to download!");
       return;
     }
@@ -136,35 +175,33 @@ const KitchenOrderHistory = () => {
     doc.setFontSize(16);
     doc.text("Order History Report", 14, 20);
 
-    // Add date range if applied
+    let yOffset = 30;
+    doc.setFontSize(11);
+
     if (fromDate || toDate) {
-      doc.setFontSize(11);
-      doc.text(`Period: ${fromDate || 'All'} to ${toDate || 'All'}`, 14, 30);
+      doc.text(`Period: ${fromDate || 'All'} to ${toDate || 'All'}`, 14, yOffset);
+      yOffset += 8;
+    }
+    if (searchTerm) {
+      doc.text(`Search: ${searchTerm}`, 14, yOffset);
+      yOffset += 8;
     }
 
-    doc.setFontSize(12);
-    doc.text(`Total Orders: ${pagination.totalRecords}`, 14, 38);
+    doc.text(`Total Orders: ${dataToExport.length}`, 14, yOffset);
+    yOffset += 12;
 
-    // Table columns
-    const tableColumn = ["Order  ", "Date", "Customer", "Pubmed", "Status"];
-    const tableRows = [];
-
-    orders.forEach(order => {
-      const orderDate = order.order_date 
-        ? new Date(order.order_date).toLocaleDateString('en-IN') 
-        : 'N/A';
-
-      tableRows.push([
-        order.order_num,
-        orderDate,
-        order.first_name || 'N/A',
-        order.pubmed_name || 'N/A',
-        order.status || 'PREPARING'
-      ]);
-    });
+    const tableColumn = ["Order Number", "Order Date", "Name", "Phone Number", "Subtotal", "Status"];
+    const tableRows = dataToExport.map(order => [
+      order.order_num,
+      order.order_date ? new Date(order.order_date).toLocaleDateString('en-IN') : 'N/A',
+      order.first_name || 'N/A',
+      order.phone_number || 'N/A',
+      `Rs. ${order.subtotal || '0.00'}`,
+      order.status || 'PREPARING'
+    ]);
 
     doc.autoTable({
-      startY: 45,
+      startY: yOffset,
       head: [tableColumn],
       body: tableRows,
       theme: 'grid',
@@ -173,32 +210,26 @@ const KitchenOrderHistory = () => {
       alternateRowStyles: { fillColor: [245, 245, 245] }
     });
 
-    // Save the PDF
-    doc.save(`Order_History_${new Date().toISOString().slice(0,10)}.pdf`);
+    doc.save(`Order_History_${new Date().toISOString().slice(0, 10)}.pdf`);
   };
 
   const getStatusColor = (status) => {
-    switch(status) {
-      case 'COMPLETED':
-        return 'bg-green-100 text-green-800';
-      case 'CANCELLED':
-        return 'bg-red-100 text-red-800';
+    switch (status?.toUpperCase()) {
+      case 'COMPLETED': return 'bg-green-100 text-green-800';
+      case 'CANCELLED': return 'bg-red-100 text-red-800';
       case 'PARTIALLY COMPLETED':
-      case 'PARTIAL':
-        return 'bg-orange-100 text-orange-800';
-      default:
-        return 'bg-blue-100 text-blue-800';
+      case 'PARTIAL': return 'bg-orange-100 text-orange-800';
+      default: return 'bg-blue-100 text-blue-800';
     }
   };
 
-  // Ensure orders is always an array before rendering
-  const safeOrders = Array.isArray(orders) ? orders : [];
+  const safeOrders = filteredOrders;   // Use filtered orders for display
 
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-gray-800">Order History</h2>
-        
+        <h2 className="text-2xl font-bold text-gray-800">Kitchen Order History</h2>
+
         <button
           onClick={downloadPDF}
           disabled={!safeOrders.length}
@@ -211,38 +242,75 @@ const KitchenOrderHistory = () => {
         </button>
       </div>
 
-      {/* Date Filter */}
-      <div className="bg-white p-4 rounded-lg shadow mb-6 flex gap-4 items-end">
-        <div>
-          <label className="block text-sm font-medium mb-1 text-gray-700">From Date</label>
-          <input
-            type="date"
-            value={fromDate}
-            onChange={(e) => setFromDate(e.target.value)}
-            className="border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+      {/* Filters */}
+      <div className="bg-white p-4 rounded-lg shadow mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+          {/* Search Input */}
+          <div>
+            <label className="block text-sm font-medium mb-1 text-gray-700">Search</label>
+            <div className="relative">
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search by order #, name or phone..."
+                className="w-full border border-gray-300 rounded-lg px-4 py-2 pl-10 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <svg className="absolute left-3 top-3 h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm('')}
+                  className="absolute right-3 top-3 text-gray-400 hover:text-gray-600 text-xl leading-none"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* From Date */}
+          <div>
+            <label className="block text-sm font-medium mb-1 text-gray-700">From Date</label>
+            <input
+              type="date"
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+              className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          {/* To Date */}
+          <div>
+            <label className="block text-sm font-medium mb-1 text-gray-700">To Date</label>
+            <input
+              type="date"
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
+              className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              onClick={() => fetchOrderHistory(1)}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors flex-1"
+            >
+              Refresh
+            </button>
+            <button
+              onClick={handleReset}
+              className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors"
+            >
+              Reset
+            </button>
+          </div>
         </div>
-        <div>
-          <label className="block text-sm font-medium mb-1 text-gray-700">To Date</label>
-          <input
-            type="date"
-            value={toDate}
-            onChange={(e) => setToDate(e.target.value)}
-            className="border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-        <button
-          onClick={handleFilter}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors"
-        >
-          Apply Filter
-        </button>
-        <button
-          onClick={handleReset}
-          className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors"
-        >
-          Reset
-        </button>
+      </div>
+
+      <div className="mb-4 text-sm text-gray-600">
+        Showing {safeOrders.length} orders | Total Records: {pagination.totalRecords}
       </div>
 
       {loading ? (
@@ -259,10 +327,11 @@ const KitchenOrderHistory = () => {
               <table className="min-w-full">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order  </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pubmed</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order Number</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order Date</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer Name</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone Number</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subtotal</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                   </tr>
                 </thead>
@@ -274,7 +343,7 @@ const KitchenOrderHistory = () => {
                           onClick={() => handleOrderClick(order)}
                           className="text-blue-600 hover:text-blue-800 hover:underline font-medium cursor-pointer"
                         >
-                           {order.order_num}
+                          {order.order_num}
                         </button>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
@@ -284,7 +353,12 @@ const KitchenOrderHistory = () => {
                         {order.first_name || 'N/A'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                        {order.pubmed_name || 'N/A'}
+                        {order.phone_number || 'N/A'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="text-sm font-medium text-gray-900">
+                          ₹{order.subtotal || '0'}
+                        </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(order.status)}`}>
@@ -299,143 +373,105 @@ const KitchenOrderHistory = () => {
 
             {safeOrders.length === 0 && !loading && (
               <div className="text-center py-12">
-                <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                <p className="mt-2 text-gray-500">No orders found</p>
+                <p className="text-gray-500">No orders found matching your search</p>
               </div>
             )}
           </div>
 
-          {/* Pagination */}
-          {pagination.totalPages > 1 && (
-            <div className="flex justify-between items-center mt-6">
-              <div className="text-sm text-gray-600">
-                Showing {((pagination.currentPage - 1) * pagination.recordsPerPage) + 1} to{' '}
-                {Math.min(pagination.currentPage * pagination.recordsPerPage, pagination.totalRecords)} of{' '}
-                {pagination.totalRecords} orders
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => handlePageChange(pagination.currentPage - 1)}
-                  disabled={!pagination.hasPrevPage}
-                  className="px-4 py-2 bg-gray-500 text-white rounded-lg disabled:bg-gray-300 hover:bg-gray-600 transition-colors"
-                >
-                  Previous
-                </button>
-                <div className="flex gap-1">
-                  {[...Array(Math.min(5, pagination.totalPages))].map((_, i) => {
-                    let pageNum;
-                    if (pagination.totalPages <= 5) {
-                      pageNum = i + 1;
-                    } else if (pagination.currentPage <= 3) {
-                      pageNum = i + 1;
-                    } else if (pagination.currentPage >= pagination.totalPages - 2) {
-                      pageNum = pagination.totalPages - 4 + i;
-                    } else {
-                      pageNum = pagination.currentPage - 2 + i;
-                    }
-                    
-                    return (
-                      <button
-                        key={pageNum}
-                        onClick={() => handlePageChange(pageNum)}
-                        className={`px-4 py-2 rounded-lg transition-colors ${
-                          pagination.currentPage === pageNum
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                        }`}
-                      >
-                        {pageNum}
-                      </button>
-                    );
-                  })}
-                </div>
-                <button
-                  onClick={() => handlePageChange(pagination.currentPage + 1)}
-                  disabled={!pagination.hasNextPage}
-                  className="px-4 py-2 bg-gray-500 text-white rounded-lg disabled:bg-gray-300 hover:bg-gray-600 transition-colors"
-                >
-                  Next
-                </button>
-              </div>
-            </div>
-          )}
+          {/* Note: Pagination is disabled for now since we're filtering on frontend */}
+          {/* If you want full pagination + search, backend support is needed */}
         </>
       )}
 
-      {/* Modal for Order Details */}
+      {/* Modal remains same as before */}
       {modalOpen && selectedOrder && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-hidden">
+          <div className="bg-white rounded-lg shadow-xl max-w-5xl w-full max-h-[90vh] overflow-hidden">
             <div className="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-4 flex justify-between items-center">
               <div>
                 <h3 className="text-xl font-bold text-white">
-                  Order Details:  {selectedOrder.order_num}
+                  Order Details: #{selectedOrder.order_num}
                 </h3>
                 <p className="text-sm text-blue-100 mt-1">
                   Customer: {selectedOrder.first_name || 'N/A'} | 
-                  Pubmed: {selectedOrder.pubmed_name || 'N/A'}
+                  Phone: {selectedOrder.phone_number || 'N/A'}
                 </p>
               </div>
-              <button 
-                onClick={closeModal} 
-                className="text-white hover:text-gray-200 transition-colors"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+              <button onClick={closeModal} className="text-white hover:text-gray-200">
+                ✕
               </button>
             </div>
-            
+
             <div className="px-6 py-4 overflow-y-auto max-h-[calc(90vh-120px)]">
               {loadingDetails ? (
                 <div className="text-center py-8">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
                   <p className="mt-2 text-gray-600">Loading order details...</p>
                 </div>
-              ) : orderItemDetails[selectedOrder.order_num]?.length > 0 ? (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full border rounded-lg">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item Name</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quantity</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {orderItemDetails[selectedOrder.order_num].map((item, index) => (
-                        <tr key={index} className="hover:bg-gray-50">
-                          <td className="px-4 py-3 text-sm text-gray-900">{item.item_name || 'N/A'}</td>
-                          <td className="px-4 py-3 text-sm text-gray-600">{item.quantity}</td>
-                          <td className="px-4 py-3 text-sm text-gray-600">{item.type}</td>
-                          <td className="px-4 py-3">
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                              item.status === 'CANCELLED' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
-                            }`}>
-                              {item.status}
-                            </span>
-                          </td>
+              ) : orderItemDetails[selectedOrder.order_num]?.items?.length > 0 ? (
+                <>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full border rounded-lg">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item Name</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quantity</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Preparation Charges</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Subtotal</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {orderItemDetails[selectedOrder.order_num].items.map((item, index) => (
+                          <tr key={index} className="hover:bg-gray-50">
+                            <td className="px-4 py-3 text-sm text-gray-900">{item.item_name || 'N/A'}</td>
+                            <td className="px-4 py-3 text-sm text-gray-600">{item.quantity}</td>
+                            <td className="px-4 py-3 text-sm text-gray-600">{item.type || 'N/A'}</td>
+                            <td className="px-4 py-3 text-sm text-gray-600">
+                              ₹{item.pr_charges ? parseFloat(item.pr_charges).toFixed(2) : '0.00'}
+                            </td>
+                            <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                              ₹{item.subtotal ? parseFloat(item.subtotal).toFixed(2) : '0.00'}
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                item.status?.toUpperCase() === 'CANCELLED' ? 'bg-red-100 text-red-800' :
+                                item.status?.toUpperCase() === 'COMPLETED' ? 'bg-green-100 text-green-800' :
+                                'bg-yellow-100 text-yellow-800'
+                              }`}>
+                                {item.status || 'PENDING'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="mt-6 pt-4 border-t border-gray-200 flex justify-end">
+                    <div className="bg-gray-50 rounded-lg p-4 min-w-[300px]">
+                      <div className="flex justify-between items-center pt-2 border-t border-gray-200">
+                        <span className="text-lg font-bold text-gray-900">Grand Total:</span>
+                        <span className="text-xl font-bold text-blue-600">
+                          ₹{orderItemDetails[selectedOrder.order_num].summary?.totalAmount 
+                            ? parseFloat(orderItemDetails[selectedOrder.order_num].summary.totalAmount).toFixed(2)
+                            : orderItemDetails[selectedOrder.order_num].items
+                                .reduce((sum, item) => sum + (parseFloat(item.subtotal) || 0), 0)
+                                .toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </>
               ) : (
-                <div className="text-center py-8">
-                  <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  <p className="mt-2 text-gray-500">No items found for this order</p>
-                </div>
+                <div className="text-center py-8 text-gray-500">No items found for this order</div>
               )}
             </div>
-            
+
             <div className="bg-gray-50 px-6 py-3 border-t flex justify-end">
-              <button 
-                onClick={closeModal} 
+              <button
+                onClick={closeModal}
                 className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors"
               >
                 Close

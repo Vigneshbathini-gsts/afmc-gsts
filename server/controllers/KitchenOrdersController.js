@@ -1015,7 +1015,7 @@ exports.getOrderHistory = async (req, res) => {
     const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
     const offset = (pageNum - 1) * limitNum;
 
-    const query = `
+   const query = `
     SELECT 
   kn.ordernumber AS order_num,
   nm.order_date,
@@ -1024,6 +1024,9 @@ exports.getOrderHistory = async (req, res) => {
   COALESCE(xnm.phone_number, xu.phone_number) AS phone_number,
 
   CONCAT(UPPER(LEFT(xp.pubmed_name, 1)), LOWER(SUBSTRING(xp.pubmed_name, 2))) AS pubmed_name,
+
+  -- ✅ ADDED SUBTOTAL
+  FORMAT(nm.order_total, 2) AS subtotal,
 
   CASE
     WHEN SUM(CASE WHEN UPPER(kn.status) = 'PREPARING' THEN 1 ELSE 0 END) > 0
@@ -1061,15 +1064,14 @@ WHERE STR_TO_DATE(nm.order_date, '%m/%d/%Y')
       BETWEEN STR_TO_DATE(?, '%Y-%m-%d') 
       AND STR_TO_DATE(?, '%Y-%m-%d')
 
-GROUP BY kn.ordernumber, nm.order_date, first_name, phone_number, xp.pubmed_name
+GROUP BY kn.ordernumber, nm.order_date, first_name, phone_number, xp.pubmed_name, nm.order_total
 
--- ✅ APEX HAVING (IMPORTANT)
 HAVING 
   SUM(CASE WHEN UPPER(kn.status) IN ('PREPARING','CANCELLED','RECEIVED') THEN 1 ELSE 0 END) < COUNT(*)
 
 ORDER BY kn.ordernumber DESC
 LIMIT ? OFFSET ?
-    `;
+`;
 
     const countQuery = `
       SELECT COUNT(DISTINCT nm.order_num) as total
