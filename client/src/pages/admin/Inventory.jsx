@@ -582,13 +582,13 @@ export default function Inventory() {
 
       <div className="p-8 relative z-10">
         <div className="flex items-center justify-between mb-8">
-          <h1 className="text-2xl font-semibold text-gray-800">
+          <h1 className="text-2xl font-semibold text-afmc-maroon">
             Inventory Management
           </h1>
           <button
             type="button"
             onClick={() => navigate("/admin/dashboard")}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-white shadow hover:shadow-md border border-white/60 text-gray-700"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-white shadow hover:shadow-md border border-afmc-gold/30 text-gray-700 hover:text-afmc-maroon hover:bg-afmc-maroon/5 transition"
           >
             <FaArrowLeft />
             Go To Dashboard
@@ -889,7 +889,7 @@ export default function Inventory() {
                   type="button"
                   onClick={handleAddStock}
                   disabled={stockSaving || stockRows.length === 0}
-                  className="px-6 py-2.5 rounded-full bg-green-600 text-white font-semibold disabled:opacity-70"
+                  className="px-6 py-2.5 rounded-full bg-afmc-maroon text-white font-semibold shadow-afmc hover:bg-afmc-maroon2 focus:outline-none focus:ring-2 focus:ring-afmc-gold/50 disabled:opacity-70"
                 >
                   {stockSaving ? "Saving..." : "Add"}
                 </button>
@@ -1054,7 +1054,7 @@ export default function Inventory() {
                 <button
                   type="button"
                   onClick={handleStageStock}
-                  className="inline-flex items-center gap-2 rounded-full bg-green-600 px-5 py-2.5 text-white font-semibold"
+                  className="inline-flex items-center gap-2 rounded-full bg-afmc-maroon px-5 py-2.5 text-white font-semibold shadow-afmc hover:bg-afmc-maroon2 focus:outline-none focus:ring-2 focus:ring-afmc-gold/50"
                 >
                   <FaPlus />
                   Add Stock
@@ -1399,7 +1399,7 @@ export default function Inventory() {
                 type="button"
                 onClick={handleCreateItem}
                 disabled={saving}
-                className="px-8 py-3 rounded-full bg-green-600 text-white font-semibold disabled:opacity-70"
+                className="px-8 py-3 rounded-full bg-afmc-maroon text-white font-semibold shadow-afmc hover:bg-afmc-maroon2 focus:outline-none focus:ring-2 focus:ring-afmc-gold/50 disabled:opacity-70"
               >
                 {saving ? "Creating..." : "Create"}
               </button>
@@ -1427,7 +1427,7 @@ export default function Inventory() {
                   type="button"
                   onClick={handleUpdateImage}
                   disabled={imageSaving}
-                  className="px-6 py-2.5 rounded-full bg-green-600 text-white font-semibold disabled:opacity-70"
+                  className="px-6 py-2.5 rounded-full bg-afmc-maroon text-white font-semibold shadow-afmc hover:bg-afmc-maroon2 focus:outline-none focus:ring-2 focus:ring-afmc-gold/50 disabled:opacity-70"
                 >
                   {imageSaving ? "Saving..." : "Update"}
                 </button>
