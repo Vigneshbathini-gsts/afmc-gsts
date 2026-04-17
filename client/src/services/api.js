@@ -225,13 +225,15 @@ export const cocktailAPI = {
       params: { itemCode, pegs },
     }),
   getById: (id) => api.get(`/cocktails/${id}`),
-  create: (data) =>
+  create: (data) => {
+     console.log("Request Data:", data);
     api.post("/cocktails", data, {
       headers:
         data instanceof FormData
           ? { "Content-Type": "multipart/form-data" }
           : undefined,
-    }),
+    })
+},
   update: (id, data) =>
     api.put(`/cocktails/${id}`, data, {
       headers:

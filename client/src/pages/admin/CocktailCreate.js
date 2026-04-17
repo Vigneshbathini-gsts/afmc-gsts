@@ -35,6 +35,7 @@ export default function CocktailCreate() {
       try {
         const response = await cocktailAPI.getIngredientOptions();
         setIngredientOptions(response.data?.data || []);
+        console.log(response.data);
       } catch (fetchError) {
         console.error(fetchError);
       }
@@ -75,6 +76,7 @@ export default function CocktailCreate() {
     try {
       const response = await cocktailAPI.getIngredientPrice(itemCode, pegs);
       const pricing = response.data?.data;
+      console.log("response",response.data);
 
       setRows((current) =>
         current.map((row) =>
@@ -157,6 +159,7 @@ export default function CocktailCreate() {
       setError("");
 
       const payload = new FormData();
+      console.log("payload",payload)
       payload.append("itemName", form.itemName);
       payload.append("subCategory", form.subCategory);
       payload.append("description", form.description);
@@ -177,7 +180,6 @@ export default function CocktailCreate() {
         navigate(`/admin/cocktail-edit?itemId=${createdItemId}`);
         return;
       }
-
       navigate("/admin/cocktail-management");
     } catch (submitError) {
       console.error(submitError);
