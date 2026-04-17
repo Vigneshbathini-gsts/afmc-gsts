@@ -268,10 +268,10 @@ export default function PriceUpdate() {
   }, [showScanner]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-rose-50 to-white relative p-6 md:p-10 overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-afmc-bg via-white to-afmc-bg2 relative p-6 md:p-10 overflow-hidden">
       {/* Background Blobs */}
-      <div className="absolute top-20 left-20 w-72 h-72 bg-[#d70652]/10 rounded-full blur-3xl"></div>
-      <div className="absolute bottom-20 right-20 w-80 h-80 bg-[#ff025e]/10 rounded-full blur-3xl"></div>
+      <div className="absolute top-20 left-20 w-72 h-72 bg-afmc-maroon/10 rounded-full blur-3xl"></div>
+      <div className="absolute bottom-20 right-20 w-80 h-80 bg-afmc-maroon2/10 rounded-full blur-3xl"></div>
 
       <div className="relative max-w-3xl mx-auto">
         {/* Header */}
@@ -288,7 +288,7 @@ export default function PriceUpdate() {
               Barcode
             </label>
             <div className="flex gap-3">
-              <div className="flex items-center w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 shadow-sm focus-within:ring-2 focus-within:ring-[#d70652]">
+              <div className="flex items-center w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 shadow-sm focus-within:ring-2 focus-within:ring-afmc-maroon">
                 <FaBarcode className="text-gray-400 mr-3" />
                 <input
                   type="text"
@@ -305,7 +305,7 @@ export default function PriceUpdate() {
               <button
                 type="button"
                 onClick={startScanner}
-                className="px-5 rounded-2xl bg-[#d70652] hover:bg-[#b00543] text-white shadow-md transition flex items-center gap-2"
+                className="px-5 rounded-2xl bg-afmc-maroon hover:bg-afmc-maroon2 text-white shadow-md transition flex items-center gap-2"
               >
                 <FaCamera />
                 <span className="hidden sm:inline">Scan</span>
@@ -336,7 +336,7 @@ export default function PriceUpdate() {
             <label className="block text-sm font-semibold text-gray-700 mb-2">
               Unit Price
             </label>
-            <div className="flex items-center rounded-2xl border border-gray-200 bg-white px-4 py-3 shadow-sm focus-within:ring-2 focus-within:ring-[#d70652]">
+            <div className="flex items-center rounded-2xl border border-gray-200 bg-white px-4 py-3 shadow-sm focus-within:ring-2 focus-within:ring-afmc-maroon">
               <FaRupeeSign className="text-gray-400 mr-3" />
               <input
                 type="number"
@@ -374,7 +374,7 @@ export default function PriceUpdate() {
               type="button"
               onClick={handleSave}
               disabled={loading || fetchingItem}
-              className="flex-1 bg-[#d70652] hover:bg-[#b00543] text-white font-semibold py-3 rounded-2xl shadow-md transition flex items-center justify-center gap-2 disabled:opacity-70"
+              className="flex-1 bg-afmc-maroon hover:bg-afmc-maroon2 text-white font-semibold py-3 rounded-2xl shadow-md transition flex items-center justify-center gap-2 disabled:opacity-70"
             >
               <FaSave />
               {loading ? "Saving..." : "Save"}
@@ -413,7 +413,7 @@ export default function PriceUpdate() {
             </div>
 
             {/* Scanner Frame */}
-            <div className="relative rounded-3xl overflow-hidden border-4 border-[#d70652]/20 shadow-lg bg-black">
+            <div className="relative rounded-3xl overflow-hidden border-4 border-afmc-maroon/20 shadow-lg bg-black">
               <div
                 id="reader"
                 className="w-full min-h-[320px] md:min-h-[380px]"
@@ -424,7 +424,7 @@ export default function PriceUpdate() {
                 <div className="absolute inset-6 border-2 border-white/70 rounded-2xl"></div>
 
                 {!scanSuccess && (
-                  <div className="absolute left-6 right-6 top-10 h-1 bg-[#ff025e] rounded-full shadow-lg animate-pulse"></div>
+                  <div className="absolute left-6 right-6 top-10 h-1 bg-afmc-maroon2 rounded-full shadow-lg animate-pulse"></div>
                 )}
 
                 {scanSuccess && (

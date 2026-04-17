@@ -7,15 +7,15 @@ export default function UserLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="h-screen overflow-hidden bg-afmc-bg">
       <UserSidebar
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
       />
 
-      <div className="flex flex-col min-h-screen">
+      <div className="flex flex-col h-full min-h-0">
         <UserNavbar onMenuClick={() => setSidebarOpen(true)} />
-        <main className="p-4 md:p-6">
+        <main className="flex-1 min-h-0 overflow-y-auto p-4 md:p-6">
           <Outlet />
         </main>
       </div>

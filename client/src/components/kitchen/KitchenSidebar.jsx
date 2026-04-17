@@ -10,8 +10,8 @@ import {
 export default function KitchenSidebar({ isOpen, onClose }) {
   const navLinkClass = ({ isActive }) =>
     `flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${isActive
-      ? "bg-[#d70652] text-white font-semibold shadow-md"
-      : "text-gray-700 hover:bg-pink-100 hover:text-[#d70652]"
+      ? "bg-afmc-maroon text-white font-semibold shadow-md"
+      : "text-gray-700 hover:bg-afmc-maroon/10 hover:text-afmc-maroon"
     }`;
 
   return (
@@ -27,7 +27,7 @@ export default function KitchenSidebar({ isOpen, onClose }) {
           }`}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b">
-          <h2 className="text-xl font-bold text-[#d70652]">Kitchen Panel</h2>
+          <h2 className="text-xl font-bold text-afmc-maroon">Kitchen Panel</h2>
           <button
             onClick={onClose}
             className="text-2xl text-gray-600 hover:text-red-500 transition"

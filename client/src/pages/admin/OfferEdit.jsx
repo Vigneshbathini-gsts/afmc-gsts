@@ -105,9 +105,9 @@ export default function OfferEdit() {
 
   if (loadingOffer) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-pink-50 via-rose-50 to-white flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-afmc-bg via-white to-afmc-bg2 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-pink-200 border-t-[#d70652] rounded-full animate-spin mx-auto mb-4"></div>
+          <div className="w-16 h-16 border-4 border-afmc-maroon/15 border-t-afmc-maroon rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-gray-600">Loading offer details...</p>
         </div>
       </div>
@@ -115,17 +115,17 @@ export default function OfferEdit() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-rose-50 to-white relative p-6 md:p-8">
+    <div className="min-h-screen bg-gradient-to-br from-afmc-bg via-white to-afmc-bg2 relative p-6 md:p-8">
       {/* Background Blobs */}
-      <div className="absolute top-20 left-20 w-72 h-72 bg-[#d70652]/10 rounded-full blur-3xl"></div>
-      <div className="absolute bottom-20 right-20 w-80 h-80 bg-[#ff025e]/10 rounded-full blur-3xl"></div>
+      <div className="absolute top-20 left-20 w-72 h-72 bg-afmc-maroon/10 rounded-full blur-3xl"></div>
+      <div className="absolute bottom-20 right-20 w-80 h-80 bg-afmc-maroon2/10 rounded-full blur-3xl"></div>
 
       <div className="relative max-w-5xl mx-auto">
         {/* Header */}
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5 mb-8">
           <div>
             <h1 className="text-3xl font-bold text-gray-800 flex items-center gap-3">
-              <span className="w-12 h-12 rounded-2xl bg-[#d70652] text-white flex items-center justify-center shadow-lg">
+              <span className="w-12 h-12 rounded-2xl bg-gradient-to-br from-afmc-maroon to-afmc-maroon2 text-white flex items-center justify-center shadow-lg">
                 <FaGift />
               </span>
               Edit  Offer
@@ -169,7 +169,7 @@ export default function OfferEdit() {
           {/* Read-Only Fields Section */}
           <div className="bg-gray-50 rounded-2xl p-4 border border-gray-200">
             <h3 className="text-md font-semibold text-gray-700 mb-4 flex items-center gap-2">
-              <FaBoxOpen className="text-[#d70652]" />
+              <FaBoxOpen className="text-afmc-maroon" />
               Offer Details (Read Only)
             </h3>
 
@@ -257,7 +257,7 @@ export default function OfferEdit() {
           {/* Editable Fields Section */}
           <div className="bg-white rounded-2xl p-4 border border-gray-200">
             <h3 className="text-md font-semibold text-gray-700 mb-4 flex items-center gap-2">
-              <FaCalendarCheck className="text-[#d70652]" />
+              <FaCalendarCheck className="text-afmc-maroon" />
               End Offer
             </h3>
 
@@ -267,7 +267,7 @@ export default function OfferEdit() {
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   End Date <span className="text-gray-400 text-xs">(Optional)</span>
                 </label>
-                <div className="flex items-center rounded-2xl border border-gray-200 bg-white px-4 py-3 shadow-sm focus-within:ring-2 focus-within:ring-[#d70652]">
+                <div className="flex items-center rounded-2xl border border-gray-200 bg-white px-4 py-3 shadow-sm focus-within:ring-2 focus-within:ring-afmc-maroon">
                   <FaCalendarCheck className="text-gray-400 mr-3" />
                   <input
                     type="date"
@@ -292,7 +292,7 @@ export default function OfferEdit() {
               type="button"
               onClick={handleUpdate}
               disabled={saving}
-              className="flex-1 bg-[#d70652] hover:bg-[#b00543] text-white font-semibold py-3 rounded-2xl shadow-md transition flex items-center justify-center gap-2 disabled:opacity-50"
+              className="flex-1 bg-afmc-maroon hover:bg-afmc-maroon2 text-white font-semibold py-3 rounded-2xl shadow-md transition flex items-center justify-center gap-2 disabled:opacity-50"
             >
               <FaSave />
               {saving ? "Deactivating..." : "Deactivate Offer"}

@@ -10,8 +10,8 @@ import {
 export default function AttendantSidebar({ isOpen, onClose }) {
     const navLinkClass = ({ isActive }) =>
         `flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${isActive
-            ? "bg-[#d70652] text-white font-semibold shadow-md"
-            : "text-gray-700 hover:bg-pink-100 hover:text-[#d70652]"
+            ? "bg-afmc-maroon text-afmc-gold font-semibold shadow-md"
+            : "text-gray-700 hover:bg-afmc-maroon/10 hover:text-afmc-maroon"
         }`;
 
     return (
@@ -26,8 +26,9 @@ export default function AttendantSidebar({ isOpen, onClose }) {
                 className={`fixed top-0 left-0 h-screen w-72 bg-white shadow-2xl z-50 transform transition-transform duration-300 ${isOpen ? "translate-x-0" : "-translate-x-full"
                     }`}
             >
+                <div className="h-1 w-full bg-gradient-to-r from-afmc-maroon via-afmc-gold to-afmc-maroon2" />
                 <div className="flex items-center justify-between px-5 py-4 border-b">
-                    <h2 className="text-xl font-bold text-[#d70652]">Order Attendant</h2>
+                    <h2 className="text-xl font-bold text-afmc-maroon">Order Attendant</h2>
                     <button
                         onClick={onClose}
                         className="text-2xl text-gray-600 hover:text-red-500 transition"

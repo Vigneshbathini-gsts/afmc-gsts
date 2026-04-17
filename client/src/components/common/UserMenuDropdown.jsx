@@ -16,18 +16,18 @@ export default function UserMenuDropdown({ username }) {
   const navigate = useNavigate();
   const { user, clearUser } = useAuth();
 
-  const dropdownRef = useRef(null); // ✅ FIXED
+  const dropdownRef = useRef(null);
 
   const displayName = username || user?.username || "User";
 
-  // ✅ Logout
+  // Logout
   const handleLogout = () => {
     localStorage.removeItem("token");
     clearUser();
     navigate("/login");
   };
 
-  // ✅ Close dropdown on outside click
+  // Close dropdown on outside click
   useEffect(() => {
     const handleOutsideClick = (event) => {
       if (
@@ -48,9 +48,9 @@ export default function UserMenuDropdown({ username }) {
       {/* User Button */}
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded-xl transition"
+        className="flex items-center gap-2 bg-gray-100 hover:bg-afmc-maroon/10 px-4 py-2 rounded-xl transition"
       >
-        <FaUserCircle className="text-xl text-[#d70652]" />
+        <FaUserCircle className="text-xl text-afmc-maroon" />
         <span className="font-medium text-gray-800">
           {displayName}
         </span>
@@ -65,17 +65,17 @@ export default function UserMenuDropdown({ username }) {
               setPasswordModalOpen(true);
               setOpen(false);
             }}
-            className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-pink-50 text-gray-700"
+            className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-afmc-maroon/5 text-gray-700"
           >
-            <FaKey className="text-[#d70652]" />
+            <FaKey className="text-afmc-maroon" />
             Change Password
           </button>
 
           <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-red-50 text-red-600"
+            className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-afmc-maroon/5 text-gray-700"
           >
-            <FaSignOutAlt />
+            <FaSignOutAlt className="text-afmc-maroon" />
             Sign Out
           </button>
         </div>

@@ -16,7 +16,6 @@ export default function OutletOrders({ kitchenType = "Bar" }) {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
-console.log("Rendering OutletOrders with kitchenType:", kitchenType);
 
     const navigate = useNavigate();
     const rowsPerPage = 8;
@@ -24,11 +23,11 @@ console.log("Rendering OutletOrders with kitchenType:", kitchenType);
     const isKitchen = kitchenType === "Kitchen";
     const title = isKitchen ? "Kitchen Orders" : "Bar Orders";
     const description = isKitchen ? "View and manage food-related orders" : "View and manage liquor-related orders";
-    const gradientFrom = isKitchen ? "from-green-600" : "from-pink-600";
-    const gradientVia = isKitchen ? "via-teal-500" : "via-rose-500";
-    const gradientTo = isKitchen ? "to-emerald-400" : "to-orange-400";
-    const hoverBg = isKitchen ? "hover:bg-green-50/30" : "hover:bg-pink-50/30";
-    const headerBg = isKitchen ? "from-gray-50 to-green-50" : "from-gray-50 to-pink-50";
+    const gradientFrom = "from-afmc-maroon";
+    const gradientVia = "via-afmc-maroon2";
+    const gradientTo = "to-afmc-gold";
+    const hoverBg = "hover:bg-afmc-maroon/5";
+    const headerBg = "from-gray-50 to-afmc-bg2";
     const icon = isKitchen ? <FaUtensils className="text-2xl" /> : <FaCocktail className="text-2xl" />;
 
     const fetchOrders = useCallback(async () => {

@@ -576,19 +576,19 @@ export default function Inventory() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-rose-50 to-white relative">
-      <div className="absolute top-16 left-12 w-72 h-72 bg-[#d70652]/10 rounded-full blur-3xl"></div>
-      <div className="absolute bottom-20 right-20 w-80 h-80 bg-[#ff025e]/10 rounded-full blur-3xl"></div>
+    <div className="min-h-screen bg-gradient-to-br from-afmc-bg via-white to-afmc-bg2 relative">
+      <div className="absolute top-16 left-12 w-72 h-72 bg-afmc-maroon/10 rounded-full blur-3xl"></div>
+      <div className="absolute bottom-20 right-20 w-80 h-80 bg-afmc-maroon2/10 rounded-full blur-3xl"></div>
 
       <div className="p-8 relative z-10">
         <div className="flex items-center justify-between mb-8">
-          <h1 className="text-2xl font-semibold text-gray-800">
+          <h1 className="text-2xl font-semibold text-afmc-maroon">
             Inventory Management
           </h1>
           <button
             type="button"
             onClick={() => navigate("/admin/dashboard")}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-white shadow hover:shadow-md border border-white/60 text-gray-700"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-white shadow hover:shadow-md border border-afmc-gold/30 text-gray-700 hover:text-afmc-maroon hover:bg-afmc-maroon/5 transition"
           >
             <FaArrowLeft />
             Go To Dashboard
@@ -607,15 +607,14 @@ export default function Inventory() {
                   onClick={() =>
                     setIsCategoryDropdownOpen((prev) => !prev)
                   }
-                  className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-left text-gray-800 focus:border-[#ff025e] focus:ring-2 focus:ring-[#ff025e]/20 flex items-center justify-between"
+                  className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-left text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20 flex items-center justify-between"
                 >
                   <span className="truncate">
                     {selectedCategory?.category_name || "All Categories"}
                   </span>
                   <FaChevronDown
-                    className={`text-gray-400 transition-transform ${
-                      isCategoryDropdownOpen ? "rotate-180" : ""
-                    }`}
+                    className={`text-gray-400 transition-transform ${isCategoryDropdownOpen ? "rotate-180" : ""
+                      }`}
                   />
                 </button>
 
@@ -642,11 +641,10 @@ export default function Inventory() {
                           setCategoryFilter("");
                           setIsCategoryDropdownOpen(false);
                         }}
-                        className={`w-full px-4 py-2.5 text-left text-sm hover:bg-[#ff025e]/5 ${
-                          !categoryId
-                            ? "bg-[#ff025e]/10 font-medium text-[#d70652]"
-                            : "text-gray-700"
-                        }`}
+                        className={`w-full px-4 py-2.5 text-left text-sm hover:bg-afmc-maroon2/5 ${!categoryId
+                          ? "bg-afmc-maroon2/10 font-medium text-afmc-maroon"
+                          : "text-gray-700"
+                          }`}
                       >
                         All Categories
                       </button>
@@ -665,11 +663,10 @@ export default function Inventory() {
                               setCategoryFilter(category.category_name || "");
                               setIsCategoryDropdownOpen(false);
                             }}
-                            className={`w-full px-4 py-2.5 text-left text-sm hover:bg-[#ff025e]/5 ${
-                              String(categoryId) === String(category.category_id)
-                                ? "bg-[#ff025e]/10 font-medium text-[#d70652]"
-                                : "text-gray-700"
-                            }`}
+                            className={`w-full px-4 py-2.5 text-left text-sm hover:bg-afmc-maroon2/5 ${String(categoryId) === String(category.category_id)
+                              ? "bg-afmc-maroon2/10 font-medium text-afmc-maroon"
+                              : "text-gray-700"
+                              }`}
                           >
                             {category.category_name}
                           </button>
@@ -689,15 +686,14 @@ export default function Inventory() {
                 <button
                   type="button"
                   onClick={() => setIsItemDropdownOpen((prev) => !prev)}
-                  className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-left text-gray-800 focus:border-[#ff025e] focus:ring-2 focus:ring-[#ff025e]/20 flex items-center justify-between"
+                  className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-left text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20 flex items-center justify-between"
                 >
                   <span className="truncate">
                     {selectedItem?.item_name || "All Items"}
                   </span>
                   <FaChevronDown
-                    className={`text-gray-400 transition-transform ${
-                      isItemDropdownOpen ? "rotate-180" : ""
-                    }`}
+                    className={`text-gray-400 transition-transform ${isItemDropdownOpen ? "rotate-180" : ""
+                      }`}
                   />
                 </button>
 
@@ -724,9 +720,8 @@ export default function Inventory() {
                           setItemFilter("");
                           setIsItemDropdownOpen(false);
                         }}
-                        className={`w-full px-4 py-2.5 text-left text-sm hover:bg-[#ff025e]/5 ${
-                          !itemCode ? "bg-[#ff025e]/10 font-medium text-[#d70652]" : "text-gray-700"
-                        }`}
+                        className={`w-full px-4 py-2.5 text-left text-sm hover:bg-afmc-maroon2/5 ${!itemCode ? "bg-afmc-maroon2/10 font-medium text-afmc-maroon" : "text-gray-700"
+                          }`}
                       >
                         All Items
                       </button>
@@ -745,11 +740,10 @@ export default function Inventory() {
                               setItemFilter(item.item_name || "");
                               setIsItemDropdownOpen(false);
                             }}
-                            className={`w-full px-4 py-2.5 text-left text-sm hover:bg-[#ff025e]/5 ${
-                              itemCode === item.item_code
-                                ? "bg-[#ff025e]/10 font-medium text-[#d70652]"
-                                : "text-gray-700"
-                            }`}
+                            className={`w-full px-4 py-2.5 text-left text-sm hover:bg-afmc-maroon2/5 ${itemCode === item.item_code
+                              ? "bg-afmc-maroon2/10 font-medium text-afmc-maroon"
+                              : "text-gray-700"
+                              }`}
                           >
                             {item.item_name}
                           </button>
@@ -762,9 +756,23 @@ export default function Inventory() {
             </div>
 
             <div className="flex flex-col gap-3">
+
+              {/* 🔼 Move this block to TOP (no style change) */}
+              <button
+                type="button"
+                onClick={openAddModal}
+                className="w-full lg:w-auto px-5 py-3 rounded-2xl border border-afmc-maroon text-afmc-maroon font-semibold flex items-center gap-2 hover:bg-afmc-maroon/5 transition"
+              >
+                <FaPlus />
+                Add New Item
+              </button>
+
+              {/* Existing Search Label */}
               <label className="block text-sm font-medium text-gray-700">
                 Search
               </label>
+
+              {/* Existing Search Input + Button */}
               <div className="flex items-center gap-3">
                 <div className="flex-1 flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3">
                   <FaSearch className="text-gray-400" />
@@ -776,6 +784,7 @@ export default function Inventory() {
                     className="w-full bg-transparent outline-none text-gray-800 placeholder:text-gray-400"
                   />
                 </div>
+
                 <button
                   type="button"
                   onClick={() => {
@@ -788,14 +797,7 @@ export default function Inventory() {
                   Search
                 </button>
               </div>
-              <button
-                type="button"
-                onClick={openAddModal}
-                className="w-full lg:w-auto px-5 py-3 rounded-2xl border border-[#ff025e] text-[#ff025e] font-semibold flex items-center gap-2"
-              >
-                <FaPlus />
-                Add New Item
-              </button>
+
             </div>
           </div>
 
@@ -837,7 +839,7 @@ export default function Inventory() {
                           <button
                             type="button"
                             onClick={() => openStockModal(row)}
-                            className="inline-flex items-center justify-center w-9 h-9 rounded-full border border-gray-200 text-[#d70652] hover:bg-[#d70652]/10"
+                            className="inline-flex items-center justify-center w-9 h-9 rounded-full border border-gray-200 text-afmc-maroon hover:bg-afmc-maroon/10"
                             title="Add stock"
                           >
                             <FaPen />
@@ -847,7 +849,7 @@ export default function Inventory() {
                           <button
                             type="button"
                             onClick={() => openImageModal(row)}
-                            className="inline-flex items-center justify-center w-9 h-9 rounded-full border border-gray-200 text-[#d70652] hover:bg-[#d70652]/10"
+                            className="inline-flex items-center justify-center w-9 h-9 rounded-full border border-gray-200 text-afmc-maroon hover:bg-afmc-maroon/10"
                             title="Update image"
                           >
                             <FaPen />
@@ -887,7 +889,7 @@ export default function Inventory() {
                   type="button"
                   onClick={handleAddStock}
                   disabled={stockSaving || stockRows.length === 0}
-                  className="px-6 py-2.5 rounded-full bg-green-600 text-white font-semibold disabled:opacity-70"
+                  className="px-6 py-2.5 rounded-full bg-afmc-maroon text-white font-semibold shadow-afmc hover:bg-afmc-maroon2 focus:outline-none focus:ring-2 focus:ring-afmc-gold/50 disabled:opacity-70"
                 >
                   {stockSaving ? "Saving..." : "Add"}
                 </button>
@@ -1052,7 +1054,7 @@ export default function Inventory() {
                 <button
                   type="button"
                   onClick={handleStageStock}
-                  className="inline-flex items-center gap-2 rounded-full bg-green-600 px-5 py-2.5 text-white font-semibold"
+                  className="inline-flex items-center gap-2 rounded-full bg-afmc-maroon px-5 py-2.5 text-white font-semibold shadow-afmc hover:bg-afmc-maroon2 focus:outline-none focus:ring-2 focus:ring-afmc-gold/50"
                 >
                   <FaPlus />
                   Add Stock
@@ -1180,15 +1182,14 @@ export default function Inventory() {
                   <button
                     type="button"
                     onClick={() => setIsAddCategoryDropdownOpen((prev) => !prev)}
-                    className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-left text-gray-800 focus:border-[#ff025e] focus:ring-2 focus:ring-[#ff025e]/20 flex items-center justify-between"
+                    className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-left text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20 flex items-center justify-between"
                   >
                     <span className="truncate">
                       {selectedAddCategory?.category_name || "Select Category"}
                     </span>
                     <FaChevronDown
-                      className={`text-gray-400 transition-transform ${
-                        isAddCategoryDropdownOpen ? "rotate-180" : ""
-                      }`}
+                      className={`text-gray-400 transition-transform ${isAddCategoryDropdownOpen ? "rotate-180" : ""
+                        }`}
                     />
                   </button>
 
@@ -1227,11 +1228,10 @@ export default function Inventory() {
                                 setSubCategoryFilter("");
                                 setIsAddCategoryDropdownOpen(false);
                               }}
-                              className={`w-full px-4 py-2.5 text-left text-sm hover:bg-[#ff025e]/5 ${
-                                String(formValues.categoryId) === String(category.category_id)
-                                  ? "bg-[#ff025e]/10 font-medium text-[#d70652]"
-                                  : "text-gray-700"
-                              }`}
+                              className={`w-full px-4 py-2.5 text-left text-sm hover:bg-afmc-maroon2/5 ${String(formValues.categoryId) === String(category.category_id)
+                                ? "bg-afmc-maroon2/10 font-medium text-afmc-maroon"
+                                : "text-gray-700"
+                                }`}
                             >
                               {category.category_name}
                             </button>
@@ -1252,7 +1252,7 @@ export default function Inventory() {
                     type="button"
                     onClick={() => setIsSubCategoryDropdownOpen((prev) => !prev)}
                     disabled={!formValues.categoryId}
-                    className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-left text-gray-800 focus:border-[#ff025e] focus:ring-2 focus:ring-[#ff025e]/20 flex items-center justify-between disabled:cursor-not-allowed disabled:opacity-60"
+                    className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-left text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20 flex items-center justify-between disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <span className="truncate">
                       {selectedAddSubCategory?.sub_category_name ||
@@ -1261,9 +1261,8 @@ export default function Inventory() {
                           : "Select Category First")}
                     </span>
                     <FaChevronDown
-                      className={`text-gray-400 transition-transform ${
-                        isSubCategoryDropdownOpen ? "rotate-180" : ""
-                      }`}
+                      className={`text-gray-400 transition-transform ${isSubCategoryDropdownOpen ? "rotate-180" : ""
+                        }`}
                     />
                   </button>
 
@@ -1300,11 +1299,10 @@ export default function Inventory() {
                                 setSubCategoryFilter(sub.sub_category_name || "");
                                 setIsSubCategoryDropdownOpen(false);
                               }}
-                              className={`w-full px-4 py-2.5 text-left text-sm hover:bg-[#ff025e]/5 ${
-                                String(formValues.subCategory) === String(sub.sub_category_id)
-                                  ? "bg-[#ff025e]/10 font-medium text-[#d70652]"
-                                  : "text-gray-700"
-                              }`}
+                              className={`w-full px-4 py-2.5 text-left text-sm hover:bg-afmc-maroon2/5 ${String(formValues.subCategory) === String(sub.sub_category_id)
+                                ? "bg-afmc-maroon2/10 font-medium text-afmc-maroon"
+                                : "text-gray-700"
+                                }`}
                             >
                               {sub.sub_category_name}
                             </button>
@@ -1401,7 +1399,7 @@ export default function Inventory() {
                 type="button"
                 onClick={handleCreateItem}
                 disabled={saving}
-                className="px-8 py-3 rounded-full bg-green-600 text-white font-semibold disabled:opacity-70"
+                className="px-8 py-3 rounded-full bg-afmc-maroon text-white font-semibold shadow-afmc hover:bg-afmc-maroon2 focus:outline-none focus:ring-2 focus:ring-afmc-gold/50 disabled:opacity-70"
               >
                 {saving ? "Creating..." : "Create"}
               </button>
@@ -1429,7 +1427,7 @@ export default function Inventory() {
                   type="button"
                   onClick={handleUpdateImage}
                   disabled={imageSaving}
-                  className="px-6 py-2.5 rounded-full bg-green-600 text-white font-semibold disabled:opacity-70"
+                  className="px-6 py-2.5 rounded-full bg-afmc-maroon text-white font-semibold shadow-afmc hover:bg-afmc-maroon2 focus:outline-none focus:ring-2 focus:ring-afmc-gold/50 disabled:opacity-70"
                 >
                   {imageSaving ? "Saving..." : "Update"}
                 </button>

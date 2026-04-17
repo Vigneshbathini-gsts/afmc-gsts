@@ -139,17 +139,17 @@ export default function Offers() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-rose-50 to-white relative p-6 md:p-8">
+    <div className="min-h-screen bg-gradient-to-br from-afmc-bg via-white to-afmc-bg2 relative p-6 md:p-8">
       {/* Background Blobs */}
-      <div className="absolute top-20 left-20 w-72 h-72 bg-[#d70652]/10 rounded-full blur-3xl"></div>
-      <div className="absolute bottom-20 right-20 w-80 h-80 bg-[#ff025e]/10 rounded-full blur-3xl"></div>
+      <div className="absolute top-20 left-20 w-72 h-72 bg-afmc-maroon/10 rounded-full blur-3xl"></div>
+      <div className="absolute bottom-20 right-20 w-80 h-80 bg-afmc-maroon2/10 rounded-full blur-3xl"></div>
 
       <div className="relative max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5 mb-8">
           <div>
             <h1 className="text-3xl font-bold text-gray-800 flex items-center gap-3">
-              <span className="w-12 h-12 rounded-2xl bg-[#d70652] text-white flex items-center justify-center shadow-lg">
+              <span className="w-12 h-12 rounded-2xl bg-gradient-to-br from-afmc-maroon to-afmc-maroon2 text-white flex items-center justify-center shadow-lg">
                 <FaGift />
               </span>
               Offers Management
@@ -170,7 +170,7 @@ export default function Offers() {
 
             <button
               onClick={handleCreate}
-              className="px-5 py-3 rounded-2xl bg-[#d70652] hover:bg-[#b00543] text-white font-semibold shadow-md transition flex items-center gap-2"
+              className="px-5 py-3 rounded-2xl bg-afmc-maroon hover:bg-afmc-maroon2 text-white font-semibold shadow-md transition flex items-center gap-2"
             >
               <FaPlusCircle />
               Create Offer
@@ -183,7 +183,7 @@ export default function Offers() {
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             {/* Search */}
             <div className="w-full lg:max-w-md">
-              <div className="flex items-center rounded-2xl border border-gray-200 bg-white px-4 py-3 shadow-sm focus-within:ring-2 focus-within:ring-[#d70652]">
+              <div className="flex items-center rounded-2xl border border-gray-200 bg-white px-4 py-3 shadow-sm focus-within:ring-2 focus-within:ring-afmc-maroon">
                 <FaSearch className="text-gray-400 mr-3" />
                 <input
                   type="text"
@@ -197,8 +197,8 @@ export default function Offers() {
 
             {/* Summary */}
             <div className="flex flex-wrap gap-3">
-              <div className="px-4 py-3 rounded-2xl bg-pink-50 border border-pink-100 text-sm text-gray-700 shadow-sm">
-                <span className="font-semibold text-[#d70652]">
+              <div className="px-4 py-3 rounded-2xl bg-afmc-maroon/5 border border-afmc-maroon/10 text-sm text-gray-700 shadow-sm">
+                <span className="font-semibold text-afmc-maroon">
                   {offers.length}
                 </span>{" "}
                 Total Offers
@@ -241,12 +241,12 @@ export default function Offers() {
           {/* Loading */}
           {loading ? (
             <div className="p-10 text-center text-gray-500">
-              <div className="w-12 h-12 border-4 border-pink-200 border-t-[#d70652] rounded-full animate-spin mx-auto mb-4"></div>
+              <div className="w-12 h-12 border-4 border-afmc-maroon/15 border-t-afmc-maroon rounded-full animate-spin mx-auto mb-4"></div>
               Loading offers...
             </div>
           ) : filteredOffers.length === 0 ? (
             <div className="p-12 text-center">
-              <div className="w-20 h-20 mx-auto rounded-full bg-pink-100 text-[#d70652] flex items-center justify-center text-3xl mb-4">
+              <div className="w-20 h-20 mx-auto rounded-full bg-afmc-maroon/10 text-afmc-maroon flex items-center justify-center text-3xl mb-4">
                 <FaTag />
               </div>
               <h3 className="text-xl font-semibold text-gray-800">
@@ -261,7 +261,7 @@ export default function Offers() {
               {!search && (
                 <button
                   onClick={handleCreate}
-                  className="mt-6 px-5 py-3 rounded-2xl bg-[#d70652] hover:bg-[#b00543] text-white font-semibold shadow-md transition inline-flex items-center gap-2"
+                  className="mt-6 px-5 py-3 rounded-2xl bg-afmc-maroon hover:bg-afmc-maroon2 text-white font-semibold shadow-md transition inline-flex items-center gap-2"
                 >
                   <FaPlusCircle />
                   Create Offer
@@ -292,7 +292,7 @@ export default function Offers() {
                     {paginatedOffers.map((offer, index) => (
                       <tr
                         key={offer.offer_id}
-                        className={`border-b border-gray-100 hover:bg-pink-50/50 transition ${
+                        className={`border-b border-gray-100 hover:bg-afmc-maroon/5 transition ${
                           index % 2 === 0 ? "bg-white/30" : "bg-white/10"
                         }`}
                       >
@@ -371,7 +371,7 @@ export default function Offers() {
                     {endItem}
                   </span>{" "}
                   of{" "}
-                  <span className="font-semibold text-[#d70652]">
+                  <span className="font-semibold text-afmc-maroon">
                     {filteredOffers.length}
                   </span>{" "}
                   offers
@@ -392,7 +392,7 @@ export default function Offers() {
                       onClick={() => handlePageClick(page)}
                       className={`w-10 h-10 rounded-xl font-semibold transition ${
                         currentPage === page
-                          ? "bg-[#d70652] text-white shadow-md"
+                          ? "bg-afmc-maroon text-white shadow-md"
                           : "bg-white border border-gray-200 text-gray-700 hover:bg-gray-100"
                       }`}
                     >

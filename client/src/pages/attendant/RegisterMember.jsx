@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronsLeft, UserPlus, Phone, User, Users } from "lucide-react";
+import { UserPlus, Phone, User, Users } from "lucide-react";
 import { orderAPI } from "../../services/api";
 
 export default function RegisterMember() {
