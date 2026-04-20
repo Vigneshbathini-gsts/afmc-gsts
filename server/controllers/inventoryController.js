@@ -1,6 +1,7 @@
 const inventoryModel = require("../models/inventoryModel");
 const fs = require("fs");
 const path = require("path");
+const upload = require("../utils/uploadMiddleware");
 
 exports.getInventory = async (req, res) => {
   try {
@@ -183,7 +184,7 @@ exports.updateItemImage = async (req, res) => {
     }
 
     if (existing.file_name) {
-      const filePath = path.join(__dirname, "..", "uploads", existing.file_name);
+      const filePath = path.join(upload.uploadPath, existing.file_name);
       fs.promises.unlink(filePath).catch(() => {});
     }
 

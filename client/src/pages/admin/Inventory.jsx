@@ -7,6 +7,12 @@ const requiresVolume = (acUnit) => String(acUnit || "").trim().toUpperCase() !==
 
 const isValidBarcode = (value) => /^\d{4,32}$/.test(String(value || "").trim());
 
+const toInitCap = (value) =>
+  String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/(^|\s)\S/g, (match) => match.toUpperCase());
+
 const getCurrentUsername = () => {
   try {
     const rawUser =
@@ -38,10 +44,10 @@ export default function Inventory() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showStockModal, setShowStockModal] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
-  const [addCategoryFilter, setAddCategoryFilter] = useState("");
   const [isAddCategoryDropdownOpen, setIsAddCategoryDropdownOpen] = useState(false);
   const [subCategoryFilter, setSubCategoryFilter] = useState("");
   const [isSubCategoryDropdownOpen, setIsSubCategoryDropdownOpen] = useState(false);
+  const [isAcUnitDropdownOpen, setIsAcUnitDropdownOpen] = useState(false);
   const [formValues, setFormValues] = useState({
     itemName: "",
     description: "",
@@ -56,6 +62,8 @@ export default function Inventory() {
   const [stockError, setStockError] = useState("");
   const [imageSaving, setImageSaving] = useState(false);
   const [imageError, setImageError] = useState("");
+  const [imagePreviewUrl, setImagePreviewUrl] = useState("");
+  const [imageCacheBusters, setImageCacheBusters] = useState({});
   const [imageForm, setImageForm] = useState({
     itemCode: "",
     itemName: "",
@@ -81,6 +89,7 @@ export default function Inventory() {
   const itemDropdownRef = useRef(null);
   const addCategoryDropdownRef = useRef(null);
   const subCategoryDropdownRef = useRef(null);
+  const acUnitDropdownRef = useRef(null);
   const searchRef = useRef("");
 
   const fetchCategories = async () => {
@@ -203,6 +212,13 @@ export default function Inventory() {
       ) {
         setIsSubCategoryDropdownOpen(false);
       }
+
+      if (
+        acUnitDropdownRef.current &&
+        !acUnitDropdownRef.current.contains(event.target)
+      ) {
+        setIsAcUnitDropdownOpen(false);
+      }
     };
 
     document.addEventListener("mousedown", handleClickOutside);
@@ -251,14 +267,7 @@ export default function Inventory() {
     [items, itemCode]
   );
 
-  const filteredAddCategories = useMemo(() => {
-    const query = addCategoryFilter.trim().toLowerCase();
-    if (!query) return cleanedCategories;
-
-    return cleanedCategories.filter((category) =>
-      String(category.category_name || "").toLowerCase().includes(query)
-    );
-  }, [addCategoryFilter, cleanedCategories]);
+  const filteredAddCategories = useMemo(() => cleanedCategories, [cleanedCategories]);
 
   const filteredAddSubCategories = useMemo(() => {
     const query = subCategoryFilter.trim().toLowerCase();
@@ -288,6 +297,8 @@ export default function Inventory() {
     [formValues.subCategory, subCategories]
   );
 
+  const acUnitOptions = useMemo(() => ["Nos", "Pegs", "Glass", "Mug", "Can"], []);
+
   const formatDate = (date) => {
     const d = date instanceof Date ? date : new Date(date);
     const mm = String(d.getMonth() + 1).padStart(2, "0");
@@ -313,10 +324,10 @@ export default function Inventory() {
       prepCharges: "N",
       image: null,
     });
-    setAddCategoryFilter("");
     setIsAddCategoryDropdownOpen(false);
     setSubCategoryFilter("");
     setIsSubCategoryDropdownOpen(false);
+    setIsAcUnitDropdownOpen(false);
     setShowAddModal(true);
   };
 
@@ -406,6 +417,7 @@ export default function Inventory() {
 
   const openImageModal = (row) => {
     setImageError("");
+    setImagePreviewUrl("");
     setImageForm({
       itemCode: row.item_code,
       itemName: row.item_name,
@@ -557,8 +569,26 @@ export default function Inventory() {
     try {
       const formData = new FormData();
       formData.append("image", imageForm.image);
-      await inventoryAPI.updateImage(imageForm.itemCode, formData);
-      setShowImageModal(false);
+      const response = await inventoryAPI.updateImage(imageForm.itemCode, formData);
+      const responseFileName =
+        response?.data?.data?.file_name ||
+        response?.data?.data?.fileName ||
+        response?.data?.data?.filename ||
+        response?.data?.file_name ||
+        response?.data?.fileName ||
+        response?.data?.filename ||
+        "";
+
+      setImageCacheBusters((prev) => ({
+        ...prev,
+        [imageForm.itemCode]: Date.now(),
+      }));
+      setImageForm((prev) => ({
+        ...prev,
+        currentImage: responseFileName || prev.currentImage,
+        image: null,
+      }));
+      setImagePreviewUrl("");
       fetchInventory();
     } catch (err) {
       console.error("Failed to update image:", err);
@@ -568,11 +598,29 @@ export default function Inventory() {
     }
   };
 
+  useEffect(() => {
+    return () => {
+      if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
+    };
+  }, [imagePreviewUrl]);
+
+  const withCacheBuster = (url, cacheBuster) => {
+    if (!url) return "";
+    if (!cacheBuster) return url;
+    return `${url}${url.includes("?") ? "&" : "?"}v=${cacheBuster}`;
+  };
+
   const getImageUrl = (fileName) => {
     if (!fileName) return "";
+    const raw = String(fileName).trim();
+    if (!raw) return "";
+    if (/^https?:\/\//i.test(raw)) return raw;
     const baseUrl =
       process.env.REACT_APP_API_URL || "http://localhost:5000/api";
-    return `${baseUrl.replace(/\/api\/?$/, "")}/uploads/${fileName}`;
+    const cleanBase = baseUrl.replace(/\/api\/?$/, "");
+    const normalizedName = raw.split(/[\\/]/).pop();
+    const encodedName = encodeURIComponent(normalizedName);
+    return `${cleanBase}/uploads/${encodedName}`;
   };
 
   return (
@@ -580,8 +628,8 @@ export default function Inventory() {
       <div className="absolute top-16 left-12 w-72 h-72 bg-afmc-maroon/10 rounded-full blur-3xl"></div>
       <div className="absolute bottom-20 right-20 w-80 h-80 bg-afmc-maroon2/10 rounded-full blur-3xl"></div>
 
-      <div className="p-8 relative z-10">
-        <div className="flex items-center justify-between mb-8">
+      <div className="p-6 md:p-8 relative z-10">
+        <div className="flex items-center justify-between mb-6 md:mb-8">
           <h1 className="text-2xl font-semibold text-afmc-maroon">
             Inventory Management
           </h1>
@@ -595,8 +643,9 @@ export default function Inventory() {
           </button>
         </div>
 
-        <div className="bg-white/80 border border-white/60 rounded-3xl shadow-xl backdrop-blur-sm p-6">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-end">
+        <div className="bg-white/80 border border-afmc-gold/15 rounded-3xl shadow-xl backdrop-blur-sm p-5 md:p-6">
+          <div className="mb-5 md:mb-6 h-1 w-full rounded-full bg-gradient-to-r from-afmc-maroon via-afmc-gold to-afmc-maroon2" />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 md:gap-6 items-end">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Category Name
@@ -791,7 +840,7 @@ export default function Inventory() {
                     setSearch(inventorySearchInput.trim());
                     fetchInventory({ search: inventorySearchInput.trim() });
                   }}
-                  className="px-5 py-3 rounded-2xl bg-[#5b5b5b] text-white font-semibold flex items-center gap-2 shadow hover:shadow-md"
+                  className="px-5 py-3 rounded-2xl bg-afmc-maroon text-white font-semibold flex items-center gap-2 shadow-afmc hover:bg-afmc-maroon2 focus:outline-none focus:ring-2 focus:ring-afmc-gold/50 transition"
                 >
                   <FaSearch />
                   Search
@@ -801,16 +850,16 @@ export default function Inventory() {
             </div>
           </div>
 
-          <div className="mt-8">
+          <div className="mt-6 md:mt-8">
             {error && (
               <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
                 {error}
               </div>
             )}
 
-            <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
+            <div className="overflow-hidden rounded-2xl border border-afmc-gold/25 bg-white">
               <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-gray-600">
+                <thead className="bg-afmc-maroon/5 text-afmc-maroon">
                   <tr>
                     <th className="px-4 py-3 text-left font-medium">Add Stock</th>
                     <th className="px-4 py-3 text-left font-medium">Update Image</th>
@@ -834,7 +883,10 @@ export default function Inventory() {
                     </tr>
                   ) : (
                     inventory.map((row) => (
-                      <tr key={row.item_id} className="border-t border-gray-100">
+                      <tr
+                        key={row.item_id}
+                        className="border-t border-gray-100 hover:bg-afmc-gold/10 transition-colors"
+                      >
                         <td className="px-4 py-3">
                           <button
                             type="button"
@@ -1195,19 +1247,6 @@ export default function Inventory() {
 
                   {isAddCategoryDropdownOpen && (
                     <div className="absolute z-30 mt-2 w-full rounded-2xl border border-gray-200 bg-white shadow-2xl overflow-hidden">
-                      <div className="border-b border-gray-100 p-3">
-                        <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2">
-                          <FaSearch className="text-gray-400" />
-                          <input
-                            type="text"
-                            value={addCategoryFilter}
-                            onChange={(e) => setAddCategoryFilter(e.target.value)}
-                            placeholder="Search category name"
-                            className="w-full bg-transparent text-sm text-gray-800 outline-none placeholder:text-gray-400"
-                          />
-                        </div>
-                      </div>
-
                       <div className="max-h-72 overflow-y-auto py-2">
                         {filteredAddCategories.length === 0 ? (
                           <div className="px-4 py-3 text-sm text-gray-500">
@@ -1224,7 +1263,6 @@ export default function Inventory() {
                                   categoryId: category.category_id,
                                   subCategory: "",
                                 }));
-                                setAddCategoryFilter(category.category_name || "");
                                 setSubCategoryFilter("");
                                 setIsAddCategoryDropdownOpen(false);
                               }}
@@ -1255,7 +1293,7 @@ export default function Inventory() {
                     className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-left text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20 flex items-center justify-between disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <span className="truncate">
-                      {selectedAddSubCategory?.sub_category_name ||
+                      {toInitCap(selectedAddSubCategory?.sub_category_name) ||
                         (formValues.categoryId
                           ? "Select Sub Category"
                           : "Select Category First")}
@@ -1269,15 +1307,27 @@ export default function Inventory() {
                   {isSubCategoryDropdownOpen && formValues.categoryId && (
                     <div className="absolute z-30 mt-2 w-full rounded-2xl border border-gray-200 bg-white shadow-2xl overflow-hidden">
                       <div className="border-b border-gray-100 p-3">
-                        <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2">
-                          <FaSearch className="text-gray-400" />
-                          <input
-                            type="text"
-                            value={subCategoryFilter}
-                            onChange={(e) => setSubCategoryFilter(e.target.value)}
-                            placeholder="Search sub category"
-                            className="w-full bg-transparent text-sm text-gray-800 outline-none placeholder:text-gray-400"
-                          />
+                        <div className="flex items-center gap-2">
+                          <div className="flex flex-1 items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2">
+                            <FaSearch className="text-gray-400" />
+                            <input
+                              type="text"
+                              value={subCategoryFilter}
+                              onChange={(e) => setSubCategoryFilter(e.target.value)}
+                              placeholder="Search sub category"
+                              className="w-full bg-transparent text-sm text-gray-800 outline-none placeholder:text-gray-400"
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFormValues((prev) => ({ ...prev, subCategory: "" }));
+                              setSubCategoryFilter("");
+                            }}
+                            className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                          >
+                            Reset
+                          </button>
                         </div>
                       </div>
 
@@ -1296,7 +1346,7 @@ export default function Inventory() {
                                   ...prev,
                                   subCategory: sub.sub_category_id,
                                 }));
-                                setSubCategoryFilter(sub.sub_category_name || "");
+                                setSubCategoryFilter(toInitCap(sub.sub_category_name) || "");
                                 setIsSubCategoryDropdownOpen(false);
                               }}
                               className={`w-full px-4 py-2.5 text-left text-sm hover:bg-afmc-maroon2/5 ${String(formValues.subCategory) === String(sub.sub_category_id)
@@ -1304,7 +1354,7 @@ export default function Inventory() {
                                 : "text-gray-700"
                                 }`}
                             >
-                              {sub.sub_category_name}
+                              {toInitCap(sub.sub_category_name)}
                             </button>
                           ))
                         )}
@@ -1335,19 +1385,42 @@ export default function Inventory() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Accounting Unit
                 </label>
-                <select
-                  value={formValues.acUnit}
-                  onChange={(e) =>
-                    setFormValues((prev) => ({ ...prev, acUnit: e.target.value }))
-                  }
-                  className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-800"
-                >
-                  <option value="Nos">Nos</option>
-                  <option value="Pegs">Pegs</option>
-                  <option value="Glass">Glass</option>
-                  <option value="Mug">Mug</option>
-                  <option value="Can">Can</option>
-                </select>
+                <div className="relative" ref={acUnitDropdownRef}>
+                  <button
+                    type="button"
+                    onClick={() => setIsAcUnitDropdownOpen((prev) => !prev)}
+                    className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-left text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20 flex items-center justify-between"
+                  >
+                    <span className="truncate">{formValues.acUnit || "Select Unit"}</span>
+                    <FaChevronDown
+                      className={`text-gray-400 transition-transform ${isAcUnitDropdownOpen ? "rotate-180" : ""
+                        }`}
+                    />
+                  </button>
+
+                  {isAcUnitDropdownOpen && (
+                    <div className="absolute z-30 mt-2 w-full rounded-2xl border border-gray-200 bg-white shadow-2xl overflow-hidden">
+                      <div className="max-h-72 overflow-y-auto py-2">
+                        {acUnitOptions.map((unit) => (
+                          <button
+                            key={unit}
+                            type="button"
+                            onClick={() => {
+                              setFormValues((prev) => ({ ...prev, acUnit: unit }));
+                              setIsAcUnitDropdownOpen(false);
+                            }}
+                            className={`w-full px-4 py-2.5 text-left text-sm hover:bg-afmc-maroon2/5 ${String(formValues.acUnit).toLowerCase() === String(unit).toLowerCase()
+                              ? "bg-afmc-maroon2/10 font-medium text-afmc-maroon"
+                              : "text-gray-700"
+                              }`}
+                          >
+                            {unit}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="md:col-span-2 flex items-center gap-6">
@@ -1453,9 +1526,18 @@ export default function Inventory() {
                   Current Image
                 </label>
                 <div className="w-full rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-4 py-3 text-gray-700 flex items-center justify-center min-h-[140px]">
-                  {imageForm.currentImage ? (
+                  {imagePreviewUrl ? (
                     <img
-                      src={getImageUrl(imageForm.currentImage)}
+                      src={imagePreviewUrl}
+                      alt={imageForm.itemName || "Selected image preview"}
+                      className="max-h-40 object-contain"
+                    />
+                  ) : imageForm.currentImage ? (
+                    <img
+                      src={withCacheBuster(
+                        getImageUrl(imageForm.currentImage),
+                        imageCacheBusters[imageForm.itemCode]
+                      )}
                       alt={imageForm.itemName || "Item image"}
                       className="max-h-40 object-contain"
                     />
@@ -1485,10 +1567,15 @@ export default function Inventory() {
                   type="file"
                   accept="image/*"
                   onChange={(e) =>
-                    setImageForm((prev) => ({
-                      ...prev,
-                      image: e.target.files?.[0] || null,
-                    }))
+                    setImageForm((prev) => {
+                      const file = e.target.files?.[0] || null;
+                      if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
+                      setImagePreviewUrl(file ? URL.createObjectURL(file) : "");
+                      return {
+                        ...prev,
+                        image: file,
+                      };
+                    })
                   }
                   className="w-full rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-4 py-3 text-gray-700"
                 />
