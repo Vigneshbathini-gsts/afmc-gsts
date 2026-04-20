@@ -1,227 +1,331 @@
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import {
-    FaTimesCircle,
-    FaSpinner,
-    FaSearch,
-    FaChevronLeft,
-    FaChevronRight,
-    FaUtensils,
-    FaCocktail,
+  FaTimesCircle,
+  FaSpinner,
+  FaSearch,
+  FaChevronLeft,
+  FaChevronRight,
+  FaUtensils,
+  FaCocktail,
 } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { barOrdersAPI } from "../../services/api";
 
+/* THEME */
+const MAROON = "#6B1A4F";
+const MAROON2 = "#7B2252";
+const GOLD = "#DAA520";
+
 export default function OutletOrders({ kitchenType = "Bar" }) {
-    const [orders, setOrders] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [searchTerm, setSearchTerm] = useState("");
-    const [currentPage, setCurrentPage] = useState(1);
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
 
-    const navigate = useNavigate();
-    const rowsPerPage = 8;
+  const navigate = useNavigate();
+  const rowsPerPage = 8;
 
-    const isKitchen = kitchenType === "Kitchen";
-    const title = isKitchen ? "Kitchen Orders" : "Bar Orders";
-    const description = isKitchen ? "View and manage food-related orders" : "View and manage liquor-related orders";
-    const gradientFrom = "from-afmc-maroon";
-    const gradientVia = "via-afmc-maroon2";
-    const gradientTo = "to-afmc-gold";
-    const hoverBg = "hover:bg-afmc-maroon/5";
-    const headerBg = "from-gray-50 to-afmc-bg2";
-    const icon = isKitchen ? <FaUtensils className="text-2xl" /> : <FaCocktail className="text-2xl" />;
+  const isKitchen = kitchenType === "Kitchen";
+  const title = isKitchen ? "Kitchen Orders" : "Bar Orders";
+  const description = isKitchen
+    ? "View and manage food-related orders"
+    : "View and manage liquor-related orders";
 
-    const fetchOrders = useCallback(async () => {
-        try {
-            setLoading(true);
-            const res = await barOrdersAPI.getOrders(kitchenType);
-            console.log(`Fetched ${kitchenType} orders:`, res.data);
-            setOrders(res.data || []);
-        } catch (error) {
-            console.error(`Error fetching ${kitchenType.toLowerCase()} orders:`, error);
-        } finally {
-            setLoading(false);
-        }
-    }, [kitchenType]);
+  const icon = isKitchen ? <FaUtensils /> : <FaCocktail />;
 
-    useEffect(() => {
-        fetchOrders();
-    }, [kitchenType, fetchOrders]);
+  /* FETCH */
+  const fetchOrders = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await barOrdersAPI.getOrders(kitchenType);
+      setOrders(res.data || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, [kitchenType]);
 
-    const handleOrderClick = async (order) => {
-        try {
-            if (order.CAN_NAVIGATE !== "Y") return;
+  useEffect(() => {
+    fetchOrders();
+  }, [fetchOrders]);
 
-            let updatedOrder = { ...order };
+  /* FILTER */
+  const filteredOrders = useMemo(() => {
+    return orders.filter((o) => {
+      const search = searchTerm.toLowerCase();
+      return (
+        String(o.ORDERNUMBER).toLowerCase().includes(search) ||
+        String(o.FIRST_NAME).toLowerCase().includes(search) ||
+        String(o.STATUS).toLowerCase().includes(search)
+      );
+    });
+  }, [orders, searchTerm]);
 
-            if (order.Status1 === "Received") {
-                await barOrdersAPI.updateStatus({
-                    ORDERNUMBER: order.ORDERNUMBER,
-                    KITCHEN: kitchenType,
-                });
+  /* PAGINATION */
+  const totalPages = Math.ceil(filteredOrders.length / rowsPerPage);
 
-                updatedOrder = {
-                    ...order,
-                    STATUS: "Preparing",
-                    Status1: "Preparing",
-                    COLOR: "2-red",
-                };
-            }
+  const paginatedOrders = useMemo(() => {
+    const start = (currentPage - 1) * rowsPerPage;
+    return filteredOrders.slice(start, start + rowsPerPage);
+  }, [filteredOrders, currentPage]);
 
-            navigate("../order-details", {
-                state: { ...updatedOrder, kitchenType: kitchenType },
-            });
-        } catch (error) {
-            console.error("Error updating order status:", error);
-            alert("Failed to open order details. Please try again.");
-        }
-    };
+  useEffect(() => setCurrentPage(1), [searchTerm]);
 
-    const handleCancelClick = (order) => {
-        if (order.CAN_CANCEL !== "Y") return;
-        alert(`Cancel order ${order.ORDERNUMBER}`);
-    };
+  /* HANDLERS */
+  const handleOrderClick = async (order) => {
+    if (order.CAN_NAVIGATE !== "Y") return;
 
-    const getStatusClasses = (status) => {
-        switch (status) {
-            case "Received": return "bg-yellow-100 text-yellow-700 border border-yellow-300";
-            case "Preparing": return "bg-red-100 text-red-600 border border-red-300";
-            case "Completed": return "bg-green-100 text-green-700 border border-green-300";
-            default: return "bg-gray-100 text-gray-600 border border-gray-300";
-        }
-    };
+    try {
+      let updated = { ...order };
 
-    const filteredOrders = useMemo(() => {
-        return orders.filter((order) => {
-            const orderNo = String(order.ORDERNUMBER || "").toLowerCase();
-            const firstName = String(order.FIRST_NAME || "").toLowerCase();
-            const status = String(order.STATUS || "").toLowerCase();
-            const search = searchTerm.toLowerCase();
-            return orderNo.includes(search) || firstName.includes(search) || status.includes(search);
+      if (order.Status1 === "Received") {
+        await barOrdersAPI.updateStatus({
+          ORDERNUMBER: order.ORDERNUMBER,
+          KITCHEN: kitchenType,
         });
-    }, [orders, searchTerm]);
 
-    const totalPages = Math.ceil(filteredOrders.length / rowsPerPage);
-    const paginatedOrders = useMemo(() => {
-        const startIndex = (currentPage - 1) * rowsPerPage;
-        return filteredOrders.slice(startIndex, startIndex + rowsPerPage);
-    }, [filteredOrders, currentPage]);
+        updated.Status1 = "Preparing";
+        updated.STATUS = "Preparing";
+      }
 
-    useEffect(() => {
-        setCurrentPage(1);
-    }, [searchTerm]);
+      navigate("../order-details", {
+        state: { ...updated, kitchenType },
+      });
+    } catch (err) {
+      alert("Failed to open order");
+    }
+  };
 
-    return (
-        <div className="p-4 md:p-6 space-y-5">
-            <div className={`bg-gradient-to-r ${gradientFrom} ${gradientVia} ${gradientTo} rounded-2xl shadow-md p-4 md:p-5 text-white`}>
-                <div className="flex items-center gap-3">
-                    <div className="bg-white/20 p-3 rounded-xl">{icon}</div>
-                    <div>
-                        <h1 className="text-xl md:text-2xl font-bold">{title}</h1>
-                        <p className="text-white/90 text-xs md:text-sm">{description}</p>
-                    </div>
-                </div>
-            </div>
+  const getStatusStyle = (status) => {
+    switch (status) {
+      case "Received":
+        return {
+          background: "#fff8e6",
+          color: "#b8860b",
+          border: "1px solid #f0d98a",
+        };
+      case "Preparing":
+        return {
+          background: "#fbe9f0",
+          color: MAROON2,
+          border: "1px solid #e3b6c8",
+        };
+      case "Completed":
+        return {
+          background: "#eaf7f0",
+          color: "#1e7e34",
+          border: "1px solid #b7e4c7",
+        };
+      default:
+        return {
+          background: "#f4f4f4",
+          color: "#666",
+        };
+    }
+  };
 
-            <div className="bg-white rounded-3xl shadow-lg border border-gray-100 overflow-hidden">
-                <div className={`px-5 py-4 border-b bg-gradient-to-r ${headerBg} flex flex-col md:flex-row md:items-center md:justify-between gap-3`}>
-                    <div>
-                        <h2 className="text-lg font-bold text-gray-800">Orders List</h2>
-                        <p className="text-sm text-gray-500">Active and completed {kitchenType.toLowerCase()} orders</p>
-                    </div>
-                    <div className="relative w-full md:w-80">
-                        <FaSearch className="absolute top-1/2 left-3 -translate-y-1/2 text-gray-400 text-sm" />
-                        <input
-                            type="text"
-                            placeholder="Search by order no, name, status..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-pink-400 text-sm"
-                        />
-                    </div>
-                </div>
-
-                {loading ? (
-                    <div className="flex items-center justify-center py-16 text-gray-500 gap-3">
-                        <FaSpinner className="animate-spin text-xl" />
-                        <span className="text-base font-medium">Loading orders...</span>
-                    </div>
-                ) : filteredOrders.length === 0 ? (
-                    <div className="py-16 text-center text-gray-500">No {kitchenType.toLowerCase()} orders found.</div>
-                ) : (
-                    <>
-                        <div className="overflow-x-auto">
-                            <table className="min-w-full text-sm">
-                                <thead className="bg-gray-50 text-gray-700 uppercase text-xs tracking-wider">
-                                    <tr>
-
-
-
-
-                                        <th className="px-6 py-4 text-left">Ordernumber</th>
-                                        <th className="px-6 py-4 text-left">Name</th>
-                                        <th className="px-6 py-4 text-left">Status</th>
-                                        <th className="px-6 py-4 text-left">Order Date</th>
-                                        <th className="px-6 py-4 text-left">Handled By Bar</th>
-                                        <th className="px-6 py-4 text-left">Handled By Kitchen</th>
-                                        <th className="px-6 py-4 text-center">Cancel</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {paginatedOrders.map((order, index) => (
-                                        <tr key={order.ORDERNUMBER || index} className={`border-t border-gray-100 ${hoverBg} transition`}>
-                                            <td className="px-6 py-4 font-semibold">
-                                                {order.CAN_NAVIGATE === "Y" ? (
-                                                    <button onClick={() => handleOrderClick(order)} className={`${isKitchen ? "text-green-600 hover:text-green-800" : "text-pink-600 hover:text-pink-800"} hover:underline`}>
-                                                        {order.ORDERNUMBER}
-                                                    </button>
-                                                ) : (
-                                                    <span className="text-gray-400 cursor-not-allowed">{order.ORDERNUMBER}</span>
-                                                )}
-                                            </td>
-                                            <td className="px-6 py-4 text-gray-700">{order.FIRST_NAME || "N/A"}</td>
-                                            <td className="px-6 py-4">
-                                                <span className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${getStatusClasses(order.STATUS)}`}>
-                                                    {order.STATUS}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4 text-gray-600">{order.CREATION_DATE || "N/A"}</td>
-                                            <td className="px-6 py-4 text-gray-600">{order.Handled_by_bar || "N/A"}</td>
-                                            <td className="px-6 py-4 text-gray-600">{order.Handled_by_kitchen || ""}</td>
-                                            <td className="px-6 py-4 text-center">
-                                                <button
-                                                    onClick={() => handleCancelClick(order)}
-                                                    disabled={order.CAN_CANCEL !== "Y"}
-                                                    className={`text-xl transition ${order.CAN_CANCEL === "Y" ? "text-red-500 hover:text-red-700" : "text-gray-300 cursor-not-allowed"}`}
-                                                    title={order.CAN_CANCEL === "Y" ? "Cancel Order" : "Cancel not allowed"}
-                                                >
-                                                    <FaTimesCircle />
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <div className="flex flex-col md:flex-row items-center justify-between gap-3 px-5 py-4 border-t bg-gray-50">
-                            <p className="text-sm text-gray-600">
-                                Showing {(currentPage - 1) * rowsPerPage + 1} to {Math.min(currentPage * rowsPerPage, filteredOrders.length)} of {filteredOrders.length} orders
-                            </p>
-                            <div className="flex items-center gap-2">
-                                <button onClick={() => setCurrentPage((prev) => prev - 1)} disabled={currentPage === 1} className="px-3 py-2 rounded-lg border bg-white text-gray-600 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed">
-                                    <FaChevronLeft />
-                                </button>
-                                <span className={`px-4 py-2 rounded-lg ${isKitchen ? "bg-green-100 text-green-700" : "bg-pink-100 text-pink-700"} font-semibold text-sm`}>
-                                    Page {currentPage} of {totalPages || 1}
-                                </span>
-                                <button onClick={() => setCurrentPage((prev) => prev + 1)} disabled={currentPage === totalPages || totalPages === 0} className="px-3 py-2 rounded-lg border bg-white text-gray-600 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed">
-                                    <FaChevronRight />
-                                </button>
-                            </div>
-                        </div>
-                    </>
-                )}
-            </div>
+  return (
+    <div style={{ padding: 24 }}>
+      
+      {/* HEADER */}
+      <div
+        style={{
+          background: `linear-gradient(135deg, ${MAROON}, ${MAROON2})`,
+          borderRadius: 16,
+          padding: "16px 20px",
+          color: "#fff",
+          marginBottom: 20,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div
+            style={{
+              background: "rgba(255,255,255,0.1)",
+              padding: 10,
+              borderRadius: 10,
+              color: GOLD,
+              fontSize: 18,
+            }}
+          >
+            {icon}
+          </div>
+          <div>
+            <h2 style={{ margin: 0 }}>{title}</h2>
+            <p style={{ margin: 0, fontSize: 12, opacity: 0.8 }}>
+              {description}
+            </p>
+          </div>
         </div>
-    );
+      </div>
+
+      {/* CARD */}
+      <div
+        style={{
+          background: "#fff",
+          borderRadius: 20,
+          boxShadow: "0 8px 30px rgba(107,26,79,0.08)",
+          border: "1px solid rgba(107,26,79,0.1)",
+        }}
+      >
+        {/* TOP BAR */}
+        <div
+          style={{
+            padding: 16,
+            borderBottom: "1px solid #eee",
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 10,
+            flexWrap: "wrap",
+          }}
+        >
+          <div>
+            <h3 style={{ margin: 0 }}>Orders List</h3>
+            <p style={{ fontSize: 12, color: "#777" }}>
+              Active and completed orders
+            </p>
+          </div>
+
+          <div style={{ position: "relative", width: 260 }}>
+            <FaSearch
+              style={{
+                position: "absolute",
+                top: "50%",
+                left: 10,
+                transform: "translateY(-50%)",
+                color: "#aaa",
+              }}
+            />
+            <input
+              placeholder="Search..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "10px 10px 10px 32px",
+                borderRadius: 10,
+                border: "1px solid rgba(107,26,79,0.2)",
+              }}
+            />
+          </div>
+        </div>
+
+        {/* CONTENT */}
+        {loading ? (
+          <div style={{ padding: 40, textAlign: "center" }}>
+            <FaSpinner className="spin" />
+          </div>
+        ) : filteredOrders.length === 0 ? (
+          <div style={{ padding: 40, textAlign: "center" }}>
+            No orders found
+          </div>
+        ) : (
+          <>
+            <table style={{ width: "100%", fontSize: 14 }}>
+              <thead style={{ background: "#fafafa" }}>
+                <tr>
+                  <th style={th}>Order No</th>
+                  <th style={th}>Name</th>
+                  <th style={th}>Status</th>
+                  <th style={th}>Date</th>
+                  <th style={th}>Bar</th>
+                  <th style={th}>Kitchen</th>
+                  <th style={th}>Cancel</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {paginatedOrders.map((o, i) => (
+                  <tr key={i} style={{ borderTop: "1px solid #eee" }}>
+                    <td style={td}>
+                      <span
+                        onClick={() => handleOrderClick(o)}
+                        style={{
+                          color: MAROON,
+                          cursor: "pointer",
+                          fontWeight: 600,
+                        }}
+                      >
+                        {o.ORDERNUMBER}
+                      </span>
+                    </td>
+
+                    <td style={td}>{o.FIRST_NAME}</td>
+
+                    <td style={td}>
+                      <span
+                        style={{
+                          padding: "4px 10px",
+                          borderRadius: 20,
+                          fontSize: 12,
+                          fontWeight: 600,
+                          ...getStatusStyle(o.STATUS),
+                        }}
+                      >
+                        {o.STATUS}
+                      </span>
+                    </td>
+
+                    <td style={td}>{o.CREATION_DATE}</td>
+                    <td style={td}>{o.Handled_by_bar}</td>
+                    <td style={td}>{o.Handled_by_kitchen}</td>
+
+                    <td style={{ ...td, textAlign: "center" }}>
+                      <FaTimesCircle
+                        style={{
+                          color:
+                            o.CAN_CANCEL === "Y" ? "#e74c3c" : "#ccc",
+                          cursor:
+                            o.CAN_CANCEL === "Y"
+                              ? "pointer"
+                              : "not-allowed",
+                        }}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            {/* PAGINATION */}
+            <div
+              style={{
+                padding: 16,
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                borderTop: "1px solid #eee",
+              }}
+            >
+              <span style={{ fontSize: 12 }}>
+                Page {currentPage} of {totalPages || 1}
+              </span>
+
+              <div style={{ display: "flex", gap: 10 }}>
+                <button onClick={() => setCurrentPage((p) => p - 1)}>
+                  <FaChevronLeft />
+                </button>
+
+                <button onClick={() => setCurrentPage((p) => p + 1)}>
+                  <FaChevronRight />
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
 }
+
+/* TABLE STYLES */
+const th = {
+  textAlign: "left",
+  padding: "12px 16px",
+  fontSize: 12,
+  color: "#666",
+};
+
+const td = {
+  padding: "12px 16px",
+};
