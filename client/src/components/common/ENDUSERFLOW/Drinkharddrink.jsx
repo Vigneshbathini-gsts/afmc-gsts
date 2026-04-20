@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { API_BASE_URL } from "../../../services/api";
 
 function Drinkharddrink() {
   const [data, setdata] = useState([]);
@@ -11,7 +12,7 @@ function Drinkharddrink() {
   const fetchdata = async (type) => {
     try {
       const response = await fetch(
-        `http://localhost:5000/api/Drinkhard${type}`
+        `${API_BASE_URL}/Drinkhard${type}`
       );
       const result = await response.json();
       setdata(result.data || []);

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { API_BASE_URL } from "../../../services/api";
 
 function EnduserMocktail() {
   const [data, setdata] = useState([]);
@@ -12,7 +13,7 @@ function EnduserMocktail() {
 
   const fetchdata = async () => {
     try {
-      const response = await fetch("http://localhost:5000/api/fetchmocktail");
+      const response = await fetch(`${API_BASE_URL}/fetchmocktail`);
       const result = await response.json();
       setdata(result.data || []);
     } catch (error) {

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { ChevronsLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { API_BASE_URL } from "../../services/api";
 
 const BASEAPI = "https://afmc.globalsparkteksolutions.com/AFMCIMAGES/";
 
@@ -162,7 +163,7 @@ function EnduserOtherSection() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await fetch("http://localhost:5000/api/menubar");
+        const response = await fetch(`${API_BASE_URL}/menubar`);
         const result = await response.json();
         console.log("1",result.data);
 
@@ -223,7 +224,7 @@ function EnduserMocktailSection() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await fetch("http://localhost:5000/api/fetchmocktail");
+        const response = await fetch(`${API_BASE_URL}/fetchmocktail`);
         const result = await response.json();
         console.log("2",result.data);
         setData(result.data || []);
@@ -278,7 +279,7 @@ function DrinkHardDrinkSection() {
     const fetchData = async () => {
       try {
         const response = await fetch(
-          `http://localhost:5000/api/Drinkhard${category}`
+          `${API_BASE_URL}/Drinkhard${category}`
         );
         const result = await response.json();
         console.log("3",result.data);
@@ -344,7 +345,7 @@ function SnackVegSection() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await fetch("http://localhost:5000/api/Snacksveg");
+        const response = await fetch(`${API_BASE_URL}/Snacksveg`);
         const result = await response.json();
         console.log("4",result.data);
         setData(result.data || []);
@@ -397,7 +398,7 @@ function SnackNonVegSection() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await fetch("http://localhost:5000/api/Snakcnonveg");
+        const response = await fetch(`${API_BASE_URL}/Snakcnonveg`);
         const result = await response.json();
         console.log("5",result.data);
         setData(result.data || []);

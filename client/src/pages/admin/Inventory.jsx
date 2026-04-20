@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { FaArrowLeft, FaChevronDown, FaPlus, FaSearch, FaPen, FaTrash,FaCamera } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import BarcodeScanner from "../../components/common/BarcodeScanner";
-import { inventoryAPI } from "../../services/api";
+import { API_BASE_URL, inventoryAPI } from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
 
 
@@ -602,9 +602,7 @@ const currentLoggedInUser =
 
   const getImageUrl = (fileName) => {
     if (!fileName) return "";
-    const baseUrl =
-      process.env.REACT_APP_API_URL || "http://localhost:5000/api";
-    return `${baseUrl.replace(/\/api\/?$/, "")}/uploads/${fileName}`;
+    return `${API_BASE_URL.replace(/\/api\/?$/, "")}/uploads/${fileName}`;
   };
 
   return (
@@ -1541,3 +1539,4 @@ const currentLoggedInUser =
     </div>
   );
 }
+

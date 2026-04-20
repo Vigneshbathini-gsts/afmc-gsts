@@ -8,6 +8,8 @@ const MySQLSession = require("express-mysql-session");
 dotenv.config();
 
 const app = express();
+const BASE_PATH = `/${(process.env.BASE_PATH || "AFMCMESS").replace(/^\/+|\/+$/g, "")}`;
+const API_BASE_PATH = `${BASE_PATH}/api`;
 
 require("./config/db");
 
@@ -57,10 +59,10 @@ app.use(
   })
 );
 app.use(express.json());
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+app.use(`${BASE_PATH}/uploads`, express.static(path.join(__dirname, "uploads")));
 
-app.get("/", (req, res) => {
-  res.json({ status: "Server is running" });
+app.get(BASE_PATH, (req, res) => {
+  res.json({ status: "Server is running", basePath: BASE_PATH, apiBasePath: API_BASE_PATH });
 });
 
 const authRoutes = require("./routes/authRoutes");
@@ -79,51 +81,51 @@ const cancelledOrdersRoutes = require("./routes/cancelledOrdersRoutes");
 
 
 const Snacksveg = require("./routes/MenuRoutesbeer");
-app.use("/api", Snacksveg);
+app.use(API_BASE_PATH, Snacksveg);
 
 const Stacknonveg = require('./routes/MenuRoutesbeer');
-app.use('/api', Stacknonveg);
+app.use(API_BASE_PATH, Stacknonveg);
 
 const Drinkhardbeer = require('./routes/MenuRoutesbeer');
-app.use('/api', Drinkhardbeer);
+app.use(API_BASE_PATH, Drinkhardbeer);
 
 const Drinkhardbrandy = require('./routes/MenuRoutesbeer');
-app.use('/api', Drinkhardbrandy);
+app.use(API_BASE_PATH, Drinkhardbrandy);
 
 const Drinkhardbreezer = require('./routes/MenuRoutesbeer');
-app.use('/api', Drinkhardbreezer);
+app.use(API_BASE_PATH, Drinkhardbreezer);
 
 const Drinkhardvodka = require('./routes/MenuRoutesbeer');
-app.use('/api', Drinkhardvodka);
+app.use(API_BASE_PATH, Drinkhardvodka);
 
 const DrinkhardGin = require('./routes/MenuRoutesbeer');
-app.use('/api', DrinkhardGin);
+app.use(API_BASE_PATH, DrinkhardGin);
 
 const DrinkhardRum = require('./routes/MenuRoutesbeer');
-app.use('/api', DrinkhardRum);
+app.use(API_BASE_PATH, DrinkhardRum);
 
 
 const DrinkhardWhisky = require('./routes/MenuRoutesbeer');
-app.use('/api', DrinkhardWhisky);
+app.use(API_BASE_PATH, DrinkhardWhisky);
 
 const DrinkhardWine = require('./routes/MenuRoutesbeer');
-app.use('/api', DrinkhardWine);
+app.use(API_BASE_PATH, DrinkhardWine);
 
 
 const DrinkhardLiquor = require('./routes/MenuRoutesbeer');
-app.use('/api', DrinkhardLiquor);
+app.use(API_BASE_PATH, DrinkhardLiquor);
 
 const DrinkhardTequila = require('./routes/MenuRoutesbeer');
-app.use('/api', DrinkhardTequila);
+app.use(API_BASE_PATH, DrinkhardTequila);
 
 const DrinkhardCocktail = require('./routes/MenuRoutesbeer');
-app.use('/api', DrinkhardCocktail);
+app.use(API_BASE_PATH, DrinkhardCocktail);
 
 
 const menuroutesbeer = require('./routes/MenuRoutesbeer');
 const Mocktailuser = require('./routes/MenuRoutesbeer')
-app.use("/api", Mocktailuser);
-app.use("/api", menuroutesbeer);
+app.use(API_BASE_PATH, Mocktailuser);
+app.use(API_BASE_PATH, menuroutesbeer);
 
 
 
@@ -131,19 +133,19 @@ app.use("/api", menuroutesbeer);
 
 
 
-app.use("/api/auth", authRoutes);
-app.use("/api/reports", reportRoutes);
-app.use("/api/cocktails", cocktailRoutes);
-app.use("/api/users", userRoutes);
-app.use("/api/orders", orderRoutes);
-app.use("/api/bar-orders", KitchenOrdersRoutes);
-app.use("/api/collection", collectionRoutes);
-app.use("/api/price", priceRoutes);
-app.use("/api/offers", offerRoutes);
-app.use("/api/inventory", inventoryRoutes);
-app.use("/api/profit", profitRoutes);
-app.use("/api/notifications", notificationRoutes);
-app.use("/api/cancelled-orders", cancelledOrdersRoutes);
+app.use(`${API_BASE_PATH}/auth`, authRoutes);
+app.use(`${API_BASE_PATH}/reports`, reportRoutes);
+app.use(`${API_BASE_PATH}/cocktails`, cocktailRoutes);
+app.use(`${API_BASE_PATH}/users`, userRoutes);
+app.use(`${API_BASE_PATH}/orders`, orderRoutes);
+app.use(`${API_BASE_PATH}/bar-orders`, KitchenOrdersRoutes);
+app.use(`${API_BASE_PATH}/collection`, collectionRoutes);
+app.use(`${API_BASE_PATH}/price`, priceRoutes);
+app.use(`${API_BASE_PATH}/offers`, offerRoutes);
+app.use(`${API_BASE_PATH}/inventory`, inventoryRoutes);
+app.use(`${API_BASE_PATH}/profit`, profitRoutes);
+app.use(`${API_BASE_PATH}/notifications`, notificationRoutes);
+app.use(`${API_BASE_PATH}/cancelled-orders`, cancelledOrdersRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
