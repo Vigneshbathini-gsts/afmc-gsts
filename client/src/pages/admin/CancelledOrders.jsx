@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { FaSearch, FaUndoAlt, FaBan, FaChevronLeft, FaChevronRight,FaArrowLeft } from "react-icons/fa";
+import { FaSearch, FaUndoAlt, FaBan, FaChevronLeft, FaChevronRight, FaArrowLeft, FaDownload } from "react-icons/fa";
 import { cancelledOrdersAPI } from "../../services/api";
 import OrderDetailsModal from "../../components/OrderDetailsModal";
 import { useNavigate } from "react-router-dom";
+import { exportTableToPdf } from "../../utils/pdfExport";
 
 export default function CancelledOrders() {
   const navigate = useNavigate();
@@ -65,6 +66,40 @@ export default function CancelledOrders() {
     }, 100);
   };
 
+  const handleDownload = () => {
+    if (!orders.length) {
+      alert("No data to download");
+      return;
+    }
+
+    // Format date for display
+    const formatDate = (dateString) => {
+      if (!dateString) return "-";
+      const date = new Date(dateString);
+      return date.toLocaleDateString();
+    };
+
+    exportTableToPdf({
+      title: "Cancelled Orders Report",
+      fileName: `cancelled-orders-${new Date().toISOString().split("T")[0]}.pdf`,
+      subtitle: `From: ${formatDate(filters.fromDate)}   To: ${formatDate(filters.toDate)}`,
+      headers: [
+        "Order Number",
+        "Status",
+        "Order Date",
+        "Customer Name",
+        "Pubmed"
+      ],
+      rows: orders.map((order) => [
+        order?.ORDER_NUM ?? "",
+        order?.status ?? "",
+        order?.ORDER_DATE ?? "",
+        order?.FIRST_NAME ?? "",
+        order?.pubmed_name ?? "",
+      ]),
+    });
+  };
+
   // Pagination logic
   const totalPages = Math.ceil(orders.length / rowsPerPage);
   const startIndex = (currentPage - 1) * rowsPerPage;
@@ -86,7 +121,14 @@ export default function CancelledOrders() {
   return (
     <div className="p-4 min-h-screen bg-gradient-to-br from-afmc-bg via-white to-afmc-bg2">
       {/* Back Button */}
-      <div className="flex justify-end mb-4">
+      <div className="flex justify-end mb-4 gap-3">
+        <button
+          onClick={handleDownload}
+          className="flex items-center gap-2 px-3 py-1.5 text-sm bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg shadow-md transition duration-300"
+        >
+          <FaDownload size={14} />
+          Download PDF
+        </button>
         <button
           onClick={() => navigate("/admin/dashboard")}
           className="flex items-center gap-2 px-3 py-1.5 text-sm bg-gradient-to-r from-afmc-maroon to-afmc-maroon2 hover:from-afmc-maroon2 hover:to-afmc-maroon text-white font-medium rounded-lg shadow-md transition duration-300"

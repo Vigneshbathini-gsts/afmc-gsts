@@ -1,0 +1,272 @@
+/* src/styles/globalTheme.css */
+
+/* Import only system fonts - no custom fonts */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* Animation keyframes */
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scale(1.08);
+    opacity: 0.75;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* Base styles */
+.afmc-theme {
+  /* Colors as CSS variables */
+  --maroon: #6B1A4F;
+  --maroon2: #7B2252;
+  --maroon-dark: #3A0D30;
+  --gold: #DAA520;
+  --gold-dim: rgba(218,165,32,0.65);
+  --gold-light: rgba(218,165,32,0.1);
+  --error: #e74c3c;
+  --success: #27ae60;
+}
+
+/* Card styles (matching login form card) */
+.afmc-card {
+  background: #ffffff;
+  border-radius: 20px;
+  border: 0.5px solid rgba(107,26,79,0.1);
+  box-shadow: 0 8px 40px rgba(107,26,79,0.1);
+  padding: 32px 36px;
+  animation: fadeUp 0.65s ease both 0.1s;
+}
+
+/* Button styles (matching login submit button) */
+.afmc-button {
+  width: 100%;
+  padding: 14px;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #6B1A4F 0%, #7B2252 100%);
+  color: #DAA520;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 14px rgba(107,26,79,0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.afmc-button:hover:not(:disabled) {
+  background: linear-gradient(135deg, #7B2252 0%, #5c1648 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(107,26,79,0.35);
+}
+
+.afmc-button:active:not(:disabled) {
+  transform: translateY(0px);
+}
+
+.afmc-button:disabled {
+  opacity: 0.72;
+  cursor: not-allowed;
+}
+
+/* Input styles (matching login inputs) */
+.afmc-input-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(107,26,79,0.2);
+  border-radius: 12px;
+  padding: 12px 16px;
+  background: #ffffff;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.afmc-input-wrapper:focus-within {
+  border-color: #DAA520;
+  box-shadow: 0 0 0 2px rgba(218,165,32,0.1);
+}
+
+.afmc-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  color: #1a1a1a;
+  outline: none;
+  font-family: inherit;
+}
+
+.afmc-input::placeholder {
+  color: #aaa;
+}
+
+.afmc-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #555;
+  margin-bottom: 8px;
+}
+
+/* Error styles */
+.afmc-error-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fff5f5;
+  border: 1px solid #f5c2c7;
+  border-radius: 10px;
+  color: #c0392b;
+  font-size: 12px;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+}
+
+.afmc-error-text {
+  font-size: 11px;
+  color: #e74c3c;
+  margin-top: 6px;
+  margin-left: 4px;
+}
+
+/* Outlet card (matching login) */
+.afmc-outlet-card {
+  flex: 1;
+  border: 1px solid rgba(123,34,82,0.25);
+  border-radius: 12px;
+  padding: 14px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  background: rgba(107,26,79,0.04);
+  transition: all 0.2s ease;
+  outline: none;
+}
+
+.afmc-outlet-card:hover {
+  border-color: #DAA520;
+  background: rgba(218,165,32,0.12);
+  transform: translateY(-2px);
+}
+
+.afmc-outlet-card.selected {
+  border: 1.5px solid #DAA520;
+  background: rgba(218,165,32,0.1);
+}
+
+.afmc-outlet-card:focus-visible {
+  outline: 2px solid #DAA520;
+  outline-offset: 2px;
+}
+
+/* Spinner */
+.afmc-spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(218,165,32,0.3);
+  border-top-color: #DAA520;
+  animation: spin 0.7s linear infinite;
+  display: inline-block;
+}
+
+.afmc-spinner-lg {
+  width: 42px;
+  height: 42px;
+  border: 3px solid rgba(107,26,79,0.15);
+  border-top-color: #6B1A4F;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+/* Loading screen */
+.afmc-loading-screen {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #f9f5f7 0%, #f0e9ed 100%);
+  gap: 16px;
+}
+
+/* Badge */
+.afmc-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: rgba(218,165,32,0.1);
+  border: 0.5px solid rgba(218,165,32,0.25);
+  border-radius: 20px;
+  font-size: 11px;
+  color: rgba(218,165,32,0.65);
+  letter-spacing: 0.05em;
+}
+
+/* Divider */
+.afmc-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.afmc-divider-line {
+  flex: 1;
+  height: 0.5px;
+  background: rgba(107,26,79,0.15);
+}
+
+/* Grid layout helper */
+.afmc-grid {
+  display: flex;
+  gap: 12px;
+}

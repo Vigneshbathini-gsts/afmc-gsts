@@ -12,5 +12,8 @@ router.put("/cancel", authMiddleware, KitchenOrdersController.cancelBarOrderItem
 router.get("/active", authMiddleware, KitchenOrdersController.getActiveBarOrders);
 router.put("/notifications/read", authMiddleware, KitchenOrdersController.markNotificationAsRead);
 router.get("/cocktail/:itemId", authMiddleware, KitchenOrdersController.getCocktailDetailsById);
-
+router.get("/cancelled-orders", authMiddleware, KitchenOrdersController.getCancelledOrders);
+router.get("/order-history", authMiddleware, KitchenOrdersController.getOrderHistory);
+router.get("/cancelled-order-details/:orderNumber", authMiddleware, KitchenOrdersController.getOrderDetailsByOrderNumber);
+router.get("/order-history-details/:orderNumber", authMiddleware, KitchenOrdersController.getOrderHistoryItemDetails);
 module.exports = router;

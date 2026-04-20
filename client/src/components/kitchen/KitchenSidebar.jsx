@@ -1,11 +1,18 @@
 import React from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import {
   FaTimes,
-  FaBell,
+  FaUtensils,
+  FaHistory,
+  FaBan,
 } from "react-icons/fa";
 
 export default function KitchenSidebar({ isOpen, onClose }) {
+  const location = useLocation();
+
+  const basePath = location.pathname.startsWith('/kitchen') ? '/kitchen' : '/bar';
+  const isBar = basePath === '/bar';
+
   const navLinkClass = ({ isActive }) =>
     `flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${isActive
       ? "bg-afmc-maroon text-white font-semibold shadow-md"
@@ -25,7 +32,9 @@ export default function KitchenSidebar({ isOpen, onClose }) {
           }`}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b">
-          <h2 className="text-xl font-bold text-afmc-maroon">Kitchen Panel</h2>
+          <h2 className="text-xl font-bold text-afmc-maroon">
+            {isBar ? "Bar Panel" : "Kitchen Panel"}
+          </h2>
           <button
             onClick={onClose}
             className="text-2xl text-gray-600 hover:text-red-500 transition"
@@ -35,10 +44,25 @@ export default function KitchenSidebar({ isOpen, onClose }) {
         </div>
 
         <div className="p-4 space-y-3">
-          <NavLink to="/kitchen/dashboard" className={navLinkClass} onClick={onClose}>
-            <FaBell />
-            Pubmed / Dashboard
+          {/* Dashboard - dynamic path */}
+          <NavLink to={`${basePath}/dashboard`} className={navLinkClass} onClick={onClose}>
+            <FaUtensils />
+            {isBar ? "Pubmed" : "Orders"}
           </NavLink>
+
+          {/* Only show history and cancelled orders for BAR */}
+          {isBar && (
+            <>
+              <NavLink to="/bar/order-history" className={navLinkClass} onClick={onClose}>
+                <FaHistory />
+                Order History
+              </NavLink>
+              <NavLink to="/bar/cancelled-orders" className={navLinkClass} onClick={onClose}>
+                <FaBan />
+                Cancelled Orders
+              </NavLink>
+            </>
+          )}
         </div>
       </aside>
     </>

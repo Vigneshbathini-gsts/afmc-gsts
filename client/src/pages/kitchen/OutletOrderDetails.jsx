@@ -172,64 +172,45 @@ export default function OutletOrderDetails() {
     }
   };
 
-  const autoProcessScan = useCallback(async (scannedBarcode) => {
-    if (!scannedBarcode || processingScanRef.current) return;
-    processingScanRef.current = true;
+ const autoProcessScan = useCallback(async (scannedBarcode) => {
+  if (!scannedBarcode || processingScanRef.current) return;
+  processingScanRef.current = true;
 
-    setProcessingScan(true);
-    setScanError("");
-    setScanMessage("");
+  setProcessingScan(true);
+  setScanError("");
+  setScanMessage("");
 
-    // Check for duplicate scan in current session
-    if (isBarcodeScanned(scannedBarcode)) {
-      setScanError(`Duplicate scan! Barcode ${scannedBarcode} has already been scanned.`);
-      setProcessingScan(false);
-      setTimeout(() => setScanError(""), 3000);
-      return;
-    }
+  try {
+    const res = await barOrdersAPI.processScan({
+      ORDERNUMBER: orderData?.ORDERNUMBER,
+      BARCODE: scannedBarcode,
+      QUANTITY: qty || 1,
+      KITCHEN: department,
+    });
 
-    try {
-      const res = await barOrdersAPI.processScan({
-        ORDERNUMBER: orderData?.ORDERNUMBER,
-        BARCODE: scannedBarcode,
-        QUANTITY: qty || 1,
-        KITCHEN: department,
-      });
+    const scanData = res.data?.data || {};
 
-      const scanData = res.data?.data || res.data || {};
-
-      // Check if requested quantity exceeds order quantity
-      const currentScannedQty = getScannedQuantityByItemCode(scanData.itemCode);
-      if (currentScannedQty + (qty || 1) > scanData.orderedQuantity) {
-        const remaining = scanData.orderedQuantity - currentScannedQty;
-        setScanError(`Cannot scan ${qty || 1} item(s). Only ${remaining} more item(s) needed for "${scanData.itemName}".`);
-        setProcessingScan(false);
-        setTimeout(() => setScanError(""), 3000);
-        return;
-      }
-
-      // Refetch scanned items from session after successful scan
+    // SUCCESS path
+    if (res.data?.success === true) {
+      // Refetch scanned items
       const scannedRes = await barOrdersAPI.getScannedItems(orderData.ORDERNUMBER);
       const scannedData = scannedRes.data?.data || [];
       setScannedItems(scannedData);
 
-      setScanMessage(`✓ ${scanData.itemName} validated for order ${orderData?.ORDERNUMBER}.`);
+      setScanMessage(`✓ ${scanData.itemName || 'Item'} scanned successfully.`);
       setItemCode(scanData.itemCode || "");
       setItemName(scanData.itemName || "");
       setPrice(scanData.calculatedPrice || "");
 
-      if (
-        scanData.isCocktailIngredient &&
-        Array.isArray(scanData.ingredients) &&
-        scanData.ingredients.length
-      ) {
+      // Cocktail modal
+      if (scanData.isCocktailIngredient && Array.isArray(scanData.addedThisScan) && scanData.addedThisScan.length > 0) {
         setScannedCocktailData({
-          name: scanData.itemName || scanData.parentItem || "Cocktail",
-          ingredients: scanData.ingredients.map((ingredient) => ({
-            item_code: ingredient.item_code,
-            item_name: ingredient.item_name,
-            pegs: ingredient.total_quantity,
-            quantity: ingredient.total_quantity,
+          name: scanData.itemName || "Cocktail",
+          ingredients: scanData.addedThisScan.map(ing => ({
+            item_code: ing.itemCode,
+            item_name: ing.itemName,
+            pegs: ing.pegs || 1,
+            quantity: ing.scanQuantity,
           })),
         });
         setShowCocktailModal(true);
@@ -240,24 +221,28 @@ export default function OutletOrderDetails() {
           setBarcode("");
           setQty("");
         }
-        setProcessingScan(false);
-        setTimeout(() => {
-          if (isMountedRef.current) setScanMessage("");
-        }, 3000);
-      }, 1500);
-
-    } catch (error) {
-      setScanMessage("");
-      setScanError(error.response?.data?.message || error.message || "Failed to process scan.");
-      console.error("Process Scan Error:", error);
-      setProcessingScan(false);
-      setTimeout(() => {
-        if (isMountedRef.current) setScanError("");
-      }, 3000);
-    } finally {
-      processingScanRef.current = false;
+      }, 800);
+    } 
+    // Backend returned error (400, etc.)
+    else {
+      setScanError(scanData.message || res.data?.message || "Scan failed");
     }
-  }, [orderData, department, qty, getScannedQuantityByItemCode, isBarcodeScanned]);
+
+  } catch (error) {
+    const errMsg = error.response?.data?.message || error.message || "Failed to process scan.";
+    setScanError(errMsg);
+    console.error("Process Scan Error:", error);
+  } finally {
+    setProcessingScan(false);
+    processingScanRef.current = false;
+    setTimeout(() => {
+      if (isMountedRef.current) {
+        setScanMessage("");
+        setScanError("");
+      }
+    }, 4000);
+  }
+}, [orderData, department, qty]);
 
   const startScanner = async () => {
     try {
