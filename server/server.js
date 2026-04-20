@@ -4,6 +4,7 @@ const dotenv = require("dotenv");
 const path = require("path");
 const session = require("express-session");
 const MySQLSession = require("express-mysql-session");
+const upload = require("./utils/uploadMiddleware");
 
 dotenv.config();
 
@@ -57,7 +58,7 @@ app.use(
   })
 );
 app.use(express.json());
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+app.use("/uploads", express.static(upload.uploadPath));
 
 app.get("/", (req, res) => {
   res.json({ status: "Server is running" });
