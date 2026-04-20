@@ -2,8 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { FaSearch, FaArrowLeft, FaDownload } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { inventoryAPI } from "../../services/api";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+import { exportTableToPdf } from "../../utils/pdfExport";
 
 const toInputDate = (date) => {
   const d = date instanceof Date ? date : new Date(date);
@@ -93,36 +92,6 @@ export default function StockReports() {
   const downloadPdf = () => {
     if (!rows || rows.length === 0) return;
 
-    const doc = new jsPDF({ unit: "pt", format: "a4" });
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const marginX = 40;
-    let cursorY = 40;
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(14);
-    doc.text("ARMED FORCES  MEDICAL  COLLEGE", pageWidth / 2, cursorY, {
-      align: "center",
-    });
-    cursorY += 18;
-
-    doc.setFontSize(12);
-    doc.text(
-      activeTab === "in" ? "Stock In Report" : "Stock Out Report",
-      pageWidth / 2,
-      cursorY,
-      { align: "center" }
-    );
-    cursorY += 18;
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    doc.text(
-      `From: ${formatReportDate(fromDate)}    To: ${formatReportDate(toDate)}`,
-      marginX,
-      cursorY
-    );
-    cursorY += 10;
-
     const isStockIn = activeTab === "in";
     const tableRows = rows.map((row) =>
       isStockIn
@@ -145,10 +114,14 @@ export default function StockReports() {
           ]
     );
 
-    autoTable(doc, {
-      startY: cursorY + 10,
-      head: isStockIn
-        ? [[
+    exportTableToPdf({
+      title: isStockIn ? "Stock In Report" : "Stock Out Report",
+      fileName: isStockIn ? "stock-in-report.pdf" : "stock-out-report.pdf",
+      subtitle: `From: ${formatReportDate(fromDate)}    To: ${formatReportDate(
+        toDate
+      )}`,
+      headers: isStockIn
+        ? [
             "Item Code",
             "Item Name",
             "Batch ID",
@@ -156,49 +129,18 @@ export default function StockReports() {
             "A/c Unit",
             "Stock",
             "Total Price",
-          ]]
-        : [[
+          ]
+        : [
             "Item Code",
             "Item Name",
             "Transaction Date",
             "A/c Unit",
             "Stock",
             "Total Price",
-          ]],
-      body: tableRows,
-      styles: {
-        font: "helvetica",
-        fontSize: 9,
-        cellPadding: 4,
-      },
-      headStyles: {
-        fillColor: [245, 245, 245],
-        textColor: [60, 60, 60],
-      },
-      columnStyles: {
-        ...(isStockIn
-          ? {
-              0: { cellWidth: 55 },
-              1: { cellWidth: 110 },
-              2: { cellWidth: 70 },
-              3: { cellWidth: 85 },
-              4: { cellWidth: 55 },
-              5: { cellWidth: 45 },
-              6: { cellWidth: 65 },
-            }
-          : {
-              0: { cellWidth: 60 },
-              1: { cellWidth: 150 },
-              2: { cellWidth: 90 },
-              3: { cellWidth: 60 },
-              4: { cellWidth: 50 },
-              5: { cellWidth: 70 },
-            }),
-      },
-      margin: { left: marginX, right: marginX },
+          ],
+      rows: tableRows,
+      orientation: "portrait",
     });
-
-    doc.save(activeTab === "in" ? "stock-in-report.pdf" : "stock-out-report.pdf");
   };
 
   return (

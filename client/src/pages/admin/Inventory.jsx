@@ -580,8 +580,8 @@ export default function Inventory() {
       <div className="absolute top-16 left-12 w-72 h-72 bg-afmc-maroon/10 rounded-full blur-3xl"></div>
       <div className="absolute bottom-20 right-20 w-80 h-80 bg-afmc-maroon2/10 rounded-full blur-3xl"></div>
 
-      <div className="p-8 relative z-10">
-        <div className="flex items-center justify-between mb-8">
+      <div className="p-6 md:p-8 relative z-10">
+        <div className="flex items-center justify-between mb-6 md:mb-8">
           <h1 className="text-2xl font-semibold text-afmc-maroon">
             Inventory Management
           </h1>
@@ -595,8 +595,9 @@ export default function Inventory() {
           </button>
         </div>
 
-        <div className="bg-white/80 border border-white/60 rounded-3xl shadow-xl backdrop-blur-sm p-6">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-end">
+        <div className="bg-white/80 border border-afmc-gold/15 rounded-3xl shadow-xl backdrop-blur-sm p-5 md:p-6">
+          <div className="mb-5 md:mb-6 h-1 w-full rounded-full bg-gradient-to-r from-afmc-maroon via-afmc-gold to-afmc-maroon2" />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 md:gap-6 items-end">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Category Name
@@ -791,7 +792,7 @@ export default function Inventory() {
                     setSearch(inventorySearchInput.trim());
                     fetchInventory({ search: inventorySearchInput.trim() });
                   }}
-                  className="px-5 py-3 rounded-2xl bg-[#5b5b5b] text-white font-semibold flex items-center gap-2 shadow hover:shadow-md"
+                  className="px-5 py-3 rounded-2xl bg-afmc-maroon text-white font-semibold flex items-center gap-2 shadow-afmc hover:bg-afmc-maroon2 focus:outline-none focus:ring-2 focus:ring-afmc-gold/50 transition"
                 >
                   <FaSearch />
                   Search
@@ -801,16 +802,16 @@ export default function Inventory() {
             </div>
           </div>
 
-          <div className="mt-8">
+          <div className="mt-6 md:mt-8">
             {error && (
               <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
                 {error}
               </div>
             )}
 
-            <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
+            <div className="overflow-hidden rounded-2xl border border-afmc-gold/25 bg-white">
               <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-gray-600">
+                <thead className="bg-afmc-maroon/5 text-afmc-maroon">
                   <tr>
                     <th className="px-4 py-3 text-left font-medium">Add Stock</th>
                     <th className="px-4 py-3 text-left font-medium">Update Image</th>
@@ -834,7 +835,10 @@ export default function Inventory() {
                     </tr>
                   ) : (
                     inventory.map((row) => (
-                      <tr key={row.item_id} className="border-t border-gray-100">
+                      <tr
+                        key={row.item_id}
+                        className="border-t border-gray-100 hover:bg-afmc-gold/10 transition-colors"
+                      >
                         <td className="px-4 py-3">
                           <button
                             type="button"

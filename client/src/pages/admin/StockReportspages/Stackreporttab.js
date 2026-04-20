@@ -50,7 +50,7 @@ export default function Stackreporttab() {
               className={`flex-1 text-center py-4 cursor-pointer transition-all ${
                 isActive
                   ? "relative font-semibold text-afmc-maroon bg-gradient-to-r from-afmc-maroon/5 via-white to-afmc-gold/15"
-                  : "text-gray-600 hover:text-afmc-maroon hover:bg-afmc-maroon/5"
+                  : "text-afmc-maroon hover:bg-afmc-maroon/5"
               }`}
             >
               {isActive && (
