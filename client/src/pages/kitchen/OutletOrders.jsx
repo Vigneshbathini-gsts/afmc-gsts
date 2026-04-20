@@ -34,6 +34,7 @@ export default function OutletOrders({ kitchenType = "Bar" }) {
         try {
             setLoading(true);
             const res = await barOrdersAPI.getOrders(kitchenType);
+            console.log(`Fetched ${kitchenType} orders:`, res.data);
             setOrders(res.data || []);
         } catch (error) {
             console.error(`Error fetching ${kitchenType.toLowerCase()} orders:`, error);
@@ -152,10 +153,16 @@ export default function OutletOrders({ kitchenType = "Bar" }) {
                             <table className="min-w-full text-sm">
                                 <thead className="bg-gray-50 text-gray-700 uppercase text-xs tracking-wider">
                                     <tr>
-                                        <th className="px-6 py-4 text-left">Order No</th>
-                                        <th className="px-6 py-4 text-left">Ordered By</th>
+
+
+
+
+                                        <th className="px-6 py-4 text-left">Ordernumber</th>
+                                        <th className="px-6 py-4 text-left">Name</th>
                                         <th className="px-6 py-4 text-left">Status</th>
-                                        <th className="px-6 py-4 text-left">Created Date</th>
+                                        <th className="px-6 py-4 text-left">Order Date</th>
+                                        <th className="px-6 py-4 text-left">Handled By Bar</th>
+                                        <th className="px-6 py-4 text-left">Handled By Kitchen</th>
                                         <th className="px-6 py-4 text-center">Cancel</th>
                                     </tr>
                                 </thead>
@@ -178,6 +185,8 @@ export default function OutletOrders({ kitchenType = "Bar" }) {
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4 text-gray-600">{order.CREATION_DATE || "N/A"}</td>
+                                            <td className="px-6 py-4 text-gray-600">{order.Handled_by_bar || "N/A"}</td>
+                                            <td className="px-6 py-4 text-gray-600">{order.Handled_by_kitchen || ""}</td>
                                             <td className="px-6 py-4 text-center">
                                                 <button
                                                     onClick={() => handleCancelClick(order)}
