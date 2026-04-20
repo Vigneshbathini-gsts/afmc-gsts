@@ -77,6 +77,60 @@ const profitRoutes = require("./routes/profitRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const cancelledOrdersRoutes = require("./routes/cancelledOrdersRoutes");
 
+
+const Snacksveg = require("./routes/MenuRoutesbeer");
+app.use("/api", Snacksveg);
+
+const Stacknonveg = require('./routes/MenuRoutesbeer');
+app.use('/api', Stacknonveg);
+
+const Drinkhardbeer = require('./routes/MenuRoutesbeer');
+app.use('/api', Drinkhardbeer);
+
+const Drinkhardbrandy = require('./routes/MenuRoutesbeer');
+app.use('/api', Drinkhardbrandy);
+
+const Drinkhardbreezer = require('./routes/MenuRoutesbeer');
+app.use('/api', Drinkhardbreezer);
+
+const Drinkhardvodka = require('./routes/MenuRoutesbeer');
+app.use('/api', Drinkhardvodka);
+
+const DrinkhardGin = require('./routes/MenuRoutesbeer');
+app.use('/api', DrinkhardGin);
+
+const DrinkhardRum = require('./routes/MenuRoutesbeer');
+app.use('/api', DrinkhardRum);
+
+
+const DrinkhardWhisky = require('./routes/MenuRoutesbeer');
+app.use('/api', DrinkhardWhisky);
+
+const DrinkhardWine = require('./routes/MenuRoutesbeer');
+app.use('/api', DrinkhardWine);
+
+
+const DrinkhardLiquor = require('./routes/MenuRoutesbeer');
+app.use('/api', DrinkhardLiquor);
+
+const DrinkhardTequila = require('./routes/MenuRoutesbeer');
+app.use('/api', DrinkhardTequila);
+
+const DrinkhardCocktail = require('./routes/MenuRoutesbeer');
+app.use('/api', DrinkhardCocktail);
+
+
+const menuroutesbeer = require('./routes/MenuRoutesbeer');
+const Mocktailuser = require('./routes/MenuRoutesbeer')
+app.use("/api", Mocktailuser);
+app.use("/api", menuroutesbeer);
+
+
+
+
+
+
+
 app.use("/api/auth", authRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/cocktails", cocktailRoutes);

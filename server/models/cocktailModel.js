@@ -78,6 +78,22 @@ const validatePayload = (payload) => {
     throw new Error("Valid sub category is required");
   }
 
+  if (memberProfit == null) {
+    throw new Error("Member profit is required");
+  }
+
+  if (memberPrCharges == null) {
+    throw new Error("Member PR charges are required");
+  }
+
+  if (nonMemberProfit == null) {
+    throw new Error("Non member profit is required");
+  }
+
+  if (nonMemberPrCharges == null) {
+    throw new Error("Non member PR charges are required");
+  }
+
   if (!rows.length) {
     throw new Error("At least one cocktail detail row is required");
   }
@@ -106,6 +122,27 @@ const validatePayload = (payload) => {
     nonMemberPrCharges,
     rows,
   };
+};
+
+const ensureCocktailNameIsUnique = async (itemName, excludeItemId = null, connection = db) => {
+  const query = `
+    SELECT ITEM_ID
+    FROM xxafmc_inventory
+    WHERE UPPER(TRIM(ITEM_NAME)) = UPPER(TRIM(?))
+      AND SUB_CATEGORY IN (14, 15)
+      AND (? IS NULL OR ITEM_ID <> ?)
+    LIMIT 1
+  `;
+
+  const [rows] = await connection.execute(query, [
+    itemName,
+    excludeItemId,
+    excludeItemId,
+  ]);
+
+  if (rows.length > 0) {
+    throw new Error("Cocktail or mocktail name already exists");
+  }
 };
 
 const getCocktailItems = async (search = "") => {
@@ -403,6 +440,7 @@ const createCocktailItem = async (payload, options = {}) => {
 
   try {
     await connection.beginTransaction();
+    await ensureCocktailNameIsUnique(data.itemName, null, connection);
 
     const [[nextInventoryRow]] = await connection.execute(
       `
@@ -499,6 +537,7 @@ const updateCocktailItem = async (itemId, payload, options = {}) => {
 
   try {
     await connection.beginTransaction();
+    await ensureCocktailNameIsUnique(data.itemName, itemId, connection);
 
     const [[existingItem]] = await connection.execute(
       `
@@ -516,9 +555,10 @@ const updateCocktailItem = async (itemId, payload, options = {}) => {
     }
 
     const inventoryItemCode = Number(existingItem.ITEM_CODE || existingItem.ITEM_ID);
-    const imagePath = options.imageFile
-      ? `${AFMC_IMAGE_PUBLIC_BASE_URL}/${options.imageFile.filename}`
-      : existingItem.IMAGE;
+    // const imagePath = options.imageFile
+    //   ? `${AFMC_IMAGE_PUBLIC_BASE_URL}/${options.imageFile.filename}`
+    //   : existingItem.IMAGE;
+    const imagePath = data.itemName || null;
     const fileName = options.imageFile?.originalname || existingItem.FILE_NAME;
     const mimeType = options.imageFile?.mimetype || existingItem.MIME_TYPE;
 

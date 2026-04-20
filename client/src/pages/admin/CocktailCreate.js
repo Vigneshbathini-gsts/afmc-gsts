@@ -30,6 +30,36 @@ export default function CocktailCreate() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
+  const validateForm = () => {
+    const trimmedItemName = form.itemName.trim();
+
+    if (!trimmedItemName) {
+      return "Item name is required.";
+    }
+
+    if (!form.subCategory) {
+      return "Sub category is required.";
+    }
+
+    if (form.memberProfit === "") {
+      return "Member Profit is required.";
+    }
+
+    if (form.memberPrCharges === "") {
+      return "Member Pr Charges is required.";
+    }
+
+    if (form.nonMemberProfit === "") {
+      return "Non Member Profit is required.";
+    }
+
+    if (form.nonMemberPrCharges === "") {
+      return "Non Member Pr Charges is required.";
+    }
+
+    return "";
+  };
+
   useEffect(() => {
     const fetchIngredientOptions = async () => {
       try {
@@ -154,6 +184,14 @@ export default function CocktailCreate() {
   }, [rows, search]);
 
   const handleSubmit = async () => {
+    const validationMessage = validateForm();
+
+    if (validationMessage) {
+      setError(validationMessage);
+      window.alert(validationMessage);
+      return;
+    }
+
     try {
       setSaving(true);
       setError("");
@@ -183,10 +221,11 @@ export default function CocktailCreate() {
       navigate("/admin/cocktail-management");
     } catch (submitError) {
       console.error(submitError);
-      setError(
+      const message =
         submitError.response?.data?.message ||
-          "Unable to create cocktail item. Please check the entered values."
-      );
+        "Unable to create cocktail item. Please check the entered values.";
+      setError(message);
+      window.alert(message);
     } finally {
       setSaving(false);
     }
@@ -231,13 +270,25 @@ export default function CocktailCreate() {
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <input
               value={form.itemName}
-              onChange={(event) => updateForm("itemName", event.target.value)}
+              onChange={(event) => {
+                updateForm("itemName", event.target.value);
+                if (error) {
+                  setError("");
+                }
+              }}
               placeholder="Item Name"
+              required
               className="rounded-md border border-[#a79e96] px-4 py-4 outline-none"
             />
             <select
               value={form.subCategory}
-              onChange={(event) => updateForm("subCategory", event.target.value)}
+              onChange={(event) => {
+                updateForm("subCategory", event.target.value);
+                if (error) {
+                  setError("");
+                }
+              }}
+              required
               className="rounded-md border border-[#a79e96] px-4 py-4 outline-none"
             >
               <option value="">Sub Category</option>
@@ -266,32 +317,50 @@ export default function CocktailCreate() {
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
             <input
               value={form.memberProfit}
-              onChange={(event) => updateForm("memberProfit", event.target.value)}
+              onChange={(event) => {
+                updateForm("memberProfit", event.target.value);
+                if (error) {
+                  setError("");
+                }
+              }}
               placeholder="Member Profit"
+              required
               className="rounded-md border border-[#a79e96] px-4 py-4 outline-none"
             />
             <input
               value={form.memberPrCharges}
-              onChange={(event) =>
-                updateForm("memberPrCharges", event.target.value)
-              }
+              onChange={(event) => {
+                updateForm("memberPrCharges", event.target.value);
+                if (error) {
+                  setError("");
+                }
+              }}
               placeholder="Member Pr Charges"
+              required
               className="rounded-md border border-[#a79e96] px-4 py-4 outline-none"
             />
             <input
               value={form.nonMemberProfit}
-              onChange={(event) =>
-                updateForm("nonMemberProfit", event.target.value)
-              }
+              onChange={(event) => {
+                updateForm("nonMemberProfit", event.target.value);
+                if (error) {
+                  setError("");
+                }
+              }}
               placeholder="Non Member Profit"
+              required
               className="rounded-md border border-[#a79e96] px-4 py-4 outline-none"
             />
             <input
               value={form.nonMemberPrCharges}
-              onChange={(event) =>
-                updateForm("nonMemberPrCharges", event.target.value)
-              }
+              onChange={(event) => {
+                updateForm("nonMemberPrCharges", event.target.value);
+                if (error) {
+                  setError("");
+                }
+              }}
               placeholder="Non Member Pr Charges"
+              required
               className="rounded-md border border-[#a79e96] px-4 py-4 outline-none"
             />
           </div>
