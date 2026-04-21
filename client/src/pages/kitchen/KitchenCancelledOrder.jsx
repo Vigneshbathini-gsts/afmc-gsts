@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
 import { barOrdersAPI } from '../../services/api';
+import { exportTableToPdf } from '../../utils/pdfExport';
 import {
     FaTimesCircle,
     FaSpinner,
@@ -148,7 +147,14 @@ const KitchenCancelledOrder = () => {
         setSelectedOrder(null);
     };
 
-    // Download PDF using currently filtered orders
+    // Format date for display
+    const formatDate = (dateString) => {
+        if (!dateString) return "N/A";
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-IN');
+    };
+
+    // Download PDF using exportTableToPdf utility
     const downloadPDF = () => {
         const dataToExport = filteredOrders;
 
@@ -157,45 +163,41 @@ const KitchenCancelledOrder = () => {
             return;
         }
 
-        const doc = new jsPDF();
-        doc.setFontSize(16);
-        doc.text("Cancelled Orders Report", 14, 20);
-
-        let yOffset = 30;
-        doc.setFontSize(11);
-
-        if (fromDate || toDate) {
-            doc.text(`Period: ${fromDate || 'All'} to ${toDate || 'All'}`, 14, yOffset);
-            yOffset += 8;
+        // Create subtitle with filter information
+        let subtitleParts = [];
+        if (fromDate && toDate) {
+            subtitleParts.push(`Period: ${formatDate(fromDate)} to ${formatDate(toDate)}`);
         }
         if (searchTerm) {
-            doc.text(`Search: ${searchTerm}`, 14, yOffset);
-            yOffset += 8;
+            subtitleParts.push(`Search: ${searchTerm}`);
         }
+        const subtitle = subtitleParts.join(' | ');
 
-        doc.text(`Total Cancelled Orders: ${dataToExport.length}`, 14, yOffset);
-        yOffset += 12;
-
-        const tableColumn = ["Order #", "Date", "Customer", "Pubmed", "Status"];
+        // Prepare table rows
         const tableRows = dataToExport.map(order => [
-            order.order_num,
-            order.order_date ? new Date(order.order_date).toLocaleDateString('en-IN') : 'N/A',
+            order.order_num?.toString() || '',
+            order.order_date ? formatDate(order.order_date) : 'N/A',
             order.first_name || 'N/A',
             order.pubmed_name || 'N/A',
-            "Cancelled"
+            "CANCELLED"
         ]);
 
-        doc.autoTable({
-            startY: yOffset,
-            head: [tableColumn],
-            body: tableRows,
-            theme: 'grid',
-            styles: { fontSize: 10 },
-            headStyles: { fillColor: [220, 38, 38] },
-            alternateRowStyles: { fillColor: [245, 245, 245] }
+        exportTableToPdf({
+            mainHeader: "ARMED FORCES MEDICAL COLLEGE",
+            title: "Cancelled Orders Report",
+            fileName: `cancelled-orders-${new Date().toISOString().split("T")[0]}.pdf`,
+            subtitle: subtitle,
+            headers: [
+                "Order Number",
+                "Order Date",
+                "Customer Name",
+                "Pubmed",
+                "Status"
+            ],
+            rows: tableRows,
+            footerText: "Armed Forces Medical College - Cancelled Orders Report",
+            showLogo: true,
         });
-
-        doc.save(`Cancelled_Orders_${new Date().toISOString().slice(0, 10)}.pdf`);
     };
 
     const getStatusClasses = () => {
@@ -211,7 +213,7 @@ const KitchenCancelledOrder = () => {
                     className="bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-xl flex items-center gap-2 disabled:bg-gray-400 transition-colors"
                 >
                     <FaDownload />
-                    PDF
+                    Download
                 </button>
             </div>
          
@@ -276,7 +278,7 @@ const KitchenCancelledOrder = () => {
                         <h2 className="text-lg font-bold text-gray-800">Cancelled Orders List</h2>
                         <p className="text-sm text-gray-500">
                             Showing {filteredOrders.length} cancelled orders
-                            {fromDate && toDate && ` from ${fromDate} to ${toDate}`}
+                            {fromDate && toDate && ` from ${formatDate(fromDate)} to ${formatDate(toDate)}`}
                         </p>
                     </div>
                     <div className="flex gap-3">
@@ -330,7 +332,7 @@ const KitchenCancelledOrder = () => {
                                                 </button>
                                             </td>
                                             <td className="px-6 py-4 text-gray-600">
-                                                {order.order_date ? new Date(order.order_date).toLocaleDateString('en-IN') : 'N/A'}
+                                                {order.order_date ? formatDate(order.order_date) : 'N/A'}
                                             </td>
                                             <td className="px-6 py-4 text-gray-700">{order.first_name || 'N/A'}</td>
                                             <td className="px-6 py-4 text-gray-600">{order.pubmed_name || 'N/A'}</td>
@@ -374,7 +376,7 @@ const KitchenCancelledOrder = () => {
                 )}
             </div>
 
-            {/* Modal remains the same */}
+            {/* Modal for Order Details */}
             {modalOpen && selectedOrder && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
@@ -392,9 +394,7 @@ const KitchenCancelledOrder = () => {
                                 onClick={closeModal}
                                 className="text-gray-500 hover:text-gray-700"
                             >
-                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
+                                <FaTimesCircle className="text-xl" />
                             </button>
                         </div>
 
@@ -418,9 +418,9 @@ const KitchenCancelledOrder = () => {
                                         <tbody className="divide-y divide-gray-200">
                                             {orderItemDetails[selectedOrder.order_num].map((item, index) => (
                                                 <tr key={index} className="hover:bg-gray-50">
-                                                    <td className="px-4 py-3">{item.item_name || 'N/A'}</td>
-                                                    <td className="px-4 py-3">{item.quantity}</td>
-                                                    <td className="px-4 py-3">{item.type || 'N/A'}</td>
+                                                    <td className="px-4 py-3 text-sm text-gray-900">{item.item_name || 'N/A'}</td>
+                                                    <td className="px-4 py-3 text-sm text-gray-600">{item.quantity}</td>
+                                                    <td className="px-4 py-3 text-sm text-gray-600">{item.type || 'N/A'}</td>
                                                     <td className="px-4 py-3">
                                                         <span className="px-2 py-1 text-xs rounded-full bg-red-100 text-red-800">
                                                             {item.status || 'CANCELLED'}

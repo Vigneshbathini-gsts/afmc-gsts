@@ -1,6 +1,4 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
 import { barOrdersAPI } from '../../services/api';
 import {
   FaTimesCircle,
@@ -13,6 +11,7 @@ import {
   FaSync,
   FaHistory,
 } from "react-icons/fa";
+import { exportTableToPdf } from '../../utils/pdfExport';
 
 const KitchenOrderHistory = () => {
   const [orders, setOrders] = useState([]);
@@ -171,7 +170,14 @@ const KitchenOrderHistory = () => {
     setSelectedOrder(null);
   };
 
-  // Download PDF using currently filtered orders
+  // Format date for display
+  const formatDate = (dateString) => {
+    if (!dateString) return "-";
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-IN');
+  };
+
+  // Download PDF using exportTableToPdf utility
   const downloadPDF = () => {
     const dataToExport = filteredOrders;
 
@@ -180,46 +186,43 @@ const KitchenOrderHistory = () => {
       return;
     }
 
-    const doc = new jsPDF();
-    doc.setFontSize(16);
-    doc.text("Order History Report", 14, 20);
-
-    let yOffset = 30;
-    doc.setFontSize(11);
-
-    if (fromDate || toDate) {
-      doc.text(`Period: ${fromDate || 'All'} to ${toDate || 'All'}`, 14, yOffset);
-      yOffset += 8;
+    // Create subtitle with filter information
+    let subtitleParts = [];
+    if (fromDate && toDate) {
+      subtitleParts.push(`Period: ${formatDate(fromDate)} to ${formatDate(toDate)}`);
     }
     if (searchTerm) {
-      doc.text(`Search: ${searchTerm}`, 14, yOffset);
-      yOffset += 8;
+      subtitleParts.push(`Search: ${searchTerm}`);
     }
+    const subtitle = subtitleParts.join(' | ');
 
-    doc.text(`Total Orders: ${dataToExport.length}`, 14, yOffset);
-    yOffset += 12;
-
-    const tableColumn = ["Order #", "Order Date", "Customer Name", "Phone Number", "Subtotal", "Status"];
+    // Prepare table rows
     const tableRows = dataToExport.map(order => [
-      order.order_num,
-      order.order_date ? new Date(order.order_date).toLocaleDateString('en-IN') : 'N/A',
+      order.order_num?.toString() || '',
+      order.order_date ? formatDate(order.order_date) : 'N/A',
       order.first_name || 'N/A',
       order.phone_number || 'N/A',
-      `Rs. ${order.subtotal || '0.00'}`,
+      `${order.subtotal || '0'}`,
       order.status || 'PREPARING'
     ]);
 
-    doc.autoTable({
-      startY: yOffset,
-      head: [tableColumn],
-      body: tableRows,
-      theme: 'grid',
-      styles: { fontSize: 10 },
-      headStyles: { fillColor: [41, 128, 185] },
-      alternateRowStyles: { fillColor: [245, 245, 245] }
+    exportTableToPdf({
+      mainHeader: "ARMED FORCES MEDICAL COLLEGE",
+      title: "Kitchen Order History Report",
+      fileName: `order-history-${new Date().toISOString().split("T")[0]}.pdf`,
+      subtitle: subtitle,
+      headers: [
+        "Order Number",
+        "Order Date",
+        "Customer Name",
+        "Phone Number",
+        "Subtotal",
+        "Status"
+      ],
+      rows: tableRows,
+      footerText: "Armed Forces Medical College - Kitchen Order History Report",
+      showLogo: true,
     });
-
-    doc.save(`Order_History_${new Date().toISOString().slice(0, 10)}.pdf`);
   };
 
   const getStatusColor = (status) => {
@@ -241,7 +244,7 @@ const KitchenOrderHistory = () => {
           className="bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-xl flex items-center gap-2 disabled:bg-gray-400 transition-colors"
         >
           <FaDownload />
-          PDF
+          Download
         </button>
       </div>
 
@@ -306,7 +309,7 @@ const KitchenOrderHistory = () => {
             <h2 className="text-lg font-bold text-gray-800">Orders List</h2>
             <p className="text-sm text-gray-500">
               Showing {filteredOrders.length} orders
-              {fromDate && toDate && ` from ${fromDate} to ${toDate}`}
+              {fromDate && toDate && ` from ${formatDate(fromDate)} to ${formatDate(toDate)}`}
             </p>
           </div>
           <div className="flex gap-3">
@@ -314,7 +317,7 @@ const KitchenOrderHistory = () => {
               <FaSearch className="absolute top-1/2 left-3 -translate-y-1/2 text-gray-400 text-sm" />
               <input
                 type="text"
-                placeholder="Search by order #, name or phone..."
+                placeholder="Search by order  , name or phone..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
@@ -349,7 +352,7 @@ const KitchenOrderHistory = () => {
               <table className="min-w-full text-sm">
                 <thead className="bg-blue-50 text-gray-700 uppercase text-xs tracking-wider">
                   <tr>
-                    <th className="px-6 py-4 text-left">Order #</th>
+                    <th className="px-6 py-4 text-left">Order  </th>
                     <th className="px-6 py-4 text-left">Order Date</th>
                     <th className="px-6 py-4 text-left">Customer Name</th>
                     <th className="px-6 py-4 text-left">Phone Number</th>
@@ -369,7 +372,7 @@ const KitchenOrderHistory = () => {
                         </button>
                       </td>
                       <td className="px-6 py-4 text-gray-600">
-                        {order.order_date ? new Date(order.order_date).toLocaleDateString('en-IN') : 'N/A'}
+                        {order.order_date ? formatDate(order.order_date) : 'N/A'}
                       </td>
                       <td className="px-6 py-4 text-gray-700">{order.first_name || 'N/A'}</td>
                       <td className="px-6 py-4 text-gray-600">{order.phone_number || 'N/A'}</td>
@@ -425,7 +428,7 @@ const KitchenOrderHistory = () => {
             <div className="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-4 flex justify-between items-center">
               <div>
                 <h3 className="text-xl font-bold text-white">
-                  Order Details: #{selectedOrder.order_num}
+                  Order Details:  {selectedOrder.order_num}
                 </h3>
                 <p className="text-sm text-blue-100 mt-1">
                   Customer: {selectedOrder.first_name || 'N/A'} |

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState, useRef } from "react";
 import { FaSearch, FaUndoAlt, FaBan, FaChevronLeft, FaChevronRight, FaArrowLeft, FaDownload } from "react-icons/fa";
 import { cancelledOrdersAPI } from "../../services/api";
 import OrderDetailsModal from "../../components/OrderDetailsModal";
@@ -18,6 +18,11 @@ export default function CancelledOrders() {
 
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
+  
+  // Refs to track if we should auto-filter
+  const isInitialMount = useRef(true);
+  const fromDateRef = useRef(today);
+  const toDateRef = useRef(today);
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
@@ -34,7 +39,7 @@ export default function CancelledOrders() {
       setLoading(true);
       const res = await cancelledOrdersAPI.getCancelledOrders(filters);
       setOrders(res.data.data || []);
-      setCurrentPage(1); // reset to first page on new fetch
+      setCurrentPage(1);
     } catch (error) {
       console.error("Error fetching cancelled orders:", error);
       alert("Failed to load cancelled orders report");
@@ -43,12 +48,40 @@ export default function CancelledOrders() {
     }
   }, [filters]);
 
+  // Initial fetch on mount only
   useEffect(() => {
     fetchCancelledOrders();
-  }, [fetchCancelledOrders]);
+    isInitialMount.current = false;
+  }, []);
 
   const handleChange = (e) => {
-    setFilters({ ...filters, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setFilters(prev => ({ ...prev, [name]: value }));
+  };
+
+  // Handle date selection - only filter when a complete date is selected
+  const handleDateChange = (e) => {
+    const { name, value } = e.target;
+    
+    // Update the filter state
+    setFilters(prev => ({ ...prev, [name]: value }));
+    
+    // Update refs
+    if (name === 'fromDate') {
+      fromDateRef.current = value;
+    } else {
+      toDateRef.current = value;
+    }
+    
+    // Only fetch if both dates are valid and not during month navigation
+    if (value && value.length === 10) { // Date string is complete (YYYY-MM-DD)
+      // Small delay to ensure state is updated
+      setTimeout(() => {
+        if (fromDateRef.current && toDateRef.current) {
+          fetchCancelledOrders();
+        }
+      }, 100);
+    }
   };
 
   const handleSearch = (e) => {
@@ -57,10 +90,18 @@ export default function CancelledOrders() {
   };
 
   const handleReset = () => {
+    const resetFromDate = today;
+    const resetToDate = today;
+    
     setFilters({
-      fromDate: today,
-      toDate: today,
+      fromDate: resetFromDate,
+      toDate: resetToDate,
     });
+    
+    fromDateRef.current = resetFromDate;
+    toDateRef.current = resetToDate;
+    
+    // Fetch immediately after reset
     setTimeout(() => {
       fetchCancelledOrders();
     }, 100);
@@ -79,10 +120,12 @@ export default function CancelledOrders() {
       return date.toLocaleDateString();
     };
 
+    // Dynamic values based on current component
     exportTableToPdf({
+      mainHeader: "ARMED FORCES MEDICAL COLLEGE",
       title: "Cancelled Orders Report",
       fileName: `cancelled-orders-${new Date().toISOString().split("T")[0]}.pdf`,
-      subtitle: `From: ${formatDate(filters.fromDate)}   To: ${formatDate(filters.toDate)}`,
+      subtitle: `From: ${formatDate(filters.fromDate)} To: ${formatDate(filters.toDate)}`,
       headers: [
         "Order Number",
         "Status",
@@ -97,6 +140,8 @@ export default function CancelledOrders() {
         order?.FIRST_NAME ?? "",
         order?.pubmed_name ?? "",
       ]),
+      footerText: "Armed Forces Medical College - Cancelled Orders Report",
+      showLogo: true,
     });
   };
 
@@ -163,7 +208,7 @@ export default function CancelledOrders() {
               type="date"
               name="fromDate"
               value={filters.fromDate}
-              onChange={handleChange}
+              onChange={handleDateChange}
               className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-afmc-maroon"
             />
           </div>
@@ -176,7 +221,7 @@ export default function CancelledOrders() {
               type="date"
               name="toDate"
               value={filters.toDate}
-              onChange={handleChange}
+              onChange={handleDateChange}
               className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-afmc-maroon"
             />
           </div>
@@ -199,26 +244,6 @@ export default function CancelledOrders() {
               Reset
             </button>
           </div>
-
-          {/* Rows per page */}
-          {/* <div>
-            <label className="block mb-1 text-sm font-medium text-slate-700">
-              Rows Per Page
-            </label>
-            <select
-              value={rowsPerPage}
-              onChange={(e) => {
-                setRowsPerPage(Number(e.target.value));
-                setCurrentPage(1);
-              }}
-              className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-afmc-maroon"
-            >
-              <option value={5}>5</option>
-              <option value={10}>10</option>
-              <option value={20}>20</option>
-              <option value={50}>50</option>
-            </select>
-          </div> */}
         </div>
       </form>
 
