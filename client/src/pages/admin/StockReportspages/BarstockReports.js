@@ -1,9 +1,12 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { FaArrowLeft } from "react-icons/fa";
 import api from "../../../services/api";
 import Stackreporttab from "./Stackreporttab";
+import { toInitCap } from "../../../utils/textFormat";
 
 export default function BarstockReports() {
+  const navigate = useNavigate();
   const rowsPerPage = 15;
   const requestInFlight = useRef(false);
   const [searchParams] = useSearchParams();
@@ -107,73 +110,121 @@ export default function BarstockReports() {
       <div className="absolute top-16 left-12 w-72 h-72 bg-afmc-maroon/10 rounded-full blur-3xl"></div>
       <div className="absolute bottom-20 right-20 w-80 h-80 bg-afmc-maroon2/10 rounded-full blur-3xl"></div>
 
-      <div className="relative z-10 p-6">
-        <Stackreporttab />
-
-        <div className="mt-6 flex gap-4">
-          <input
-            type="text"
-            placeholder="Search Item Name..."
-            value={itemName}
-            onChange={(e) => setItemName(e.target.value)}
-            className="w-64 rounded-lg border px-4 py-2"
-          />
-
+      <div className="relative z-10 p-8">
+        <div className="flex items-center justify-between mb-6 md:mb-8">
+          <h1 className="text-2xl font-semibold text-afmc-maroon">
+            Stock Reports
+          </h1>
           <button
-            onClick={handleSearch}
-            className="rounded-lg bg-blue-500 px-4 py-2 text-white"
+            type="button"
+            onClick={() => navigate("/admin/dashboard")}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-white shadow hover:shadow-md border border-afmc-gold/30 text-gray-700 hover:text-afmc-maroon hover:bg-afmc-maroon/5 transition"
           >
-            Search
+            <FaArrowLeft />
+            Go To Dashboard
           </button>
         </div>
 
-        <div
-          className="mt-6 max-h-[70vh] overflow-auto rounded-xl bg-white shadow"
-          onScroll={handleScroll}
-        >
-          <table className="w-full text-left text-sm">
-            <thead className="sticky top-0 bg-gray-100 text-xs uppercase">
-              <tr>
-                <th className="p-3">Item Code</th>
-                <th className="p-3">Item Name</th>
-                <th className="p-3">Unit Price</th>
-                <th className="p-3">Total Price</th>
-                <th className="p-3">Available Stock</th>
-                <th className="p-3">Reserved Stock</th>
-                <th className="p-3">A/C Unit</th>
-              </tr>
-            </thead>
+        <Stackreporttab showTopBar={false} showReportTitle={false} />
 
-            <tbody>
-              {data.map((item, index) => (
-                <tr
-                  key={`${item.item_code || "row"}-${index}`}
-                  className="border-b hover:bg-gray-50"
-                >
-                  <td className="p-3">{item.item_code}</td>
-                  <td className="p-3">{item.item_name}</td>
-                  <td className="p-3">{item.unit_price ?? "-"}</td>
-                  <td className="p-3">{item.total_price ?? "-"}</td>
-                  <td className="p-3">{item.AVAILABLE_STOCK ?? 0}</td>
-                  <td className="p-3">{item.RESERVED_STOCK ?? 0}</td>
-                  <td className="p-3">{item.A_C_UNIT ?? "-"}</td>
-                </tr>
-              ))}
+        <div className="mt-8 bg-white/80 border border-white/60 rounded-3xl shadow-xl backdrop-blur-sm p-6">
+          <div className="flex flex-wrap items-end gap-4 mb-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Item Name
+              </label>
+              <input
+                type="text"
+                placeholder="Search Item Name..."
+                value={itemName}
+                onChange={(e) => setItemName(e.target.value)}
+                className="w-72 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
+              />
+            </div>
 
-              {!loading && !data.length && (
-                <tr>
-                  <td className="p-3 text-center" colSpan="7">
-                    No data found.
-                  </td>
-                </tr>
+            <button
+              type="button"
+              onClick={handleSearch}
+              className="px-6 py-3 rounded-2xl bg-[#5b5b5b] text-white font-semibold flex items-center gap-2 shadow hover:shadow-md"
+            >
+              Search
+            </button>
+          </div>
+
+          <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
+            <div
+              className="max-h-[70vh] overflow-auto"
+              onScroll={handleScroll}
+            >
+              <table className="w-full text-left text-sm">
+                <thead className="sticky top-0 bg-gray-50 text-gray-600">
+                  <tr>
+                    <th className="px-4 py-3 text-left font-medium">
+                      Item Code
+                    </th>
+                    <th className="px-4 py-3 text-left font-medium">
+                      Item Name
+                    </th>
+                    <th className="px-4 py-3 text-left font-medium">
+                      Unit Price
+                    </th>
+                    <th className="px-4 py-3 text-left font-medium">
+                      Total Price
+                    </th>
+                    <th className="px-4 py-3 text-left font-medium">
+                      Available Stock
+                    </th>
+                    <th className="px-4 py-3 text-left font-medium">
+                      Reserved Stock
+                    </th>
+                    <th className="px-4 py-3 text-left font-medium">
+                      A/C Unit
+                    </th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {data.map((item, index) => (
+                    <tr
+                      key={`${item.item_code || "row"}-${index}`}
+                      className="border-t border-gray-100 hover:bg-gray-50"
+                    >
+                      <td className="px-4 py-3">{item.item_code}</td>
+                      <td className="px-4 py-3 capitalize">
+                        {toInitCap(item.item_name)}
+                      </td>
+                      <td className="px-4 py-3">{item.unit_price ?? "-"}</td>
+                      <td className="px-4 py-3">{item.total_price ?? "-"}</td>
+                      <td className="px-4 py-3">{item.AVAILABLE_STOCK ?? 0}</td>
+                      <td className="px-4 py-3">{item.RESERVED_STOCK ?? 0}</td>
+                      <td className="px-4 py-3">
+                        {toInitCap(item.A_C_UNIT ?? "-")}
+                      </td>
+                    </tr>
+                  ))}
+
+                  {!loading && !data.length && (
+                    <tr>
+                      <td className="px-4 py-6 text-center text-gray-500" colSpan="7">
+                        No records found.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+
+              {loading && (
+                <p className="px-4 py-6 text-center text-gray-500">
+                  Loading...
+                </p>
               )}
-            </tbody>
-          </table>
-
-          {loading && <p className="p-3 text-center">Loading...</p>}
-          {!loading && data.length > 0 && !hasMore && (
-            <p className="p-3 text-center">No more data</p>
-          )}
+              {!loading && data.length > 0 && !hasMore && (
+                <p className="px-4 py-6 text-center text-gray-500">
+                  No more data
+                </p>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>

@@ -1,8 +1,21 @@
 import React, { useEffect, useState } from "react";
 import { FaDownload, FaSearch } from "react-icons/fa";
+import { FaArrowLeft } from "react-icons/fa";
 import api from "../../../services/api";
 import Stackreporttab from "./Stackreporttab";
 import { exportTableToPdf } from "../../../utils/pdfExport";
+import FilterDropdown from "../../../components/common/FilterDropdown";
+import { useNavigate } from "react-router-dom";
+import { toInitCap } from "../../../utils/textFormat";
+
+const toInputDate = (date) => {
+  const d = date instanceof Date ? date : new Date(date);
+  if (Number.isNaN(d.getTime())) return "";
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  return `${yyyy}-${mm}-${dd}`;
+};
 
 const buildQueryParams = (filters) => {
   const params = {};
@@ -26,9 +39,11 @@ const formatQuantity = (value) => {
 };
 
 export default function Orderitemdetails() {
+  const navigate = useNavigate();
+  const today = toInputDate(new Date());
   const initialFilters = {
-    fromDate: "",
-    toDate: "",
+    fromDate: today,
+    toDate: today,
     itemNames: "",
     kitchenName: "",
     userName: "",
@@ -160,151 +175,205 @@ export default function Orderitemdetails() {
       <div className="absolute top-16 left-12 w-72 h-72 bg-afmc-maroon/10 rounded-full blur-3xl"></div>
       <div className="absolute bottom-20 right-20 w-80 h-80 bg-afmc-maroon2/10 rounded-full blur-3xl"></div>
 
-      <div className="relative z-10 p-6">
-        <div className="bg-white p-6 rounded-xl shadow">
-          <Stackreporttab />
+      <div className="relative z-10 p-8">
+        <div className="flex items-center justify-between mb-6 md:mb-8">
+          <h1 className="text-2xl font-semibold text-afmc-maroon">
+            Stock Reports
+          </h1>
+          <button
+            type="button"
+            onClick={() => navigate("/admin/dashboard")}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-white shadow hover:shadow-md border border-afmc-gold/30 text-gray-700 hover:text-afmc-maroon hover:bg-afmc-maroon/5 transition"
+          >
+            <FaArrowLeft />
+            Go To Dashboard
+          </button>
+        </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mt-5 mb-5">
-            <input
-              type="date"
-              name="fromDate"
-              value={filters.fromDate}
-              onChange={handleChange}
-              className="input"
-            />
-            <input
-              type="date"
-              name="toDate"
-              value={filters.toDate}
-              onChange={handleChange}
-              className="input"
-            />
-            <select
-              name="itemNames"
-              value={filters.itemNames}
-              onChange={handleChange}
-              className="input"
-              disabled={filtersLoading}
-            >
-              <option value="">
-                {filtersLoading ? "Loading items..." : "Select Item Name"}
-              </option>
-              {filterOptions.itemNames.map((itemName) => (
-                <option key={itemName} value={itemName}>
-                  {itemName}
-                </option>
-              ))}
-            </select>
-            <select
-              name="kitchenName"
-              value={filters.kitchenName}
-              onChange={handleChange}
-              className="input"
-              disabled={filtersLoading}
-            >
-              <option value="">
-                {filtersLoading ? "Loading kitchens..." : "Select Kitchen Name"}
-              </option>
-              {filterOptions.kitchenNames.map((kitchenName) => (
-                <option key={kitchenName} value={kitchenName}>
-                  {kitchenName}
-                </option>
-              ))}
-            </select>
-            <select
-              name="userName"
-              value={filters.userName}
-              onChange={handleChange}
-              className="input"
-              disabled={filtersLoading}
-            >
-              <option value="">
-                {filtersLoading ? "Loading users..." : "Select User Name"}
-              </option>
-              {filterOptions.userNames.map((userName) => (
-                <option key={userName} value={userName}>
-                  {userName}
-                </option>
-              ))}
-            </select>
+        <Stackreporttab showTopBar={false} showReportTitle={false} />
+
+        <div className="mt-8 bg-white/80 border border-white/60 rounded-3xl shadow-xl backdrop-blur-sm p-6">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                From
+              </label>
+              <input
+                type="date"
+                name="fromDate"
+                value={filters.fromDate}
+                onChange={handleChange}
+                className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                To
+              </label>
+              <input
+                type="date"
+                name="toDate"
+                value={filters.toDate}
+                onChange={handleChange}
+                className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Item Name
+              </label>
+              <FilterDropdown
+                value={filters.itemNames}
+                onChange={(next) =>
+                  setFilters((current) => ({ ...current, itemNames: next }))
+                }
+                options={filterOptions.itemNames}
+                placeholder="Select Item Name"
+                allLabel="All Items"
+                loading={filtersLoading}
+                loadingLabel="Loading items..."
+                formatLabel={toInitCap}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Kitchen Name
+              </label>
+              <FilterDropdown
+                value={filters.kitchenName}
+                onChange={(next) =>
+                  setFilters((current) => ({ ...current, kitchenName: next }))
+                }
+                options={filterOptions.kitchenNames}
+                placeholder="Select Kitchen Name"
+                allLabel="All Kitchens"
+                loading={filtersLoading}
+                loadingLabel="Loading kitchens..."
+                formatLabel={toInitCap}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                User Name
+              </label>
+              <FilterDropdown
+                value={filters.userName}
+                onChange={(next) =>
+                  setFilters((current) => ({ ...current, userName: next }))
+                }
+                options={filterOptions.userNames}
+                placeholder="Select User Name"
+                allLabel="All Users"
+                loading={filtersLoading}
+                loadingLabel="Loading users..."
+                formatLabel={toInitCap}
+              />
+            </div>
           </div>
 
-          <div className="flex justify-end gap-3 mb-4">
-            <button onClick={handleSearch} className="btn" disabled={loading}>
-              <FaSearch size={16} /> {loading ? "Loading..." : "Search"}
+          <div className="flex flex-wrap justify-end gap-3 mb-4">
+            <button
+              type="button"
+              onClick={handleSearch}
+              className="px-6 py-3 rounded-2xl bg-[#5b5b5b] text-white font-semibold flex items-center gap-2 shadow hover:shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
+              disabled={loading}
+            >
+              <FaSearch size={16} />
+              {loading ? "Loading..." : "Search"}
             </button>
             <button
+              type="button"
               onClick={exportPdf}
-              className="btn"
+              className="px-6 py-3 rounded-2xl bg-afmc-maroon hover:bg-afmc-maroon2 text-white font-semibold flex items-center gap-2 shadow hover:shadow-md transition disabled:opacity-60 disabled:cursor-not-allowed"
               disabled={!data.length}
             >
-              <FaDownload size={16} /> Download
+              <FaDownload size={16} />
+              Download
             </button>
           </div>
 
-          {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
+          {error && (
+            <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+              {error}
+            </div>
+          )}
 
           {!hasSearched ? (
-            <div className="rounded-lg border border-dashed border-gray-300 p-8 text-center text-gray-500">
+            <div className="rounded-2xl border border-dashed border-gray-300 p-8 text-center text-gray-500 bg-white">
               Select filters and click Search to view data.
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full border">
-                <thead className="bg-gray-200">
-                  <tr>
-                    <th className="th">Item</th>
-                    <th className="th">Qty</th>
-                    <th className="th">Total Profit</th>
-                    <th className="th">Prep Charges</th>
-                    <th className="th">Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.length ? (
-                    data.map((row, i) => (
-                      <tr
-                        key={row.item_id || `${row.item_name || "row"}-${i}`}
-                        className={`text-center border-t ${
-                          !row.item_id ? "font-bold text-red-600" : ""
-                        }`}
-                      >
-                        <td className="td">{row.item_name || "-"}</td>
-                        <td className="td">{formatQuantity(row.quantity)}</td>
-                        <td className="td">
-                          {row.total_profit ? formatNumber(row.total_profit) : "-"}
-                        </td>
-                        <td className="td">
-                          {row.food_pr_charges
-                            ? formatNumber(row.food_pr_charges)
-                            : "-"}
-                        </td>
-                        <td className="td">
-                          {row.subtotal ? formatNumber(row.subtotal) : "-"}
+            <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 text-gray-600">
+                    <tr>
+                      <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
+                        Item
+                      </th>
+                      <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
+                        Qty
+                      </th>
+                      <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
+                        Total Profit
+                      </th>
+                      <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
+                        Prep Charges
+                      </th>
+                      <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
+                        Total
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.length ? (
+                      data.map((row, i) => (
+                        <tr
+                          key={row.item_id || `${row.item_name || "row"}-${i}`}
+                          className={`border-t border-gray-100 hover:bg-gray-50 ${
+                            !row.item_id ? "font-bold text-red-600" : ""
+                          }`}
+                        >
+                          <td className="px-4 py-3 whitespace-nowrap capitalize">
+                            {toInitCap(row.item_name || "-")}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            {formatQuantity(row.quantity)}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            {row.total_profit ? formatNumber(row.total_profit) : "-"}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            {row.food_pr_charges
+                              ? formatNumber(row.food_pr_charges)
+                              : "-"}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            {row.subtotal ? formatNumber(row.subtotal) : "-"}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr className="border-t border-gray-100">
+                        <td
+                          className="px-4 py-6 text-center text-gray-500"
+                          colSpan="5"
+                        >
+                          No records found.
                         </td>
                       </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td className="td text-center" colSpan="5">
-                        No data found.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>
       </div>
-
-      <style>{`
-        .input { padding: 8px; border: 1px solid #ccc; border-radius: 6px; width: 100%; }
-        .btn { display: flex; gap: 5px; align-items: center; background: #6b5f5f; color: white; padding: 8px 14px; border-radius: 20px; }
-        .btn:disabled { opacity: 0.6; cursor: not-allowed; }
-        .th { padding: 10px }
-        .td { padding: 10px }
-      `}</style>
     </div>
   );
 }

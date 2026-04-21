@@ -103,26 +103,33 @@ export default function ProfitManagement() {
     };
 
     return (
-        <div className="p-4 min-h-screen bg-slate-100">
-            <div className="flex justify-end mb-4">
-                <button
-                    onClick={() => navigate("/admin/dashboard")}
-                    className="flex items-center gap-2 px-3 py-1.5 text-sm bg-gradient-to-r from-afmc-maroon to-afmc-maroon2 hover:from-afmc-maroon2 hover:to-afmc-maroon text-white font-medium rounded-lg shadow-md transition duration-300"
-                  >
-                    <FaArrowLeft size={14} />
-                    Back
-                  </button>
-            </div>
+        <div className="min-h-screen bg-gradient-to-br from-afmc-bg via-white to-afmc-bg2 relative">
+            <div className="absolute top-16 left-12 w-72 h-72 bg-afmc-maroon/10 rounded-full blur-3xl"></div>
+            <div className="absolute bottom-20 right-20 w-80 h-80 bg-afmc-maroon2/10 rounded-full blur-3xl"></div>
 
-            <h1 className="text-2xl font-bold text-slate-800 mb-4">
-                Profit Management
-            </h1>
+            <div className="p-6 md:p-8 relative z-10">
+                <div className="flex items-center justify-between mb-6 md:mb-8">
+                    <h1 className="text-2xl font-semibold text-afmc-maroon">
+                        Profit Management
+                    </h1>
+                    <button
+                        type="button"
+                        onClick={() => navigate("/admin/dashboard")}
+                        className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-white shadow hover:shadow-md border border-afmc-gold/30 text-gray-700 hover:text-afmc-maroon hover:bg-afmc-maroon/5 transition"
+                    >
+                        <FaArrowLeft />
+                        Go To Dashboard
+                    </button>
+                </div>
 
-            <div className="grid md:grid-cols-2 gap-4 mb-5">
+                <div className="bg-white/80 border border-afmc-gold/15 rounded-3xl shadow-xl backdrop-blur-sm p-5 md:p-6 mb-6">
+                    <div className="mb-5 md:mb-6 h-1 w-full rounded-full bg-gradient-to-r from-afmc-maroon via-afmc-gold to-afmc-maroon2" />
+
+                    <div className="grid md:grid-cols-2 gap-5 md:gap-6">
                 {/* Member Pricing */}
                 <form
                     onSubmit={handleMemberSubmit}
-                    className="bg-white rounded-xl shadow-sm p-4"
+                    className="bg-white/70 border border-white/60 rounded-3xl shadow-lg backdrop-blur-sm p-5"
                 >
                     <h2 className="text-lg font-semibold text-slate-700 mb-3">
                         Member Profit Setup
@@ -136,7 +143,7 @@ export default function ProfitManagement() {
                             name="category"
                             value={memberForm.category}
                             onChange={handleMemberChange}
-                            className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
                         >
                             {categoryOptions.map((cat) => (
                                 <option key={cat} value={cat}>
@@ -155,7 +162,7 @@ export default function ProfitManagement() {
                             name="profit"
                             value={memberForm.profit}
                             onChange={handleMemberChange}
-                            className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
                             required
                         />
                     </div>
@@ -170,14 +177,14 @@ export default function ProfitManagement() {
                                 name="foodPrCharges"
                                 value={memberForm.foodPrCharges}
                                 onChange={handleMemberChange}
-                                className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
                             />
                         </div>
                     )}
 
                     <button
                         type="submit"
-                        className="bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-2 rounded-md transition"
+                        className="px-6 py-3 rounded-2xl bg-afmc-maroon hover:bg-afmc-maroon2 text-white text-sm font-semibold shadow hover:shadow-md transition"
                     >
                         Update Member
                     </button>
@@ -186,7 +193,7 @@ export default function ProfitManagement() {
                 {/* Non Member Pricing */}
                 <form
                     onSubmit={handleNonMemberSubmit}
-                    className="bg-white rounded-xl shadow-sm p-4"
+                    className="bg-white/70 border border-white/60 rounded-3xl shadow-lg backdrop-blur-sm p-5"
                 >
                     <h2 className="text-lg font-semibold text-slate-700 mb-3">
                         Non-Member Profit Setup
@@ -200,7 +207,7 @@ export default function ProfitManagement() {
                             name="category"
                             value={nonMemberForm.category}
                             onChange={handleNonMemberChange}
-                            className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                            className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
                         >
                             {categoryOptions.map((cat) => (
                                 <option key={cat} value={cat}>
@@ -219,7 +226,7 @@ export default function ProfitManagement() {
                             name="profit"
                             value={nonMemberForm.profit}
                             onChange={handleNonMemberChange}
-                            className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                            className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
                             required
                         />
                     </div>
@@ -234,22 +241,23 @@ export default function ProfitManagement() {
                                 name="prCharges"
                                 value={nonMemberForm.prCharges}
                                 onChange={handleNonMemberChange}
-                                className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                                className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
                             />
                         </div>
                     )}
 
                     <button
                         type="submit"
-                        className="bg-green-600 hover:bg-green-700 text-white text-sm px-4 py-2 rounded-md transition"
+                        className="px-6 py-3 rounded-2xl bg-[#5b5b5b] text-white text-sm font-semibold shadow hover:shadow-md transition"
                     >
                         Update Non-Member
                     </button>
                 </form>
-            </div>
+                    </div>
+                </div>
 
             {/* Report Section */}
-            <div className="bg-white rounded-xl shadow-sm p-4">
+            <div className="bg-white/80 border border-white/60 rounded-3xl shadow-xl backdrop-blur-sm p-6">
                 <h2 className="text-lg font-semibold text-slate-700 mb-3">
                     Profit Report
                 </h2>
@@ -257,50 +265,60 @@ export default function ProfitManagement() {
                 {loading ? (
                     <p className="text-sm text-slate-600">Loading report...</p>
                 ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full border border-slate-200 text-sm">
-                            <thead className="bg-slate-100">
-                                <tr>
-                                    <th className="border px-3 py-2 text-left">Category</th>
-                                    <th className="border px-3 py-2 text-left">Member Profit</th>
-                                    <th className="border px-3 py-2 text-left">
-                                        Food PR Charges
-                                    </th>
-                                    <th className="border px-3 py-2 text-left">
-                                        Non-Member Profit
-                                    </th>
-                                    <th className="border px-3 py-2 text-left">PR Charges</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {reportData.length > 0 ? (
-                                    reportData.map((row, index) => (
-                                        <tr key={index} className="hover:bg-slate-50">
-                                            <td className="border px-3 py-2">{row.category_name}</td>
-                                            <td className="border px-3 py-2">{row.PROFIT}</td>
-                                            <td className="border px-3 py-2">
-                                                {row.FOOD_PR_CHARGES}
-                                            </td>
-                                            <td className="border px-3 py-2">
-                                                {row.NON_MEMBER_PROFIT}
-                                            </td>
-                                            <td className="border px-3 py-2">{row.PR_CHARGES}</td>
-                                        </tr>
-                                    ))
-                                ) : (
+                    <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                                <thead className="bg-gray-50 text-gray-600">
                                     <tr>
-                                        <td
-                                            colSpan="5"
-                                            className="border px-3 py-3 text-center text-slate-500"
-                                        >
-                                            No data found
-                                        </td>
+                                        <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
+                                            Category
+                                        </th>
+                                        <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
+                                            Member Profit
+                                        </th>
+                                        <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
+                                            Food PR Charges
+                                        </th>
+                                        <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
+                                            Non-Member Profit
+                                        </th>
+                                        <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
+                                            PR Charges
+                                        </th>
                                     </tr>
-                                )}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody>
+                                    {reportData.length > 0 ? (
+                                        reportData.map((row, index) => (
+                                            <tr
+                                                key={index}
+                                                className="border-t border-gray-100 hover:bg-gray-50"
+                                            >
+                                                <td className="px-4 py-3 capitalize">
+                                                    {row.category_name}
+                                                </td>
+                                                <td className="px-4 py-3">{row.PROFIT}</td>
+                                                <td className="px-4 py-3">{row.FOOD_PR_CHARGES}</td>
+                                                <td className="px-4 py-3">{row.NON_MEMBER_PROFIT}</td>
+                                                <td className="px-4 py-3">{row.PR_CHARGES}</td>
+                                            </tr>
+                                        ))
+                                    ) : (
+                                        <tr className="border-t border-gray-100">
+                                            <td
+                                                colSpan="5"
+                                                className="px-4 py-6 text-center text-gray-500"
+                                            >
+                                                No records found.
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 )}
+            </div>
             </div>
         </div>
     );

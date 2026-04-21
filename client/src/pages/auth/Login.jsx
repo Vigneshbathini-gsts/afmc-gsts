@@ -169,7 +169,7 @@ export default function Login() {
 
   const getEmailError = () => {
     if (!touched.email) return "";
-    if (!email) return "Username or service number is required";
+    if (!email) return "Username is required";
     if (!validateUsername(email)) return "Please enter a valid username, service number, or email";
     return "";
   };
@@ -285,7 +285,7 @@ export default function Login() {
           {/* Header */}
           <div style={styles.formHeader}>
             <div style={styles.eyebrow}>Secure Sign-In</div>
-            <h1 style={styles.formTitle}>Welcome back</h1>
+            <h1 style={styles.formTitle}>Welcome</h1>
             <p style={styles.formSub}>
               Enter your credentials to access the mess management system.
             </p>
@@ -303,7 +303,7 @@ export default function Login() {
             {/* Username */}
             <div style={styles.fieldGroup}>
               <label style={styles.fieldLabel} htmlFor="afmc-email">
-                Username / Service Number / Email
+                Username
               </label>
               <div style={{
                 ...styles.inputWrap,
@@ -313,7 +313,7 @@ export default function Login() {
                 <input
                   id="afmc-email"
                   type="text"
-                  placeholder="e.g., john.doe, IC-12345, or john@afmc.in"
+                  placeholder="Enter Username"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   onBlur={() => setTouched(prev => ({ ...prev, email: true }))}

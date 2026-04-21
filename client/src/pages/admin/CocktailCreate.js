@@ -1,7 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { ChevronsLeft, PlusCircle, Search } from "lucide-react";
+import { PlusCircle, Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cocktailAPI } from "../../services/api";
+import { toInitCap } from "../../utils/textFormat";
+import { FaArrowLeft } from "react-icons/fa";
+import FilterDropdown from "../../components/common/FilterDropdown";
 
 const createEmptyRow = () => ({
   id: Date.now() + Math.floor(Math.random() * 1000),
@@ -61,7 +64,9 @@ export default function CocktailCreate() {
     );
 
   const recalculateRowPrices = async (rowId, itemCode, pegs) => {
-    if (!itemCode || !pegs) {
+    const numericPegs = Number(pegs);
+
+    if (!itemCode || !pegs || Number.isNaN(numericPegs) || numericPegs <= 0) {
       setRows((current) =>
         current.map((row) =>
           row.id === rowId
@@ -112,9 +117,9 @@ export default function CocktailCreate() {
           ? {
               ...row,
               itemCode,
-              itemName: selectedName,
-              memberPrice: itemCode ? row.memberPrice : "",
-              nonMemberPrice: itemCode ? row.nonMemberPrice : "",
+              itemName: toInitCap(selectedName),
+              memberPrice: "",
+              nonMemberPrice: "",
             }
           : row
       )
@@ -151,20 +156,67 @@ export default function CocktailCreate() {
     });
   }, [rows, search]);
 
+  const subCategoryOptions = useMemo(
+    () => [
+      { value: "14", label: "Cocktail" },
+      { value: "15", label: "Mocktail" },
+    ],
+    []
+  );
+
+  const ingredientDropdownOptions = useMemo(() => {
+    return ingredientOptions.map((opt) => ({
+      value: String(opt.ITEM_CODE ?? "").trim(),
+      label: `${String(opt.ITEM_CODE ?? "").trim()} - ${toInitCap(opt.ITEM_NAME)}`,
+    }));
+  }, [ingredientOptions]);
+
+  const formatIngredientLabel = (label) => {
+    const str = String(label ?? "");
+    const parts = str.split("-");
+    if (parts.length < 2) return str;
+    const code = parts[0]?.trim() ?? "";
+    const name = parts.slice(1).join("-").trim();
+    return `${code} - ${toInitCap(name)}`;
+  };
+
   const handleSubmit = async () => {
     try {
       setSaving(true);
       setError("");
 
+      if (!form.itemName?.trim()) {
+        setError("Item name is required.");
+        return;
+      }
+
+      if (!form.subCategory) {
+        setError("Please select Cocktail or Mocktail.");
+        return;
+      }
+
+      const normalizedRows = rows
+        .map((row) => ({
+          ...row,
+          itemCode: String(row.itemCode ?? "").trim(),
+          pegs: String(row.pegs ?? "").trim(),
+        }))
+        .filter((row) => row.itemCode && Number(row.pegs) > 0);
+
+      if (!normalizedRows.length) {
+        setError("Please add at least one ingredient with a valid peg value.");
+        return;
+      }
+
       const payload = new FormData();
-      payload.append("itemName", form.itemName);
+      payload.append("itemName", form.itemName.trim());
       payload.append("subCategory", form.subCategory);
       payload.append("description", form.description);
       payload.append("memberProfit", form.memberProfit);
       payload.append("memberPrCharges", form.memberPrCharges);
       payload.append("nonMemberProfit", form.nonMemberProfit);
       payload.append("nonMemberPrCharges", form.nonMemberPrCharges);
-      payload.append("rows", JSON.stringify(rows));
+      payload.append("rows", JSON.stringify(normalizedRows));
 
       if (form.image) {
         payload.append("image", form.image);
@@ -191,27 +243,30 @@ export default function CocktailCreate() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f7f4f1] px-8 py-8">
-      <div className="mx-auto max-w-7xl overflow-hidden rounded-2xl border border-[#e1d6ca] bg-white shadow-sm">
-        <div className="flex items-center justify-between border-b border-[#eee4d8] px-6 py-5">
-          <h1 className="text-3xl font-semibold text-[#1f1d1b]">
-            Mocktails/Cocktails
+    <div className="min-h-screen bg-gradient-to-br from-afmc-bg via-white to-afmc-bg2 relative">
+      <div className="absolute top-16 left-12 w-72 h-72 bg-afmc-maroon/10 rounded-full blur-3xl"></div>
+      <div className="absolute bottom-20 right-20 w-80 h-80 bg-afmc-maroon2/10 rounded-full blur-3xl"></div>
+
+      <div className="p-6 md:p-8 relative z-10">
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-6 md:mb-8">
+          <h1 className="text-2xl font-semibold text-afmc-maroon">
+            Create Cocktail/Mocktail
           </h1>
 
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
             <button
               type="button"
               onClick={() => navigate("/admin/cocktail-management")}
-              className="flex items-center gap-2 rounded-full bg-[#7a7067] px-5 py-3 font-semibold text-white"
+              className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-white shadow hover:shadow-md border border-afmc-gold/30 text-gray-700 hover:text-afmc-maroon hover:bg-afmc-maroon/5 transition"
             >
-              <ChevronsLeft size={18} />
+              <FaArrowLeft />
               Back
             </button>
             <button
               type="button"
               onClick={handleSubmit}
               disabled={saving}
-              className="flex items-center gap-2 rounded-full bg-[#5d941a] px-5 py-3 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-70"
+              className="flex items-center gap-2 px-6 py-2.5 rounded-full bg-afmc-maroon hover:bg-afmc-maroon2 text-white font-semibold shadow hover:shadow-md transition disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <PlusCircle size={18} />
               {saving ? "Creating..." : "Create"}
@@ -219,9 +274,12 @@ export default function CocktailCreate() {
           </div>
         </div>
 
-        <div className="space-y-6 p-6">
+        <div className="bg-white/80 border border-afmc-gold/15 rounded-3xl shadow-xl backdrop-blur-sm p-5 md:p-6">
+          <div className="mb-5 md:mb-6 h-1 w-full rounded-full bg-gradient-to-r from-afmc-maroon via-afmc-gold to-afmc-maroon2" />
+
+          <div className="space-y-6">
           {error && (
-            <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
               {error}
             </div>
           )}
@@ -231,22 +289,21 @@ export default function CocktailCreate() {
               value={form.itemName}
               onChange={(event) => updateForm("itemName", event.target.value)}
               placeholder="Item Name"
-              className="rounded-md border border-[#a79e96] px-4 py-4 outline-none"
+              className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 outline-none focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20 capitalize"
             />
-            <select
+            <FilterDropdown
+              label="Sub Category"
               value={form.subCategory}
-              onChange={(event) => updateForm("subCategory", event.target.value)}
-              className="rounded-md border border-[#a79e96] px-4 py-4 outline-none"
-            >
-              <option value="">Sub Category</option>
-              <option value="14">COCKTAIL</option>
-              <option value="15">MOCKTAIL</option>
-            </select>
+              onChange={(next) => updateForm("subCategory", next)}
+              options={subCategoryOptions}
+              placeholder="Sub Category"
+              allLabel="All"
+            />
             <input
               value={form.description}
               onChange={(event) => updateForm("description", event.target.value)}
               placeholder="Description"
-              className="rounded-md border border-[#a79e96] px-4 py-4 outline-none"
+              className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 outline-none focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
             />
             <div>
               <label className="mb-1 block text-sm text-[#4d4640]">Image</label>
@@ -256,7 +313,7 @@ export default function CocktailCreate() {
                 onChange={(event) =>
                   updateForm("image", event.target.files?.[0] || null)
                 }
-                className="w-full rounded-md border border-dashed border-[#a79e96] px-4 py-3"
+                className="w-full rounded-2xl border border-dashed border-gray-300 bg-white px-4 py-3"
               />
             </div>
           </div>
@@ -266,7 +323,7 @@ export default function CocktailCreate() {
               value={form.memberProfit}
               onChange={(event) => updateForm("memberProfit", event.target.value)}
               placeholder="Member Profit"
-              className="rounded-md border border-[#a79e96] px-4 py-4 outline-none"
+              className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 outline-none focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
             />
             <input
               value={form.memberPrCharges}
@@ -274,7 +331,7 @@ export default function CocktailCreate() {
                 updateForm("memberPrCharges", event.target.value)
               }
               placeholder="Member Pr Charges"
-              className="rounded-md border border-[#a79e96] px-4 py-4 outline-none"
+              className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 outline-none focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
             />
             <input
               value={form.nonMemberProfit}
@@ -282,7 +339,7 @@ export default function CocktailCreate() {
                 updateForm("nonMemberProfit", event.target.value)
               }
               placeholder="Non Member Profit"
-              className="rounded-md border border-[#a79e96] px-4 py-4 outline-none"
+              className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 outline-none focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
             />
             <input
               value={form.nonMemberPrCharges}
@@ -290,53 +347,51 @@ export default function CocktailCreate() {
                 updateForm("nonMemberPrCharges", event.target.value)
               }
               placeholder="Non Member Pr Charges"
-              className="rounded-md border border-[#a79e96] px-4 py-4 outline-none"
+              className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 outline-none focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
             />
           </div>
 
-          <div className="rounded-xl border border-[#e4dacf]">
-            <div className="flex flex-wrap items-center gap-4 border-b border-[#e9dfd5] px-4 py-4">
-              <div className="flex items-center gap-2 text-[#4e443a]">
+          <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
+            <div className="flex flex-wrap items-center gap-4 border-b border-gray-100 px-4 py-4">
+              <div className="flex items-center gap-2 text-gray-600">
                 <Search size={18} />
+                <span className="text-sm font-medium">Ingredients</span>
               </div>
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Search: All Text Columns"
-                className="rounded-md border border-[#bcb2a8] px-4 py-3 outline-none"
+                className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 outline-none focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
               />
-              <button type="button" className="font-semibold text-[#2e271f]">
-                Go
-              </button>
               <button
                 type="button"
                 onClick={addRow}
-                className="font-semibold text-[#2e271f]"
+                className="ml-auto px-6 py-3 rounded-2xl bg-[#5b5b5b] text-white font-semibold shadow hover:shadow-md"
               >
                 Add Row
               </button>
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-center">
-                <thead className="bg-white text-sm text-[#4e443a]">
+              <table className="w-full text-center text-sm">
+                <thead className="bg-gray-50 text-gray-600">
                   <tr>
-                    <th className="border-b border-r border-[#e9dfd5] px-4 py-4">
+                    <th className="border-b border-r border-gray-100 px-4 py-4">
                       #
                     </th>
-                    <th className="border-b border-r border-[#e9dfd5] px-4 py-4">
+                    <th className="border-b border-r border-gray-100 px-4 py-4">
                       Item Code
                     </th>
-                    <th className="border-b border-r border-[#e9dfd5] px-4 py-4">
+                    <th className="border-b border-r border-gray-100 px-4 py-4">
                       Item Name
                     </th>
-                    <th className="border-b border-r border-[#e9dfd5] px-4 py-4">
+                    <th className="border-b border-r border-gray-100 px-4 py-4">
                       Pegs
                     </th>
-                    <th className="border-b border-r border-[#e9dfd5] px-4 py-4">
+                    <th className="border-b border-r border-gray-100 px-4 py-4">
                       Member Price
                     </th>
-                    <th className="border-b border-r border-[#e9dfd5] px-4 py-4">
+                    <th className="border-b border-r border-gray-100 px-4 py-4">
                       Non Member Price
                     </th>
                     <th className="border-b px-4 py-4">Delete Row</th>
@@ -344,34 +399,32 @@ export default function CocktailCreate() {
                 </thead>
                 <tbody>
                   {filteredRows.map((row, index) => (
-                    <tr key={row.id} className="bg-[#f7fff8]">
-                      <td className="border-b border-r border-[#e9dfd5] px-2 py-3">
+                    <tr key={row.id} className="border-t border-gray-100">
+                      <td className="border-r border-gray-100 px-2 py-3">
                         {index + 1}
                       </td>
-                      <td className="border-b border-r border-[#e9dfd5] px-2 py-3">
-                        <select
+                      <td className="border-r border-gray-100 px-2 py-3">
+                        <FilterDropdown
                           value={row.itemCode}
-                          onChange={(event) =>
-                            handleItemCodeChange(row.id, event.target.value)
-                          }
-                          className="w-full bg-transparent text-center outline-none"
-                        >
-                          <option value="">Select Item</option>
-                          {ingredientOptions.map((option) => (
-                            <option key={option.ITEM_CODE} value={option.ITEM_CODE}>
-                              {option.ITEM_CODE}-{option.ITEM_NAME}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="border-b border-r border-[#e9dfd5] px-2 py-3">
-                        <input
-                          value={row.itemName}
-                          readOnly
-                          className="w-full bg-transparent text-center outline-none"
+                          onChange={(next) => handleItemCodeChange(row.id, next)}
+                          options={ingredientDropdownOptions}
+                          placeholder="Select Item"
+                          allLabel="Clear"
+                          formatLabel={formatIngredientLabel}
+                          buttonClassName="rounded-xl px-3 py-2 bg-transparent text-center"
+                          valueClassName="normal-case"
+                          menuClassName="text-left"
+                          usePortal
                         />
                       </td>
-                      <td className="border-b border-r border-[#e9dfd5] px-2 py-3">
+                      <td className="border-r border-gray-100 px-2 py-3">
+                        <input
+                          value={toInitCap(row.itemName)}
+                          readOnly
+                          className="w-full bg-transparent text-center outline-none capitalize"
+                        />
+                      </td>
+                      <td className="border-r border-gray-100 px-2 py-3">
                         <input
                           value={row.pegs}
                           onChange={(event) =>
@@ -380,25 +433,25 @@ export default function CocktailCreate() {
                           className="w-full bg-transparent text-center outline-none"
                         />
                       </td>
-                      <td className="border-b border-r border-[#e9dfd5] px-2 py-3">
+                      <td className="border-r border-gray-100 px-2 py-3">
                         <input
                           value={row.memberPrice}
                           readOnly
                           className="w-full bg-transparent text-center outline-none"
                         />
                       </td>
-                      <td className="border-b border-r border-[#e9dfd5] px-2 py-3">
+                      <td className="border-r border-gray-100 px-2 py-3">
                         <input
                           value={row.nonMemberPrice}
                           readOnly
                           className="w-full bg-transparent text-center outline-none"
                         />
                       </td>
-                      <td className="border-b px-2 py-3">
+                      <td className="px-2 py-3">
                         <button
                           type="button"
                           onClick={() => deleteRow(row.id)}
-                          className="font-semibold text-[#9a2c2c]"
+                          className="font-semibold text-afmc-maroon hover:text-afmc-maroon2"
                         >
                           Delete
                         </button>
@@ -409,10 +462,11 @@ export default function CocktailCreate() {
               </table>
             </div>
 
-            <div className="flex items-center justify-between px-4 py-3 text-sm text-[#5c534b]">
-              <span>{filteredRows.length} rows selected</span>
+            <div className="flex items-center justify-between px-4 py-3 text-sm text-gray-600">
+              <span>Showing {filteredRows.length} rows</span>
               <span>Total {rows.length}</span>
             </div>
+          </div>
           </div>
         </div>
       </div>

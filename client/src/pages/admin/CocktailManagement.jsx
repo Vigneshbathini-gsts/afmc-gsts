@@ -7,6 +7,7 @@ import {
   Search,
 } from "lucide-react";
 import api from "../../services/api";
+import { toInitCap } from "../../utils/textFormat";
 
 export default function CocktailManagement() {
   const navigate = useNavigate();
@@ -149,11 +150,11 @@ export default function CocktailManagement() {
                           <Pencil size={18} />
                         </button>
                       </td>
-                      <td className="px-4 py-3 font-medium text-gray-800">
-                        {item.ITEM_NAME}
+                      <td className="px-4 py-3 font-medium text-gray-800 capitalize">
+                        {toInitCap(item.ITEM_NAME)}
                       </td>
-                      <td className="px-4 py-3 text-gray-700">
-                        {item.CATEGORY_NAME}
+                      <td className="px-4 py-3 text-gray-700 capitalize">
+                        {toInitCap(item.CATEGORY_NAME)}
                       </td>
                     </tr>
                   ))
