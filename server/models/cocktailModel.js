@@ -433,6 +433,7 @@ const createCocktailItem = async (payload, options = {}) => {
   // const imagePath = options.imageFile?.filename || null;
   // const fileName = options.imageFile?.filename || null;
 
+
   const imagePath = data.itemName || null;
   const fileName = data.itemName || null;
   const mimeType = options.imageFile?.mimetype || null;
@@ -558,9 +559,18 @@ const updateCocktailItem = async (itemId, payload, options = {}) => {
     // const imagePath = options.imageFile
     //   ? `${AFMC_IMAGE_PUBLIC_BASE_URL}/${options.imageFile.filename}`
     //   : existingItem.IMAGE;
-    const imagePath = data.itemName || null;
-    const fileName = options.imageFile?.originalname || existingItem.FILE_NAME;
-    const mimeType = options.imageFile?.mimetype || existingItem.MIME_TYPE;
+
+    // const imagePath = data.itemName || null;
+    // const fileName = options.imageFile?.originalname || existingItem.FILE_NAME;
+    // const mimeType = options.imageFile?.mimetype || existingItem.MIME_TYPE;
+
+
+    const imagePath = options.imageFile
+  ? `${AFMC_IMAGE_PUBLIC_BASE_URL}/${options.imageFile.filename}`
+  : null;
+
+const fileName = options.imageFile?.filename || null;
+const mimeType = options.imageFile?.mimetype || null;
 
     await connection.execute(
       `
