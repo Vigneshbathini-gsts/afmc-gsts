@@ -38,7 +38,6 @@ export default function OutletOrders({ kitchenType = "Bar" }) {
     try {
       setLoading(true);
       const res = await barOrdersAPI.getOrders(kitchenType);
-      console.log("Fetched orders:", res.data);
       setOrders(res.data || []);
     } catch (err) {
       console.error(err);
@@ -128,7 +127,7 @@ export default function OutletOrders({ kitchenType = "Bar" }) {
 
   return (
     <div style={{ padding: 24 }}>
-      
+
       {/* HEADER */}
       <div
         style={{

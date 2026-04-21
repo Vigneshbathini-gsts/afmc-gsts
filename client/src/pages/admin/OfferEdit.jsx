@@ -76,29 +76,59 @@ export default function OfferEdit() {
     setSuccessMessage("");
   };
 
-  // Update Offer (Only End Date, Status set to 'Inactive' in backend)
-  const handleUpdate = async () => {
-    try {
-      setSaving(true);
-      setError("");
-      setSuccessMessage("");
+const handleUpdate = async () => {
+  try {
+    setSaving(true);
+    setError("");
+    setSuccessMessage("");
 
+    // Validate that end date is provided
+    if (!formData.endDate) {
+      setError("Please select an end date");
+      setSaving(false);
+      return;
+    }
 
+    // Optional: Validate that end date is not before start date
+    if (formData.startDate && formData.endDate < formData.startDate) {
+      setError("End date cannot be earlier than start date");
+      setSaving(false);
+      return;
+    }
 
+    // Pass the end date from formData to the API
+    const res = await offersAPI.updateOffer(id, {
+      endDate: formData.endDate,
+    });
 
-      setSuccessMessage("Offer deactivated successfully!");
-
+    // Check if status code is 200 (success)
+    if (res.status === 200) {
+      setSuccessMessage(res.data?.message || "Offer updated successfully!");
+      
       setTimeout(() => {
         navigate("/admin/offers");
       }, 1500);
-    } catch (err) {
-      console.error("Update Offer Error:", err);
-      console.error("Error response:", err.response?.data);
-      setError(err.response?.data?.message || "Failed to update offer");
-    } finally {
-      setSaving(false);
+    } else {
+      setError("Unexpected response from server");
     }
-  };
+  } catch (err) {
+    console.error("Update Offer Error:", err);
+    console.error("Error response:", err.response?.data);
+    
+    // Handle different error status codes
+    if (err.response?.status === 400) {
+      setError(err.response?.data?.message || "Invalid data provided");
+    } else if (err.response?.status === 404) {
+      setError("Offer not found");
+    } else if (err.response?.status === 500) {
+      setError("Server error. Please try again later.");
+    } else {
+      setError(err.response?.data?.message || "Failed to update offer");
+    }
+  } finally {
+    setSaving(false);
+  }
+};
 
   const handleBack = () => navigate(-1);
   const handleDashboard = () => navigate("/admin/dashboard");
