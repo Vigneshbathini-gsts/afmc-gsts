@@ -135,7 +135,6 @@ export default function Login() {
         password,
         outletType,
       });
-
       if (response.data?.success) {
         // Handle remember me
         if (rememberMe) {

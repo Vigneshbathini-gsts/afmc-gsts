@@ -1,24 +1,29 @@
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
-
 const configuredUploadPath =
   process.env.AFMC_IMAGE_UPLOAD_PATH || "/var/www/AFMCIMAGES";
 const uploadPath = path.resolve(configuredUploadPath);
-
 if (!fs.existsSync(uploadPath)) {
   fs.mkdirSync(uploadPath, { recursive: true });
 }
-
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, uploadPath);
   },
   filename: function (req, file, cb) {
-    const sanitizedOriginalName = file.originalname.replace(/\s+/g, "_");
-    const uniqueName = `${Date.now()}_${sanitizedOriginalName}`;
-    cb(null, uniqueName);
-  },
+  let itemName = req.body.itemName || "image";
+  // sanitize item name
+  itemName = itemName
+    .trim()
+    .replace(/\s+/g, "_")     // spaces → _
+    .replace(/[^\w.-]/g, ""); // remove special chars
+  const ext = path.extname(file.originalname); // .jpg, .png
+    const finalName = `${itemName}_${Date.now()}${ext}`;
+
+  cb(null, finalName);
+}
+
 });
 
 const fileFilter = (req, file, cb) => {

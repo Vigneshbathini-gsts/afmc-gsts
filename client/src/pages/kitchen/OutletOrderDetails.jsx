@@ -12,7 +12,7 @@ import {
 } from "react-icons/fa";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import { barOrdersAPI } from "../../services/api";
+import { API_BASE_URL, barOrdersAPI } from "../../services/api";
 import { Html5Qrcode } from "html5-qrcode";
 
 export default function OutletOrderDetails() {
@@ -114,10 +114,8 @@ export default function OutletOrderDetails() {
       clearOnExitStartedRef.current = true;
 
       const token = localStorage.getItem("token");
-      const API = process.env.REACT_APP_API_URL || "http://localhost:5000/api";
-
       try {
-        fetch(`${API}/bar-orders/scanned-items/${orderNumber}`, {
+        fetch(`${API_BASE_URL}/bar-orders/scanned-items/${orderNumber}`, {
           method: "DELETE",
           headers: token ? { Authorization: `Bearer ${token}` } : undefined,
           credentials: "include",

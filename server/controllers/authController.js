@@ -141,6 +141,7 @@ exports.loginUser = async (req, res) => {
     }
 
     const redirectPath = getRedirectPath(user.ROLE_ID, outletType);
+    console.log("redirectPath",redirectPath);
 
 
     const token = jwt.sign(

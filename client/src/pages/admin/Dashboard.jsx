@@ -1,5 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
 import {
   FaChartBar,
   FaTable,
@@ -10,53 +11,75 @@ import {
   FaWineGlassAlt,
 } from "react-icons/fa";
 
+
+
+// const Storemenu = [
+//   {
+//     title: "Inventory Management",
+//     icon: <FaChartBar />,
+//     color: "bg-blue-500/20 text-blue-600",
+//     path: "/admin/inventory",
+//   }
+// ];
+
 const menuItems = [
   {
     title: "Inventory Management",
     icon: <FaChartBar />,
     color: "bg-blue-500/20 text-blue-600",
     path: "/admin/inventory",
+   roles: [10, 80],
   },
   {
     title: "Stock Reports",
     icon: <FaTable />,
     color: "bg-slate-500/20 text-slate-600",
     path: "/admin/stock-reports",
+    roles: [10],
   },
   {
     title: "Offers",
     icon: <FaTags />,
     color: "bg-teal-500/20 text-teal-600",
     path: "/admin/offers",
+    roles: [10],
   },
   {
     title: "Item Price",
     icon: <FaDollarSign />,
     color: "bg-green-500/20 text-green-600",
     path: "/admin/price-update",
+    roles: [10],
   },
   {
     title: "Stock In/Out Report",
     icon: <FaExchangeAlt />,
     color: "bg-olive-500/20 text-green-700",
     path: "/admin/stock-in-out-report",
+    roles: [10],
   },
   {
     title: "Profit Management",
     icon: <FaCoins />,
     color: "bg-gray-500/20 text-gray-700",
     path: "/admin/profit-management",
+    roles: [10],
   },
   {
     title: "Cocktails/Mocktails",
     icon: <FaWineGlassAlt />,
     color: "bg-yellow-600/20 text-yellow-700",
     path: "/admin/cocktail-management",
+    roles: [10],
   },
 ];
 
 export default function Dashboard() {
+  const { user } = useAuth();
   const navigate = useNavigate();
+  const finalMenu = menuItems.filter((item) =>
+    item.roles.includes(Number(user?.roleId))
+  );
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-afmc-bg via-white to-afmc-bg2 relative">
@@ -65,7 +88,7 @@ export default function Dashboard() {
 
       <div className="p-8">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {menuItems.map((item, index) => (
+          {finalMenu.map((item, index) => (
             <div
               key={index}
               onClick={() => item.path && navigate(item.path)}
