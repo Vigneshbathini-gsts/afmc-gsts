@@ -427,16 +427,27 @@ const syncInventoryUnitPrice = async (connection, inventoryItemCode) => {
 const createCocktailItem = async (payload, options = {}) => {
   const data = validatePayload(payload);
   const userName = normalizeText(options.userName) || "SYSTEM";
-  // const imagePath = options.imageFile
-  //   ? `${AFMC_IMAGE_PUBLIC_BASE_URL}/${options.imageFile.filename}`
-  //   : null;
-  // const imagePath = options.imageFile?.filename || null;
-  // const fileName = options.imageFile?.filename || null;
+//   const imagePath = options.imageFile
+//   ? `${AFMC_IMAGE_PUBLIC_BASE_URL}/${options.imageFile.filename}`
+//   : null;
+// const fileName = options.imageFile?.filename || null;
+  // const mimeType = options.imageFile?.mimetype || null;
+  
+//   const imagePath = data.itemName || null;
+// const fileName = data.itemName || null;
+  // const mimeType = options.imageFile?.mimetype || null;
+  
+  const imagePath = options.imageFile
+  ? options.imageFile.filename
+  : null;
+
+const fileName = options.imageFile
+  ? options.imageFile.filename
+  : null;
+
+const mimeType = options.imageFile?.mimetype || null;
 
 
-  const imagePath = data.itemName || null;
-  const fileName = data.itemName || null;
-  const mimeType = options.imageFile?.mimetype || null;
   const connection = await db.getConnection();
 
   try {
@@ -556,21 +567,32 @@ const updateCocktailItem = async (itemId, payload, options = {}) => {
     }
 
     const inventoryItemCode = Number(existingItem.ITEM_CODE || existingItem.ITEM_ID);
-    // const imagePath = options.imageFile
-    //   ? `${AFMC_IMAGE_PUBLIC_BASE_URL}/${options.imageFile.filename}`
-    //   : existingItem.IMAGE;
+//     const imagePath = options.imageFile
+//   ? `${AFMC_IMAGE_PUBLIC_BASE_URL}/${options.imageFile.filename}`
+//   : null;
 
-    // const imagePath = data.itemName || null;
-    // const fileName = options.imageFile?.originalname || existingItem.FILE_NAME;
-    // const mimeType = options.imageFile?.mimetype || existingItem.MIME_TYPE;
+// const fileName = options.imageFile?.filename || null;
+    // const mimeType = options.imageFile?.mimetype || null;
+    
+//     const imagePath = options.imageFile
+//   ? data.itemName
+//   : existingItem.IMAGE;
 
-
+// const fileName = options.imageFile
+//   ? data.itemName
+    //   : existingItem.FILE_NAME;
+    
     const imagePath = options.imageFile
-  ? `${AFMC_IMAGE_PUBLIC_BASE_URL}/${options.imageFile.filename}`
-  : null;
+  ? options.imageFile.filename
+      : existingItem.IMAGE;
+    
+    
 
-const fileName = options.imageFile?.filename || null;
-const mimeType = options.imageFile?.mimetype || null;
+const fileName = options.imageFile
+  ? options.imageFile.filename
+  : existingItem.FILE_NAME;
+
+const mimeType = options.imageFile?.mimetype || existingItem.MIME_TYPE;
 
     await connection.execute(
       `
