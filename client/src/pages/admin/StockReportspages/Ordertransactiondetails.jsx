@@ -74,13 +74,20 @@ export default function OrderTransactionUI() {
         );
 
         if (response.data.success) {
-          setFilterOptions(
-            response.data.data || {
-              itemNames: [],
-              userNames: [],
-              kitchenNames: [],
-            }
-          );
+          const newOptions = response.data.data || {
+            itemNames: [],
+            userNames: [],
+            kitchenNames: [],
+          };
+          setFilterOptions(newOptions);
+
+          // Reset filters if selected values are no longer in options
+          setFilters((current) => ({
+            ...current,
+            itemNames: current.itemNames && newOptions.itemNames.includes(current.itemNames) ? current.itemNames : "",
+            userName: current.userName && newOptions.userNames.includes(current.userName) ? current.userName : "",
+            kitchenName: current.kitchenName && newOptions.kitchenNames.includes(current.kitchenName) ? current.kitchenName : "",
+          }));
         }
       } catch (fetchError) {
         console.error(fetchError);
