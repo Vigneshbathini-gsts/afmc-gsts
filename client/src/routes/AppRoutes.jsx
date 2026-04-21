@@ -168,32 +168,35 @@ export default function AppRoutes() {
         <Route path="order-status" element={<UserOrderStatus />} />
       </Route>
 
-      {/* ================= OUTLETS ================= */}
-      <Route
-        path="/kitchen"
-        element={
-          <ProtectedRoute allowedRoles={[40]} allowedOutletTypes={["KITCHEN"]}>
-            <KitchenLayout />
-          </ProtectedRoute>
-        }
-      >
-        <Route path="dashboard" element={<OutletDashboard />} />
-        <Route path="order-details" element={<OutletOrderDetails />} />
-      </Route>
+     {/* ================= OUTLETS ================= */}
+<Route
+  path="/kitchen"
+  element={
+    <ProtectedRoute allowedRoles={[40]} allowedOutletTypes={["KITCHEN"]}>
+      <KitchenLayout />
+    </ProtectedRoute>
+  }
+>
+  <Route path="dashboard" element={<OutletDashboard />} />
+  <Route path="order-details" element={<OutletOrderDetails />} />
+  {/* Add these missing routes */}
+  <Route path="cancelled-orders" element={<KitchenCancelledOrder />} />
+  <Route path="order-history" element={<KitchenOrderHistory />} />
+</Route>
 
-      <Route
-        path="/bar"
-        element={
-          <ProtectedRoute allowedRoles={[40]} allowedOutletTypes={["BAR"]}>
-            <KitchenLayout />
-          </ProtectedRoute>
-        }
-      >
-        <Route path="dashboard" element={<OutletDashboard />} />
-        <Route path="order-details" element={<OutletOrderDetails />} />
-        <Route path="cancelled-orders" element={<KitchenCancelledOrder />} />
-        <Route path="order-history" element={<KitchenOrderHistory />} />
-      </Route>
+<Route
+  path="/bar"
+  element={
+    <ProtectedRoute allowedRoles={[40]} allowedOutletTypes={["BAR"]}>
+      <KitchenLayout />
+    </ProtectedRoute>
+  }
+>
+  <Route path="dashboard" element={<OutletDashboard />} />
+  <Route path="order-details" element={<OutletOrderDetails />} />
+  <Route path="cancelled-orders" element={<KitchenCancelledOrder />} />
+  <Route path="order-history" element={<KitchenOrderHistory />} />
+</Route>
 
       {/* ================= STOREKEEPER ================= */}
       <Route

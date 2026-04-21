@@ -6,11 +6,11 @@ exports.getAllOffers = async (req, res) => {
     const [offers] = await db.query(`
       SELECT 
           ofr.OFFER_ID as offer_id,
-          inv.item_name,
+          MAX(inv.item_name) as item_name,
           ofr.ITEM_CODE as item_code,
           ofr.OFFER_QUANTITY as offer_quantity,
           ofr.FREE_ITEM_CODE as free_item_code,
-          freeinv.item_name AS free_item,
+          MAX(freeinv.item_name) AS free_item,
           DATE_FORMAT(ofr.OFFER_DATE, '%Y-%m-%d') as offer_date,
           ofr.STATUS as status,
           ofr.MESSAGE as message,
@@ -21,6 +21,9 @@ exports.getAllOffers = async (req, res) => {
         ON ofr.ITEM_CODE = inv.item_code
       LEFT JOIN xxafmc_inventory freeinv 
         ON ofr.FREE_ITEM_CODE = freeinv.item_code
+      GROUP BY ofr.OFFER_ID, ofr.ITEM_CODE, ofr.FREE_ITEM_CODE, 
+               ofr.OFFER_QUANTITY, ofr.OFFER_DATE, ofr.STATUS, 
+               ofr.MESSAGE, ofr.END_DATE, ofr.FREE_ITEM_QUANTITY
       ORDER BY ofr.OFFER_ID DESC
     `);
 
@@ -174,14 +177,13 @@ exports.updateOffer = async (req, res) => {
   try {
     const { id } = req.params;
     const username = req.user?.username || "SYSTEM";
-
-    console.log("Deactivating Offer - ID:", id);
+    console.log(req.body)
+const endDate=req.body.endDate;
+    console.log("Deactivating Offer - ID:", id,endDate);
     
-    // Always use current date
-    const today = new Date();
-    const end_date = today.toISOString().split('T')[0];
+   
     
-    console.log("Setting end date to:", end_date);
+    // console.log("Setting end date to:", end_date);
 
     // Check if offer exists
     const [existing] = await db.query(
@@ -201,13 +203,13 @@ exports.updateOffer = async (req, res) => {
            LAST_UPDATED_BY = ?,
            LAST_UPDATED_DATE = NOW()
        WHERE OFFER_ID = ?`,
-      [end_date, username, id]
+      [endDate, username, id]
     );
 
     res.status(200).json({
       message: "Offer deactivated successfully",
       offer_id: id,
-      end_date: end_date,
+      end_date: endDate,
       status: "Inactive"
     });
 
