@@ -19,6 +19,15 @@ export default function OfferCreate() {
   const itemDropdownRef = useRef(null);
   const freeItemDropdownRef = useRef(null);
 
+  // Helper function to get today's date in YYYY-MM-DD format
+  const getTodayDate = () => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   const [formData, setFormData] = useState({
     itemCode: "",
     itemName: "",
@@ -26,7 +35,7 @@ export default function OfferCreate() {
     freeItemCode: "",
     freeItemName: "",
     freeItemQuantity: "",
-    offerDate: "",
+    offerDate: getTodayDate(), // Set default to today's date
     message: "",
   });
 
@@ -260,7 +269,6 @@ export default function OfferCreate() {
                         className="w-full text-left px-4 py-3 hover:bg-afmc-maroon/5 transition border-b border-gray-100 last:border-b-0"
                       >
                         <p className="font-medium text-gray-800">{item.item_name}</p>
-                       
                       </button>
                     ))
                   )}
