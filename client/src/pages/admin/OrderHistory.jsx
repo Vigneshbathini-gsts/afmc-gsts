@@ -2,20 +2,35 @@ import React, { useCallback, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ChevronDown,
-  ChevronsLeft,
   Search,
   CalendarDays,
+  Download,
+  ArrowLeft,
+  X,
 } from "lucide-react";
-import { orderAPI } from "../../services/api";
+import { barOrdersAPI, orderAPI } from "../../services/api";
 import { exportTableToPdf } from "../../utils/pdfExport";
 
-const formatDateForApi = (value) => {
+const toInputDate = (date) => {
+  const d = date instanceof Date ? date : new Date(date);
+  if (Number.isNaN(d.getTime())) return "";
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  return `${yyyy}-${mm}-${dd}`;
+};
+
+const formatDateForDisplay = (value) => {
   if (!value) {
-    return null;
+    return "-";
   }
 
-  const [year, month, day] = value.split("-");
-  return `${month}/${day}/${year}`;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleDateString("en-IN");
 };
 
 const formatCurrency = (value) => {
@@ -23,10 +38,23 @@ const formatCurrency = (value) => {
   return amount.toFixed(2);
 };
 
+const getStatusClassName = (status) => {
+  switch (String(status || "").toUpperCase()) {
+    case "COMPLETED":
+      return "font-semibold text-[#0d9807]";
+    case "CANCELLED":
+      return "font-semibold text-red-600";
+    case "RECEIVED":
+      return "font-semibold text-blue-600";
+    default:
+      return "font-semibold text-amber-600";
+  }
+};
+
 const getInitialFilters = () => {
   return {
-    from: "",
-    to: "",
+    from: toInputDate(new Date()),
+    to: toInputDate(new Date()),
     username: "",
   };
 };
@@ -40,6 +68,10 @@ export default function OrderHistory() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [hasSearched, setHasSearched] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [detailsByOrder, setDetailsByOrder] = useState({});
+  const [detailsLoading, setDetailsLoading] = useState(false);
+  const [detailsError, setDetailsError] = useState("");
 
   const appUser = useMemo(() => {
     try {
@@ -58,8 +90,8 @@ export default function OrderHistory() {
         setError("");
 
         const response = await orderAPI.getOrderHistory({
-          from: formatDateForApi(activeFilters.from),
-          to: formatDateForApi(activeFilters.to),
+          from: activeFilters.from || null,
+          to: activeFilters.to || null,
           username: activeFilters.username.trim() || null,
           app_user: appUser || null,
         });
@@ -80,12 +112,9 @@ export default function OrderHistory() {
 
   const visibleRows = useMemo(() => {
     const term = quickSearch.trim().toLowerCase();
-
-    if (!term) {
-      return rows;
-    }
-
-    return rows.filter((row) => {
+    const filteredRows = !term
+      ? rows
+      : rows.filter((row) => {
       if (row?.payment_status1 === "Total") {
         return true;
       }
@@ -101,6 +130,17 @@ export default function OrderHistory() {
       ]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(term));
+    });
+
+    return [...filteredRows].sort((left, right) => {
+      const leftIsTotal = left?.payment_status1 === "Total";
+      const rightIsTotal = right?.payment_status1 === "Total";
+
+      if (leftIsTotal === rightIsTotal) {
+        return 0;
+      }
+
+      return leftIsTotal ? 1 : -1;
     });
   }, [quickSearch, rows]);
 
@@ -129,6 +169,13 @@ export default function OrderHistory() {
       return;
     }
 
+    if (filters.from > filters.to) {
+      setError("From date cannot be later than To date.");
+      setRows([]);
+      setHasSearched(false);
+      return;
+    }
+
     const nextFilters = {
       ...filters,
       username: searchValue,
@@ -147,9 +194,9 @@ export default function OrderHistory() {
     exportTableToPdf({
       title: "Admin Order History",
       fileName: "admin-order-history.pdf",
-      subtitle: `From: ${formatDateForApi(filters.from) || "-"}   To: ${
-        formatDateForApi(filters.to) || "-"
-      }   User Name: ${filters.username || "All"}`,
+      subtitle: `From: ${formatDateForDisplay(filters.from)}   To: ${formatDateForDisplay(
+        filters.to
+      )}   User Name: ${filters.username || "All"}`,
       headers: [
         "Order Number",
         "Order Date",
@@ -171,162 +218,195 @@ export default function OrderHistory() {
     });
   };
 
-  return (
-    <div className="min-h-screen bg-[linear-gradient(180deg,#f8f5f0_0%,#f4efe8_100%)] px-5 py-6 sm:px-6 lg:px-10">
-      <div className="mx-auto max-w-[1120px]">
-        <div className="relative mb-5 flex flex-wrap items-center justify-between gap-x-6 gap-y-4 px-2">
-          <div className="pointer-events-none absolute left-[18%] top-0 hidden h-[420px] w-[380px] -translate-y-4 rounded-full bg-[radial-gradient(circle,rgba(188,173,149,0.16)_0%,rgba(188,173,149,0.07)_36%,transparent_72%)] lg:block" />
+  const closeOrderModal = () => {
+    setSelectedOrder(null);
+    setDetailsError("");
+  };
 
-          <div className="relative z-10 flex flex-wrap items-center gap-4">
-            <label className="flex h-[56px] w-[146px] items-center rounded-md bg-[#ebe6df] pl-2 pr-1">
-              <span className="flex h-full flex-1 flex-col justify-center rounded-[3px] border border-[#857667] bg-white px-3 text-[#55493e]">
-                <span className="text-[11px] leading-none text-[#6f655a]">From</span>
+  const handleOrderClick = useCallback(async (orderNumber) => {
+    if (!orderNumber) return;
+
+    setSelectedOrder(orderNumber);
+    setDetailsError("");
+
+    if (detailsByOrder[orderNumber]) {
+      return;
+    }
+
+    try {
+      setDetailsLoading(true);
+      const response = await barOrdersAPI.getOrderHistoryItemDetails(orderNumber);
+      const payload = response.data?.data || {};
+
+      setDetailsByOrder((prev) => ({
+        ...prev,
+        [orderNumber]: {
+          items: payload.items || [],
+          summary: payload.summary || null,
+        },
+      }));
+    } catch (fetchError) {
+      console.error("Failed to fetch order history item details:", fetchError);
+      setDetailsError(
+        fetchError.response?.data?.message || "Unable to load order details."
+      );
+    } finally {
+      setDetailsLoading(false);
+    }
+  }, [detailsByOrder]);
+
+  const selectedOrderDetails = selectedOrder ? detailsByOrder[selectedOrder] : null;
+  const selectedOrderItems = selectedOrderDetails?.items || [];
+  const selectedOrderTotal =
+    Number(selectedOrderDetails?.summary?.totalAmount) ||
+    selectedOrderItems.reduce((sum, item) => sum + Number(item?.subtotal || 0), 0);
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-afmc-bg via-white to-afmc-bg2 relative">
+      <div className="absolute top-16 left-12 h-72 w-72 rounded-full bg-afmc-maroon/10 blur-3xl" />
+      <div className="absolute bottom-20 right-20 h-80 w-80 rounded-full bg-afmc-maroon2/10 blur-3xl" />
+
+      <div className="relative z-10 p-8">
+        <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
+          <h1 className="text-2xl font-semibold text-gray-800">Order History</h1>
+          <button
+            type="button"
+            onClick={() => navigate("/admin/dashboard")}
+            className="flex items-center gap-2 rounded-full border border-white/60 bg-white px-5 py-2.5 text-gray-700 shadow hover:shadow-md"
+          >
+            <ArrowLeft size={16} />
+            Go To Dashboard
+          </button>
+        </div>
+
+        <div className="rounded-3xl border border-white/60 bg-white/80 p-6 shadow-xl backdrop-blur-sm">
+          <div className="mb-6 flex flex-wrap items-end gap-4">
+            <label>
+              <span className="mb-2 block text-sm font-medium text-gray-700">From</span>
+              <div className="flex items-center rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
                 <input
                   type="date"
                   name="from"
                   value={filters.from}
                   onChange={handleFilterChange}
-                  className="mt-1 w-full bg-transparent text-[15px] outline-none [color-scheme:light] [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                  className="w-full bg-transparent text-gray-800 outline-none [color-scheme:light]"
                 />
-              </span>
-              <CalendarDays size={15} className="mx-2 shrink-0 text-[#43372d]" />
+                <CalendarDays size={16} className="ml-3 text-gray-500" />
+              </div>
             </label>
 
-            <label className="flex h-[56px] w-[146px] items-center rounded-md bg-[#ebe6df] pl-2 pr-1">
-              <span className="flex h-full flex-1 flex-col justify-center rounded-[3px] border border-[#857667] bg-white px-3 text-[#55493e]">
-                <span className="text-[11px] leading-none text-[#6f655a]">To</span>
+            <label>
+              <span className="mb-2 block text-sm font-medium text-gray-700">To</span>
+              <div className="flex items-center rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
                 <input
                   type="date"
                   name="to"
                   value={filters.to}
                   onChange={handleFilterChange}
-                  className="mt-1 w-full bg-transparent text-[15px] outline-none [color-scheme:light] [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                  className="w-full bg-transparent text-gray-800 outline-none [color-scheme:light]"
                 />
-              </span>
-              <CalendarDays size={15} className="mx-2 shrink-0 text-[#43372d]" />
+                <CalendarDays size={16} className="ml-3 text-gray-500" />
+              </div>
             </label>
 
-            <label className="flex h-[56px] w-[160px] items-center rounded-md bg-[#ebe6df] pl-2 pr-1">
-              <span className="flex h-full flex-1 flex-col justify-center rounded-[3px] border border-[#857667] bg-white px-3 text-[#55493e]">
-                <span className="text-[11px] leading-none text-[#6f655a]">User Name</span>
+            <label className="min-w-[220px] flex-1">
+              <span className="mb-2 block text-sm font-medium text-gray-700">User Name</span>
+              <div className="flex items-center rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
                 <input
                   type="text"
                   list="admin-order-usernames"
                   value={searchValue}
                   onChange={(event) => setSearchValue(event.target.value)}
-                  placeholder=""
-                  className="mt-1 w-full bg-transparent text-[15px] outline-none"
+                  placeholder="Search user"
+                  className="w-full bg-transparent text-gray-800 outline-none placeholder:text-gray-400"
                 />
                 <datalist id="admin-order-usernames">
                   {userOptions.map((name) => (
                     <option key={name} value={name} />
                   ))}
                 </datalist>
-              </span>
-              <ChevronDown size={15} className="mx-2 shrink-0 text-[#43372d]" />
+                <ChevronDown size={16} className="ml-3 text-gray-500" />
+              </div>
             </label>
 
             <button
               type="button"
               onClick={handleSearch}
-              className="inline-flex h-[40px] items-center gap-2 rounded-full bg-[#8b7d70] px-8 text-[15px] font-semibold text-white transition hover:bg-[#77685b]"
+              className="flex items-center gap-2 rounded-2xl bg-[#5b5b5b] px-6 py-3 font-semibold text-white shadow hover:shadow-md"
             >
-              <Search size={18} />
+              <Search size={16} />
               Search
             </button>
-          </div>
 
-          <div className="relative z-10 flex flex-wrap items-center gap-3">
             <button
               type="button"
               onClick={handleDownload}
-              className="inline-flex h-[40px] items-center gap-2 rounded-full bg-[#8b7d70] px-8 text-[15px] font-semibold text-white transition hover:bg-[#77685b]"
+              className="ml-auto flex items-center gap-2 rounded-2xl bg-afmc-maroon px-6 py-3 font-semibold text-white shadow transition hover:bg-afmc-maroon2 hover:shadow-md"
             >
-              Download
-            </button>
-
-            <button
-              type="button"
-              onClick={() => navigate(-1)}
-              className="inline-flex h-[40px] items-center gap-2 rounded-full bg-[#8b7d70] px-7 text-[15px] font-semibold text-white transition hover:bg-[#77685b]"
-            >
-              <ChevronsLeft size={16} />
-              Back
+              <Download size={16} />
+              Download PDF
             </button>
           </div>
-        </div>
 
-        <div className="overflow-hidden rounded-[14px] border border-[#dacfc1] bg-white/75 shadow-[0_12px_30px_rgba(120,99,74,0.05)]">
-          <div className="flex flex-wrap items-center gap-2 border-b border-[#e8ddd1] bg-transparent px-6 py-5">
-            <div className="flex h-[42px] w-[56px] items-center justify-center gap-1 rounded-[8px] border border-[#8d7f70] bg-[#f8f5f1] text-[#4f4235]">
-              <Search size={17} />
-              <ChevronDown size={15} />
+          {error ? (
+            <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+              {error}
             </div>
+          ) : null}
 
+          <div className="mb-6 flex items-center gap-3 rounded-2xl border border-gray-200 bg-white px-4 py-3">
+            <Search size={16} className="text-gray-400" />
             <input
               type="text"
               value={quickSearch}
               onChange={(event) => setQuickSearch(event.target.value)}
-              placeholder=""
-              className="h-[42px] min-w-[240px] flex-1 rounded-[4px] border border-[#9f9181] bg-white px-4 text-[#2d241d] outline-none"
+              placeholder="Quick search in results"
+              className="w-full bg-transparent text-sm text-gray-800 outline-none placeholder:text-gray-400"
             />
-
-            <button
-              type="button"
-              onClick={() => setQuickSearch(quickSearch.trim())}
-              className="px-3 text-[15px] font-semibold text-[#2f251d] transition hover:text-[#9d6d2f]"
-            >
-              Go
-            </button>
           </div>
 
-          <div className="relative overflow-x-auto">
-            <div className="pointer-events-none absolute inset-y-0 left-[18%] hidden w-[38%] bg-[radial-gradient(circle,rgba(214,202,188,0.24)_0%,rgba(214,202,188,0.08)_42%,transparent_72%)] lg:block" />
-
-            <table className="relative w-full min-w-[980px] border-collapse text-center">
-              <thead className="bg-white/75 text-sm font-medium text-[#51473e]">
+          <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[980px] text-sm">
+                <thead className="bg-gray-50 text-gray-600">
                 <tr>
-                  <th className="border-b border-r border-[#e7ddd2] px-4 py-4 font-medium">
+                  <th className="px-4 py-3 text-left font-medium">
                     Order Number
                   </th>
-                  <th className="border-b border-r border-[#e7ddd2] px-4 py-4 font-medium">
+                  <th className="px-4 py-3 text-left font-medium">
                     Order Date
                   </th>
-                  <th className="border-b border-r border-[#e7ddd2] px-4 py-4 font-medium">
+                  <th className="px-4 py-3 text-left font-medium">
                     Name
                   </th>
-                  <th className="border-b border-r border-[#e7ddd2] px-4 py-4 font-medium">
+                  <th className="px-4 py-3 text-left font-medium">
                     Order Status
                   </th>
-                  <th className="border-b border-r border-[#e7ddd2] px-4 py-4 font-medium">
+                  <th className="px-4 py-3 text-left font-medium">
                     Payment Method
                   </th>
-                  <th className="border-b border-r border-[#e7ddd2] px-4 py-4 font-medium">
+                  <th className="px-4 py-3 text-left font-medium">
                     Payment Status
                   </th>
-                  <th className="border-b px-4 py-4 font-medium">Amount</th>
+                  <th className="px-4 py-3 text-left font-medium">Amount</th>
                 </tr>
               </thead>
-
-              <tbody className="text-[#231f1b]">
+              <tbody>
                 {loading ? (
                   <tr>
-                    <td className="px-4 py-10 text-center" colSpan="7">
+                    <td className="px-4 py-8 text-center text-gray-500" colSpan="7">
                       Loading order history...
                     </td>
                   </tr>
                 ) : error ? (
                   <tr>
-                    <td
-                      className="px-4 py-10 text-center text-[#b04444]"
-                      colSpan="7"
-                    >
+                    <td className="px-4 py-8 text-center text-red-600" colSpan="7">
                       {error}
                     </td>
                   </tr>
                 ) : !hasSearched ? (
                   <tr>
-                    <td className="px-4 py-10 text-center" colSpan="7">
+                    <td className="px-4 py-8 text-center text-gray-500" colSpan="7">
                       Select From and To dates, then click Search to view order history.
                     </td>
                   </tr>
@@ -337,23 +417,33 @@ export default function OrderHistory() {
                     return (
                       <tr
                         key={`${row?.order_num ?? "total"}-${index}`}
-                        className={`border-b border-[#eee4d9] ${
+                        className={`border-t border-gray-100 ${
                           isTotalRow
-                            ? "bg-[#f7f1e9] font-semibold"
-                            : "bg-white/35 transition hover:bg-[#fcfaf7]"
+                            ? "bg-afmc-maroon/5 font-semibold text-gray-800"
+                            : "text-gray-700 transition hover:bg-gray-50"
                         }`}
                       >
-                        <td className="border-r border-[#eee4d9] px-4 py-4 text-[#0b79c9]">
-                          {row?.order_num || ""}
+                        <td className="px-4 py-3 text-afmc-maroon">
+                          {isTotalRow ? (
+                            row?.order_num || ""
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleOrderClick(row?.order_num)}
+                              className="font-medium text-afmc-maroon transition hover:underline"
+                            >
+                              {row?.order_num || ""}
+                            </button>
+                          )}
                         </td>
-                        <td className="border-r border-[#eee4d9] px-4 py-4">
+                        <td className="px-4 py-3">
                           {row?.order_date || ""}
                         </td>
-                        <td className="border-r border-[#eee4d9] px-4 py-4">
+                        <td className="px-4 py-3">
                           {isTotalRow ? "" : row?.first_name || "-"}
                         </td>
                         <td
-                          className={`border-r border-[#eee4d9] px-4 py-4 ${
+                          className={`px-4 py-3 ${
                             row?.status === "Completed"
                               ? "font-semibold text-[#0d9807]"
                               : ""
@@ -361,13 +451,13 @@ export default function OrderHistory() {
                         >
                           {row?.status || ""}
                         </td>
-                        <td className="border-r border-[#eee4d9] px-4 py-4">
+                        <td className="px-4 py-3">
                           {row?.payment_method || ""}
                         </td>
-                        <td className="border-r border-[#eee4d9] px-4 py-4">
+                        <td className="px-4 py-3">
                           {row?.payment_status1 || ""}
                         </td>
-                        <td className="px-4 py-4">
+                        <td className="px-4 py-3">
                           {formatCurrency(row?.subtotal)}
                         </td>
                       </tr>
@@ -375,16 +465,105 @@ export default function OrderHistory() {
                   })
                 ) : (
                   <tr>
-                    <td className="px-4 py-10 text-center" colSpan="7">
+                    <td className="px-4 py-8 text-center text-gray-500" colSpan="7">
                       No orders found for the selected filters.
                     </td>
                   </tr>
                 )}
               </tbody>
-            </table>
+              </table>
+            </div>
           </div>
         </div>
       </div>
+
+      {selectedOrder ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
+          <div className="relative w-full max-w-6xl rounded-[28px] border border-white/70 bg-white/95 shadow-2xl backdrop-blur">
+            <button
+              type="button"
+              onClick={closeOrderModal}
+              className="absolute right-5 top-5 rounded-full p-2 text-gray-500 transition hover:bg-gray-100 hover:text-gray-700"
+              aria-label="Close order details"
+            >
+              <X size={20} />
+            </button>
+
+            <div className="border-b border-gray-200 px-6 py-5">
+              <h2 className="text-3xl font-semibold text-gray-800">Order History</h2>
+            </div>
+
+            <div className="bg-[radial-gradient(circle_at_center,_rgba(128,0,0,0.08),_transparent_55%)] px-6 py-5">
+              <p className="text-xl text-gray-800">
+                <span className="font-semibold">Order Number :</span>{" "}
+                <span className="text-sky-800">{selectedOrder}</span>
+              </p>
+
+              <div className="mt-5 overflow-hidden rounded-2xl border border-gray-200 bg-white/90 shadow-sm">
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[920px] text-sm">
+                    <thead className="bg-gray-50 text-gray-700">
+                      <tr>
+                        <th className="px-4 py-3 text-left font-medium">Item Name</th>
+                        <th className="px-4 py-3 text-left font-medium">Quantity</th>
+                        <th className="px-4 py-3 text-left font-medium">Status</th>
+                        <th className="px-4 py-3 text-left font-medium">Type</th>
+                        <th className="px-4 py-3 text-left font-medium">Price</th>
+                        <th className="px-4 py-3 text-left font-medium">Preparation Charges</th>
+                        <th className="px-4 py-3 text-left font-medium">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {detailsLoading ? (
+                        <tr>
+                          <td colSpan="7" className="px-4 py-8 text-center text-gray-500">
+                            Loading order details...
+                          </td>
+                        </tr>
+                      ) : detailsError ? (
+                        <tr>
+                          <td colSpan="7" className="px-4 py-8 text-center text-red-600">
+                            {detailsError}
+                          </td>
+                        </tr>
+                      ) : selectedOrderItems.length ? (
+                        <>
+                          {selectedOrderItems.map((item, index) => (
+                            <tr key={`${item?.order_line_id || index}-${index}`} className="border-t border-gray-100 text-gray-700">
+                              <td className="px-4 py-3">{item?.item_name || "-"}</td>
+                              <td className="px-4 py-3">{item?.quantity ?? "-"}</td>
+                              <td className={`px-4 py-3 ${getStatusClassName(item?.status)}`}>
+                                {item?.status || "Pending"}
+                              </td>
+                              <td className="px-4 py-3">{item?.type || "NA"}</td>
+                              <td className="px-4 py-3">{formatCurrency(item?.price)}</td>
+                              <td className="px-4 py-3">{formatCurrency(item?.pr_charges)}</td>
+                              <td className="px-4 py-3">{formatCurrency(item?.subtotal)}</td>
+                            </tr>
+                          ))}
+                          <tr className="border-t border-gray-200 bg-gray-50/80 text-red-600">
+                            <td colSpan="5" className="px-4 py-4" />
+                            <td className="px-4 py-4 text-left text-xl font-medium">Total</td>
+                            <td className="px-4 py-4 text-left text-xl font-medium">
+                              {formatCurrency(selectedOrderTotal)}
+                            </td>
+                          </tr>
+                        </>
+                      ) : (
+                        <tr>
+                          <td colSpan="7" className="px-4 py-8 text-center text-gray-500">
+                            No items found for this order.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -9,14 +9,9 @@ const normalizeParam = (value) => {
   return trimmed ? trimmed : null;
 };
 
-const normalizeItemNames = (value) => {
+const normalizeLikeParam = (value) => {
   const normalized = normalizeParam(value);
-  if (!normalized) return [];
-
-  return normalized
-    .split(",")
-    .map((item) => item.trim().toUpperCase())
-    .filter(Boolean);
+  return normalized ? `%${normalized.toUpperCase()}%` : null;
 };
 
 const normalizeDateParam = (value) => {
@@ -24,8 +19,6 @@ const normalizeDateParam = (value) => {
   if (!normalized) return null;
   return /^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized : null;
 };
-
-const buildInClause = (items) => items.map(() => "?").join(", ");
 
 const buildDateFilterClause = (columnName, fromDate, toDate) => {
   if (fromDate && toDate) {
@@ -53,14 +46,10 @@ const buildDateValues = (fromDate, toDate) => {
 const getOrderTransactionDetails = async (req, res) => {
   const fromDate = normalizeDateParam(req.query.fromDate);
   const toDate = normalizeDateParam(req.query.toDate);
-  const orderNumber = normalizeParam(req.query.orderNumber);
-  const userName = normalizeParam(req.query.userName);
-  const kitchenName = normalizeParam(req.query.kitchenName);
-  const itemNames = normalizeItemNames(req.query.itemNames);
-
-  const itemFilterClause = itemNames.length
-    ? `AND UPPER(XI.ITEM_NAME) IN (${buildInClause(itemNames)})`
-    : "";
+  const orderNumberLike = normalizeLikeParam(req.query.orderNumber);
+  const userNameLike = normalizeLikeParam(req.query.userName);
+  const kitchenNameLike = normalizeLikeParam(req.query.kitchenName);
+  const itemNameLike = normalizeLikeParam(req.query.itemNames);
 
   const dateFilterClause = buildDateFilterClause(
     "OH.ORDER_DATE_NEW",
@@ -70,12 +59,17 @@ const getOrderTransactionDetails = async (req, res) => {
 
   const baseWhere = `
     WHERE 
-      UPPER(OD.PAYMENT_STATUS) = 'PAID'
+      TRIM(UPPER(OD.PAYMENT_STATUS)) = 'PAID'
       ${dateFilterClause}
-      AND (? IS NULL OR OD.ORDER_ID = ?)
-      AND (? IS NULL OR UPPER(COALESCE(XNM.FIRST_NAME, XU.FIRST_NAME)) = UPPER(?))
-      AND (? IS NULL OR UPPER(XP.PUBMED_NAME) = UPPER(?))
-      ${itemFilterClause}
+      AND (? IS NULL OR CAST(OD.ORDER_ID AS CHAR) LIKE ?)
+      AND (
+        ? IS NULL
+        OR UPPER(TRIM(IFNULL(COALESCE(XNM.FIRST_NAME, XU.FIRST_NAME), ''))) LIKE ?
+        OR UPPER(TRIM(CONCAT_WS(' ', IFNULL(XNM.FIRST_NAME, XU.FIRST_NAME), IFNULL(XNM.LAST_NAME, '')))) LIKE ?
+        OR UPPER(TRIM(CONCAT_WS(' ', IFNULL(XU.FIRST_NAME, ''), IFNULL(XU.LAST_NAME, '')))) LIKE ?
+      )
+      AND (? IS NULL OR UPPER(TRIM(IFNULL(XP.PUBMED_NAME, ''))) LIKE ?)
+      AND (? IS NULL OR UPPER(TRIM(IFNULL(XI.ITEM_NAME, ''))) LIKE ?)
   `;
 
   const detailQuery = `
@@ -191,13 +185,16 @@ const getOrderTransactionDetails = async (req, res) => {
 
   const baseValues = [
     ...dateValues,
-    orderNumber,
-    orderNumber,
-    userName,
-    userName,
-    kitchenName,
-    kitchenName,
-    ...itemNames,
+    orderNumberLike,
+    orderNumberLike,
+    userNameLike,
+    userNameLike,
+    userNameLike,
+    userNameLike,
+    kitchenNameLike,
+    kitchenNameLike,
+    itemNameLike,
+    itemNameLike,
   ];
 
   const values = [...baseValues, ...baseValues];
@@ -233,24 +230,24 @@ const getOrderTransactionFilterOptions = async (req, res) => {
   const dateValues = buildDateValues(fromDate, toDate);
 
   const itemQuery = `
-    SELECT DISTINCT xi.item_name AS value
+    SELECT DISTINCT TRIM(xi.item_name) AS value
     FROM xxafmc_order_details od
     JOIN xxafmc_order_header oh ON od.order_id = oh.order_num
     LEFT JOIN xxafmc_inventory xi ON xi.item_code = od.item_id
-    WHERE UPPER(od.payment_status) = 'PAID'
+    WHERE TRIM(UPPER(od.payment_status)) = 'PAID'
       ${dateFilterClause}
       AND xi.item_name IS NOT NULL
       AND TRIM(xi.item_name) <> ''
-    ORDER BY xi.item_name ASC
+    ORDER BY TRIM(xi.item_name) ASC
   `;
 
   const userQuery = `
-    SELECT DISTINCT COALESCE(xnm.first_name, xu.first_name) AS value
+    SELECT DISTINCT TRIM(COALESCE(xnm.first_name, xu.first_name)) AS value
     FROM xxafmc_order_details od
     JOIN xxafmc_order_header oh ON od.order_id = oh.order_num
     LEFT JOIN xxafmc_users xu ON oh.user_id = xu.user_id
     LEFT JOIN xxafmc_non_members xnm ON xnm.id = oh.member_id
-    WHERE UPPER(od.payment_status) = 'PAID'
+    WHERE TRIM(UPPER(od.payment_status)) = 'PAID'
       ${dateFilterClause}
       AND COALESCE(xnm.first_name, xu.first_name) IS NOT NULL
       AND TRIM(COALESCE(xnm.first_name, xu.first_name)) <> ''
@@ -258,15 +255,15 @@ const getOrderTransactionFilterOptions = async (req, res) => {
   `;
 
   const kitchenQuery = `
-    SELECT DISTINCT xp.pubmed_name AS value
+    SELECT DISTINCT TRIM(xp.pubmed_name) AS value
     FROM xxafmc_order_details od
     JOIN xxafmc_order_header oh ON od.order_id = oh.order_num
     LEFT JOIN xxafmc_pubmed xp ON xp.pubmed_id = oh.pubmed
-    WHERE UPPER(od.payment_status) = 'PAID'
+    WHERE TRIM(UPPER(od.payment_status)) = 'PAID'
       ${dateFilterClause}
       AND xp.pubmed_name IS NOT NULL
       AND TRIM(xp.pubmed_name) <> ''
-    ORDER BY xp.pubmed_name ASC
+    ORDER BY TRIM(xp.pubmed_name) ASC
   `;
 
   try {
