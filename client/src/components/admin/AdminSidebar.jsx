@@ -60,15 +60,7 @@ export default function AdminSidebar({ isOpen, onClose }) {
             Dashboard
           </NavLink>
 
-          <NavLink
-            to="/admin/inventory"
-            className={navLinkClass}
-            onClick={onClose}
-          >
-            <FaBoxes />
-            Inventory
-          </NavLink>
-
+      
           {!isInventoryOnlyUser && (
             <NavLink
               to="/admin/add-item"
