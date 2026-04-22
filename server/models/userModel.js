@@ -365,7 +365,7 @@ const createBulkUsers = async ({ rows, createdBy }) => {
       const [existingOfficerRows] = await connection.execute(
         `
           SELECT OFFICER_ID
-          FROM XXAFMC_OFFICERS_INFORMATION
+          FROM xxafmc_officers_information
           WHERE UPPER(FIRST_NAME) = UPPER(?)
           LIMIT 1
         `,
@@ -402,7 +402,7 @@ const createBulkUsers = async ({ rows, createdBy }) => {
       const [roleRows] = await connection.execute(
         `
           SELECT ROLE_ID, ROLE
-          FROM XXAFMC_ROLE
+          FROM xxafmc_role
           WHERE UPPER(ROLE) = UPPER(?)
           LIMIT 1
         `,
@@ -422,7 +422,7 @@ const createBulkUsers = async ({ rows, createdBy }) => {
       const [[nextOfficerRow]] = await connection.execute(
         `
           SELECT COALESCE(MAX(OFFICER_ID), 0) + 1 AS nextOfficerId
-          FROM XXAFMC_OFFICERS_INFORMATION
+          FROM xxafmc_officers_information
         `
       );
 
@@ -430,7 +430,7 @@ const createBulkUsers = async ({ rows, createdBy }) => {
 
       await connection.execute(
         `
-          INSERT INTO XXAFMC_OFFICERS_INFORMATION (
+          INSERT INTO xxafmc_officers_information (
             OFFICER_ID,
             ROLE_ID,
             FIRST_NAME,
@@ -469,7 +469,7 @@ const createBulkUsers = async ({ rows, createdBy }) => {
 
       await connection.execute(
         `
-          INSERT INTO XXAFMC_USERS (
+          INSERT INTO xxafmc_users (
             USER_ID,
             USER_NAME,
             PASSWORD,

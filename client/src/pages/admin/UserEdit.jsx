@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { ChevronsLeft, Save } from "lucide-react";
+import { ArrowLeft, Save } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { userAPI } from "../../services/api";
 
@@ -15,6 +15,11 @@ const INITIAL_FORM = {
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_REGEX = /^\d{10}$/;
+
+const STATUS_STYLES = {
+  Active: "bg-[#ebf7ef] text-[#1f7a3d] border-[#cbe8d3]",
+  Inactive: "bg-[#fff1f1] text-[#b04444] border-[#f1c8c8]",
+};
 
 const validateEditForm = (formData, roles) => {
   const firstName = String(formData.firstName || "").trim();
@@ -175,181 +180,217 @@ export default function UserEdit() {
   };
 
   return (
-    <div className="min-h-screen bg-[linear-gradient(135deg,#f5f1eb_0%,#efe7de_50%,#f8f5f0_100%)] px-4 py-6 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-5xl rounded-[28px] border border-[#deceb9] bg-white/90 p-4 shadow-[0_20px_60px_rgba(92,69,43,0.08)] backdrop-blur sm:p-6">
-        <div className="mb-8 flex items-center justify-between">
-          <h1 className="text-2xl font-semibold text-[#2d241d]">
-            User role assignment
-          </h1>
+    <div className="min-h-screen bg-gradient-to-br from-afmc-bg via-white to-afmc-bg2 relative">
+      <div className="absolute top-16 left-12 h-72 w-72 rounded-full bg-afmc-maroon/10 blur-3xl" />
+      <div className="absolute bottom-20 right-20 h-80 w-80 rounded-full bg-afmc-maroon2/10 blur-3xl" />
+
+      <div className="relative z-10 p-8">
+        <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold text-gray-800">User Details</h1>
+            <p className="mt-1 text-sm text-gray-500">
+              Update role, status, and contact information for this account.
+            </p>
+          </div>
 
           <button
             type="button"
             onClick={() => navigate("/admin/users")}
-            className="inline-flex items-center gap-2 rounded-full bg-[#7a6e62] px-5 py-3 font-semibold text-white transition hover:bg-[#665b50]"
+            className="flex items-center gap-2 rounded-full border border-white/60 bg-white px-5 py-2.5 text-gray-700 shadow hover:shadow-md"
           >
-            <ChevronsLeft size={18} />
-            Back
+            <ArrowLeft size={16} />
+            Back To Users
           </button>
         </div>
 
-        <div className="relative overflow-hidden rounded-[24px] border border-[#eadfd2] bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(249,245,239,0.98)_100%)] px-4 py-8 sm:px-8">
-          <div className="pointer-events-none absolute inset-y-0 left-[10%] hidden w-[45%] rounded-full bg-[radial-gradient(circle,rgba(187,164,136,0.12)_0%,rgba(187,164,136,0.02)_55%,transparent_72%)] lg:block" />
-
+        <div className="rounded-3xl border border-white/60 bg-white/80 p-6 shadow-xl backdrop-blur-sm">
           {loading ? (
-            <div className="relative py-20 text-center text-[#5f564d]">
+            <div className="rounded-2xl border border-gray-200 bg-white px-6 py-16 text-center text-gray-500">
               Loading user details...
             </div>
           ) : error && !formData.userName ? (
-            <div className="relative py-20 text-center text-[#b04444]">
+            <div className="rounded-2xl border border-red-200 bg-red-50 px-6 py-16 text-center text-red-600">
               {error}
             </div>
           ) : (
-            <form
-              onSubmit={handleSave}
-              className="relative mx-auto max-w-2xl space-y-6"
-            >
-              <div className="grid gap-5 sm:grid-cols-[180px_minmax(0,1fr)] sm:items-center">
-                <div className="text-right font-semibold text-[#5a4d40]">
-                  User Name
+            <form onSubmit={handleSave} className="space-y-6">
+              <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+                <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
+                  <div className="mb-5 flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-medium text-gray-500">User Name</p>
+                      <h2 className="mt-1 text-2xl font-semibold text-gray-800">
+                        {formData.userName || "-"}
+                      </h2>
+                    </div>
+                    <span
+                      className={`inline-flex rounded-full border px-3 py-1 text-sm font-semibold ${
+                        STATUS_STYLES[formData.status] || STATUS_STYLES.Inactive
+                      }`}
+                    >
+                      {formData.status}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                    <div className="md:col-span-2">
+                      <label
+                        htmlFor="firstName"
+                        className="mb-2 block text-sm font-medium text-gray-700"
+                      >
+                        Officer Name
+                      </label>
+                      <input
+                        id="firstName"
+                        name="firstName"
+                        type="text"
+                        value={formData.firstName}
+                        onChange={handleChange}
+                        maxLength={50}
+                        className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-800 outline-none transition focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
+                      />
+                    </div>
+
+                    <div>
+                      <label
+                        htmlFor="loginType"
+                        className="mb-2 block text-sm font-medium text-gray-700"
+                      >
+                        Login Type
+                      </label>
+                      <select
+                        id="loginType"
+                        name="loginType"
+                        value={formData.loginType}
+                        onChange={handleChange}
+                        className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-800 outline-none transition focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
+                      >
+                        <option value="Member">Member</option>
+                        <option value="Non Member">Non Member</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label
+                        htmlFor="status"
+                        className="mb-2 block text-sm font-medium text-gray-700"
+                      >
+                        Status
+                      </label>
+                      <select
+                        id="status"
+                        name="status"
+                        value={formData.status}
+                        onChange={handleChange}
+                        className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-800 outline-none transition focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
+                      >
+                        <option value="Active">Active</option>
+                        <option value="Inactive">Inactive</option>
+                      </select>
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <label
+                        htmlFor="roleId"
+                        className="mb-2 block text-sm font-medium text-gray-700"
+                      >
+                        Role
+                      </label>
+                      <select
+                        id="roleId"
+                        name="roleId"
+                        value={formData.roleId}
+                        onChange={handleChange}
+                        disabled={loadingRoles}
+                        className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-800 outline-none transition focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {roles.map((role) => (
+                          <option key={role.ROLE_ID} value={role.ROLE_ID}>
+                            {role.ROLE_NAME}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
                 </div>
-                <div className="text-lg font-semibold text-[#2d241d]">
-                  {formData.userName || "-"}
+
+                <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
+                  <h3 className="text-lg font-semibold text-gray-800">
+                    Contact Information
+                  </h3>
+                  <p className="mt-1 text-sm text-gray-500">
+                    Keep the user email and phone number up to date.
+                  </p>
+
+                  <div className="mt-5 space-y-5">
+                    <div>
+                      <label
+                        htmlFor="email"
+                        className="mb-2 block text-sm font-medium text-gray-700"
+                      >
+                        Email
+                      </label>
+                      <input
+                        id="email"
+                        name="email"
+                        type="email"
+                        value={formData.email}
+                        onChange={handleChange}
+                        maxLength={100}
+                        className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-800 outline-none transition focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
+                      />
+                    </div>
+
+                    <div>
+                      <label
+                        htmlFor="phoneNumber"
+                        className="mb-2 block text-sm font-medium text-gray-700"
+                      >
+                        Phone Number
+                      </label>
+                      <input
+                        id="phoneNumber"
+                        name="phoneNumber"
+                        type="text"
+                        value={formData.phoneNumber}
+                        onChange={handleChange}
+                        inputMode="numeric"
+                        pattern="\d{10}"
+                        maxLength={10}
+                        className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-800 outline-none transition focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
+                      />
+                    </div>
+                  </div>
                 </div>
-              </div>
-
-              <div className="grid gap-5 sm:grid-cols-[180px_minmax(0,1fr)] sm:items-center">
-                <label
-                  htmlFor="firstName"
-                  className="text-right font-semibold text-[#5a4d40]"
-                >
-                  Officer Name
-                </label>
-                <input
-                  id="firstName"
-                  name="firstName"
-                  type="text"
-                  value={formData.firstName}
-                  onChange={handleChange}
-                  maxLength={50}
-                  className="w-full rounded-md border border-[#9b8f82] bg-white px-4 py-3 text-[#241d17] outline-none transition focus:border-[#8c631f]"
-                />
-              </div>
-
-              <div className="grid gap-5 sm:grid-cols-[180px_minmax(0,1fr)] sm:items-center">
-                <label
-                  htmlFor="loginType"
-                  className="text-right font-semibold text-[#5a4d40]"
-                >
-                  Login Type
-                </label>
-                <select
-                  id="loginType"
-                  name="loginType"
-                  value={formData.loginType}
-                  onChange={handleChange}
-                  className="w-full rounded-md border border-[#9b8f82] bg-white px-4 py-3 text-[#241d17] outline-none transition focus:border-[#8c631f]"
-                >
-                  <option value="Member">Member</option>
-                  <option value="Non Member">Non Member</option>
-                </select>
-              </div>
-
-              <div className="grid gap-5 sm:grid-cols-[180px_minmax(0,1fr)] sm:items-center">
-                <label
-                  htmlFor="roleId"
-                  className="text-right font-semibold text-[#5a4d40]"
-                >
-                  Role
-                </label>
-                <select
-                  id="roleId"
-                  name="roleId"
-                  value={formData.roleId}
-                  onChange={handleChange}
-                  disabled={loadingRoles}
-                  className="w-full rounded-md border border-[#9b8f82] bg-white px-4 py-3 text-[#241d17] outline-none transition focus:border-[#8c631f] disabled:bg-[#f3eee7]"
-                >
-                  {roles.map((role) => (
-                    <option key={role.ROLE_ID} value={role.ROLE_ID}>
-                      {role.ROLE_NAME}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid gap-5 sm:grid-cols-[180px_minmax(0,1fr)] sm:items-center">
-                <label
-                  htmlFor="status"
-                  className="text-right font-semibold text-[#5a4d40]"
-                >
-                  Status
-                </label>
-                <select
-                  id="status"
-                  name="status"
-                  value={formData.status}
-                  onChange={handleChange}
-                  className="w-full rounded-md border border-[#9b8f82] bg-white px-4 py-3 text-[#241d17] outline-none transition focus:border-[#8c631f]"
-                >
-                  <option value="Active">Active</option>
-                  <option value="Inactive">Inactive</option>
-                </select>
-              </div>
-
-              <div className="grid gap-5 sm:grid-cols-[180px_minmax(0,1fr)] sm:items-center">
-                <label
-                  htmlFor="email"
-                  className="text-right font-semibold text-[#5a4d40]"
-                >
-                  Email
-                </label>
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  maxLength={100}
-                  className="w-full rounded-md border border-[#9b8f82] bg-white px-4 py-3 text-[#241d17] outline-none transition focus:border-[#8c631f]"
-                />
-              </div>
-
-              <div className="grid gap-5 sm:grid-cols-[180px_minmax(0,1fr)] sm:items-center">
-                <label
-                  htmlFor="phoneNumber"
-                  className="text-right font-semibold text-[#5a4d40]"
-                >
-                  Phone Number
-                </label>
-                <input
-                  id="phoneNumber"
-                  name="phoneNumber"
-                  type="text"
-                  value={formData.phoneNumber}
-                  onChange={handleChange}
-                  inputMode="numeric"
-                  pattern="\d{10}"
-                  maxLength={10}
-                  className="w-full rounded-md border border-[#9b8f82] bg-white px-4 py-3 text-[#241d17] outline-none transition focus:border-[#8c631f]"
-                />
               </div>
 
               {error ? (
-                <p className="text-sm font-medium text-[#b04444]">{error}</p>
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+                  {error}
+                </div>
               ) : null}
 
               {success ? (
-                <p className="text-sm font-medium text-[#2f7a3f]">{success}</p>
+                <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+                  {success}
+                </div>
               ) : null}
 
-              <div className="flex justify-end pt-2">
+              <div className="flex flex-wrap justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => navigate("/admin/users")}
+                  className="rounded-2xl bg-gray-600 px-6 py-3 font-semibold text-white"
+                >
+                  Cancel
+                </button>
                 <button
                   type="submit"
                   disabled={saving || loadingRoles}
-                  className="inline-flex items-center gap-2 rounded-full bg-[#6f931f] px-6 py-3 font-semibold text-white transition hover:bg-[#5d7c1a] disabled:cursor-not-allowed disabled:bg-[#9cac74]"
+                  className="inline-flex items-center gap-2 rounded-2xl bg-afmc-maroon px-6 py-3 font-semibold text-white shadow transition hover:bg-afmc-maroon2 disabled:cursor-not-allowed disabled:opacity-70"
                 >
                   <Save size={18} />
-                  {saving ? "Saving..." : "Save"}
+                  {saving ? "Saving..." : "Save Changes"}
                 </button>
               </div>
             </form>
