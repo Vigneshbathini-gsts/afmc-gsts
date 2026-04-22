@@ -24,7 +24,15 @@ export default function Offers() {
   const itemsPerPage = 10;
 
   // =========================
-  // Fetch Offers
+  // INITCAP FUNCTION (LIKE ORACLE SQL)
+  // =========================
+  const initCap = (str) => {
+    if (!str || typeof str !== 'string') return '';
+    return str.toLowerCase().replace(/\b\w/g, (char) => char.toUpperCase());
+  };
+
+  // =========================
+  // FETCH OFFERS WITH INITCAP
   // =========================
   const fetchOffers = async () => {
     try {
@@ -32,10 +40,25 @@ export default function Offers() {
       setError("");
 
       const res = await offersAPI.getAllOffers();
-      setOffers(res.data.offers || []);
+      const offersData = res.data.offers || [];
+      console.log("Raw Offers Data:", offersData);
+      const initcapOffers = offersData.map(offer => ({
+        offer_id: initCap(offer.offer_id?.toString()) || "",
+        item_name: initCap(offer.item_name) || "",
+        item_code: initCap(offer.item_code) || "",
+        free_item: initCap(offer.free_item) || "",
+        free_item_code: initCap(offer.free_item_code) || "",
+        message: initCap(offer.message) || "",
+        status: offer.status, // Don't apply initCap to status - keep as is from backend
+        offer_quantity: offer.offer_quantity,
+        free_item_quantity: offer.free_item_quantity,
+        offer_date: offer.offer_date,
+        end_date: offer.end_date,
+      }));
+      setOffers(initcapOffers);
     } catch (err) {
       console.error("Fetch Offers Error:", err);
-      setError(err.response?.data?.message || "Failed to fetch offers");
+      setError(initCap(err.response?.data?.message) || "Failed To Fetch Offers");
     } finally {
       setLoading(false);
     }
@@ -46,7 +69,7 @@ export default function Offers() {
   }, []);
 
   // =========================
-  // Search Filter
+  // SEARCH FILTER (CASE-INSENSITIVE)
   // =========================
   const filteredOffers = useMemo(() => {
     if (!search.trim()) return offers;
@@ -70,14 +93,14 @@ export default function Offers() {
   }, [offers, search]);
 
   // =========================
-  // Reset page when search changes
+  // RESET PAGE WHEN SEARCH CHANGES
   // =========================
   useEffect(() => {
     setCurrentPage(1);
   }, [search]);
 
   // =========================
-  // Pagination Logic
+  // PAGINATION LOGIC
   // =========================
   const totalPages = Math.ceil(filteredOffers.length / itemsPerPage);
 
@@ -103,22 +126,22 @@ export default function Offers() {
   };
 
   // =========================
-  // Date Format
+  // DATE FORMAT
   // =========================
   const formatDate = (date) => {
     if (!date) return "-";
-    return new Date(date).toLocaleDateString("en-IN");
+    return new Date(date).toLocaleDateString("En-In");
   };
 
   // =========================
-  // Navigation
+  // NAVIGATION
   // =========================
   const handleBack = () => navigate(-1);
   const handleCreate = () => navigate("/admin/offers/create");
   const handleEdit = (id) => navigate(`/admin/offers/edit/${id}`);
 
   // =========================
-  // Page Number Buttons
+  // PAGE NUMBER BUTTONS
   // =========================
   const getPageNumbers = () => {
     const pages = [];
@@ -138,6 +161,30 @@ export default function Offers() {
     return pages;
   };
 
+  const activeCount = offers.filter(
+    (o) => o.status?.toLowerCase() === "active"
+  ).length;
+
+  const scheduledCount = offers.filter(
+    (o) => o.status?.toLowerCase() === "scheduled"
+  ).length;
+
+  const inactiveCount = offers.filter(
+    (o) => o.status?.toLowerCase() === "inactive"
+  ).length;
+
+  const getStatusStyle = (status) => {
+    switch (status?.toLowerCase()) {
+      case "active":
+        return "bg-emerald-100 text-emerald-700 border-emerald-200";
+      case "scheduled":
+        return "bg-yellow-100 text-yellow-700 border-yellow-200";
+      case "inactive":
+      default:
+        return "bg-slate-100 text-slate-700 border-slate-200";
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-afmc-bg via-white to-afmc-bg2 relative p-6 md:p-8">
       {/* Background Blobs */}
@@ -155,7 +202,7 @@ export default function Offers() {
               Offers Management
             </h1>
             <p className="text-gray-500 mt-2">
-              Create, manage, and update promotional offers
+              Create, Manage, And Update Promotional Offers
             </p>
           </div>
 
@@ -187,7 +234,7 @@ export default function Offers() {
                 <FaSearch className="text-gray-400 mr-3" />
                 <input
                   type="text"
-                  placeholder="Search by item, free item, message, status..."
+                  placeholder="Search By Item, Free Item, Message, Status..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="w-full outline-none text-gray-700 bg-transparent"
@@ -195,7 +242,7 @@ export default function Offers() {
               </div>
             </div>
 
-            {/* Summary */}
+            {/* Summary - Fixed counts */}
             <div className="flex flex-wrap gap-3">
               <div className="px-4 py-3 rounded-2xl bg-afmc-maroon/5 border border-afmc-maroon/10 text-sm text-gray-700 shadow-sm">
                 <span className="font-semibold text-afmc-maroon">
@@ -206,22 +253,14 @@ export default function Offers() {
 
               <div className="px-4 py-3 rounded-2xl bg-emerald-50 border border-emerald-100 text-sm text-gray-700 shadow-sm">
                 <span className="font-semibold text-emerald-600">
-                  {
-                    offers.filter(
-                      (o) => o.status?.toLowerCase() === "active"
-                    ).length
-                  }
+                  {activeCount}
                 </span>{" "}
                 Active
               </div>
 
               <div className="px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 text-sm text-gray-700 shadow-sm">
                 <span className="font-semibold text-slate-600">
-                  {
-                    offers.filter(
-                      (o) => o.status?.toLowerCase() !== "active"
-                    ).length
-                  }
+                  {inactiveCount}
                 </span>{" "}
                 Inactive
               </div>
@@ -242,7 +281,7 @@ export default function Offers() {
           {loading ? (
             <div className="p-10 text-center text-gray-500">
               <div className="w-12 h-12 border-4 border-afmc-maroon/15 border-t-afmc-maroon rounded-full animate-spin mx-auto mb-4"></div>
-              Loading offers...
+              Loading Offers...
             </div>
           ) : filteredOffers.length === 0 ? (
             <div className="p-12 text-center">
@@ -250,12 +289,12 @@ export default function Offers() {
                 <FaTag />
               </div>
               <h3 className="text-xl font-semibold text-gray-800">
-                No offers found
+                No Offers Found
               </h3>
               <p className="text-gray-500 mt-2">
                 {search
-                  ? "Try a different search keyword."
-                  : "Create your first offer to get started."}
+                  ? "Try A Different Search Keyword."
+                  : "Create Your First Offer To Get Started."}
               </p>
 
               {!search && (
@@ -275,12 +314,9 @@ export default function Offers() {
                   <thead className="bg-white/70 border-b border-gray-200">
                     <tr className="text-gray-700">
                       <th className="px-5 py-4 font-semibold">Action</th>
-                      <th className="px-5 py-4 font-semibold">Offer ID</th>
+                      <th className="px-5 py-4 font-semibold">Offer Id</th>
                       <th className="px-5 py-4 font-semibold">Item Name</th>
-                      <th className="px-5 py-4 font-semibold">Item Code</th>
-                      <th className="px-5 py-4 font-semibold">Buy Qty</th>
                       <th className="px-5 py-4 font-semibold">Free Item</th>
-                      <th className="px-5 py-4 font-semibold">Free Qty</th>
                       <th className="px-5 py-4 font-semibold">Offer Date</th>
                       <th className="px-5 py-4 font-semibold">End Date</th>
                       <th className="px-5 py-4 font-semibold">Status</th>
@@ -292,9 +328,8 @@ export default function Offers() {
                     {paginatedOffers.map((offer, index) => (
                       <tr
                         key={offer.offer_id}
-                        className={`border-b border-gray-100 hover:bg-afmc-maroon/5 transition ${
-                          index % 2 === 0 ? "bg-white/30" : "bg-white/10"
-                        }`}
+                        className={`border-b border-gray-100 hover:bg-afmc-maroon/5 transition ${index % 2 === 0 ? "bg-white/30" : "bg-white/10"
+                          }`}
                       >
                         <td className="px-5 py-4">
                           <button
@@ -314,20 +349,8 @@ export default function Offers() {
                           {offer.item_name || "-"}
                         </td>
 
-                        <td className="px-5 py-4 text-gray-600">
-                          {offer.item_code || "-"}
-                        </td>
-
-                        <td className="px-5 py-4 text-gray-700">
-                          {offer.offer_quantity || "-"}
-                        </td>
-
                         <td className="px-5 py-4 text-gray-700 font-medium">
                           {offer.free_item || "-"}
-                        </td>
-
-                        <td className="px-5 py-4 text-gray-700">
-                          {offer.free_item_quantity || "-"}
                         </td>
 
                         <td className="px-5 py-4 text-gray-600 whitespace-nowrap">
@@ -340,14 +363,13 @@ export default function Offers() {
 
                         <td className="px-5 py-4">
                           <span
-                            className={`px-3 py-1.5 rounded-full text-xs font-semibold border ${
-                              offer.status?.toLowerCase() === "active"
-                                ? "bg-emerald-100 text-emerald-700 border-emerald-200"
-                                : "bg-slate-100 text-slate-700 border-slate-200"
-                            }`}
+                            className={`px-3 py-1.5 rounded-full text-xs font-semibold border ${getStatusStyle(
+                              offer.status
+                            )}`}
                           >
                             {offer.status || "Inactive"}
                           </span>
+
                         </td>
 
                         <td className="px-5 py-4 text-gray-700 min-w-[280px]">
@@ -366,15 +388,15 @@ export default function Offers() {
                   <span className="font-semibold text-gray-800">
                     {startItem}
                   </span>{" "}
-                  to{" "}
+                  To{" "}
                   <span className="font-semibold text-gray-800">
                     {endItem}
                   </span>{" "}
-                  of{" "}
+                  Of{" "}
                   <span className="font-semibold text-afmc-maroon">
                     {filteredOffers.length}
                   </span>{" "}
-                  offers
+                  Offers
                 </div>
 
                 <div className="flex items-center gap-2 flex-wrap justify-center">
@@ -390,11 +412,10 @@ export default function Offers() {
                     <button
                       key={page}
                       onClick={() => handlePageClick(page)}
-                      className={`w-10 h-10 rounded-xl font-semibold transition ${
-                        currentPage === page
+                      className={`w-10 h-10 rounded-xl font-semibold transition ${currentPage === page
                           ? "bg-afmc-maroon text-white shadow-md"
                           : "bg-white border border-gray-200 text-gray-700 hover:bg-gray-100"
-                      }`}
+                        }`}
                     >
                       {page}
                     </button>

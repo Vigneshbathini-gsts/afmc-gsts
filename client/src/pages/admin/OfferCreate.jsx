@@ -19,6 +19,21 @@ export default function OfferCreate() {
   const itemDropdownRef = useRef(null);
   const freeItemDropdownRef = useRef(null);
 
+  // Helper function to get today's date in YYYY-MM-DD format
+  const getTodayDate = () => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  // Helper function for INITCAP (Proper Case)
+  const toInitCap = (str) => {
+    if (!str) return '';
+    return str.toLowerCase().replace(/\b\w/g, char => char.toUpperCase());
+  };
+
   const [formData, setFormData] = useState({
     itemCode: "",
     itemName: "",
@@ -26,7 +41,7 @@ export default function OfferCreate() {
     freeItemCode: "",
     freeItemName: "",
     freeItemQuantity: "",
-    offerDate: "",
+    offerDate: getTodayDate(),
     message: "",
   });
 
@@ -38,13 +53,29 @@ export default function OfferCreate() {
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
-  // Fetch Items for Dropdown
+  // Fetch Items for Dropdown with deduplication
   const fetchItems = async () => {
     try {
       setLoadingItems(true);
       setError("");
       const res = await offersAPI.getAllItemsForOffer();
-      setItems(res.data.items || []);
+      
+      // Remove duplicates based on item_code
+      const itemsList = res.data.items || [];
+      const uniqueItems = [];
+      const seenCodes = new Set();
+      
+      for (const item of itemsList) {
+        if (!seenCodes.has(item.item_code)) {
+          seenCodes.add(item.item_code);
+          uniqueItems.push({
+            ...item,
+            item_name: toInitCap(item.item_name) // Store INITCAP version
+          });
+        }
+      }
+      
+      setItems(uniqueItems);
     } catch (err) {
       console.error("Fetch Items Error:", err);
       setError("Failed to fetch item list");
@@ -90,7 +121,7 @@ export default function OfferCreate() {
     setFormData((prev) => ({
       ...prev,
       itemCode: item.item_code,
-      itemName: item.item_name,
+      itemName: item.item_name, // Already in INITCAP from fetch
     }));
     setShowItemDropdown(false);
   };
@@ -100,7 +131,7 @@ export default function OfferCreate() {
     setFormData((prev) => ({
       ...prev,
       freeItemCode: item.item_code,
-      freeItemName: item.item_name,
+      freeItemName: item.item_name, // Already in INITCAP from fetch
     }));
     setShowFreeItemDropdown(false);
   };
@@ -177,7 +208,7 @@ export default function OfferCreate() {
       <div className="absolute bottom-20 right-20 w-80 h-80 bg-afmc-maroon2/10 rounded-full blur-3xl"></div>
 
       <div className="relative max-w-5xl mx-auto">
-        {/* Header */}
+        {/* Header with Buttons */}
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5 mb-8">
           <div>
             <h1 className="text-3xl font-bold text-gray-800 flex items-center gap-3">
@@ -191,7 +222,7 @@ export default function OfferCreate() {
             </p>
           </div>
 
-          <div className="flex flex-wrap gap-3">
+          <div className="flex gap-3">
             <button
               onClick={handleBack}
               className="px-5 py-3 rounded-2xl bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold shadow-sm transition flex items-center gap-2"
@@ -260,7 +291,6 @@ export default function OfferCreate() {
                         className="w-full text-left px-4 py-3 hover:bg-afmc-maroon/5 transition border-b border-gray-100 last:border-b-0"
                       >
                         <p className="font-medium text-gray-800">{item.item_name}</p>
-                       
                       </button>
                     ))
                   )}
@@ -389,34 +419,16 @@ export default function OfferCreate() {
             </div>
           </div>
 
-          {/* Buttons */}
-          <div className="flex flex-col sm:flex-row gap-4 pt-4">
+          {/* Small Create Offer Button aligned to right */}
+          <div className="flex justify-end pt-4">
             <button
               type="button"
               onClick={handleSave}
               disabled={saving}
-              className="flex-1 bg-afmc-maroon hover:bg-afmc-maroon2 text-white font-semibold py-3 rounded-2xl shadow-md transition flex items-center justify-center gap-2 disabled:opacity-70"
+              className="px-6 py-2.5 bg-afmc-maroon hover:bg-afmc-maroon2 text-white font-semibold rounded-xl shadow-md transition flex items-center gap-2 disabled:opacity-70 text-sm"
             >
-              <FaSave />
+              <FaSave className="text-sm" />
               {saving ? "Creating..." : "Create Offer"}
-            </button>
-
-            <button
-              type="button"
-              onClick={handleBack}
-              className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-3 rounded-2xl shadow-sm transition flex items-center justify-center gap-2"
-            >
-              <FaArrowLeft />
-              Back
-            </button>
-
-            <button
-              type="button"
-              onClick={handleDashboard}
-              className="flex-1 bg-white border border-gray-200 hover:bg-gray-50 text-gray-800 font-semibold py-3 rounded-2xl shadow-sm transition flex items-center justify-center gap-2"
-            >
-              <FaHome />
-              Dashboard
             </button>
           </div>
         </div>
