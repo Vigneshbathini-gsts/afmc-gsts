@@ -17,6 +17,12 @@ export default function OfferEdit() {
   const navigate = useNavigate();
   const { id } = useParams();
 
+  // Helper function for INITCAP (Proper Case)
+  const toInitCap = (str) => {
+    if (!str || typeof str !== 'string') return '';
+    return str.toLowerCase().replace(/\b\w/g, char => char.toUpperCase());
+  };
+
   const [formData, setFormData] = useState({
     offerId: "",
     itemCode: "",
@@ -46,14 +52,14 @@ export default function OfferEdit() {
         setFormData({
           offerId: offer.offer_id,
           itemCode: offer.item_code,
-          itemName: offer.item_name || "",
+          itemName: toInitCap(offer.item_name) || "",
           offerQuantity: offer.offer_quantity,
           freeItemCode: offer.free_item_code,
-          freeItemName: offer.free_item || "",
+          freeItemName: toInitCap(offer.free_item) || "",
           freeItemQuantity: offer.free_item_quantity,
           offerDate: offer.offer_date ? offer.offer_date.split("T")[0] : "",
           endDate: offer.end_date ? offer.end_date.split("T")[0] : "",
-          message: offer.message || "",
+          message: toInitCap(offer.message) || "",
         });
       } catch (err) {
         console.error("Fetch Offer Error:", err);
@@ -76,59 +82,59 @@ export default function OfferEdit() {
     setSuccessMessage("");
   };
 
-const handleUpdate = async () => {
-  try {
-    setSaving(true);
-    setError("");
-    setSuccessMessage("");
+  const handleUpdate = async () => {
+    try {
+      setSaving(true);
+      setError("");
+      setSuccessMessage("");
 
-    // Validate that end date is provided
-    if (!formData.endDate) {
-      setError("Please select an end date");
-      setSaving(false);
-      return;
-    }
+      // Validate that end date is provided
+      if (!formData.endDate) {
+        setError("Please select an end date");
+        setSaving(false);
+        return;
+      }
 
-    // Optional: Validate that end date is not before start date
-    if (formData.startDate && formData.endDate < formData.startDate) {
-      setError("End date cannot be earlier than start date");
-      setSaving(false);
-      return;
-    }
+      // Validate that end date is not before start date
+      if (formData.offerDate && formData.endDate < formData.offerDate) {
+        setError("End date cannot be earlier than start date");
+        setSaving(false);
+        return;
+      }
 
-    // Pass the end date from formData to the API
-    const res = await offersAPI.updateOffer(id, {
-      endDate: formData.endDate,
-    });
+      // Pass the end date from formData to the API
+      const res = await offersAPI.updateOffer(id, {
+        endDate: formData.endDate,
+      });
 
-    // Check if status code is 200 (success)
-    if (res.status === 200) {
-      setSuccessMessage(res.data?.message || "Offer updated successfully!");
+      // Check if status code is 200 (success)
+      if (res.status === 200) {
+        setSuccessMessage(res.data?.message || "Offer deactivated successfully!");
+        
+        setTimeout(() => {
+          navigate("/admin/offers");
+        }, 1500);
+      } else {
+        setError("Unexpected response from server");
+      }
+    } catch (err) {
+      console.error("Update Offer Error:", err);
+      console.error("Error response:", err.response?.data);
       
-      setTimeout(() => {
-        navigate("/admin/offers");
-      }, 1500);
-    } else {
-      setError("Unexpected response from server");
+      // Handle different error status codes
+      if (err.response?.status === 400) {
+        setError(err.response?.data?.message || "Invalid data provided");
+      } else if (err.response?.status === 404) {
+        setError("Offer not found");
+      } else if (err.response?.status === 500) {
+        setError("Server error. Please try again later.");
+      } else {
+        setError(err.response?.data?.message || "Failed to deactivate offer");
+      }
+    } finally {
+      setSaving(false);
     }
-  } catch (err) {
-    console.error("Update Offer Error:", err);
-    console.error("Error response:", err.response?.data);
-    
-    // Handle different error status codes
-    if (err.response?.status === 400) {
-      setError(err.response?.data?.message || "Invalid data provided");
-    } else if (err.response?.status === 404) {
-      setError("Offer not found");
-    } else if (err.response?.status === 500) {
-      setError("Server error. Please try again later.");
-    } else {
-      setError(err.response?.data?.message || "Failed to update offer");
-    }
-  } finally {
-    setSaving(false);
-  }
-};
+  };
 
   const handleBack = () => navigate(-1);
   const handleDashboard = () => navigate("/admin/dashboard");
@@ -145,45 +151,47 @@ const handleUpdate = async () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-afmc-bg via-white to-afmc-bg2 relative p-6 md:p-8">
+    <div className="min-h-screen bg-gradient-to-br from-afmc-bg via-white to-afmc-bg2 relative p-4 md:p-6">
       {/* Background Blobs */}
       <div className="absolute top-20 left-20 w-72 h-72 bg-afmc-maroon/10 rounded-full blur-3xl"></div>
       <div className="absolute bottom-20 right-20 w-80 h-80 bg-afmc-maroon2/10 rounded-full blur-3xl"></div>
 
       <div className="relative max-w-5xl mx-auto">
-        {/* Header */}
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5 mb-8">
+        {/* Header with Buttons */}
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5 mb-6">
           <div>
-            <h1 className="text-3xl font-bold text-gray-800 flex items-center gap-3">
-              <span className="w-12 h-12 rounded-2xl bg-gradient-to-br from-afmc-maroon to-afmc-maroon2 text-white flex items-center justify-center shadow-lg">
-                <FaGift />
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-800 flex items-center gap-3">
+              <span className="w-10 h-10 md:w-12 md:h-12 rounded-2xl bg-gradient-to-br from-afmc-maroon to-afmc-maroon2 text-white flex items-center justify-center shadow-lg">
+                <FaGift className="text-sm md:text-base" />
               </span>
-              Edit  Offer
+              Edit Offer
             </h1>
-           
+            <p className="text-gray-500 mt-1 text-sm md:text-base">
+              Deactivate offer by setting end date
+            </p>
           </div>
 
-          <div className="flex flex-wrap gap-3">
+          <div className="flex gap-2 md:gap-3">
             <button
               onClick={handleBack}
-              className="px-5 py-3 rounded-2xl bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold shadow-sm transition flex items-center gap-2"
+              className="px-4 py-2 md:px-5 md:py-3 rounded-2xl bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold shadow-sm transition flex items-center gap-2 text-sm md:text-base"
             >
-              <FaArrowLeft />
+              <FaArrowLeft className="text-xs md:text-sm" />
               Back
             </button>
 
             <button
               onClick={handleDashboard}
-              className="px-5 py-3 rounded-2xl bg-white border border-gray-200 hover:bg-gray-50 text-gray-800 font-semibold shadow-sm transition flex items-center gap-2"
+              className="px-4 py-2 md:px-5 md:py-3 rounded-2xl bg-white border border-gray-200 hover:bg-gray-50 text-gray-800 font-semibold shadow-sm transition flex items-center gap-2 text-sm md:text-base"
             >
-              <FaHome />
+              <FaHome className="text-xs md:text-sm" />
               Dashboard
             </button>
           </div>
         </div>
 
         {/* Form Card */}
-        <div className="bg-white/70 backdrop-blur-md border border-white/40 shadow-xl rounded-3xl p-6 md:p-8 space-y-6">
+        <div className="bg-white/70 backdrop-blur-md border border-white/40 shadow-xl rounded-2xl md:rounded-3xl p-4 md:p-8 space-y-6">
           {successMessage && (
             <div className="bg-green-100 text-green-700 text-sm px-4 py-3 rounded-2xl border border-green-200">
               {successMessage}
@@ -295,7 +303,7 @@ const handleUpdate = async () => {
               {/* End Date - Editable */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  End Date <span className="text-gray-400 text-xs">(Optional)</span>
+                  End Date <span className="text-red-500">*</span>
                 </label>
                 <div className="flex items-center rounded-2xl border border-gray-200 bg-white px-4 py-3 shadow-sm focus-within:ring-2 focus-within:ring-afmc-maroon">
                   <FaCalendarCheck className="text-gray-400 mr-3" />
@@ -308,42 +316,22 @@ const handleUpdate = async () => {
                   />
                 </div>
                 <p className="text-xs text-gray-400 mt-1">
-                  Set the end date for this offer. Status will be set to Inactive.
+                  Set the end date for this offer. Status will be set to Inactive after this date.
                 </p>
               </div>
             </div>
           </div>
 
-         
-
-          {/* Buttons */}
-          <div className="flex flex-col sm:flex-row gap-4 pt-4">
+          {/* Single Deactivate Offer Button aligned to right */}
+          <div className="flex justify-end pt-4">
             <button
               type="button"
               onClick={handleUpdate}
               disabled={saving}
-              className="flex-1 bg-afmc-maroon hover:bg-afmc-maroon2 text-white font-semibold py-3 rounded-2xl shadow-md transition flex items-center justify-center gap-2 disabled:opacity-50"
+              className="px-6 py-2.5 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl shadow-md transition flex items-center gap-2 disabled:opacity-50 text-sm"
             >
-              <FaSave />
+              <FaSave className="text-sm" />
               {saving ? "Deactivating..." : "Deactivate Offer"}
-            </button>
-
-            <button
-              type="button"
-              onClick={handleBack}
-              className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-3 rounded-2xl shadow-sm transition flex items-center justify-center gap-2"
-            >
-              <FaArrowLeft />
-              Back
-            </button>
-
-            <button
-              type="button"
-              onClick={handleDashboard}
-              className="flex-1 bg-white border border-gray-200 hover:bg-gray-50 text-gray-800 font-semibold py-3 rounded-2xl shadow-sm transition flex items-center justify-center gap-2"
-            >
-              <FaHome />
-              Dashboard
             </button>
           </div>
         </div>
