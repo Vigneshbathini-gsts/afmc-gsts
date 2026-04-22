@@ -5,6 +5,13 @@ import OrderDetailsModal from "../../components/OrderDetailsModal";
 import { useNavigate } from "react-router-dom";
 import { exportTableToPdf } from "../../utils/pdfExport";
 
+// Helper function to convert string to INITCAP (Title Case)
+const toInitCap = (str) => {
+  if (!str || str === "") return "-";
+  if (typeof str !== "string") str = String(str);
+  return str.toLowerCase().replace(/\b\w/g, (char) => char.toUpperCase());
+};
+
 export default function CancelledOrders() {
   const navigate = useNavigate();
   const [selectedOrderNumber, setSelectedOrderNumber] = useState(null);
@@ -42,7 +49,7 @@ export default function CancelledOrders() {
       setCurrentPage(1);
     } catch (error) {
       console.error("Error fetching cancelled orders:", error);
-      alert("Failed to load cancelled orders report");
+      alert("Failed To Load Cancelled Orders Report");
     } finally {
       setLoading(false);
     }
@@ -109,7 +116,7 @@ export default function CancelledOrders() {
 
   const handleDownload = () => {
     if (!orders.length) {
-      alert("No data to download");
+      alert("No Data To Download");
       return;
     }
 
@@ -135,10 +142,10 @@ export default function CancelledOrders() {
       ],
       rows: orders.map((order) => [
         order?.ORDER_NUM ?? "",
-        order?.status ?? "",
+        toInitCap(order?.status ?? ""),
         order?.ORDER_DATE ?? "",
-        order?.FIRST_NAME ?? "",
-        order?.pubmed_name ?? "",
+        toInitCap(order?.FIRST_NAME ?? ""),
+        toInitCap(order?.pubmed_name ?? ""),
       ]),
       footerText: "Armed Forces Medical College - Cancelled Orders Report",
       showLogo: true,
@@ -172,7 +179,7 @@ export default function CancelledOrders() {
           className="flex items-center gap-2 px-3 py-1.5 text-sm bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg shadow-md transition duration-300"
         >
           <FaDownload size={14} />
-          Download PDF
+          Download Pdf
         </button>
         <button
           onClick={() => navigate("/admin/dashboard")}
@@ -190,7 +197,7 @@ export default function CancelledOrders() {
           Cancelled Orders Report
         </h1>
         <p className="text-sm text-white/80 mt-1">
-          View fully cancelled food orders
+          View Fully Cancelled Food Orders
         </p>
       </div>
 
@@ -255,12 +262,12 @@ export default function CancelledOrders() {
           </h2>
           <p className="text-sm text-slate-500">
             Showing {orders.length === 0 ? 0 : startIndex + 1} to{" "}
-            {Math.min(endIndex, orders.length)} of {orders.length} records
+            {Math.min(endIndex, orders.length)} of {orders.length} Records
           </p>
         </div>
 
         {loading ? (
-          <p className="text-sm text-slate-600">Loading report...</p>
+          <p className="text-sm text-slate-600">Loading Report...</p>
         ) : (
           <>
             <div className="overflow-x-auto">
@@ -286,12 +293,12 @@ export default function CancelledOrders() {
                         </td>
                         <td className="border px-3 py-2">
                           <span className="bg-red-100 text-red-700 text-xs font-semibold px-2 py-1 rounded-full">
-                            {row.status}
+                            {toInitCap(row.status)}
                           </span>
                         </td>
                         <td className="border px-3 py-2">{row.ORDER_DATE}</td>
-                        <td className="border px-3 py-2">{row.FIRST_NAME}</td>
-                        <td className="border px-3 py-2">{row.pubmed_name}</td>
+                        <td className="border px-3 py-2">{toInitCap(row.FIRST_NAME)}</td>
+                        <td className="border px-3 py-2">{toInitCap(row.pubmed_name)}</td>
                       </tr>
                     ))
                   ) : (
@@ -300,7 +307,7 @@ export default function CancelledOrders() {
                         colSpan="5"
                         className="border px-3 py-4 text-center text-slate-500"
                       >
-                        No cancelled orders found
+                        No Cancelled Orders Found
                       </td>
                     </tr>
                   )}

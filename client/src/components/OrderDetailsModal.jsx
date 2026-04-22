@@ -2,6 +2,13 @@ import React, { useEffect, useState } from "react";
 import { FaTimes, FaBoxOpen } from "react-icons/fa";
 import { orderAPI } from "../services/api";
 
+// Helper function to convert string to INITCAP (Title Case)
+const toInitCap = (str) => {
+  if (!str || str === "") return "-";
+  if (typeof str !== "string") str = String(str);
+  return str.toLowerCase().replace(/\b\w/g, (char) => char.toUpperCase());
+};
+
 const getStatusClassName = (status) => {
   const normalizedStatus = String(status || "").toLowerCase();
 
@@ -26,11 +33,11 @@ export default function OrderDetailsModal({ isOpen, onClose, orderNumber }) {
         setError("");
 
         const response = await orderAPI.getOrderDetails(orderNumber);
-        // console.log("Order Details Response:", response.data);
+        console.log("Order Details Response:", response.data);
         setItems(response.data?.data || []);
       } catch (err) {
         console.error("Error fetching order details:", err);
-        setError("Failed to fetch order details");
+        setError("Failed To Fetch Order Details");
       } finally {
         setLoading(false);
       }
@@ -74,7 +81,7 @@ export default function OrderDetailsModal({ isOpen, onClose, orderNumber }) {
           <div className="text-center py-10 text-red-500">{error}</div>
         ) : items.length === 0 ? (
           <div className="text-center py-10 text-gray-500">
-            No order details found
+            No Order Details Found
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -90,14 +97,14 @@ export default function OrderDetailsModal({ isOpen, onClose, orderNumber }) {
               <tbody>
                 {items.map((item, index) => (
                   <tr key={index} className="border-t hover:bg-gray-50">
-                    <td className="px-4 py-3">{item.item_name}</td>
+                    <td className="px-4 py-3">{toInitCap(item.item_name)}</td>
                     <td className="px-4 py-3">
                       <span className={`font-semibold ${getStatusClassName(item.status)}`}>
-                        {item.status || "Received"}
+                        {toInitCap(item.status || "Received")}
                       </span>
                     </td>
                     <td className="px-4 py-3">{item.quantity}</td>
-                    <td className="px-4 py-3">{item.type || "NA"}</td>
+                    <td className="px-4 py-3">{toInitCap(item.type || "Na")}</td>
                   </tr>
                 ))}
               </tbody>

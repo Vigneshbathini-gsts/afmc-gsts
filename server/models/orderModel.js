@@ -302,19 +302,26 @@ async function getActiveOrders({
 
 async function getOrderDetails(orderNumber) {
   const query = `
-    SELECT
-      od.order_line_id,
-      od.order_id AS order_num,
-      od.item_id,
-      COALESCE(xi.item_name, od.item_id) AS item_name,
-      od.quantity,
-      xi.type,
-      COALESCE(NULLIF(od.order_status, ''), 'Pending') AS status
-    FROM xxafmc_order_details od
-    LEFT JOIN xxafmc_inventory xi
-      ON xi.item_code = od.item_id
-    WHERE od.order_id = ?
-    ORDER BY od.order_line_id ASC
+  SELECT
+  od.order_line_id,
+  od.order_id AS order_num,
+  od.item_id,
+  COALESCE(xi.item_name, od.item_id) AS item_name,
+  od.quantity,
+  COALESCE(NULLIF(xi.type, ''), 'NA') AS type,
+  COALESCE(NULLIF(od.order_status, ''), 'Pending') AS status
+FROM xxafmc_order_details od
+LEFT JOIN (
+    SELECT 
+      item_code,
+      MAX(item_name) AS item_name,
+      MAX(COALESCE(NULLIF(type, ''), 'NA')) AS type
+    FROM xxafmc_inventory
+    GROUP BY item_code
+) xi
+  ON xi.item_code = od.item_id
+WHERE od.order_id = ?
+ORDER BY od.order_line_id ASC;
   `;
 
   const [rows] = await db.execute(query, [orderNumber]);

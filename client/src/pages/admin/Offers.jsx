@@ -41,6 +41,7 @@ export default function Offers() {
 
       const res = await offersAPI.getAllOffers();
       const offersData = res.data.offers || [];
+      console.log("Raw Offers Data:", offersData);
       const initcapOffers = offersData.map(offer => ({
         offer_id: initCap(offer.offer_id?.toString()) || "",
         item_name: initCap(offer.item_name) || "",
@@ -160,12 +161,29 @@ export default function Offers() {
     return pages;
   };
 
-  // Calculate active and inactive counts correctly
-  const activeCount = offers.filter(offer => 
-    offer.status && offer.status.toLowerCase() === "active"
+  const activeCount = offers.filter(
+    (o) => o.status?.toLowerCase() === "active"
   ).length;
-  
-  const inactiveCount = offers.length - activeCount;
+
+  const scheduledCount = offers.filter(
+    (o) => o.status?.toLowerCase() === "scheduled"
+  ).length;
+
+  const inactiveCount = offers.filter(
+    (o) => o.status?.toLowerCase() === "inactive"
+  ).length;
+
+  const getStatusStyle = (status) => {
+    switch (status?.toLowerCase()) {
+      case "active":
+        return "bg-emerald-100 text-emerald-700 border-emerald-200";
+      case "scheduled":
+        return "bg-yellow-100 text-yellow-700 border-yellow-200";
+      case "inactive":
+      default:
+        return "bg-slate-100 text-slate-700 border-slate-200";
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-afmc-bg via-white to-afmc-bg2 relative p-6 md:p-8">
@@ -310,9 +328,8 @@ export default function Offers() {
                     {paginatedOffers.map((offer, index) => (
                       <tr
                         key={offer.offer_id}
-                        className={`border-b border-gray-100 hover:bg-afmc-maroon/5 transition ${
-                          index % 2 === 0 ? "bg-white/30" : "bg-white/10"
-                        }`}
+                        className={`border-b border-gray-100 hover:bg-afmc-maroon/5 transition ${index % 2 === 0 ? "bg-white/30" : "bg-white/10"
+                          }`}
                       >
                         <td className="px-5 py-4">
                           <button
@@ -346,14 +363,13 @@ export default function Offers() {
 
                         <td className="px-5 py-4">
                           <span
-                            className={`px-3 py-1.5 rounded-full text-xs font-semibold border ${
-                              offer.status?.toLowerCase() === "active"
-                                ? "bg-emerald-100 text-emerald-700 border-emerald-200"
-                                : "bg-slate-100 text-slate-700 border-slate-200"
-                            }`}
+                            className={`px-3 py-1.5 rounded-full text-xs font-semibold border ${getStatusStyle(
+                              offer.status
+                            )}`}
                           >
                             {offer.status || "Inactive"}
                           </span>
+
                         </td>
 
                         <td className="px-5 py-4 text-gray-700 min-w-[280px]">
@@ -396,11 +412,10 @@ export default function Offers() {
                     <button
                       key={page}
                       onClick={() => handlePageClick(page)}
-                      className={`w-10 h-10 rounded-xl font-semibold transition ${
-                        currentPage === page
+                      className={`w-10 h-10 rounded-xl font-semibold transition ${currentPage === page
                           ? "bg-afmc-maroon text-white shadow-md"
                           : "bg-white border border-gray-200 text-gray-700 hover:bg-gray-100"
-                      }`}
+                        }`}
                     >
                       {page}
                     </button>

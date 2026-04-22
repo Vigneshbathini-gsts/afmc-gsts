@@ -12,18 +12,34 @@ exports.getAllOffers = async (req, res) => {
           ofr.FREE_ITEM_CODE as free_item_code,
           MAX(freeinv.item_name) AS free_item,
           DATE_FORMAT(ofr.OFFER_DATE, '%Y-%m-%d') as offer_date,
-          ofr.STATUS as status,
+
+          -- ✅ Dynamic Status (CORE FIX)
+          CASE 
+            WHEN CURDATE() < ofr.OFFER_DATE THEN 'Scheduled'
+            WHEN CURDATE() BETWEEN ofr.OFFER_DATE AND ofr.END_DATE THEN 'Active'
+            ELSE 'Inactive'
+          END as status,
+
           ofr.MESSAGE as message,
           DATE_FORMAT(ofr.END_DATE, '%Y-%m-%d') as end_date,
           ofr.FREE_ITEM_QUANTITY as free_item_quantity
+
       FROM xxafmc_offers ofr
       LEFT JOIN xxafmc_inventory inv 
         ON ofr.ITEM_CODE = inv.item_code
       LEFT JOIN xxafmc_inventory freeinv 
         ON ofr.FREE_ITEM_CODE = freeinv.item_code
-      GROUP BY ofr.OFFER_ID, ofr.ITEM_CODE, ofr.FREE_ITEM_CODE, 
-               ofr.OFFER_QUANTITY, ofr.OFFER_DATE, ofr.STATUS, 
-               ofr.MESSAGE, ofr.END_DATE, ofr.FREE_ITEM_QUANTITY
+
+      GROUP BY 
+          ofr.OFFER_ID, 
+          ofr.ITEM_CODE, 
+          ofr.FREE_ITEM_CODE, 
+          ofr.OFFER_QUANTITY, 
+          ofr.OFFER_DATE,
+          ofr.MESSAGE, 
+          ofr.END_DATE, 
+          ofr.FREE_ITEM_QUANTITY
+
       ORDER BY ofr.OFFER_ID DESC
     `);
 
@@ -31,6 +47,7 @@ exports.getAllOffers = async (req, res) => {
       message: "Offers fetched successfully",
       offers,
     });
+
   } catch (err) {
     console.log("Get All Offers Error:", err);
     res.status(500).json({ message: "Internal server error" });
@@ -172,18 +189,17 @@ exports.createOffer = async (req, res) => {
   }
 };
 
-// Update Offer - Always set end_date to current date, Status to 'Inactive'
 exports.updateOffer = async (req, res) => {
   try {
     const { id } = req.params;
     const username = req.user?.username || "SYSTEM";
-    console.log(req.body)
-const endDate=req.body.endDate;
-    console.log("Deactivating Offer - ID:", id,endDate);
-    
-   
-    
-    // console.log("Setting end date to:", end_date);
+    const { endDate } = req.body;
+
+    console.log("Updating Offer - ID:", id, "EndDate:", endDate);
+
+    if (!endDate) {
+      return res.status(400).json({ message: "End date is required" });
+    }
 
     // Check if offer exists
     const [existing] = await db.query(
@@ -195,11 +211,10 @@ const endDate=req.body.endDate;
       return res.status(404).json({ message: "Offer not found" });
     }
 
-    // Update end_date with current date and set status to 'Inactive'
+    // ✅ ONLY update END_DATE (NO STATUS)
     await db.query(
       `UPDATE xxafmc_offers 
        SET END_DATE = ?,
-           STATUS = 'Inactive',
            LAST_UPDATED_BY = ?,
            LAST_UPDATED_DATE = NOW()
        WHERE OFFER_ID = ?`,
@@ -207,10 +222,9 @@ const endDate=req.body.endDate;
     );
 
     res.status(200).json({
-      message: "Offer deactivated successfully",
+      message: "Offer updated successfully",
       offer_id: id,
-      end_date: endDate,
-      status: "Inactive"
+      end_date: endDate
     });
 
   } catch (err) {
