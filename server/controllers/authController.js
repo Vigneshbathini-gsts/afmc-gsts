@@ -108,6 +108,7 @@ exports.loginUser = async (req, res) => {
         ON u.ROLE_ID = r.ROLE_ID
       WHERE (u.EMAIL = ? OR u.USER_NAME = ?)
         AND u.PASSWORD = ?
+        AND u.ATTRIBUTE1 = 'A'
       LIMIT 1
     `;
 
@@ -117,7 +118,7 @@ exports.loginUser = async (req, res) => {
     if (!rows || rows.length === 0) {
       return res.status(401).json({
         success: false,
-        message: "Invalid username or password",
+        message: "Invalid username or password, or account is inactive",
       });
     }
 

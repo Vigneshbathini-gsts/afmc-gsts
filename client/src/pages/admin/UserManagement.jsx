@@ -184,12 +184,6 @@ export default function UserManagement() {
 
       await fetchUsers(search);
 
-      if (trimmedPayload.loginType === "Non Member") {
-        setFormSuccess(
-          "User created successfully. Non Member records are not shown in this Member-only list."
-        );
-      }
-
       setTimeout(() => {
         closeCreateModal();
       }, 900);
@@ -380,9 +374,9 @@ export default function UserManagement() {
                   <th className="px-4 py-3 text-left font-medium">
                     User Name
                   </th>
-                  <th className="px-4 py-3 text-left font-medium">
+                  {/* <th className="px-4 py-3 text-left font-medium">
                     Officer ID
-                  </th>
+                  </th> */}
                   <th className="px-4 py-3 text-left font-medium">
                     Status
                   </th>
@@ -429,9 +423,9 @@ export default function UserManagement() {
                         <td className="px-4 py-3 font-medium text-gray-800">
                           {user.USER_NAME || "-"}
                         </td>
-                        <td className="px-4 py-3 text-gray-700">
+                        {/* <td className="px-4 py-3 text-gray-700">
                           {user.OFFICER_ID || "-"}
-                        </td>
+                        </td> */}
                         <td className="px-4 py-3">
                           <span
                             className={`inline-flex rounded-full border px-3 py-1 text-sm font-semibold ${statusClass}`}
@@ -469,13 +463,13 @@ export default function UserManagement() {
 
       {isCreateModalOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#2c2118]/35 p-4 backdrop-blur-[2px]">
-          <div className="relative w-full max-w-3xl overflow-hidden rounded-3xl border border-white/70 bg-white/95 p-6 shadow-2xl backdrop-blur-md md:p-7">
+          <div className="relative w-full max-w-3xl overflow-hidden rounded-3xl border border-white/70 bg-white/95 p-5 shadow-2xl backdrop-blur-md">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(193,173,144,0.12)_0%,rgba(193,173,144,0.04)_38%,transparent_68%)]" />
 
-            <div className="relative mb-5 flex items-center justify-between border-b border-gray-100 pb-3">
+            <div className="relative mb-3 flex items-center justify-between border-b border-gray-100 pb-2">
               <div>
                 <h2 className="text-lg font-semibold text-gray-800">Add User</h2>
-                <p className="mt-1 text-sm text-gray-500">
+                <p className="text-xs text-gray-500">
                   Create a new account using the same form pattern as inventory management.
                 </p>
               </div>
@@ -490,16 +484,16 @@ export default function UserManagement() {
             </div>
 
             <form onSubmit={handleCreateUser} className="relative">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-5">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-4">
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                  <label className="mb-1 block text-sm font-medium text-gray-700">
                     Login Type
                   </label>
                   <select
                     name="loginType"
                     value={formData.loginType}
                     onChange={handleFormChange}
-                    className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-800 outline-none transition focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
+                    className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-2 text-sm text-gray-800 outline-none transition focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
                   >
                     <option value="Member">Member</option>
                     <option value="Non Member">Non Member</option>
@@ -507,7 +501,7 @@ export default function UserManagement() {
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                  <label className="mb-1 block text-sm font-medium text-gray-700">
                     First Name
                   </label>
                   <input
@@ -517,12 +511,12 @@ export default function UserManagement() {
                     onChange={handleFormChange}
                     maxLength={50}
                     placeholder="Enter first name"
-                    className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-800 outline-none transition focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
+                    className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-2 text-sm text-gray-800 outline-none transition focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
                   />
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                  <label className="mb-1 block text-sm font-medium text-gray-700">
                     Last Name
                   </label>
                   <input
@@ -532,12 +526,12 @@ export default function UserManagement() {
                     onChange={handleFormChange}
                     maxLength={50}
                     placeholder="Enter last name"
-                    className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-800 outline-none transition focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
+                    className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-2 text-sm text-gray-800 outline-none transition focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
                   />
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                  <label className="mb-1 block text-sm font-medium text-gray-700">
                     User Name
                   </label>
                   <input
@@ -547,12 +541,12 @@ export default function UserManagement() {
                     onChange={handleFormChange}
                     maxLength={50}
                     placeholder="Enter user name"
-                    className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-800 outline-none transition focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
+                    className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-2 text-sm text-gray-800 outline-none transition focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
                   />
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                  <label className="mb-1 block text-sm font-medium text-gray-700">
                     Email
                   </label>
                   <input
@@ -562,12 +556,12 @@ export default function UserManagement() {
                     onChange={handleFormChange}
                     maxLength={100}
                     placeholder="Enter email"
-                    className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-800 outline-none transition focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
+                    className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-2 text-sm text-gray-800 outline-none transition focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
                   />
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                  <label className="mb-1 block text-sm font-medium text-gray-700">
                     Password
                   </label>
                   <input
@@ -577,12 +571,12 @@ export default function UserManagement() {
                     onChange={handleFormChange}
                     minLength={6}
                     placeholder="Enter password"
-                    className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-800 outline-none transition focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
+                    className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-2 text-sm text-gray-800 outline-none transition focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
                   />
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                  <label className="mb-1 block text-sm font-medium text-gray-700">
                     Confirm Password
                   </label>
                   <input
@@ -592,12 +586,12 @@ export default function UserManagement() {
                     onChange={handleFormChange}
                     minLength={6}
                     placeholder="Re-enter password"
-                    className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-800 outline-none transition focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
+                    className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-2 text-sm text-gray-800 outline-none transition focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
                   />
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                  <label className="mb-1 block text-sm font-medium text-gray-700">
                     Phone Number
                   </label>
                   <input
@@ -609,35 +603,35 @@ export default function UserManagement() {
                     pattern="\d{10}"
                     maxLength={10}
                     placeholder="Enter 10-digit phone number"
-                    className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-800 outline-none transition focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
+                    className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-2 text-sm text-gray-800 outline-none transition focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
                   />
                 </div>
               </div>
 
               {formError ? (
-                <p className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-[#b04444]">
+                <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-[#b04444]">
                   {formError}
                 </p>
               ) : null}
 
               {formSuccess ? (
-                <p className="mt-4 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-medium text-[#2f7a3f]">
+                <p className="mt-3 rounded-xl border border-green-200 bg-green-50 px-4 py-2 text-sm font-medium text-[#2f7a3f]">
                   {formSuccess}
                 </p>
               ) : null}
 
-              <div className="mt-6 flex justify-end gap-3">
+              <div className="mt-4 flex justify-end gap-3">
                 <button
                   type="button"
                   onClick={closeCreateModal}
-                  className="rounded-full bg-gray-600 px-5 py-2.5 text-sm font-semibold text-white"
+                  className="rounded-full bg-gray-600 px-5 py-2 text-sm font-semibold text-white"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="inline-flex items-center gap-2 rounded-full bg-afmc-maroon px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-afmc-maroon2 disabled:cursor-not-allowed disabled:bg-[#9cac74]"
+                  className="inline-flex items-center gap-2 rounded-full bg-afmc-maroon px-5 py-2 text-sm font-semibold text-white transition hover:bg-afmc-maroon2 disabled:cursor-not-allowed disabled:bg-[#9cac74]"
                 >
                   <PlusCircle size={18} />
                   {saving ? "Creating..." : "Create User"}
@@ -653,7 +647,7 @@ export default function UserManagement() {
           <div className="relative w-full max-w-4xl overflow-hidden rounded-[18px] border border-[#d8ccbe] bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(249,245,239,0.98)_100%)] shadow-[0_30px_90px_rgba(61,41,18,0.22)]">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(193,173,144,0.16)_0%,rgba(193,173,144,0.05)_34%,transparent_65%)]" />
 
-            <div className="relative flex items-center justify-between border-b border-[#eadfd2] px-6 py-5">
+            <div className="relative flex items-center justify-between border-b border-[#eadfd2] px-5 py-3">
               <h2 className="text-[20px] font-semibold text-[#2a221b]">
                 Multiple Employee Creation
               </h2>
@@ -667,28 +661,28 @@ export default function UserManagement() {
               </button>
             </div>
 
-            <div className="relative p-6">
-              <div className="rounded-[14px] border border-[#e5dbd0] bg-white/90 p-4 shadow-[0_12px_30px_rgba(61,41,18,0.12)] sm:p-6">
-                <div className="mb-6 flex justify-end">
+            <div className="relative p-5">
+              <div className="rounded-[14px] border border-[#e5dbd0] bg-white/90 p-4 shadow-[0_12px_30px_rgba(61,41,18,0.12)]">
+                <div className="mb-4 flex justify-end">
                   <button
                     type="button"
                     onClick={handleTemplateDownload}
-                    className="rounded-md bg-[#3f3935] px-6 py-4 text-base font-semibold text-white transition hover:bg-[#302b28]"
+                    className="rounded-md bg-[#3f3935] px-5 py-2 text-base font-semibold text-white transition hover:bg-[#302b28]"
                   >
                     Sample Template
                   </button>
                 </div>
 
-                <div className="space-y-5">
+                <div className="space-y-4">
                   <div>
-                    <label className="mb-2 block text-sm text-[#5f564d]">
+                    <label className="mb-1 block text-sm text-[#5f564d]">
                       Upload File:
                     </label>
                     <input
                       type="file"
                       accept=".csv"
                       onChange={handleUploadFileChange}
-                      className="block w-full rounded-md border border-dashed border-[#9b8f82] bg-white px-3 py-3 text-[#241d17] file:mr-4 file:rounded file:border-0 file:bg-transparent file:text-base"
+                      className="block w-full rounded-md border border-dashed border-[#9b8f82] bg-white px-3 py-2 text-[#241d17] file:mr-4 file:rounded file:border-0 file:bg-transparent file:text-base"
                     />
                   </div>
 
@@ -709,7 +703,7 @@ export default function UserManagement() {
                       type="button"
                       onClick={handleBulkUpload}
                       disabled={uploading}
-                      className="rounded-md bg-[#3f3935] px-10 py-3 text-xl font-semibold text-white transition hover:bg-[#302b28] disabled:cursor-not-allowed disabled:bg-[#8f8883]"
+                      className="rounded-md bg-[#3f3935] px-8 py-2 text-lg font-semibold text-white transition hover:bg-[#302b28] disabled:cursor-not-allowed disabled:bg-[#8f8883]"
                     >
                       {uploading ? "Uploading..." : "Upload"}
                     </button>

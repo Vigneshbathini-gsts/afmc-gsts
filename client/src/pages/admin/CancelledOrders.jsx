@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { FaSearch, FaUndoAlt, FaBan, FaChevronLeft, FaChevronRight, FaArrowLeft, FaDownload, FaTimes } from "react-icons/fa";
 import { cancelledOrdersAPI } from "../../services/api";
 import OrderDetailsModal from "../../components/OrderDetailsModal";
@@ -23,6 +23,8 @@ export default function CancelledOrders() {
     toDate: today,
   });
 
+  const initialFiltersRef = useRef(filters);
+
   // Search filters
   const [searchFilters, setSearchFilters] = useState({
     searchTerm: "", // Combined search term
@@ -41,10 +43,10 @@ export default function CancelledOrders() {
     setIsModalOpen(true);
   };
 
-  const fetchCancelledOrders = useCallback(async () => {
+  const fetchCancelledOrders = useCallback(async (queryFilters) => {
     try {
       setLoading(true);
-      const res = await cancelledOrdersAPI.getCancelledOrders(filters);
+      const res = await cancelledOrdersAPI.getCancelledOrders(queryFilters);
       setOrders(res.data.data || []);
       setCurrentPage(1);
     } catch (error) {
@@ -53,12 +55,12 @@ export default function CancelledOrders() {
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, []);
 
   // Initial fetch on mount only
   useEffect(() => {
-    fetchCancelledOrders();
-  }, []);
+    fetchCancelledOrders(initialFiltersRef.current);
+  }, [fetchCancelledOrders]);
 
   // Handle date selection - only filter when a complete date is selected
   const handleDateChange = (e) => {

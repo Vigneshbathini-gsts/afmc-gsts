@@ -1,5 +1,5 @@
 import React from "react";
-import { FaBars, FaUtensils } from "react-icons/fa";
+import { FaBars } from "react-icons/fa";
 import { useLocation } from "react-router-dom";
 import UserMenuDropdown from "../common/UserMenuDropdown";
 import StockNotificationBell from "../common/StockNotificationBell";

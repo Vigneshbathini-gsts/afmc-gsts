@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useState } from "react";
 import { FaSearch, FaArrowLeft, FaDownload } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { inventoryAPI } from "../../services/api";
@@ -40,18 +40,11 @@ export default function StockReports() {
   const [stockInRows, setStockInRows] = useState([]);
   const [stockOutRows, setStockOutRows] = useState([]);
 
-  const params = useMemo(() => {
-    return {
-      fromDate: fromDate || undefined,
-      toDate: toDate || undefined,
-    };
-  }, [fromDate, toDate]);
-
-  const fetchStockIn = useCallback(async () => {
+  const fetchStockIn = useCallback(async (queryParams) => {
     setLoading(true);
     setError("");
     try {
-      const response = await inventoryAPI.getStockInReport(params);
+      const response = await inventoryAPI.getStockInReport(queryParams);
       setStockInRows(response.data.data || []);
     } catch (err) {
       console.error("Failed to load stock-in report:", err);
@@ -59,13 +52,13 @@ export default function StockReports() {
     } finally {
       setLoading(false);
     }
-  }, [params]);
+  }, []);
 
-  const fetchStockOut = useCallback(async () => {
+  const fetchStockOut = useCallback(async (queryParams) => {
     setLoading(true);
     setError("");
     try {
-      const response = await inventoryAPI.getStockOutReport(params);
+      const response = await inventoryAPI.getStockOutReport(queryParams);
       setStockOutRows(response.data.data || []);
     } catch (err) {
       console.error("Failed to load stock-out report:", err);
@@ -73,19 +66,20 @@ export default function StockReports() {
     } finally {
       setLoading(false);
     }
-  }, [params]);
+  }, []);
 
   const handleSearch = useCallback(async () => {
-    if (activeTab === "in") {
-      await fetchStockIn();
-    } else {
-      await fetchStockOut();
-    }
-  }, [activeTab, fetchStockIn, fetchStockOut]);
+    const queryParams = {
+      fromDate: fromDate || undefined,
+      toDate: toDate || undefined,
+    };
 
-  useEffect(() => {
-    handleSearch();
-  }, [handleSearch]);
+    if (activeTab === "in") {
+      await fetchStockIn(queryParams);
+    } else {
+      await fetchStockOut(queryParams);
+    }
+  }, [activeTab, fromDate, toDate, fetchStockIn, fetchStockOut]);
 
   const rows = activeTab === "in" ? stockInRows : stockOutRows;
 
@@ -245,9 +239,9 @@ export default function StockReports() {
                 <tr>
                   <th className="px-4 py-3 text-left font-medium">Item Code</th>
                   <th className="px-4 py-3 text-left font-medium">Item Name</th>
-                  {activeTab === "in" && (
+                  {/* {activeTab === "in" && (
                     <th className="px-4 py-3 text-left font-medium">Batch ID</th>
-                  )}
+                  )} */}
                   <th className="px-4 py-3 text-left font-medium">
                     Transaction Date
                   </th>
@@ -274,9 +268,9 @@ export default function StockReports() {
                     <tr key={`${row.item_code}-${idx}`} className="border-t border-gray-100">
                       <td className="px-4 py-3">{row.item_code}</td>
                       <td className="px-4 py-3">{row.item_name}</td>
-                      {activeTab === "in" && (
+                      {/* {activeTab === "in" && (
                         <td className="px-4 py-3">{row.batch_id || "-"}</td>
-                      )}
+                      )} */}
                       <td className="px-4 py-3">
                         {formatDisplayDate(row.creation_date)}
                       </td>

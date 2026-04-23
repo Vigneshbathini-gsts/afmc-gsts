@@ -29,7 +29,6 @@ const getAllUsers = async ({ search = "" } = {}) => {
   const trimmedSearch = search.trim();
   let query = `
     ${BASE_USER_SELECT}
-      AND UPPER(xu.LOGIN_TYPE) = 'MEMBER'
   `;
   const params = [];
 

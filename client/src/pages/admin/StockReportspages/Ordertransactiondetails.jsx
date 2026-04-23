@@ -192,21 +192,6 @@ export default function OrderTransactionUI() {
     await fetchData(nextFilters);
   };
 
-  const handleReset = () => {
-    setFilters({
-      fromDate: today,
-      toDate: today,
-      orderNumber: "",
-      userName: "",
-      kitchenName: "",
-      itemNames: "",
-    });
-    setAppliedFilters({ ...initialFilters });
-    setHasSearched(false);
-    setData([]);
-    setError("");
-  };
-
   const exportPdf = () => {
     if (!data.length) return;
 
@@ -418,21 +403,21 @@ export default function OrderTransactionUI() {
                       <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
                         Order Number
                       </th>
-                      <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
+                      {/* <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
                         User Name
-                      </th>
-                      <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
+                      </th> */}
+                      {/* <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
                         Kitchen Name
-                      </th>
+                      </th> */}
                       <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
                         Item Name
                       </th>
                       <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
                         Quantity
                       </th>
-                      <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
+                      {/* <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
                         Profit %
-                      </th>
+                      </th> */}
                       <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
                         Total Profit
                       </th>
@@ -471,21 +456,21 @@ export default function OrderTransactionUI() {
                           <td className="px-4 py-3 whitespace-nowrap">
                             {row.ORDER_NUM || "-"}
                           </td>
-                          <td className="px-4 py-3 whitespace-nowrap">
+                          {/* <td className="px-4 py-3 whitespace-nowrap">
                             {row.FIRST_NAME || "-"}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap">
+                          </td> */}
+                          {/* <td className="px-4 py-3 whitespace-nowrap">
                             {row.PUBMED_NAME || "-"}
-                          </td>
+                          </td> */}
                           <td className="px-4 py-3 whitespace-nowrap capitalize">
                             {toInitCap(stripHtml(row.ITEM_NAME || "-"))}
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
                             {row.QUANTITY || "-"}
                           </td>
-                          <td className="px-4 py-3 whitespace-nowrap">
+                          {/* <td className="px-4 py-3 whitespace-nowrap">
                             {row.TOTALPERCENT || "-"}
-                          </td>
+                          </td> */}
                           <td className="px-4 py-3 whitespace-nowrap">
                             {row.TOTAL_PROFIT || "-"}
                           </td>

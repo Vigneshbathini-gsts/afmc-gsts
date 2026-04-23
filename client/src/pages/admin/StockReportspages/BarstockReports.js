@@ -165,9 +165,9 @@ export default function BarstockReports() {
                     <th className="px-4 py-3 text-left font-medium">
                       Item Name
                     </th>
-                    <th className="px-4 py-3 text-left font-medium">
+                    {/* <th className="px-4 py-3 text-left font-medium">
                       Unit Price
-                    </th>
+                    </th> */}
                     <th className="px-4 py-3 text-left font-medium">
                       Total Price
                     </th>
@@ -193,7 +193,7 @@ export default function BarstockReports() {
                       <td className="px-4 py-3 capitalize">
                         {toInitCap(item.item_name)}
                       </td>
-                      <td className="px-4 py-3">{item.unit_price ?? "-"}</td>
+                      {/* <td className="px-4 py-3">{item.unit_price ?? "-"}</td> */}
                       <td className="px-4 py-3">{item.total_price ?? "-"}</td>
                       <td className="px-4 py-3">{item.AVAILABLE_STOCK ?? 0}</td>
                       <td className="px-4 py-3">{item.RESERVED_STOCK ?? 0}</td>

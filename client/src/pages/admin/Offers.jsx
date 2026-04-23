@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FaPlusCircle,
@@ -12,6 +12,11 @@ import {
 } from "react-icons/fa";
 import { offersAPI } from "../../services/api";
 
+const initCap = (str) => {
+  if (!str || typeof str !== 'string') return '';
+  return str.toLowerCase().replace(/\b\w/g, (char) => char.toUpperCase());
+};
+
 export default function Offers() {
   const navigate = useNavigate();
 
@@ -24,17 +29,9 @@ export default function Offers() {
   const itemsPerPage = 10;
 
   // =========================
-  // INITCAP FUNCTION (LIKE ORACLE SQL)
-  // =========================
-  const initCap = (str) => {
-    if (!str || typeof str !== 'string') return '';
-    return str.toLowerCase().replace(/\b\w/g, (char) => char.toUpperCase());
-  };
-
-  // =========================
   // FETCH OFFERS WITH INITCAP
   // =========================
-  const fetchOffers = async () => {
+  const fetchOffers = useCallback(async () => {
     try {
       setLoading(true);
       setError("");
@@ -62,11 +59,11 @@ export default function Offers() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchOffers();
-  }, []);
+  }, [fetchOffers]);
 
   // =========================
   // SEARCH FILTER (CASE-INSENSITIVE)
@@ -163,10 +160,6 @@ export default function Offers() {
 
   const activeCount = offers.filter(
     (o) => o.status?.toLowerCase() === "active"
-  ).length;
-
-  const scheduledCount = offers.filter(
-    (o) => o.status?.toLowerCase() === "scheduled"
   ).length;
 
   const inactiveCount = offers.filter(

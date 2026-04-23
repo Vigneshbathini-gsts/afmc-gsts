@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FaArrowLeft,
@@ -13,6 +13,11 @@ import {
 } from "react-icons/fa";
 import { offersAPI } from "../../services/api";
 
+const toInitCap = (str) => {
+  if (!str || typeof str !== "string") return "";
+  return str.toLowerCase().replace(/\b\w/g, (char) => char.toUpperCase());
+};
+
 export default function OfferCreate() {
   const navigate = useNavigate();
 
@@ -26,12 +31,6 @@ export default function OfferCreate() {
     const month = String(today.getMonth() + 1).padStart(2, '0');
     const day = String(today.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
-  };
-
-  // Helper function for INITCAP (Proper Case)
-  const toInitCap = (str) => {
-    if (!str) return '';
-    return str.toLowerCase().replace(/\b\w/g, char => char.toUpperCase());
   };
 
   const [formData, setFormData] = useState({
@@ -54,7 +53,7 @@ export default function OfferCreate() {
   const [successMessage, setSuccessMessage] = useState("");
 
   // Fetch Items for Dropdown with deduplication
-  const fetchItems = async () => {
+  const fetchItems = useCallback(async () => {
     try {
       setLoadingItems(true);
       setError("");
@@ -82,11 +81,11 @@ export default function OfferCreate() {
     } finally {
       setLoadingItems(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchItems();
-  }, []);
+  }, [fetchItems]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
