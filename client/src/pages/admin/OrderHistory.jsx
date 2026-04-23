@@ -1,9 +1,7 @@
 import React, { useCallback, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  ChevronDown,
   Search,
-  CalendarDays,
   Download,
   ArrowLeft,
   X,
@@ -115,7 +113,7 @@ export default function OrderHistory() {
     const filteredRows = !term
       ? rows
       : rows.filter((row) => {
-      if (row?.payment_status1 === "Total") {
+      if (row?.payment_status1 === "Total" || row?.payment_method === "Total") {
         return true;
       }
 
@@ -133,8 +131,10 @@ export default function OrderHistory() {
     });
 
     return [...filteredRows].sort((left, right) => {
-      const leftIsTotal = left?.payment_status1 === "Total";
-      const rightIsTotal = right?.payment_status1 === "Total";
+      const leftIsTotal =
+        left?.payment_status1 === "Total" || left?.payment_method === "Total";
+      const rightIsTotal =
+        right?.payment_status1 === "Total" || right?.payment_method === "Total";
 
       if (leftIsTotal === rightIsTotal) {
         return 0;
@@ -143,6 +143,14 @@ export default function OrderHistory() {
       return leftIsTotal ? 1 : -1;
     });
   }, [quickSearch, rows]);
+
+  const totalAmount = useMemo(() => {
+    return rows
+      .filter(
+        (row) => !(row?.payment_status1 === "Total" || row?.payment_method === "Total")
+      )
+      .reduce((sum, row) => sum + Number(row?.subtotal || 0), 0);
+  }, [rows]);
 
   const userOptions = useMemo(() => {
     const names = rows
@@ -291,7 +299,6 @@ export default function OrderHistory() {
                   onChange={handleFilterChange}
                   className="w-full bg-transparent text-gray-800 outline-none [color-scheme:light]"
                 />
-                <CalendarDays size={16} className="ml-3 text-gray-500" />
               </div>
             </label>
 
@@ -305,11 +312,10 @@ export default function OrderHistory() {
                   onChange={handleFilterChange}
                   className="w-full bg-transparent text-gray-800 outline-none [color-scheme:light]"
                 />
-                <CalendarDays size={16} className="ml-3 text-gray-500" />
               </div>
             </label>
 
-            <label className="min-w-[220px] flex-1">
+            <label className="min-w-[220px] max-w-[320px] w-full">
               <span className="mb-2 block text-sm font-medium text-gray-700">User Name</span>
               <div className="flex items-center rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
                 <input
@@ -325,7 +331,6 @@ export default function OrderHistory() {
                     <option key={name} value={name} />
                   ))}
                 </datalist>
-                <ChevronDown size={16} className="ml-3 text-gray-500" />
               </div>
             </label>
 
@@ -354,7 +359,7 @@ export default function OrderHistory() {
             </div>
           ) : null}
 
-          <div className="mb-6 flex items-center gap-3 rounded-2xl border border-gray-200 bg-white px-4 py-3">
+          <div className="mb-6 flex max-w-[520px] items-center gap-3 rounded-2xl border border-gray-200 bg-white px-4 py-3">
             <Search size={16} className="text-gray-400" />
             <input
               type="text"
@@ -412,7 +417,8 @@ export default function OrderHistory() {
                   </tr>
                 ) : visibleRows.length ? (
                   visibleRows.map((row, index) => {
-                    const isTotalRow = row?.payment_status1 === "Total";
+                    const isTotalRow =
+                      row?.payment_status1 === "Total" || row?.payment_method === "Total" || "";
 
                     return (
                       <tr
@@ -452,13 +458,13 @@ export default function OrderHistory() {
                           {row?.status || ""}
                         </td>
                         <td className="px-4 py-3">
-                          {row?.payment_method || ""}
+                          {isTotalRow ? "" : row?.payment_method || ""}
                         </td>
                         <td className="px-4 py-3">
-                          {row?.payment_status1 || ""}
+                          {isTotalRow ? "Total" : row?.payment_status1 || ""}
                         </td>
                         <td className="px-4 py-3">
-                          {formatCurrency(row?.subtotal)}
+                          {formatCurrency(isTotalRow ? totalAmount : row?.subtotal)}
                         </td>
                       </tr>
                     );
