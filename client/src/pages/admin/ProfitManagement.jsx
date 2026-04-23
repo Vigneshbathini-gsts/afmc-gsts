@@ -126,199 +126,203 @@ export default function ProfitManagement() {
                     <div className="mb-5 md:mb-6 h-1 w-full rounded-full bg-gradient-to-r from-afmc-maroon via-afmc-gold to-afmc-maroon2" />
 
                     <div className="grid md:grid-cols-2 gap-5 md:gap-6">
-                {/* Member Pricing */}
-                <form
-                    onSubmit={handleMemberSubmit}
-                    className="bg-white/70 border border-white/60 rounded-3xl shadow-lg backdrop-blur-sm p-5"
-                >
-                    <h2 className="text-lg font-semibold text-slate-700 mb-3">
-                        Member Profit Setup
-                    </h2>
-
-                    <div className="mb-3">
-                        <label className="block mb-1 text-sm font-medium text-slate-700">
-                            Category
-                        </label>
-                        <select
-                            name="category"
-                            value={memberForm.category}
-                            onChange={handleMemberChange}
-                            className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
+                        {/* Member Pricing */}
+                        <form
+                            onSubmit={handleMemberSubmit}
+                            className="bg-white/70 border border-white/60 rounded-3xl shadow-lg backdrop-blur-sm p-5"
                         >
-                            {categoryOptions.map((cat) => (
-                                <option key={cat} value={cat}>
-                                    {cat}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
+                            <h2 className="text-lg font-semibold text-slate-700 mb-3">
+                                Member Profit Setup
+                            </h2>
 
-                    <div className="mb-3">
-                        <label className="block mb-1 text-sm font-medium text-slate-700">
-                            Profit
-                        </label>
-                        <input
-                            type="number"
-                            name="profit"
-                            value={memberForm.profit}
-                            onChange={handleMemberChange}
-                            className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
-                            required
-                        />
-                    </div>
+                            <div className="mb-3">
+                                <label className="block mb-1 text-sm font-medium text-slate-700">
+                                    Category
+                                </label>
+                                <select
+                                    name="category"
+                                    value={memberForm.category}
+                                    onChange={handleMemberChange}
+                                    className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
+                                >
+                                    {categoryOptions.map((cat) => (
+                                        <option key={cat} value={cat}>
+                                            {cat}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
 
-                    {memberForm.category === "Snacks" && (
-                        <div className="mb-3">
-                            <label className="block mb-1 text-sm font-medium text-slate-700">
-                                Food PR Charges
-                            </label>
-                            <input
-                                type="number"
-                                name="foodPrCharges"
-                                value={memberForm.foodPrCharges}
-                                onChange={handleMemberChange}
-                                className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
-                            />
-                        </div>
-                    )}
+                            <div className="mb-3">
+                                <label className="block mb-1 text-sm font-medium text-slate-700">
+                                    Profit
+                                </label>
+                                <input
+                                    type="number"
+                                    name="profit"
+                                    value={memberForm.profit}
+                                    onChange={handleMemberChange}
+                                    className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
+                                    required
+                                    min="0"
+                                />
+                            </div>
 
-                    <button
-                        type="submit"
-                        className="px-6 py-3 rounded-2xl bg-afmc-maroon hover:bg-afmc-maroon2 text-white text-sm font-semibold shadow hover:shadow-md transition"
-                    >
-                        Update Member
-                    </button>
-                </form>
+                            {memberForm.category === "Snacks" && (
+                                <div className="mb-3">
+                                    <label className="block mb-1 text-sm font-medium text-slate-700">
+                                        Food PR Charges
+                                    </label>
+                                    <input
+                                        type="number"
+                                        name="foodPrCharges"
+                                        value={memberForm.foodPrCharges}
+                                        onChange={handleMemberChange}
+                                        className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
+                                        min="0"
+                                    />
+                                </div>
+                            )}
 
-                {/* Non Member Pricing */}
-                <form
-                    onSubmit={handleNonMemberSubmit}
-                    className="bg-white/70 border border-white/60 rounded-3xl shadow-lg backdrop-blur-sm p-5"
-                >
-                    <h2 className="text-lg font-semibold text-slate-700 mb-3">
-                        Non-Member Profit Setup
-                    </h2>
+                            <button
+                                type="submit"
+                                className="px-6 py-3 rounded-2xl bg-afmc-maroon hover:bg-afmc-maroon2 text-white text-sm font-semibold shadow hover:shadow-md transition"
+                            >
+                                Update Member
+                            </button>
+                        </form>
 
-                    <div className="mb-3">
-                        <label className="block mb-1 text-sm font-medium text-slate-700">
-                            Category
-                        </label>
-                        <select
-                            name="category"
-                            value={nonMemberForm.category}
-                            onChange={handleNonMemberChange}
-                            className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
+                        {/* Non Member Pricing */}
+                        <form
+                            onSubmit={handleNonMemberSubmit}
+                            className="bg-white/70 border border-white/60 rounded-3xl shadow-lg backdrop-blur-sm p-5"
                         >
-                            {categoryOptions.map((cat) => (
-                                <option key={cat} value={cat}>
-                                    {cat}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
+                            <h2 className="text-lg font-semibold text-slate-700 mb-3">
+                                Non-Member Profit Setup
+                            </h2>
 
-                    <div className="mb-3">
-                        <label className="block mb-1 text-sm font-medium text-slate-700">
-                            Non-Member Profit
-                        </label>
-                        <input
-                            type="number"
-                            name="profit"
-                            value={nonMemberForm.profit}
-                            onChange={handleNonMemberChange}
-                            className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
-                            required
-                        />
-                    </div>
+                            <div className="mb-3">
+                                <label className="block mb-1 text-sm font-medium text-slate-700">
+                                    Category
+                                </label>
+                                <select
+                                    name="category"
+                                    value={nonMemberForm.category}
+                                    onChange={handleNonMemberChange}
+                                    className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
+                                >
+                                    {categoryOptions.map((cat) => (
+                                        <option key={cat} value={cat}>
+                                            {cat}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
 
-                    {nonMemberForm.category === "Snacks" && (
-                        <div className="mb-3">
-                            <label className="block mb-1 text-sm font-medium text-slate-700">
-                                PR Charges
-                            </label>
-                            <input
-                                type="number"
-                                name="prCharges"
-                                value={nonMemberForm.prCharges}
-                                onChange={handleNonMemberChange}
-                                className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
-                            />
-                        </div>
-                    )}
+                            <div className="mb-3">
+                                <label className="block mb-1 text-sm font-medium text-slate-700">
+                                    Non-Member Profit
+                                </label>
+                                <input
+                                    type="number"
+                                    name="profit"
+                                    min="0"
+                                    value={nonMemberForm.profit}
+                                    onChange={handleNonMemberChange}
+                                    className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
+                                    required
+                                />
+                            </div>
 
-                    <button
-                        type="submit"
-                        className="px-6 py-3 rounded-2xl bg-[#5b5b5b] text-white text-sm font-semibold shadow hover:shadow-md transition"
-                    >
-                        Update Non-Member
-                    </button>
-                </form>
+                            {nonMemberForm.category === "Snacks" && (
+                                <div className="mb-3">
+                                    <label className="block mb-1 text-sm font-medium text-slate-700">
+                                        PR Charges
+                                    </label>
+                                    <input
+                                        type="number"
+                                        name="prCharges"
+                                        min="0"
+                                        value={nonMemberForm.prCharges}
+                                        onChange={handleNonMemberChange}
+                                        className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
+                                    />
+                                </div>
+                            )}
+
+                            <button
+                                type="submit"
+                                className="px-6 py-3 rounded-2xl bg-[#5b5b5b] text-white text-sm font-semibold shadow hover:shadow-md transition"
+                            >
+                                Update Non-Member
+                            </button>
+                        </form>
                     </div>
                 </div>
 
-            {/* Report Section */}
-            <div className="bg-white/80 border border-white/60 rounded-3xl shadow-xl backdrop-blur-sm p-6">
-                <h2 className="text-lg font-semibold text-slate-700 mb-3">
-                    Profit Report
-                </h2>
+                {/* Report Section */}
+                <div className="bg-white/80 border border-white/60 rounded-3xl shadow-xl backdrop-blur-sm p-6">
+                    <h2 className="text-lg font-semibold text-slate-700 mb-3">
+                        Profit Report
+                    </h2>
 
-                {loading ? (
-                    <p className="text-sm text-slate-600">Loading report...</p>
-                ) : (
-                    <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead className="bg-gray-50 text-gray-600">
-                                    <tr>
-                                        <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
-                                            Category
-                                        </th>
-                                        <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
-                                            Member Profit
-                                        </th>
-                                        <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
-                                            Food PR Charges
-                                        </th>
-                                        <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
-                                            Non-Member Profit
-                                        </th>
-                                        <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
-                                            PR Charges
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {reportData.length > 0 ? (
-                                        reportData.map((row, index) => (
-                                            <tr
-                                                key={index}
-                                                className="border-t border-gray-100 hover:bg-gray-50"
-                                            >
-                                                <td className="px-4 py-3 capitalize">
-                                                    {row.category_name}
-                                                </td>
-                                                <td className="px-4 py-3">{row.PROFIT}</td>
-                                                <td className="px-4 py-3">{row.FOOD_PR_CHARGES}</td>
-                                                <td className="px-4 py-3">{row.NON_MEMBER_PROFIT}</td>
-                                                <td className="px-4 py-3">{row.PR_CHARGES}</td>
-                                            </tr>
-                                        ))
-                                    ) : (
-                                        <tr className="border-t border-gray-100">
-                                            <td
-                                                colSpan="5"
-                                                className="px-4 py-6 text-center text-gray-500"
-                                            >
-                                                No records found.
-                                            </td>
+                    {loading ? (
+                        <p className="text-sm text-slate-600">Loading report...</p>
+                    ) : (
+                        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead className="bg-gray-50 text-gray-600">
+                                        <tr>
+                                            <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
+                                                Category
+                                            </th>
+                                            <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
+                                                Member Profit
+                                            </th>
+                                            <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
+                                                Food PR Charges
+                                            </th>
+                                            <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
+                                                Non-Member Profit
+                                            </th>
+                                            <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
+                                                PR Charges
+                                            </th>
                                         </tr>
-                                    )}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody>
+                                        {reportData.length > 0 ? (
+                                            reportData.map((row, index) => (
+                                                <tr
+                                                    key={index}
+                                                    className="border-t border-gray-100 hover:bg-gray-50"
+                                                >
+                                                    <td className="px-4 py-3 capitalize">
+                                                        {row.category_name}
+                                                    </td>
+                                                    <td className="px-4 py-3">{row.PROFIT}</td>
+                                                    <td className="px-4 py-3">{row.FOOD_PR_CHARGES}</td>
+                                                    <td className="px-4 py-3">{row.NON_MEMBER_PROFIT}</td>
+                                                    <td className="px-4 py-3">{row.PR_CHARGES}</td>
+                                                </tr>
+                                            ))
+                                        ) : (
+                                            <tr className="border-t border-gray-100">
+                                                <td
+                                                    colSpan="5"
+                                                    className="px-4 py-6 text-center text-gray-500"
+                                                >
+                                                    No records found.
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
-                    </div>
-                )}
-            </div>
+                    )}
+                </div>
             </div>
         </div>
     );

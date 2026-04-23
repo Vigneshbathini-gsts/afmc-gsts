@@ -115,7 +115,7 @@ const getOrderTransactionDetails = async (req, res) => {
     }
 
     const detailQuery = `
-      SELECT 
+      SELECT DISTINCT
         OD.ORDER_LINE_ID,
         OD.ORDER_ID,
         OD.ITEM_ID,
@@ -141,6 +141,7 @@ const getOrderTransactionDetails = async (req, res) => {
           ((OD.SUBTOTAL - IFNULL(OD.FOOD_PR_CHARGES * OD.QUANTITY, 0)) /
           (1 + (IFNULL(OD.PROFIT, 0) / 100)))) / OD.QUANTITY, 2
         ) AS UNIT_PROFIT,
+        IFNULL(OD.PROFIT, 0) AS TOTALPERCENT,
         OH.ORDER_NUM,
         OH.USER_ID,
         OH.ORDER_DATE_NEW AS O_DATE,
@@ -153,7 +154,6 @@ const getOrderTransactionDetails = async (req, res) => {
       JOIN xxafmc_order_header OH ON OD.ORDER_ID = OH.ORDER_NUM
       LEFT JOIN xxafmc_inventory XI ON XI.ITEM_CODE = OD.ITEM_ID
       LEFT JOIN xxafmc_users XU ON OH.USER_ID = XU.USER_ID
-      LEFT JOIN xxafmc_role R ON XU.ROLE_ID = R.ROLE_ID
       LEFT JOIN xxafmc_pubmed XP ON XP.PUBMED_ID = OH.PUBMED
       LEFT JOIN xxafmc_non_members XNM ON XNM.ID = OH.MEMBER_ID
       ${baseWhere}
@@ -175,6 +175,7 @@ const getOrderTransactionDetails = async (req, res) => {
           (1 + (IFNULL(OD.PROFIT, 0) / 100)))
         ),2) AS TOTAL_PROFIT,
         NULL AS UNIT_PROFIT,
+        NULL AS TOTALPERCENT,
         NULL AS ORDER_NUM,
         NULL AS USER_ID,
         NULL AS O_DATE,

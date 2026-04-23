@@ -657,7 +657,6 @@ const styles = {
   height: "70%",
   objectFit: "contain",
 },
-  crestImg: { width: 118, height: 118, objectFit: "contain" },
   crestFallback: { alignItems: "center", justifyContent: "center" },
   orgName: {
     fontFamily: "'Cinzel', serif",

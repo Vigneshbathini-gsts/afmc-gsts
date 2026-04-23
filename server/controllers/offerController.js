@@ -13,9 +13,9 @@ exports.getAllOffers = async (req, res) => {
           MAX(freeinv.item_name) AS free_item,
           DATE_FORMAT(ofr.OFFER_DATE, '%Y-%m-%d') as offer_date,
 
-          -- ✅ Dynamic Status (CORE FIX)
           CASE 
             WHEN CURDATE() < ofr.OFFER_DATE THEN 'Scheduled'
+            WHEN ofr.END_DATE IS NULL AND CURDATE() >= ofr.OFFER_DATE THEN 'Active'
             WHEN CURDATE() BETWEEN ofr.OFFER_DATE AND ofr.END_DATE THEN 'Active'
             ELSE 'Inactive'
           END as status,
@@ -143,7 +143,7 @@ exports.createOffer = async (req, res) => {
     const itemName = itemInfo[0]?.item_name || null;
     const freeItemName = freeItemInfo[0]?.item_name || null;
 
-    // Insert - OFFER_ID auto-generated, STATUS defaults to 'Active', END_DATE not required
+    // Insert - OFFER_ID auto-generated, STATUS will be calculated dynamically
     const [result] = await db.query(
       `INSERT INTO xxafmc_offers (
           ITEM_CODE,
@@ -154,12 +154,11 @@ exports.createOffer = async (req, res) => {
           FREE_ITEM_QUANTITY,
           OFFER_DATE,
           MESSAGE,
-          STATUS,
           CREATED_BY,
           CREATION_DATE,
           LAST_UPDATED_BY,
           LAST_UPDATED_DATE
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Active', ?, NOW(), ?, NOW())`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, NOW())`,
       [
         item_code,
         itemName,

@@ -137,11 +137,6 @@ export default function OutletOrderDetails() {
       .reduce((sum, item) => sum + item.scanQuantity, 0);
   }, [scannedItems]);
 
-  // Helper function to check if barcode already scanned
-  const isBarcodeScanned = useCallback((barcode) => {
-    return scannedItems.some(item => item.barcode === barcode);
-  }, [scannedItems]);
-
   const handleBarcodeBlur = async () => {
     if (barcode && barcode.trim() !== "" && !processingScanRef.current && !scanning && isManualScanRef.current) {
       isManualScanRef.current = false;
