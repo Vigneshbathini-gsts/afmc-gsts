@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useState, useRef } from "react";
-import { FaSearch, FaUndoAlt, FaBan, FaChevronLeft, FaChevronRight, FaArrowLeft, FaDownload } from "react-icons/fa";
+import React, { useCallback, useEffect, useState } from "react";
+import { FaSearch, FaUndoAlt, FaBan, FaChevronLeft, FaChevronRight, FaArrowLeft, FaDownload, FaTimes } from "react-icons/fa";
 import { cancelledOrdersAPI } from "../../services/api";
 import OrderDetailsModal from "../../components/OrderDetailsModal";
 import { useNavigate } from "react-router-dom";
@@ -23,13 +23,13 @@ export default function CancelledOrders() {
     toDate: today,
   });
 
+  // Search filters
+  const [searchFilters, setSearchFilters] = useState({
+    searchTerm: "", // Combined search term
+  });
+
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
-  
-  // Refs to track if we should auto-filter
-  const isInitialMount = useRef(true);
-  const fromDateRef = useRef(today);
-  const toDateRef = useRef(today);
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
@@ -58,13 +58,7 @@ export default function CancelledOrders() {
   // Initial fetch on mount only
   useEffect(() => {
     fetchCancelledOrders();
-    isInitialMount.current = false;
   }, []);
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFilters(prev => ({ ...prev, [name]: value }));
-  };
 
   // Handle date selection - only filter when a complete date is selected
   const handleDateChange = (e) => {
@@ -72,28 +66,22 @@ export default function CancelledOrders() {
     
     // Update the filter state
     setFilters(prev => ({ ...prev, [name]: value }));
-    
-    // Update refs
-    if (name === 'fromDate') {
-      fromDateRef.current = value;
-    } else {
-      toDateRef.current = value;
-    }
-    
-    // Only fetch if both dates are valid and not during month navigation
-    if (value && value.length === 10) { // Date string is complete (YYYY-MM-DD)
-      // Small delay to ensure state is updated
-      setTimeout(() => {
-        if (fromDateRef.current && toDateRef.current) {
-          fetchCancelledOrders();
-        }
-      }, 100);
-    }
   };
 
   const handleSearch = (e) => {
     e.preventDefault();
     fetchCancelledOrders();
+  };
+
+  const handleSearchChange = (e) => {
+    const { value } = e.target;
+    setSearchFilters({ searchTerm: value });
+    setCurrentPage(1); // Reset to first page when searching
+  };
+
+  const handleClearSearch = () => {
+    setSearchFilters({ searchTerm: "" });
+    setCurrentPage(1);
   };
 
   const handleReset = () => {
@@ -104,9 +92,6 @@ export default function CancelledOrders() {
       fromDate: resetFromDate,
       toDate: resetToDate,
     });
-    
-    fromDateRef.current = resetFromDate;
-    toDateRef.current = resetToDate;
     
     // Fetch immediately after reset
     setTimeout(() => {
@@ -152,11 +137,25 @@ export default function CancelledOrders() {
     });
   };
 
+  // Filter orders based on search criteria (search in both order number and customer name)
+  const filteredOrders = orders.filter((order) => {
+    const searchTermLower = searchFilters.searchTerm.toLowerCase();
+    if (!searchTermLower) return true;
+    
+    const matchesOrderNumber = order?.ORDER_NUM && 
+      order.ORDER_NUM.toString().toLowerCase().includes(searchTermLower);
+    
+    const matchesCustomerName = order?.FIRST_NAME && 
+      order.FIRST_NAME.toLowerCase().includes(searchTermLower);
+    
+    return matchesOrderNumber || matchesCustomerName;
+  });
+
   // Pagination logic
-  const totalPages = Math.ceil(orders.length / rowsPerPage);
+  const totalPages = Math.ceil(filteredOrders.length / rowsPerPage);
   const startIndex = (currentPage - 1) * rowsPerPage;
   const endIndex = startIndex + rowsPerPage;
-  const currentOrders = orders.slice(startIndex, endIndex);
+  const currentOrders = filteredOrders.slice(startIndex, endIndex);
 
   const handlePageChange = (pageNumber) => {
     setCurrentPage(pageNumber);
@@ -191,7 +190,7 @@ export default function CancelledOrders() {
       </div>
 
       {/* Header */}
-      <div className="bg-gradient-to-r from-afmc-maroon to-afmc-maroon2 rounded-2xl shadow-md p-4 mb-5 text-white">
+      <div className="mb-5">
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <FaBan />
           Cancelled Orders Report
@@ -260,9 +259,39 @@ export default function CancelledOrders() {
           <h2 className="text-lg font-semibold text-slate-700">
             Cancelled Orders List
           </h2>
+
+          {/* Combined Search Input with Cancel Icon */}
+          <div className="relative w-full md:w-80">
+            <input
+              type="text"
+              name="searchTerm"
+              value={searchFilters.searchTerm}
+              onChange={handleSearchChange}
+              placeholder="Search by Order Number or Customer Name..."
+              className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-afmc-maroon pr-10"
+            />
+            {searchFilters.searchTerm && (
+              <button
+                type="button"
+                onClick={handleClearSearch}
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              >
+                <FaTimes size={16} />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Records Info - Below the title and search */}
+        <div className="mb-3">
           <p className="text-sm text-slate-500">
-            Showing {orders.length === 0 ? 0 : startIndex + 1} to{" "}
-            {Math.min(endIndex, orders.length)} of {orders.length} Records
+            Showing {filteredOrders.length === 0 ? 0 : startIndex + 1} to{" "}
+            {Math.min(endIndex, filteredOrders.length)} of {filteredOrders.length} Records
+            {orders.length !== filteredOrders.length && (
+              <span className="text-slate-400 ml-2">
+                (filtered from {orders.length} total)
+              </span>
+            )}
           </p>
         </div>
 
@@ -316,7 +345,7 @@ export default function CancelledOrders() {
             </div>
 
             {/* Pagination */}
-            {orders.length > 0 && (
+            {filteredOrders.length > 0 && (
               <div className="flex flex-col md:flex-row items-center justify-between gap-4 mt-5">
                 <p className="text-sm text-slate-500">
                   Page {currentPage} of {totalPages || 1}
