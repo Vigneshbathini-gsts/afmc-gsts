@@ -1131,7 +1131,7 @@ export default function Inventory() {
                       }))
                     }
                   />
-                  N
+                  No
                 </label>
                 <label className="flex items-center gap-2 text-sm text-gray-700">
                   <input
@@ -1146,7 +1146,7 @@ export default function Inventory() {
                       }))
                     }
                   />
-                  Y
+                  Yes
                 </label>
               </div>
             </div>
