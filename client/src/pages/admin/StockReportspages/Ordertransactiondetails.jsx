@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { FaDownload, FaSearch } from "react-icons/fa";
 import { FaArrowLeft } from "react-icons/fa";
 import api from "../../../services/api";
@@ -19,24 +19,64 @@ const toInputDate = (date) => {
 
 const buildQueryParams = (filters) => {
   const params = {};
-  Object.entries(filters).forEach(([key, value]) => {
-    const trimmed = typeof value === "string" ? value.trim() : value;
-    if (trimmed) params[key] = trimmed;
-  });
+  const clean = (value) => (typeof value === "string" ? value.trim() : "");
+
+  const fromDate = clean(filters.fromDate);
+  const toDate = clean(filters.toDate);
+  const orderNumber = clean(filters.orderNumber);
+  const userName = clean(filters.userName);
+  const kitchenName = clean(filters.kitchenName);
+  const itemNames = clean(filters.itemNames);
+
+  // Only add non-empty values to params
+  if (fromDate) params.fromDate = fromDate;
+  if (toDate) params.toDate = toDate;
+  if (orderNumber) params.orderNumber = orderNumber;
+  if (userName) params.userName = userName;
+  if (kitchenName) params.kitchenName = kitchenName;
+  if (itemNames) params.itemNames = itemNames;
+
   return params;
+};
+
+const normalizeDropdownOptions = (options) => {
+  if (!Array.isArray(options)) return [];
+
+  return options
+    .map((option) => {
+      if (typeof option === "string" || typeof option === "number") {
+        const value = String(option).trim();
+        return value ? { label: value, value } : null;
+      }
+
+      if (!option || typeof option !== "object") return null;
+
+      const label = String(
+        option.label ?? option.name ?? option.title ?? option.D ?? option.d ?? option.value ?? ""
+      ).trim();
+      const value = String(
+        option.value ?? option.id ?? option.key ?? option.R ?? option.r ?? option.label ?? ""
+      ).trim();
+
+      return label && value ? { label, value } : null;
+    })
+    .filter(Boolean);
 };
 
 export default function OrderTransactionUI() {
   const navigate = useNavigate();
-  const today = toInputDate(new Date());
-  const initialFilters = {
-    fromDate: today,
-    toDate: today,
-    orderNumber: "",
-    userName: "",
-    kitchenName: "",
-    itemNames: "",
-  };
+  const today = useMemo(() => toInputDate(new Date()), []);
+  const initialFilters = useMemo(
+    () => ({
+      fromDate: today,
+      toDate: today,
+      orderNumber: "",
+      userName: "",
+      kitchenName: "",
+      itemNames: "",
+    }),
+    [today]
+  );
 
   const [filters, setFilters] = useState(initialFilters);
   const [appliedFilters, setAppliedFilters] = useState(initialFilters);
@@ -59,38 +99,24 @@ export default function OrderTransactionUI() {
     }));
   };
 
+  // Fetch filter options when component mounts
   useEffect(() => {
     const fetchFilterOptions = async () => {
       setFiltersLoading(true);
       try {
-        const response = await api.get(
-          "/reports/ordertransaction/filter-options",
-          {
-            params: {
-              fromDate: filters.fromDate,
-              toDate: filters.toDate,
-            },
-          }
-        );
+        const [itemResponse, userResponse, kitchenResponse] = await Promise.all([
+          api.get("/reports/ordertransaction/items"),
+          api.get("/reports/ordertransaction/users"),
+          api.get("/reports/ordertransaction/kitchens"),
+        ]);
 
-        if (response.data.success) {
-          const newOptions = response.data.data || {
-            itemNames: [],
-            userNames: [],
-            kitchenNames: [],
-          };
-          setFilterOptions(newOptions);
-
-          // Reset filters if selected values are no longer in options
-          setFilters((current) => ({
-            ...current,
-            itemNames: current.itemNames && newOptions.itemNames.includes(current.itemNames) ? current.itemNames : "",
-            userName: current.userName && newOptions.userNames.includes(current.userName) ? current.userName : "",
-            kitchenName: current.kitchenName && newOptions.kitchenNames.includes(current.kitchenName) ? current.kitchenName : "",
-          }));
-        }
+        setFilterOptions({
+          itemNames: normalizeDropdownOptions(itemResponse.data?.data),
+          userNames: normalizeDropdownOptions(userResponse.data?.data),
+          kitchenNames: normalizeDropdownOptions(kitchenResponse.data?.data),
+        });
       } catch (fetchError) {
-        console.error(fetchError);
+        console.error("Error fetching filter options:", fetchError);
         setFilterOptions({
           itemNames: [],
           userNames: [],
@@ -102,27 +128,35 @@ export default function OrderTransactionUI() {
     };
 
     fetchFilterOptions();
-  }, [filters.fromDate, filters.toDate]);
+  }, []); // Empty dependency array - fetch only once on mount
 
   const fetchData = async (activeFilters) => {
     setLoading(true);
     setError("");
 
     try {
+      const queryParams = buildQueryParams(activeFilters);
       const { data: response } = await api.get("/reports/ordertransaction", {
-        params: buildQueryParams(activeFilters),
+        params: queryParams,
       });
 
       if (response.success) {
-        setData(response.data || []);
+        // Remove the total row for display if needed
+        const displayData = response.data || [];
+        setData(displayData);
+        
+        if (displayData.length === 0) {
+          setError("No records found for the selected filters.");
+        }
       } else {
         setError(response.message || "Unable to fetch order transactions.");
+        setData([]);
       }
     } catch (requestError) {
       console.error("API Error:", requestError);
       setError(
         requestError.response?.data?.message ||
-          "Unable to fetch order transactions."
+          "Unable to fetch order transactions. Please try again."
       );
       setData([]);
     } finally {
@@ -130,11 +164,24 @@ export default function OrderTransactionUI() {
     }
   };
 
+  useEffect(() => {
+    // Auto-load today's report on first open (dates are pre-filled).
+    setAppliedFilters(initialFilters);
+    setHasSearched(true);
+    fetchData(initialFilters);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleSearch = async () => {
+    // Validate dates
     if (!filters.fromDate || !filters.toDate) {
-      setHasSearched(false);
-      setData([]);
       setError("Please select both From Date and To Date before searching.");
+      return;
+    }
+
+    // Validate date range
+    if (filters.fromDate > filters.toDate) {
+      setError("From Date cannot be greater than To Date.");
       return;
     }
 
@@ -145,14 +192,38 @@ export default function OrderTransactionUI() {
     await fetchData(nextFilters);
   };
 
+  const handleReset = () => {
+    setFilters({
+      fromDate: today,
+      toDate: today,
+      orderNumber: "",
+      userName: "",
+      kitchenName: "",
+      itemNames: "",
+    });
+    setAppliedFilters({ ...initialFilters });
+    setHasSearched(false);
+    setData([]);
+    setError("");
+  };
+
   const exportPdf = () => {
     if (!data.length) return;
 
+    // Filter out the total row for PDF export
+    const exportData = data.filter(row => row.ORD !== 2);
+
+    if (exportData.length === 0) return;
+
     exportTableToPdf({
       title: "Order Transaction Details Report",
-      fileName: "order-transaction-details-report.pdf",
-      subtitle: `From: ${appliedFilters.fromDate || "All"}   To: ${
+      fileName: `order-transaction-details-${new Date().toISOString().split('T')[0]}.pdf`,
+      subtitle: `From: ${appliedFilters.fromDate || "All"} To: ${
         appliedFilters.toDate || "All"
+      }${appliedFilters.orderNumber ? ` | Order No: ${appliedFilters.orderNumber}` : ""}${
+        appliedFilters.userName ? ` | User: ${appliedFilters.userName}` : ""
+      }${appliedFilters.kitchenName ? ` | Kitchen: ${appliedFilters.kitchenName}` : ""}${
+        appliedFilters.itemNames ? ` | Item: ${appliedFilters.itemNames}` : ""
       }`,
       headers: [
         "Order Number",
@@ -165,16 +236,16 @@ export default function OrderTransactionUI() {
         "Preparation Charges",
         "Subtotal",
       ],
-      rows: data.map((row) => [
+      rows: exportData.map((row) => [
         row.ORDER_NUM || "-",
         row.FIRST_NAME || "-",
-        stripHtml(row.PUBMED_NAME) || "-",
+        row.PUBMED_NAME || "-",
         stripHtml(row.ITEM_NAME) || "-",
-        stripHtml(row.QUANTITY) || "-",
-        stripHtml(row.TOTALPERCENT) || "-",
-        stripHtml(row.TOTAL_PROFIT) || "-",
-        stripHtml(row.FOOD_PR_CHARGES) || "-",
-        stripHtml(row.SUBTOTAL) || "-",
+        row.QUANTITY || "-",
+        row.TOTALPERCENT || "-",
+        row.TOTAL_PROFIT || "-",
+        row.FOOD_PR_CHARGES || "-",
+        row.SUBTOTAL || "-",
       ]),
     });
   };
@@ -187,7 +258,7 @@ export default function OrderTransactionUI() {
       <div className="relative z-10 p-8">
         <div className="flex items-center justify-between mb-6 md:mb-8">
           <h1 className="text-2xl font-semibold text-afmc-maroon">
-            Stock Reports
+            Order Transaction Reports
           </h1>
           <button
             type="button"
@@ -202,10 +273,10 @@ export default function OrderTransactionUI() {
         <Stackreporttab showTopBar={false} showReportTitle={false} />
 
         <div className="mt-8 bg-white/80 border border-white/60 rounded-3xl shadow-xl backdrop-blur-sm p-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                From
+                From Date <span className="text-red-500">*</span>
               </label>
               <input
                 type="date"
@@ -218,7 +289,7 @@ export default function OrderTransactionUI() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                To
+                To Date <span className="text-red-500">*</span>
               </label>
               <input
                 type="date"
@@ -234,7 +305,8 @@ export default function OrderTransactionUI() {
                 Order Number
               </label>
               <input
-                placeholder="Order Number"
+                type="text"
+                placeholder="Enter Order Number"
                 name="orderNumber"
                 value={filters.orderNumber}
                 onChange={handleChange}
@@ -249,7 +321,7 @@ export default function OrderTransactionUI() {
               <FilterDropdown
                 value={filters.itemNames}
                 onChange={(next) =>
-                  setFilters((current) => ({ ...current, itemNames: next }))
+                  setFilters((current) => ({ ...current, itemNames: next || "" }))
                 }
                 options={filterOptions.itemNames}
                 placeholder="Select Item Name"
@@ -267,7 +339,7 @@ export default function OrderTransactionUI() {
               <FilterDropdown
                 value={filters.userName}
                 onChange={(next) =>
-                  setFilters((current) => ({ ...current, userName: next }))
+                  setFilters((current) => ({ ...current, userName: next || "" }))
                 }
                 options={filterOptions.userNames}
                 placeholder="Select User Name"
@@ -285,7 +357,7 @@ export default function OrderTransactionUI() {
               <FilterDropdown
                 value={filters.kitchenName}
                 onChange={(next) =>
-                  setFilters((current) => ({ ...current, kitchenName: next }))
+                  setFilters((current) => ({ ...current, kitchenName: next || "" }))
                 }
                 options={filterOptions.kitchenNames}
                 placeholder="Select Kitchen Name"
@@ -305,16 +377,24 @@ export default function OrderTransactionUI() {
               disabled={loading}
             >
               <FaSearch size={16} />
-              {loading ? "Loading..." : "Search"}
+              {loading ? "Searching..." : "Search"}
             </button>
+            {/* <button
+              type="button"
+              className="px-6 py-3 rounded-2xl bg-gray-500 hover:bg-gray-600 text-white font-semibold flex items-center gap-2 shadow hover:shadow-md transition"
+              onClick={handleReset}
+            >
+              Reset
+            </button> */}
+            
             <button
               type="button"
               className="px-6 py-3 rounded-2xl bg-afmc-maroon hover:bg-afmc-maroon2 text-white font-semibold flex items-center gap-2 shadow hover:shadow-md transition disabled:opacity-60 disabled:cursor-not-allowed"
               onClick={exportPdf}
-              disabled={!data.length}
+              disabled={!data.length || loading}
             >
               <FaDownload size={16} />
-              Download
+              Download PDF
             </button>
           </div>
 
@@ -326,7 +406,8 @@ export default function OrderTransactionUI() {
 
           {!hasSearched ? (
             <div className="rounded-2xl border border-dashed border-gray-300 p-8 text-center text-gray-500 bg-white">
-              Enter filters and click Search to view data.
+              <p className="text-lg">Enter filters and click Search to view data.</p>
+              <p className="text-sm mt-2">Date range is required for search.</p>
             </div>
           ) : (
             <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
@@ -336,6 +417,12 @@ export default function OrderTransactionUI() {
                     <tr>
                       <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
                         Order Number
+                      </th>
+                      <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
+                        User Name
+                      </th>
+                      <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
+                        Kitchen Name
                       </th>
                       <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
                         Item Name
@@ -358,66 +445,67 @@ export default function OrderTransactionUI() {
                     </tr>
                   </thead>
                   <tbody>
-                    {!data.length && !loading ? (
-                      <tr className="border-t border-gray-100">
-                        <td
-                          className="px-4 py-6 text-center text-gray-500"
-                          colSpan="7"
-                        >
-                          No records found.
+                    {loading ? (
+                      <tr>
+                        <td colSpan="9" className="text-center py-8">
+                          <div className="flex justify-center items-center">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-afmc-maroon"></div>
+                            <span className="ml-2">Loading data...</span>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : data.length === 0 ? (
+                      <tr>
+                        <td colSpan="9" className="px-4 py-6 text-center text-gray-500">
+                          No records found for the selected criteria.
                         </td>
                       </tr>
                     ) : (
                       data.map((row, index) => (
                         <tr
-                          key={
-                            row.ORDER_LINE_ID ||
-                            `${row.ORDER_NUM || "total"}-${index}`
-                          }
-                          className="border-t border-gray-100 hover:bg-gray-50"
+                          key={row.ORDER_LINE_ID || `row-${index}`}
+                          className={`border-t border-gray-100 hover:bg-gray-50 ${
+                            row.ORD === 2 ? "bg-gray-100 font-semibold" : ""
+                          }`}
                         >
                           <td className="px-4 py-3 whitespace-nowrap">
                             {row.ORDER_NUM || "-"}
                           </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            {row.FIRST_NAME || "-"}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            {row.PUBMED_NAME || "-"}
+                          </td>
                           <td className="px-4 py-3 whitespace-nowrap capitalize">
                             {toInitCap(stripHtml(row.ITEM_NAME || "-"))}
                           </td>
-                          <td
-                            className="px-4 py-3 whitespace-nowrap"
-                            dangerouslySetInnerHTML={{
-                              __html: row.QUANTITY || "-",
-                            }}
-                          />
-                          <td
-                            className="px-4 py-3 whitespace-nowrap"
-                            dangerouslySetInnerHTML={{
-                              __html: row.TOTALPERCENT || "-",
-                            }}
-                          />
-                          <td
-                            className="px-4 py-3 whitespace-nowrap"
-                            dangerouslySetInnerHTML={{
-                              __html: row.TOTAL_PROFIT || "-",
-                            }}
-                          />
-                          <td
-                            className="px-4 py-3 whitespace-nowrap"
-                            dangerouslySetInnerHTML={{
-                              __html: row.FOOD_PR_CHARGES || "-",
-                            }}
-                          />
-                          <td
-                            className="px-4 py-3 whitespace-nowrap"
-                            dangerouslySetInnerHTML={{
-                              __html: row.SUBTOTAL || "-",
-                            }}
-                          />
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            {row.QUANTITY || "-"}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            {row.TOTALPERCENT || "-"}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            {row.TOTAL_PROFIT || "-"}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            {row.FOOD_PR_CHARGES || "-"}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            {row.SUBTOTAL || "-"}
+                          </td>
                         </tr>
                       ))
                     )}
                   </tbody>
                 </table>
               </div>
+              {!loading && data.length > 0 && (
+                <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 text-sm text-gray-600">
+                  Total Records: {data.filter(row => row.ORD !== 2).length}
+                </div>
+              )}
             </div>
           )}
         </div>
