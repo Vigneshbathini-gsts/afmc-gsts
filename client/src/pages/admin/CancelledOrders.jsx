@@ -72,7 +72,7 @@ export default function CancelledOrders() {
 
   const handleSearch = (e) => {
     e.preventDefault();
-    fetchCancelledOrders();
+    fetchCancelledOrders(filters);
   };
 
   const handleSearchChange = (e) => {
@@ -90,14 +90,16 @@ export default function CancelledOrders() {
     const resetFromDate = today;
     const resetToDate = today;
     
-    setFilters({
+    const nextFilters = {
       fromDate: resetFromDate,
       toDate: resetToDate,
-    });
+    };
+
+    setFilters(nextFilters);
     
     // Fetch immediately after reset
     setTimeout(() => {
-      fetchCancelledOrders();
+      fetchCancelledOrders(nextFilters);
     }, 100);
   };
 
