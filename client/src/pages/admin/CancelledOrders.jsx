@@ -47,6 +47,7 @@ export default function CancelledOrders() {
     try {
       setLoading(true);
       const res = await cancelledOrdersAPI.getCancelledOrders(queryFilters);
+      console.log("Cancelled Orders API Response:", res.data)
       setOrders(res.data.data || []);
       setCurrentPage(1);
     } catch (error) {
