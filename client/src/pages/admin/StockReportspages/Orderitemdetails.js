@@ -316,7 +316,7 @@ export default function Orderitemdetails() {
                         Item
                       </th>
                       <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
-                        Qty
+                        Quantity
                       </th>
                       <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
                         Total Profit
