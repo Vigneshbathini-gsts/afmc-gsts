@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { FaArrowLeft } from "react-icons/fa";
+import { FaArrowLeft, FaDownload } from "react-icons/fa";
 import api from "../../../services/api";
 import Stackreporttab from "./Stackreporttab";
 import { toInitCap } from "../../../utils/textFormat";
+import { exportTableToPdf } from "../../../utils/pdfExport";
 
 export default function BarstockReports() {
   const navigate = useNavigate();
@@ -20,6 +21,23 @@ export default function BarstockReports() {
   });
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
+  const [downloading, setDownloading] = useState(false);
+
+  const getAcUnitLabel = useCallback((row) => {
+    const value =
+      row?.A_C_UNIT ?? row?.a_c_unit ?? row?.ac_unit ?? row?.AC_UNIT ?? row?.A_CUNIT ?? "";
+    const raw = String(value || "").trim();
+    if (!raw) return "-";
+
+    const key = raw.toLowerCase();
+    if (key === "nos") return "Nos";
+    if (key === "peg" || key === "pegs") return "Pegs";
+    if (key === "glass") return "Glass";
+    if (key === "mug") return "Mug";
+    if (key === "can") return "Can";
+
+    return toInitCap(raw);
+  }, []);
 
   const fetchData = useCallback(
     async ({ reset = false, nextPage = 0 } = {}) => {
@@ -105,6 +123,70 @@ export default function BarstockReports() {
     }
   };
 
+  const handleDownload = async () => {
+    if (downloading) return;
+
+    try {
+      setDownloading(true);
+
+      const allRows = [];
+      let offsetPage = 0;
+
+      // Fetch all pages using the same endpoint and params.
+      // Stop when a page comes back smaller than our page size.
+      while (true) {
+        const res = await api.get("/reports/stock-report", {
+          params: {
+            itemName: activeFilters.itemName.trim(),
+            itemCode: activeFilters.itemCode.trim(),
+            limit: rowsPerPage,
+            offset: offsetPage * rowsPerPage,
+          },
+        });
+
+        const chunk = res.data.data || [];
+        allRows.push(...chunk);
+
+        if (chunk.length < rowsPerPage) break;
+        offsetPage += 1;
+      }
+
+      if (!allRows.length) return;
+
+      const subtitleParts = [];
+      // if (activeFilters.itemName.trim()) subtitleParts.push(`Item: ${activeFilters.itemName.trim()}`);
+      // if (activeFilters.itemCode.trim()) subtitleParts.push(`Code: ${activeFilters.itemCode.trim()}`);
+
+      exportTableToPdf({
+        title: "Bar Stock Report",
+        fileName: "bar-stock-report.pdf",
+        subtitle: subtitleParts.length ? subtitleParts.join("   ") : undefined,
+        headers: [
+          "Item Code",
+          "Item Name",
+          "Unit Price",
+          "Total Price",
+          "Available Stock",
+          "Reserved Stock",
+          "A/C Unit",
+        ],
+        rows: allRows.map((item) => [
+          item.item_code ?? "-",
+          toInitCap(item.item_name) || "-",
+          item.unit_price ?? "-",
+          item.total_price ?? "-",
+          item.AVAILABLE_STOCK ?? 0,
+          item.RESERVED_STOCK ?? 0,
+          getAcUnitLabel(item),
+        ]),
+      });
+    } catch (err) {
+      console.error("Failed to download bar stock report:", err);
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-afmc-bg via-white to-afmc-bg2 relative">
       <div className="absolute top-16 left-12 w-72 h-72 bg-afmc-maroon/10 rounded-full blur-3xl"></div>
@@ -148,6 +230,17 @@ export default function BarstockReports() {
               className="px-6 py-3 rounded-2xl bg-[#5b5b5b] text-white font-semibold flex items-center gap-2 shadow hover:shadow-md"
             >
               Search
+            </button>
+
+            <button
+              type="button"
+              onClick={handleDownload}
+              disabled={downloading}
+              className="px-6 py-3 rounded-2xl bg-afmc-maroon hover:bg-afmc-maroon2 text-white font-semibold flex items-center gap-2 shadow hover:shadow-md transition disabled:opacity-60 disabled:cursor-not-allowed"
+              title="Download PDF"
+            >
+              <FaDownload size={16} />
+              {downloading ? "Downloading..." : "Download"}
             </button>
           </div>
 
@@ -198,7 +291,7 @@ export default function BarstockReports() {
                       <td className="px-4 py-3">{item.AVAILABLE_STOCK ?? 0}</td>
                       <td className="px-4 py-3">{item.RESERVED_STOCK ?? 0}</td>
                       <td className="px-4 py-3">
-                        {toInitCap(item.A_C_UNIT ?? "-")}
+                        {getAcUnitLabel(item)}
                       </td>
                     </tr>
                   ))}

@@ -16,6 +16,37 @@ const toInitCap = (value) =>
     .toLowerCase()
     .replace(/(^|\s)\S/g, (match) => match.toUpperCase());
 
+const getAllowedAcUnits = (categoryId, subCategoryId) => {
+  const cat = Number(categoryId);
+  const sub = Number(subCategoryId);
+  if (!Number.isFinite(cat) || !Number.isFinite(sub)) return [];
+
+  const allowed = new Set();
+
+  if (cat === 10) {
+    if ([2, 4, 5, 8, 11, 12, 16, 17].includes(sub)) allowed.add("Pegs");
+    if ([1, 3, 1310].includes(sub)) allowed.add("Nos");
+    if ([1].includes(sub)) {
+      allowed.add("Can");
+      allowed.add("Mug");
+    }
+    if ([6].includes(sub)) {
+      allowed.add("Glass");
+      allowed.add("Nos");
+    }
+    if ([9].includes(sub)) {
+      allowed.add("Glass");
+      allowed.add("Nos");
+    }
+  }
+
+  if (cat === 14) {
+    if ([7, 10].includes(sub)) allowed.add("Nos");
+  }
+
+  return Array.from(allowed);
+};
+
 
 export default function Inventory() {
   const navigate = useNavigate();
@@ -40,7 +71,6 @@ export default function Inventory() {
   const [subCategories, setSubCategories] = useState([]);
   const [items, setItems] = useState([]);
   const [inventory, setInventory] = useState([]);
-  const [barTypes, setBarTypes] = useState([]);
   const [categoryId, setCategoryId] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
@@ -50,6 +80,7 @@ export default function Inventory() {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [addItemError, setAddItemError] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const [showStockModal, setShowStockModal] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
@@ -69,6 +100,7 @@ export default function Inventory() {
   const [saving, setSaving] = useState(false);
   const [stockSaving, setStockSaving] = useState(false);
   const [stockError, setStockError] = useState("");
+  const [stockInfo, setStockInfo] = useState("");
   const [imageSaving, setImageSaving] = useState(false);
   const [imageError, setImageError] = useState("");
   const [imagePreviewUrl, setImagePreviewUrl] = useState("");
@@ -144,12 +176,32 @@ export default function Inventory() {
       };
       const response = await inventoryAPI.getAll(params);
       const rows = response.data.data || [];
-      setInventory(
-        rows.filter((row) => {
-          if (row?.sub_category == null) return true;
-          return ![14, 15].includes(Number(row.sub_category));
-        })
-      );
+      const cleanedRows = rows.filter((row) => {
+        if (row?.sub_category == null) return true;
+        return ![14, 15].includes(Number(row.sub_category));
+      });
+
+      const groupedByItemCode = new Map();
+      cleanedRows.forEach((row) => {
+        const key = String(row?.item_code || row?.item_id || "").trim();
+        if (!key) return;
+
+        if (!groupedByItemCode.has(key)) {
+          groupedByItemCode.set(key, { ...row });
+          return;
+        }
+
+        const existing = groupedByItemCode.get(key);
+        const existingQty = Number(existing?.stock_quantity || 0);
+        const nextQty = Number(row?.stock_quantity || 0);
+        groupedByItemCode.set(key, {
+          ...existing,
+          stock_quantity: (Number.isFinite(existingQty) ? existingQty : 0) + (Number.isFinite(nextQty) ? nextQty : 0),
+          file_name: existing?.file_name || row?.file_name || "",
+        });
+      });
+
+      setInventory(Array.from(groupedByItemCode.values()));
     } catch (err) {
       console.error("Failed to load inventory:", err);
       setError("Failed to load inventory.");
@@ -158,20 +210,10 @@ export default function Inventory() {
     }
   }, [categoryId, itemCode]);
 
-  const fetchBarTypes = async () => {
-    try {
-      const response = await inventoryAPI.getBarTypes();
-      setBarTypes(response.data.data || []);
-    } catch (err) {
-      console.error("Failed to load bar types:", err);
-    }
-  };
-
   useEffect(() => {
     fetchCategories();
     fetchItems();
     fetchSubCategories();
-    fetchBarTypes();
   }, []);
 
   useEffect(() => {
@@ -306,7 +348,26 @@ export default function Inventory() {
     [formValues.subCategory, subCategories]
   );
 
-  const acUnitOptions = useMemo(() => ["Nos", "Pegs", "Glass", "Mug", "Can"], []);
+  const allAcUnitOptions = useMemo(() => ["Nos", "Pegs", "Glass", "Mug", "Can"], []);
+
+  const acUnitOptions = useMemo(() => {
+    const allowed = getAllowedAcUnits(formValues.categoryId, formValues.subCategory);
+    if (allowed.length === 0) return allAcUnitOptions;
+    const normalizedAllowed = new Set(allowed.map((value) => String(value).toLowerCase()));
+    return allAcUnitOptions.filter((value) => normalizedAllowed.has(String(value).toLowerCase()));
+  }, [allAcUnitOptions, formValues.categoryId, formValues.subCategory]);
+
+  useEffect(() => {
+    const allowed = getAllowedAcUnits(formValues.categoryId, formValues.subCategory);
+    if (allowed.length === 0) return;
+
+    const allowedKeys = new Set(allowed.map((value) => String(value).toLowerCase()));
+    const currentKey = String(formValues.acUnit || "").toLowerCase();
+
+    if (!currentKey || !allowedKeys.has(currentKey)) {
+      setFormValues((prev) => ({ ...prev, acUnit: allowed[0] }));
+    }
+  }, [formValues.categoryId, formValues.subCategory, formValues.acUnit]);
 
   const formatDate = (date) => {
     const d = date instanceof Date ? date : new Date(date);
@@ -324,6 +385,7 @@ export default function Inventory() {
   };
 
   const openAddModal = () => {
+    setAddItemError("");
     setFormValues({
       itemName: "",
       description: "",
@@ -347,32 +409,32 @@ export default function Inventory() {
     );
 
     if (!trimmedItemName || !formValues.categoryId) {
-      setError("Item name and category are required.");
+      setAddItemError("Item name and category are required.");
       return;
     }
 
     if (!formValues.subCategory) {
-      setError("Sub category is required.");
+      setAddItemError("Sub category is required.");
       return;
     }
 
     if (!formValues.acUnit) {
-      setError("Accounting unit is required.");
+      setAddItemError("Accounting unit is required.");
       return;
     }
 
     if (!formValues.prepCharges) {
-      setError("Preparation charges selection is required.");
+      setAddItemError("Preparation charges selection is required.");
       return;
     }
 
     if (duplicateItem) {
-      setError("Item name already exists.");
+      setAddItemError("Item name already exists.");
       return;
     }
 
     setSaving(true);
-    setError("");
+    setAddItemError("");
     try {
       const formData = new FormData();
       formData.append("itemName", trimmedItemName);
@@ -393,21 +455,39 @@ export default function Inventory() {
       fetchInventory();
     } catch (err) {
       console.error("Failed to create item:", err);
-      setError("Failed to create item.");
+      setAddItemError(err.response?.data?.message || "Failed to create item.");
     } finally {
       setSaving(false);
     }
   };
 
+  const normalizeStockType = useCallback((value) => {
+    const key = String(value || "").trim().toLowerCase();
+    if (!key) return "";
+    if (key === "free") return "Free";
+    if (key === "purchase" || key === "purchased") return "Purchased";
+    return "";
+  }, []);
+
+  const barTypeOptions = useMemo(
+    () => [
+      { value: "Free", label: "Free" },
+      { value: "Purchased", label: "Purchased" },
+    ],
+    []
+  );
+
   const openStockModal = (row) => {
     setStockError("");
+    setStockInfo("");
     setStockRows([]);
     setStockRowSearch("");
+    const normalizedType = normalizeStockType(row.ac_unit);
     setStockForm({
       itemCode: row.item_code,
       itemName: row.item_name,
       transactionDate: formatDate(new Date()),
-      acUnit: row.ac_unit || "",
+      acUnit: normalizedType || "",
       rate: "",
       quantity: 1,
       volume: "",
@@ -421,6 +501,7 @@ export default function Inventory() {
   const closeStockModal = () => {
     setShowStockModal(false);
     setStockError("");
+    setStockInfo("");
     setStockRows([]);
     setStockRowSearch("");
   };
@@ -471,6 +552,7 @@ export default function Inventory() {
     }
 
     setStockError("");
+    setStockInfo("");
 
     try {
       const response = await inventoryAPI.checkBarcodeExists(normalizedBarcode);
@@ -503,6 +585,8 @@ export default function Inventory() {
       },
     ]);
 
+    setStockInfo("Stock row staged.");
+
     setStockForm((prev) => ({
       ...prev,
       barcode: "",
@@ -522,9 +606,13 @@ export default function Inventory() {
       const normalizedBarcode = String(scannedValue || "").trim();
       setScannerOpen(false);
       setStockForm((prev) => ({ ...prev, barcode: normalizedBarcode }));
-      await stageStockRow(normalizedBarcode);
+      if (stockForm.itemCode && stockForm.rate && stockForm.transactionDate) {
+        await stageStockRow(normalizedBarcode);
+      } else {
+        setStockInfo("Scanned. Enter rate/date and click Add Stock to stage.");
+      }
     },
-    [stageStockRow]
+    [stageStockRow, stockForm.itemCode, stockForm.rate, stockForm.transactionDate]
   );
 
   const handleDeleteStockRow = (barcode) => {
@@ -1021,6 +1109,12 @@ export default function Inventory() {
               </div>
             )}
 
+            {stockInfo && !stockError && (
+              <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+                {stockInfo}
+              </div>
+            )}
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1063,9 +1157,9 @@ export default function Inventory() {
                   className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-700"
                 >
                   <option value="">Select type</option>
-                  {barTypes.map((type) => (
-                    <option key={type.type_id} value={type.type}>
-                      {type.type}
+                  {barTypeOptions.map((type) => (
+                    <option key={type.value} value={type.value}>
+                      {type.label}
                     </option>
                   ))}
                 </select>
@@ -1104,14 +1198,29 @@ export default function Inventory() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Barcode
                 </label>
-                <input
-                  type="text"
-                  value={stockForm.barcode}
-                  onChange={(e) =>
-                    setStockForm((prev) => ({ ...prev, barcode: e.target.value }))
-                  }
-                  className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-700"
-                />
+                <div className="flex items-center gap-3">
+                  <input
+                    type="text"
+                    value={stockForm.barcode}
+                    onChange={(e) =>
+                      setStockForm((prev) => ({ ...prev, barcode: e.target.value }))
+                    }
+                    placeholder="Scan or type barcode"
+                    className="flex-1 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-700"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setScannerOpen(true)}
+                    className="inline-flex items-center gap-2 rounded-2xl bg-[#d70652] px-5 py-3 font-semibold text-white shadow hover:shadow-md"
+                    title="Open scanner"
+                  >
+                    <FaCamera />
+                    Scan
+                  </button>
+                </div>
+                <p className="mt-2 text-xs text-gray-500">
+                  Tip: After scanning, the row auto-stages when rate/date are filled.
+                </p>
               </div>
 
               <div className="lg:col-span-2 flex items-center gap-6">
@@ -1131,7 +1240,7 @@ export default function Inventory() {
                       }))
                     }
                   />
-                  N
+                  No
                 </label>
                 <label className="flex items-center gap-2 text-sm text-gray-700">
                   <input
@@ -1146,21 +1255,22 @@ export default function Inventory() {
                       }))
                     }
                   />
-                  Y
+                  Yes
                 </label>
               </div>
             </div>
 
             <div className="mt-8 rounded-3xl border border-gray-200 bg-white shadow-sm">
-              <button
-                             type="button"
-                             onClick={() => setScannerOpen(true)}
-                             className="flex items-center gap-2 rounded-2xl bg-[#d70652] px-5 py-3 font-semibold text-white shadow hover:shadow-md"
-                           >
-                             <FaCamera />
-                             Scan
-                           </button>
-              <div className="min-h-[140px] border-b border-gray-100 bg-[radial-gradient(circle_at_center,rgba(215,6,82,0.06),transparent_42%)]"></div>
+              {/* <div className="border-b border-gray-100 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-semibold text-gray-800">Scanner</div>
+                    <div className="text-xs text-gray-500">
+                      Use the Scan button near Barcode to open the camera.
+                    </div>
+                  </div>
+                </div>
+              </div> */}
 
               <div className="flex flex-wrap items-center justify-between gap-4 p-4">
                 <button
@@ -1264,6 +1374,12 @@ export default function Inventory() {
             >
               X
             </button>
+
+            {addItemError && (
+              <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+                {addItemError}
+              </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
@@ -1457,7 +1573,8 @@ export default function Inventory() {
                   <button
                     type="button"
                     onClick={() => setIsAcUnitDropdownOpen((prev) => !prev)}
-                    className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-left text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20 flex items-center justify-between"
+                    disabled={!formValues.subCategory}
+                    className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-left text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20 flex items-center justify-between disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <span className="truncate">{formValues.acUnit || "Select Unit"}</span>
                     <FaChevronDown
@@ -1508,7 +1625,7 @@ export default function Inventory() {
                       }))
                     }
                   />
-                  N
+                  No
                 </label>
                 <label className="flex items-center gap-2 text-sm text-gray-700">
                   <input
@@ -1523,7 +1640,7 @@ export default function Inventory() {
                       }))
                     }
                   />
-                  Y
+                  Yes
                 </label>
               </div>
             </div>
