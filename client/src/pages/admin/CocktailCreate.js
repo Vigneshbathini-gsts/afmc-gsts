@@ -266,7 +266,7 @@ export default function CocktailCreate() {
       const createdItemId = response.data?.data?.itemId;
 
       if (createdItemId) {
-        navigate(`/admin/cocktail-edit?itemId=${createdItemId}`);
+        navigate("/admin/cocktail-management");
         return;
       }
       navigate("/admin/cocktail-management");
