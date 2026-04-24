@@ -149,7 +149,7 @@ export default function Orderitemdetails() {
       }`,
       headers: [
         "Item",
-        "Qty",
+        "Quantity",
         "Price",
         "Total Profit",
         "Unit Profit",

@@ -262,13 +262,7 @@ export default function CocktailCreate() {
         payload.append("image", form.image);
       }
 
-      const response = await cocktailAPI.create(payload);
-      const createdItemId = response.data?.data?.itemId;
-
-      if (createdItemId) {
-        navigate(`/admin/cocktail-edit?itemId=${createdItemId}`);
-        return;
-      }
+      await cocktailAPI.create(payload);
       navigate("/admin/cocktail-management");
     } catch (submitError) {
       console.error(submitError);

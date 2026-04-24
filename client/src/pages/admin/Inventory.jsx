@@ -323,8 +323,13 @@ export default function Inventory() {
 
   const filteredAddSubCategories = useMemo(() => {
     const query = subCategoryFilter.trim().toLowerCase();
+    const excludedSubCategoryNames = new Set(["cocktail", "mocktail"]);
     const cleanedSubCategories = subCategories.filter(
-      (sub) => String(sub.sub_category_name || "").trim() !== ""
+      (sub) => {
+        const name = String(sub.sub_category_name || "").trim();
+        if (!name) return false;
+        return !excludedSubCategoryNames.has(name.toLowerCase());
+      }
     );
     if (!query) return cleanedSubCategories;
 
