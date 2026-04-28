@@ -68,7 +68,7 @@ export default function CocktailCreate() {
       try {
         const response = await cocktailAPI.getIngredientOptions();
         setIngredientOptions(response.data?.data || []);
-        console.log(response.data);
+        // console.log(response.data);
       } catch (fetchError) {
         console.error(fetchError);
       }
@@ -111,7 +111,7 @@ export default function CocktailCreate() {
     try {
       const response = await cocktailAPI.getIngredientPrice(itemCode, pegs);
       const pricing = response.data?.data;
-      console.log("response",response.data);
+      // console.log("response",response.data);
 
       setRows((current) =>
         current.map((row) =>
