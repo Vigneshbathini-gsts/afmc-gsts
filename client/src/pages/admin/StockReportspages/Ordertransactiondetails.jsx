@@ -224,7 +224,7 @@ export default function OrderTransactionUI() {
       }${appliedFilters.orderNumber ? ` | Order No: ${appliedFilters.orderNumber}` : ""}${
         appliedFilters.userName ? ` | User: ${appliedFilters.userName}` : ""
       }${appliedFilters.kitchenName ? ` | Kitchen: ${appliedFilters.kitchenName}` : ""}${
-        appliedFilters.itemNames ? ` | Item: ${appliedFilters.itemNames}` : ""
+        appliedFilters.itemNames ? ` | Item: ${toInitCap(appliedFilters.itemNames)}` : ""
       }`,
       headers: [
         "Order Number",
@@ -242,7 +242,7 @@ export default function OrderTransactionUI() {
           row.ORDER_NUM || "-",
           row.FIRST_NAME || "-",
           row.PUBMED_NAME || "-",
-          stripHtml(row.ITEM_NAME) || "-",
+          toInitCap(stripHtml(row.ITEM_NAME) || "-"),
           row.QUANTITY || "-",
           row.TOTALPERCENT || "-",
           row.TOTAL_PROFIT || "-",
@@ -507,7 +507,7 @@ export default function OrderTransactionUI() {
                             {/* <td className="px-4 py-3 whitespace-nowrap">
                               {row.PUBMED_NAME || "-"}
                             </td> */}
-                            <td className="px-4 py-3 whitespace-nowrap capitalize">
+                            <td className="px-4 py-3 whitespace-nowrap">
                               {toInitCap(stripHtml(row.ITEM_NAME || "-"))}
                             </td>
                             <td className="px-4 py-3 whitespace-nowrap">

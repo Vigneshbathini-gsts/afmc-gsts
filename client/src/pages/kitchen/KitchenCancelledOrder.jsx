@@ -107,10 +107,19 @@ const KitchenCancelledOrder = () => {
 
     // Pagination
     const totalPages = Math.ceil(filteredOrders.length / rowsPerPage);
+    const safeTotalPages = Math.max(1, totalPages || 0);
     const paginatedOrders = useMemo(() => {
         const startIndex = (currentPage - 1) * rowsPerPage;
         return filteredOrders.slice(startIndex, startIndex + rowsPerPage);
     }, [filteredOrders, currentPage]);
+
+    // Clamp current page when result set changes (prevents going to Page 2 of 1, etc.)
+    useEffect(() => {
+        setCurrentPage((prev) => {
+            const next = Math.min(Math.max(prev, 1), safeTotalPages);
+            return next === prev ? prev : next;
+        });
+    }, [safeTotalPages]);
 
     // Reset to page 1 when search term changes
     useEffect(() => {
@@ -354,18 +363,20 @@ const KitchenCancelledOrder = () => {
                             </p>
                             <div className="flex items-center gap-2">
                                 <button
-                                    onClick={() => setCurrentPage(prev => prev - 1)}
+                                    onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
                                     disabled={currentPage === 1}
                                     className="px-3 py-2 rounded-lg border bg-white text-gray-600 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     <FaChevronLeft />
                                 </button>
                                 <span className="px-4 py-2 rounded-lg bg-red-100 text-red-700 font-semibold text-sm">
-                                    Page {currentPage} of {totalPages || 1}
+                                    Page {currentPage} of {safeTotalPages}
                                 </span>
                                 <button
-                                    onClick={() => setCurrentPage(prev => prev + 1)}
-                                    disabled={currentPage === totalPages || totalPages === 0}
+                                    onClick={() =>
+                                        setCurrentPage((prev) => Math.min(prev + 1, safeTotalPages))
+                                    }
+                                    disabled={currentPage >= safeTotalPages}
                                     className="px-3 py-2 rounded-lg border bg-white text-gray-600 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     <FaChevronRight />

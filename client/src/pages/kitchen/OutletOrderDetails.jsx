@@ -14,6 +14,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { API_BASE_URL, barOrdersAPI } from "../../services/api";
 import { Html5Qrcode } from "html5-qrcode";
+import { toInitCap } from "../../utils/textFormat";
 
 export default function OutletOrderDetails() {
   const location = useLocation();
@@ -523,9 +524,11 @@ export default function OutletOrderDetails() {
                           <td className="px-6 py-4 text-sm text-gray-800">
                             {item.LINK_ENABLED === "Y" ? (
                               <button onClick={() => handleItemClick(item)} className="text-pink-600 hover:underline">
-                                {item.ITEM_NAME}
+                                {toInitCap(item.ITEM_NAME || "")}
                               </button>
-                            ) : (item.ITEM_NAME)}
+                            ) : (
+                              toInitCap(item.ITEM_NAME || "")
+                            )}
                           </td>
                           <td className="px-6 py-4 text-sm font-medium">{item.quantity}</td>
                           <td className="px-6 py-4 text-sm text-green-600 font-medium">{scannedQty}</td>
@@ -675,7 +678,7 @@ export default function OutletOrderDetails() {
                     scannedItems.map((item) => (
                       <tr key={item.id} className="hover:bg-gray-50">
                         <td className="px-4 py-3 text-sm font-mono text-gray-600">{item.itemCode}</td>
-                        <td className="px-4 py-3 text-sm text-gray-800">{item.itemName}</td>
+                        <td className="px-4 py-3 text-sm text-gray-800">{toInitCap(item.itemName || "")}</td>
                         <td className="px-4 py-3 text-sm text-center font-medium">{item.scanQuantity}</td>
                         <td className="px-4 py-3 text-sm text-gray-500">
                           {new Date(item.scannedAt).toLocaleTimeString()}
@@ -704,7 +707,7 @@ export default function OutletOrderDetails() {
               </div>
               <div className="bg-gray-50 rounded-lg p-4">
                 <p className="text-xs text-gray-400 uppercase tracking-wider">Item Name</p>
-                <p className="mt-1 font-medium text-gray-800">{itemName || "-"}</p>
+                <p className="mt-1 font-medium text-gray-800">{itemName ? toInitCap(itemName) : "-"}</p>
               </div>
               <div className="bg-gray-50 rounded-lg p-4">
                 <p className="text-xs text-gray-400 uppercase tracking-wider">Price</p>
@@ -737,7 +740,7 @@ export default function OutletOrderDetails() {
                   {scannedCocktailData.ingredients?.map((ing, idx) => (
                     <tr key={idx}>
                       <td className="px-4 py-2">{ing.item_code}</td>
-                      <td className="px-4 py-2">{ing.item_name}</td>
+                      <td className="px-4 py-2">{toInitCap(ing.item_name || "")}</td>
                       <td className="px-4 py-2 text-center">{ing.pegs || 0}</td>
                       <td className="px-4 py-2 text-center">{ing.quantity || 1}</td>
                     </tr>
