@@ -91,6 +91,15 @@ export default function OrderTransactionUI() {
   });
   const [filtersLoading, setFiltersLoading] = useState(false);
 
+  const parseNumber = (value) => {
+    if (value === null || value === undefined) return 0;
+    const raw = String(value).trim();
+    if (!raw) return 0;
+    const normalized = raw.replace(/[, ]+/g, "").replace(/[^\d.-]/g, "");
+    const numberValue = Number(normalized);
+    return Number.isFinite(numberValue) ? numberValue : 0;
+  };
+
   const handleChange = (event) => {
     const { name, value } = event.target;
     setFilters((current) => ({
@@ -141,13 +150,15 @@ export default function OrderTransactionUI() {
       });
 
       if (response.success) {
-        // Remove the total row for display if needed
-        const displayData = response.data || [];
-        setData(displayData);
+        // Server may include a pre-calculated total row (e.g. ORD === 2). We compute totals
+        // on the client so filtered/search results always show correct totals.
+        const responseRows = Array.isArray(response.data) ? response.data : [];
+        const detailRows = responseRows.filter((row) => row?.ORD !== 2);
+        setData(detailRows);
         
-        if (displayData.length === 0) {
-          setError("No records found for the selected filters.");
-        }
+        // if (detailRows.length === 0) {
+        //   setError("No records found for the selected filters.");
+        // }
       } else {
         setError(response.message || "Unable to fetch order transactions.");
         setData([]);
@@ -195,10 +206,15 @@ export default function OrderTransactionUI() {
   const exportPdf = () => {
     if (!data.length) return;
 
-    // Filter out the total row for PDF export
-    const exportData = data.filter(row => row.ORD !== 2);
-
-    if (exportData.length === 0) return;
+    const totals = data.reduce(
+      (acc, row) => ({
+        quantity: acc.quantity + parseNumber(row.QUANTITY),
+        totalProfit: acc.totalProfit + parseNumber(row.TOTAL_PROFIT),
+        prepCharges: acc.prepCharges + parseNumber(row.FOOD_PR_CHARGES),
+        subtotal: acc.subtotal + parseNumber(row.SUBTOTAL),
+      }),
+      { quantity: 0, totalProfit: 0, prepCharges: 0, subtotal: 0 }
+    );
 
     exportTableToPdf({
       title: "Order Transaction Details Report",
@@ -221,18 +237,48 @@ export default function OrderTransactionUI() {
         "Preparation Charges",
         "Subtotal",
       ],
-      rows: exportData.map((row) => [
-        row.ORDER_NUM || "-",
-        row.FIRST_NAME || "-",
-        row.PUBMED_NAME || "-",
-        stripHtml(row.ITEM_NAME) || "-",
-        row.QUANTITY || "-",
-        row.TOTALPERCENT || "-",
-        row.TOTAL_PROFIT || "-",
-        row.FOOD_PR_CHARGES || "-",
-        row.SUBTOTAL || "-",
-      ]),
+      rows: [
+        ...data.map((row) => [
+          row.ORDER_NUM || "-",
+          row.FIRST_NAME || "-",
+          row.PUBMED_NAME || "-",
+          stripHtml(row.ITEM_NAME) || "-",
+          row.QUANTITY || "-",
+          row.TOTALPERCENT || "-",
+          row.TOTAL_PROFIT || "-",
+          row.FOOD_PR_CHARGES || "-",
+          row.SUBTOTAL || "-",
+        ]),
+        [
+          "",
+          "",
+          "",
+          "",
+          "TOTAL",
+          "",
+          totals.totalProfit.toFixed(2),
+          totals.prepCharges.toFixed(2),
+          totals.subtotal.toFixed(2),
+        ],
+      ],
     });
+  };
+
+  const totals = useMemo(() => {
+    return data.reduce(
+      (acc, row) => ({
+        quantity: acc.quantity + parseNumber(row.QUANTITY),
+        totalProfit: acc.totalProfit + parseNumber(row.TOTAL_PROFIT),
+        prepCharges: acc.prepCharges + parseNumber(row.FOOD_PR_CHARGES),
+        subtotal: acc.subtotal + parseNumber(row.SUBTOTAL),
+      }),
+      { quantity: 0, totalProfit: 0, prepCharges: 0, subtotal: 0 }
+    );
+  }, [data]);
+
+  const formatMoney = (value) => {
+    if (!Number.isFinite(value)) return "0.00";
+    return value.toFixed(2);
   };
 
   return (
@@ -446,49 +492,63 @@ export default function OrderTransactionUI() {
                         </td>
                       </tr>
                     ) : (
-                      data.map((row, index) => (
-                        <tr
-                          key={row.ORDER_LINE_ID || `row-${index}`}
-                          className={`border-t border-gray-100 hover:bg-gray-50 ${
-                            row.ORD === 2 ? "bg-gray-100 font-semibold" : ""
-                          }`}
-                        >
+                      <>
+                        {data.map((row, index) => (
+                          <tr
+                            key={row.ORDER_LINE_ID || `row-${index}`}
+                            className="border-t border-gray-100 hover:bg-gray-50"
+                          >
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              {row.ORDER_NUM || "-"}
+                            </td>
+                            {/* <td className="px-4 py-3 whitespace-nowrap">
+                              {row.FIRST_NAME || "-"}
+                            </td> */}
+                            {/* <td className="px-4 py-3 whitespace-nowrap">
+                              {row.PUBMED_NAME || "-"}
+                            </td> */}
+                            <td className="px-4 py-3 whitespace-nowrap capitalize">
+                              {toInitCap(stripHtml(row.ITEM_NAME || "-"))}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              {row.QUANTITY || "-"}
+                            </td>
+                            {/* <td className="px-4 py-3 whitespace-nowrap">
+                              {row.TOTALPERCENT || "-"}
+                            </td> */}
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              {row.TOTAL_PROFIT || "-"}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              {row.FOOD_PR_CHARGES || "-"}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              {row.SUBTOTAL || "-"}
+                            </td>
+                          </tr>
+                        ))}
+                        <tr className="border-t border-gray-200 bg-gray-100 font-semibold">
+                          <td className="px-4 py-3 whitespace-nowrap" />
+                          <td className="px-4 py-3 whitespace-nowrap" />
+                          <td className="px-4 py-3 whitespace-nowrap">TOTAL</td>
                           <td className="px-4 py-3 whitespace-nowrap">
-                            {row.ORDER_NUM || "-"}
-                          </td>
-                          {/* <td className="px-4 py-3 whitespace-nowrap">
-                            {row.FIRST_NAME || "-"}
-                          </td> */}
-                          {/* <td className="px-4 py-3 whitespace-nowrap">
-                            {row.PUBMED_NAME || "-"}
-                          </td> */}
-                          <td className="px-4 py-3 whitespace-nowrap capitalize">
-                            {toInitCap(stripHtml(row.ITEM_NAME || "-"))}
+                            {formatMoney(totals.totalProfit)}
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
-                            {row.QUANTITY || "-"}
-                          </td>
-                          {/* <td className="px-4 py-3 whitespace-nowrap">
-                            {row.TOTALPERCENT || "-"}
-                          </td> */}
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            {row.TOTAL_PROFIT || "-"}
+                            {formatMoney(totals.prepCharges)}
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
-                            {row.FOOD_PR_CHARGES || "-"}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            {row.SUBTOTAL || "-"}
+                            {formatMoney(totals.subtotal)}
                           </td>
                         </tr>
-                      ))
+                      </>
                     )}
                   </tbody>
                 </table>
               </div>
               {!loading && data.length > 0 && (
                 <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 text-sm text-gray-600">
-                  Total Records: {data.filter(row => row.ORD !== 2).length}
+                  Total Records: {data.length}
                 </div>
               )}
             </div>
