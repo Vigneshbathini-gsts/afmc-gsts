@@ -1,9 +1,16 @@
-import React, { useCallback, useEffect, useState } from "react";
-import { FaSearch, FaUndoAlt, FaBan, FaChevronLeft, FaChevronRight, FaArrowLeft, FaDownload } from "react-icons/fa";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { FaSearch, FaUndoAlt, FaBan, FaChevronLeft, FaChevronRight, FaArrowLeft, FaDownload, FaTimes } from "react-icons/fa";
 import { cancelledOrdersAPI } from "../../services/api";
 import OrderDetailsModal from "../../components/OrderDetailsModal";
 import { useNavigate } from "react-router-dom";
 import { exportTableToPdf } from "../../utils/pdfExport";
+
+// Helper function to convert string to INITCAP (Title Case)
+const toInitCap = (str) => {
+  if (!str || str === "") return "-";
+  if (typeof str !== "string") str = String(str);
+  return str.toLowerCase().replace(/\b\w/g, (char) => char.toUpperCase());
+};
 
 export default function CancelledOrders() {
   const navigate = useNavigate();
@@ -14,6 +21,13 @@ export default function CancelledOrders() {
   const [filters, setFilters] = useState({
     fromDate: today,
     toDate: today,
+  });
+
+  const initialFiltersRef = useRef(filters);
+
+  // Search filters
+  const [searchFilters, setSearchFilters] = useState({
+    searchTerm: "", // Combined search term
   });
 
   const [orders, setOrders] = useState([]);
@@ -29,46 +43,69 @@ export default function CancelledOrders() {
     setIsModalOpen(true);
   };
 
-  const fetchCancelledOrders = useCallback(async () => {
+  const fetchCancelledOrders = useCallback(async (queryFilters) => {
     try {
       setLoading(true);
-      const res = await cancelledOrdersAPI.getCancelledOrders(filters);
+      const res = await cancelledOrdersAPI.getCancelledOrders(queryFilters);
       setOrders(res.data.data || []);
-      setCurrentPage(1); // reset to first page on new fetch
+      setCurrentPage(1);
     } catch (error) {
       console.error("Error fetching cancelled orders:", error);
-      alert("Failed to load cancelled orders report");
+      alert("Failed To Load Cancelled Orders Report");
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, []);
 
+  // Initial fetch on mount only
   useEffect(() => {
-    fetchCancelledOrders();
+    fetchCancelledOrders(initialFiltersRef.current);
   }, [fetchCancelledOrders]);
 
-  const handleChange = (e) => {
-    setFilters({ ...filters, [e.target.name]: e.target.value });
+  // Handle date selection - only filter when a complete date is selected
+  const handleDateChange = (e) => {
+    const { name, value } = e.target;
+    
+    // Update the filter state
+    setFilters(prev => ({ ...prev, [name]: value }));
   };
 
   const handleSearch = (e) => {
     e.preventDefault();
-    fetchCancelledOrders();
+    fetchCancelledOrders(filters);
+  };
+
+  const handleSearchChange = (e) => {
+    const { value } = e.target;
+    setSearchFilters({ searchTerm: value });
+    setCurrentPage(1); // Reset to first page when searching
+  };
+
+  const handleClearSearch = () => {
+    setSearchFilters({ searchTerm: "" });
+    setCurrentPage(1);
   };
 
   const handleReset = () => {
-    setFilters({
-      fromDate: today,
-      toDate: today,
-    });
+    const resetFromDate = today;
+    const resetToDate = today;
+    
+    const nextFilters = {
+      fromDate: resetFromDate,
+      toDate: resetToDate,
+    };
+
+    setFilters(nextFilters);
+    
+    // Fetch immediately after reset
     setTimeout(() => {
-      fetchCancelledOrders();
+      fetchCancelledOrders(nextFilters);
     }, 100);
   };
 
   const handleDownload = () => {
     if (!orders.length) {
-      alert("No data to download");
+      alert("No Data To Download");
       return;
     }
 
@@ -79,10 +116,12 @@ export default function CancelledOrders() {
       return date.toLocaleDateString();
     };
 
+    // Dynamic values based on current component
     exportTableToPdf({
+      mainHeader: "ARMED FORCES MEDICAL COLLEGE",
       title: "Cancelled Orders Report",
       fileName: `cancelled-orders-${new Date().toISOString().split("T")[0]}.pdf`,
-      subtitle: `From: ${formatDate(filters.fromDate)}   To: ${formatDate(filters.toDate)}`,
+      subtitle: `From: ${formatDate(filters.fromDate)} To: ${formatDate(filters.toDate)}`,
       headers: [
         "Order Number",
         "Status",
@@ -92,19 +131,35 @@ export default function CancelledOrders() {
       ],
       rows: orders.map((order) => [
         order?.ORDER_NUM ?? "",
-        order?.status ?? "",
+        toInitCap(order?.status ?? ""),
         order?.ORDER_DATE ?? "",
-        order?.FIRST_NAME ?? "",
-        order?.pubmed_name ?? "",
+        toInitCap(order?.FIRST_NAME ?? ""),
+        toInitCap(order?.pubmed_name ?? ""),
       ]),
+      footerText: "Armed Forces Medical College - Cancelled Orders Report",
+      showLogo: true,
     });
   };
 
+  // Filter orders based on search criteria (search in both order number and customer name)
+  const filteredOrders = orders.filter((order) => {
+    const searchTermLower = searchFilters.searchTerm.toLowerCase();
+    if (!searchTermLower) return true;
+    
+    const matchesOrderNumber = order?.ORDER_NUM && 
+      order.ORDER_NUM.toString().toLowerCase().includes(searchTermLower);
+    
+    const matchesCustomerName = order?.FIRST_NAME && 
+      order.FIRST_NAME.toLowerCase().includes(searchTermLower);
+    
+    return matchesOrderNumber || matchesCustomerName;
+  });
+
   // Pagination logic
-  const totalPages = Math.ceil(orders.length / rowsPerPage);
+  const totalPages = Math.ceil(filteredOrders.length / rowsPerPage);
   const startIndex = (currentPage - 1) * rowsPerPage;
   const endIndex = startIndex + rowsPerPage;
-  const currentOrders = orders.slice(startIndex, endIndex);
+  const currentOrders = filteredOrders.slice(startIndex, endIndex);
 
   const handlePageChange = (pageNumber) => {
     setCurrentPage(pageNumber);
@@ -127,7 +182,7 @@ export default function CancelledOrders() {
           className="flex items-center gap-2 px-3 py-1.5 text-sm bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg shadow-md transition duration-300"
         >
           <FaDownload size={14} />
-          Download PDF
+          Download Pdf
         </button>
         <button
           onClick={() => navigate("/admin/dashboard")}
@@ -139,13 +194,13 @@ export default function CancelledOrders() {
       </div>
 
       {/* Header */}
-      <div className="bg-gradient-to-r from-afmc-maroon to-afmc-maroon2 rounded-2xl shadow-md p-4 mb-5 text-white">
+      <div className="mb-5">
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <FaBan />
           Cancelled Orders Report
         </h1>
         <p className="text-sm text-white/80 mt-1">
-          View fully cancelled food orders
+          View Fully Cancelled Food Orders
         </p>
       </div>
 
@@ -163,7 +218,7 @@ export default function CancelledOrders() {
               type="date"
               name="fromDate"
               value={filters.fromDate}
-              onChange={handleChange}
+              onChange={handleDateChange}
               className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-afmc-maroon"
             />
           </div>
@@ -176,7 +231,7 @@ export default function CancelledOrders() {
               type="date"
               name="toDate"
               value={filters.toDate}
-              onChange={handleChange}
+              onChange={handleDateChange}
               className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-afmc-maroon"
             />
           </div>
@@ -199,26 +254,6 @@ export default function CancelledOrders() {
               Reset
             </button>
           </div>
-
-          {/* Rows per page */}
-          {/* <div>
-            <label className="block mb-1 text-sm font-medium text-slate-700">
-              Rows Per Page
-            </label>
-            <select
-              value={rowsPerPage}
-              onChange={(e) => {
-                setRowsPerPage(Number(e.target.value));
-                setCurrentPage(1);
-              }}
-              className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-afmc-maroon"
-            >
-              <option value={5}>5</option>
-              <option value={10}>10</option>
-              <option value={20}>20</option>
-              <option value={50}>50</option>
-            </select>
-          </div> */}
         </div>
       </form>
 
@@ -228,14 +263,44 @@ export default function CancelledOrders() {
           <h2 className="text-lg font-semibold text-slate-700">
             Cancelled Orders List
           </h2>
+
+          {/* Combined Search Input with Cancel Icon */}
+          <div className="relative w-full md:w-80">
+            <input
+              type="text"
+              name="searchTerm"
+              value={searchFilters.searchTerm}
+              onChange={handleSearchChange}
+              placeholder="Search by Order Number or Customer Name..."
+              className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-afmc-maroon pr-10"
+            />
+            {searchFilters.searchTerm && (
+              <button
+                type="button"
+                onClick={handleClearSearch}
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              >
+                <FaTimes size={16} />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Records Info - Below the title and search */}
+        <div className="mb-3">
           <p className="text-sm text-slate-500">
-            Showing {orders.length === 0 ? 0 : startIndex + 1} to{" "}
-            {Math.min(endIndex, orders.length)} of {orders.length} records
+            Showing {filteredOrders.length === 0 ? 0 : startIndex + 1} to{" "}
+            {Math.min(endIndex, filteredOrders.length)} of {filteredOrders.length} Records
+            {orders.length !== filteredOrders.length && (
+              <span className="text-slate-400 ml-2">
+                (filtered from {orders.length} total)
+              </span>
+            )}
           </p>
         </div>
 
         {loading ? (
-          <p className="text-sm text-slate-600">Loading report...</p>
+          <p className="text-sm text-slate-600">Loading Report...</p>
         ) : (
           <>
             <div className="overflow-x-auto">
@@ -261,12 +326,12 @@ export default function CancelledOrders() {
                         </td>
                         <td className="border px-3 py-2">
                           <span className="bg-red-100 text-red-700 text-xs font-semibold px-2 py-1 rounded-full">
-                            {row.status}
+                            {toInitCap(row.status)}
                           </span>
                         </td>
                         <td className="border px-3 py-2">{row.ORDER_DATE}</td>
-                        <td className="border px-3 py-2">{row.FIRST_NAME}</td>
-                        <td className="border px-3 py-2">{row.pubmed_name}</td>
+                        <td className="border px-3 py-2">{toInitCap(row.FIRST_NAME)}</td>
+                        <td className="border px-3 py-2">{toInitCap(row.pubmed_name)}</td>
                       </tr>
                     ))
                   ) : (
@@ -275,7 +340,7 @@ export default function CancelledOrders() {
                         colSpan="5"
                         className="border px-3 py-4 text-center text-slate-500"
                       >
-                        No cancelled orders found
+                        No Cancelled Orders Found
                       </td>
                     </tr>
                   )}
@@ -284,7 +349,7 @@ export default function CancelledOrders() {
             </div>
 
             {/* Pagination */}
-            {orders.length > 0 && (
+            {filteredOrders.length > 0 && (
               <div className="flex flex-col md:flex-row items-center justify-between gap-4 mt-5">
                 <p className="text-sm text-slate-500">
                   Page {currentPage} of {totalPages || 1}

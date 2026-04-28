@@ -1,7 +1,32 @@
 // axios instance goes here
 import axios from "axios";
 
-const API = process.env.REACT_APP_API_URL || "http://localhost:5000/api";
+const trimTrailingSlash = (value) => value.replace(/\/+$/, "");
+
+const getDefaultApiBase = () => {
+  if (typeof window === "undefined") {
+    return "http://localhost:5000/AFMCMESS/api";
+  }
+
+  const { protocol, hostname, port, origin } = window.location;
+
+  if (hostname === "localhost" || hostname === "127.0.0.1") {
+    const backendOrigin = `${protocol}//${hostname}:5000`;
+    return `${backendOrigin}/AFMCMESS/api`;
+  }
+
+  if (port === "3000") {
+    return `${protocol}//${hostname}:5000/AFMCMESS/api`;
+  }
+
+  return `${origin}/AFMCMESS/api`;
+};
+
+export const API_BASE_URL = trimTrailingSlash(
+  process.env.REACT_APP_API_URL || getDefaultApiBase()
+);
+
+const API = API_BASE_URL;
 
 const api = axios.create({
   baseURL: API,

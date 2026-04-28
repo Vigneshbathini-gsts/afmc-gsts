@@ -1,7 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FaArrowLeft, FaChevronDown, FaPlus, FaSearch, FaPen, FaTrash } from "react-icons/fa";
+import { FaArrowLeft, FaChevronDown, FaPlus, FaSearch, FaPen, FaTrash,FaCamera } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
-import { inventoryAPI } from "../../services/api";
+import BarcodeScanner from "../../components/common/BarcodeScanner";
+import { API_BASE_URL, inventoryAPI } from "../../services/api";
+import { useAuth } from "../../context/AuthContext";
+
 
 const requiresVolume = (acUnit) => String(acUnit || "").trim().toUpperCase() !== "NOS";
 
@@ -13,25 +16,61 @@ const toInitCap = (value) =>
     .toLowerCase()
     .replace(/(^|\s)\S/g, (match) => match.toUpperCase());
 
-const getCurrentUsername = () => {
-  try {
-    const rawUser =
-      localStorage.getItem("user") || localStorage.getItem("authUser");
-    if (!rawUser) return "ADMIN";
-    const user = JSON.parse(rawUser);
-    return user?.username || user?.email || user?.user_name || user?.name || "ADMIN";
-  } catch (_error) {
-    return "ADMIN";
+const getAllowedAcUnits = (categoryId, subCategoryId) => {
+  const cat = Number(categoryId);
+  const sub = Number(subCategoryId);
+  if (!Number.isFinite(cat) || !Number.isFinite(sub)) return [];
+
+  const allowed = new Set();
+
+  if (cat === 10) {
+    if ([2, 4, 5, 8, 11, 12, 16, 17].includes(sub)) allowed.add("Pegs");
+    if ([1, 3, 1310].includes(sub)) allowed.add("Nos");
+    if ([1].includes(sub)) {
+      allowed.add("Can");
+      allowed.add("Mug");
+    }
+    if ([6].includes(sub)) {
+      allowed.add("Glass");
+      allowed.add("Nos");
+    }
+    if ([9].includes(sub)) {
+      allowed.add("Glass");
+      allowed.add("Nos");
+    }
   }
+
+  if (cat === 14) {
+    if ([7, 10].includes(sub)) allowed.add("Nos");
+  }
+
+  return Array.from(allowed);
 };
+
 
 export default function Inventory() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const currentLoggedInUser = useMemo(() => {
+    if (user) {
+      return user?.username || user?.email || user?.user_name || user?.name || "ADMIN";
+    }
+
+    try {
+      const rawUser = localStorage.getItem("user") || localStorage.getItem("authUser");
+      if (!rawUser) return "ADMIN";
+      const parsed = JSON.parse(rawUser);
+      return parsed?.username || parsed?.email || parsed?.user_name || parsed?.name || "ADMIN";
+    } catch (_error) {
+      return "ADMIN";
+    }
+  }, [user]);
+
   const [categories, setCategories] = useState([]);
   const [subCategories, setSubCategories] = useState([]);
   const [items, setItems] = useState([]);
   const [inventory, setInventory] = useState([]);
-  const [barTypes, setBarTypes] = useState([]);
   const [categoryId, setCategoryId] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
@@ -41,6 +80,7 @@ export default function Inventory() {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [addItemError, setAddItemError] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const [showStockModal, setShowStockModal] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
@@ -60,10 +100,12 @@ export default function Inventory() {
   const [saving, setSaving] = useState(false);
   const [stockSaving, setStockSaving] = useState(false);
   const [stockError, setStockError] = useState("");
+  const [stockInfo, setStockInfo] = useState("");
   const [imageSaving, setImageSaving] = useState(false);
   const [imageError, setImageError] = useState("");
   const [imagePreviewUrl, setImagePreviewUrl] = useState("");
   const [imageCacheBusters, setImageCacheBusters] = useState({});
+  const [scannerOpen, setScannerOpen] = useState(false);
   const [imageForm, setImageForm] = useState({
     itemCode: "",
     itemName: "",
@@ -134,12 +176,32 @@ export default function Inventory() {
       };
       const response = await inventoryAPI.getAll(params);
       const rows = response.data.data || [];
-      setInventory(
-        rows.filter((row) => {
-          if (row?.sub_category == null) return true;
-          return ![14, 15].includes(Number(row.sub_category));
-        })
-      );
+      const cleanedRows = rows.filter((row) => {
+        if (row?.sub_category == null) return true;
+        return ![14, 15].includes(Number(row.sub_category));
+      });
+
+      const groupedByItemCode = new Map();
+      cleanedRows.forEach((row) => {
+        const key = String(row?.item_code || row?.item_id || "").trim();
+        if (!key) return;
+
+        if (!groupedByItemCode.has(key)) {
+          groupedByItemCode.set(key, { ...row });
+          return;
+        }
+
+        const existing = groupedByItemCode.get(key);
+        const existingQty = Number(existing?.stock_quantity || 0);
+        const nextQty = Number(row?.stock_quantity || 0);
+        groupedByItemCode.set(key, {
+          ...existing,
+          stock_quantity: (Number.isFinite(existingQty) ? existingQty : 0) + (Number.isFinite(nextQty) ? nextQty : 0),
+          file_name: existing?.file_name || row?.file_name || "",
+        });
+      });
+
+      setInventory(Array.from(groupedByItemCode.values()));
     } catch (err) {
       console.error("Failed to load inventory:", err);
       setError("Failed to load inventory.");
@@ -148,20 +210,10 @@ export default function Inventory() {
     }
   }, [categoryId, itemCode]);
 
-  const fetchBarTypes = async () => {
-    try {
-      const response = await inventoryAPI.getBarTypes();
-      setBarTypes(response.data.data || []);
-    } catch (err) {
-      console.error("Failed to load bar types:", err);
-    }
-  };
-
   useEffect(() => {
     fetchCategories();
     fetchItems();
     fetchSubCategories();
-    fetchBarTypes();
   }, []);
 
   useEffect(() => {
@@ -271,8 +323,13 @@ export default function Inventory() {
 
   const filteredAddSubCategories = useMemo(() => {
     const query = subCategoryFilter.trim().toLowerCase();
+    const excludedSubCategoryNames = new Set(["cocktail", "mocktail"]);
     const cleanedSubCategories = subCategories.filter(
-      (sub) => String(sub.sub_category_name || "").trim() !== ""
+      (sub) => {
+        const name = String(sub.sub_category_name || "").trim();
+        if (!name) return false;
+        return !excludedSubCategoryNames.has(name.toLowerCase());
+      }
     );
     if (!query) return cleanedSubCategories;
 
@@ -288,7 +345,6 @@ export default function Inventory() {
       ),
     [cleanedCategories, formValues.categoryId]
   );
-
   const selectedAddSubCategory = useMemo(
     () =>
       subCategories.find(
@@ -297,7 +353,26 @@ export default function Inventory() {
     [formValues.subCategory, subCategories]
   );
 
-  const acUnitOptions = useMemo(() => ["Nos", "Pegs", "Glass", "Mug", "Can"], []);
+  const allAcUnitOptions = useMemo(() => ["Nos", "Pegs", "Glass", "Mug", "Can"], []);
+
+  const acUnitOptions = useMemo(() => {
+    const allowed = getAllowedAcUnits(formValues.categoryId, formValues.subCategory);
+    if (allowed.length === 0) return allAcUnitOptions;
+    const normalizedAllowed = new Set(allowed.map((value) => String(value).toLowerCase()));
+    return allAcUnitOptions.filter((value) => normalizedAllowed.has(String(value).toLowerCase()));
+  }, [allAcUnitOptions, formValues.categoryId, formValues.subCategory]);
+
+  useEffect(() => {
+    const allowed = getAllowedAcUnits(formValues.categoryId, formValues.subCategory);
+    if (allowed.length === 0) return;
+
+    const allowedKeys = new Set(allowed.map((value) => String(value).toLowerCase()));
+    const currentKey = String(formValues.acUnit || "").toLowerCase();
+
+    if (!currentKey || !allowedKeys.has(currentKey)) {
+      setFormValues((prev) => ({ ...prev, acUnit: allowed[0] }));
+    }
+  }, [formValues.categoryId, formValues.subCategory, formValues.acUnit]);
 
   const formatDate = (date) => {
     const d = date instanceof Date ? date : new Date(date);
@@ -315,6 +390,7 @@ export default function Inventory() {
   };
 
   const openAddModal = () => {
+    setAddItemError("");
     setFormValues({
       itemName: "",
       description: "",
@@ -338,32 +414,32 @@ export default function Inventory() {
     );
 
     if (!trimmedItemName || !formValues.categoryId) {
-      setError("Item name and category are required.");
+      setAddItemError("Item name and category are required.");
       return;
     }
 
     if (!formValues.subCategory) {
-      setError("Sub category is required.");
+      setAddItemError("Sub category is required.");
       return;
     }
 
     if (!formValues.acUnit) {
-      setError("Accounting unit is required.");
+      setAddItemError("Accounting unit is required.");
       return;
     }
 
     if (!formValues.prepCharges) {
-      setError("Preparation charges selection is required.");
+      setAddItemError("Preparation charges selection is required.");
       return;
     }
 
     if (duplicateItem) {
-      setError("Item name already exists.");
+      setAddItemError("Item name already exists.");
       return;
     }
 
     setSaving(true);
-    setError("");
+    setAddItemError("");
     try {
       const formData = new FormData();
       formData.append("itemName", trimmedItemName);
@@ -372,7 +448,8 @@ export default function Inventory() {
       formData.append("subCategory", formValues.subCategory);
       formData.append("acUnit", formValues.acUnit);
       formData.append("prepCharges", formValues.prepCharges);
-      formData.append("createdBy", getCurrentUsername());
+      console.log("createdBy", currentLoggedInUser)
+      formData.append("createdBy", currentLoggedInUser);
       if (formValues.image) {
         formData.append("image", formValues.image);
       }
@@ -383,21 +460,39 @@ export default function Inventory() {
       fetchInventory();
     } catch (err) {
       console.error("Failed to create item:", err);
-      setError("Failed to create item.");
+      setAddItemError(err.response?.data?.message || "Failed to create item.");
     } finally {
       setSaving(false);
     }
   };
 
+  const normalizeStockType = useCallback((value) => {
+    const key = String(value || "").trim().toLowerCase();
+    if (!key) return "";
+    if (key === "free") return "Free";
+    if (key === "purchase" || key === "purchased") return "Purchased";
+    return "";
+  }, []);
+
+  const barTypeOptions = useMemo(
+    () => [
+      { value: "Free", label: "Free" },
+      { value: "Purchased", label: "Purchased" },
+    ],
+    []
+  );
+
   const openStockModal = (row) => {
     setStockError("");
+    setStockInfo("");
     setStockRows([]);
     setStockRowSearch("");
+    const normalizedType = normalizeStockType(row.ac_unit);
     setStockForm({
       itemCode: row.item_code,
       itemName: row.item_name,
       transactionDate: formatDate(new Date()),
-      acUnit: row.ac_unit || "",
+      acUnit: normalizedType || "",
       rate: "",
       quantity: 1,
       volume: "",
@@ -411,6 +506,7 @@ export default function Inventory() {
   const closeStockModal = () => {
     setShowStockModal(false);
     setStockError("");
+    setStockInfo("");
     setStockRows([]);
     setStockRowSearch("");
   };
@@ -427,8 +523,10 @@ export default function Inventory() {
     setShowImageModal(true);
   };
 
-  const handleStageStock = async () => {
-    if (!stockForm.itemCode || !stockForm.rate || !stockForm.barcode || !stockForm.transactionDate) {
+  const stageStockRow = useCallback(async (barcodeValue = stockForm.barcode) => {
+    const normalizedBarcode = String(barcodeValue || "").trim();
+
+    if (!stockForm.itemCode || !stockForm.rate || !normalizedBarcode || !stockForm.transactionDate) {
       setStockError("Item code, barcode, rate, and transaction date are required.");
       return;
     }
@@ -443,7 +541,7 @@ export default function Inventory() {
       return;
     }
 
-    if (!isValidBarcode(stockForm.barcode)) {
+    if (!isValidBarcode(normalizedBarcode)) {
       setStockError("Barcode must be 4 to 32 digits.");
       return;
     }
@@ -453,14 +551,13 @@ export default function Inventory() {
       return;
     }
 
-    const normalizedBarcode = String(stockForm.barcode).trim();
-
     if (stockRows.some((row) => row.barcode === normalizedBarcode)) {
       setStockError("This barcode is already staged.");
       return;
     }
 
     setStockError("");
+    setStockInfo("");
 
     try {
       const response = await inventoryAPI.checkBarcodeExists(normalizedBarcode);
@@ -493,11 +590,35 @@ export default function Inventory() {
       },
     ]);
 
+    setStockInfo("Stock row staged.");
+
     setStockForm((prev) => ({
       ...prev,
       barcode: "",
     }));
+  }, [stockForm, stockRows]);
+
+  const handleStageStock = async () => {
+    await stageStockRow(stockForm.barcode);
   };
+
+  const handleScannerClose = useCallback(() => {
+    setScannerOpen(false);
+  }, []);
+
+  const handleScan = useCallback(
+    async (scannedValue) => {
+      const normalizedBarcode = String(scannedValue || "").trim();
+      setScannerOpen(false);
+      setStockForm((prev) => ({ ...prev, barcode: normalizedBarcode }));
+      if (stockForm.itemCode && stockForm.rate && stockForm.transactionDate) {
+        await stageStockRow(normalizedBarcode);
+      } else {
+        setStockInfo("Scanned. Enter rate/date and click Add Stock to stage.");
+      }
+    },
+    [stageStockRow, stockForm.itemCode, stockForm.rate, stockForm.transactionDate]
+  );
 
   const handleDeleteStockRow = (barcode) => {
     setStockRows((current) => current.filter((row) => row.barcode !== barcode));
@@ -528,7 +649,7 @@ export default function Inventory() {
           rate: row.rate,
           prepCharges: row.prepCharges,
           acUnit: row.acUnit,
-          createdBy: getCurrentUsername(),
+          createdBy: currentLoggedInUser,
         })),
       });
       closeStockModal();
@@ -616,7 +737,7 @@ export default function Inventory() {
     if (!raw) return "";
     if (/^https?:\/\//i.test(raw)) return raw;
     const baseUrl =
-      process.env.REACT_APP_API_URL || "http://localhost:5000/api";
+      API_BASE_URL || process.env.REACT_APP_API_URL || "http://localhost:5000/api";
     const cleanBase = baseUrl.replace(/\/api\/?$/, "");
     const normalizedName = raw.split(/[\\/]/).pop();
     const encodedName = encodeURIComponent(normalizedName);
@@ -807,15 +928,47 @@ export default function Inventory() {
             <div className="flex flex-col gap-3">
 
               {/* 🔼 Move this block to TOP (no style change) */}
-              <button
-                type="button"
-                onClick={openAddModal}
-                className="w-full lg:w-auto px-5 py-3 rounded-2xl border border-afmc-maroon text-afmc-maroon font-semibold flex items-center gap-2 hover:bg-afmc-maroon/5 transition"
-              >
-                <FaPlus />
-                Add New Item
-              </button>
+             <button
+  type="button"
+  onClick={openAddModal}
+  className="group relative inline-flex items-center gap-3 overflow-hidden rounded-xl 
+  bg-afmc-maroon px-6 py-2.5 font-semibold text-white shadow-md 
+  transition-all duration-300 ease-out
+  hover:shadow-lg hover:-translate-y-[1px]
+  focus:outline-none focus:ring-2 focus:ring-afmc-gold/60 focus:ring-offset-2"
+>
+  {/* Gold sheen overlay */}
+  <span className="absolute inset-0 opacity-0 transition-opacity duration-500 
+  group-hover:opacity-100 bg-gradient-to-r from-transparent via-afmc-gold/20 to-transparent" />
 
+  {/* Border glow */}
+  <span className="absolute inset-0 rounded-xl ring-1 ring-afmc-gold/20 
+  group-hover:ring-afmc-gold/40 transition-all duration-300" />
+
+  {/* Icon container */}
+  <span className="relative flex h-9 w-9 items-center justify-center rounded-lg 
+  bg-white/10 text-afmc-gold backdrop-blur-sm
+  transition-all duration-300 group-hover:bg-white/20">
+    <svg
+      viewBox="0 0 24 24"
+      className="h-5 w-5 transition-transform duration-300 group-hover:rotate-90"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M12 5v14M5 12h14"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+      />
+    </svg>
+  </span>
+
+  {/* Text */}
+  <span className="relative tracking-wide text-sm letter-spacing-wide">
+    Add New Item
+  </span>
+</button>
               {/* Existing Search Label */}
               <label className="block text-sm font-medium text-gray-700">
                 Search
@@ -961,6 +1114,12 @@ export default function Inventory() {
               </div>
             )}
 
+            {stockInfo && !stockError && (
+              <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+                {stockInfo}
+              </div>
+            )}
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1003,9 +1162,9 @@ export default function Inventory() {
                   className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-700"
                 >
                   <option value="">Select type</option>
-                  {barTypes.map((type) => (
-                    <option key={type.type_id} value={type.type}>
-                      {type.type}
+                  {barTypeOptions.map((type) => (
+                    <option key={type.value} value={type.value}>
+                      {type.label}
                     </option>
                   ))}
                 </select>
@@ -1044,14 +1203,29 @@ export default function Inventory() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Barcode
                 </label>
-                <input
-                  type="text"
-                  value={stockForm.barcode}
-                  onChange={(e) =>
-                    setStockForm((prev) => ({ ...prev, barcode: e.target.value }))
-                  }
-                  className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-700"
-                />
+                <div className="flex items-center gap-3">
+                  <input
+                    type="text"
+                    value={stockForm.barcode}
+                    onChange={(e) =>
+                      setStockForm((prev) => ({ ...prev, barcode: e.target.value }))
+                    }
+                    placeholder="Scan or type barcode"
+                    className="flex-1 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-700"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setScannerOpen(true)}
+                    className="inline-flex items-center gap-2 rounded-2xl bg-[#d70652] px-5 py-3 font-semibold text-white shadow hover:shadow-md"
+                    title="Open scanner"
+                  >
+                    <FaCamera />
+                    Scan
+                  </button>
+                </div>
+                <p className="mt-2 text-xs text-gray-500">
+                  Tip: After scanning, the row auto-stages when rate/date are filled.
+                </p>
               </div>
 
               <div className="lg:col-span-2 flex items-center gap-6">
@@ -1071,7 +1245,7 @@ export default function Inventory() {
                       }))
                     }
                   />
-                  N
+                  No
                 </label>
                 <label className="flex items-center gap-2 text-sm text-gray-700">
                   <input
@@ -1086,13 +1260,22 @@ export default function Inventory() {
                       }))
                     }
                   />
-                  Y
+                  Yes
                 </label>
               </div>
             </div>
 
             <div className="mt-8 rounded-3xl border border-gray-200 bg-white shadow-sm">
-              <div className="min-h-[140px] border-b border-gray-100 bg-[radial-gradient(circle_at_center,rgba(215,6,82,0.06),transparent_42%)]"></div>
+              {/* <div className="border-b border-gray-100 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-semibold text-gray-800">Scanner</div>
+                    <div className="text-xs text-gray-500">
+                      Use the Scan button near Barcode to open the camera.
+                    </div>
+                  </div>
+                </div>
+              </div> */}
 
               <div className="flex flex-wrap items-center justify-between gap-4 p-4">
                 <button
@@ -1196,6 +1379,12 @@ export default function Inventory() {
             >
               X
             </button>
+
+            {addItemError && (
+              <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+                {addItemError}
+              </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
@@ -1389,7 +1578,8 @@ export default function Inventory() {
                   <button
                     type="button"
                     onClick={() => setIsAcUnitDropdownOpen((prev) => !prev)}
-                    className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-left text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20 flex items-center justify-between"
+                    disabled={!formValues.subCategory}
+                    className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-left text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20 flex items-center justify-between disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <span className="truncate">{formValues.acUnit || "Select Unit"}</span>
                     <FaChevronDown
@@ -1440,7 +1630,7 @@ export default function Inventory() {
                       }))
                     }
                   />
-                  N
+                  No
                 </label>
                 <label className="flex items-center gap-2 text-sm text-gray-700">
                   <input
@@ -1455,7 +1645,7 @@ export default function Inventory() {
                       }))
                     }
                   />
-                  Y
+                  Yes
                 </label>
               </div>
             </div>
@@ -1584,6 +1774,8 @@ export default function Inventory() {
           </div>
         </div>
       )}
+       <BarcodeScanner isOpen={scannerOpen} onClose={handleScannerClose} onScan={handleScan} />
     </div>
   );
 }
+

@@ -6,21 +6,40 @@ exports.getAllOffers = async (req, res) => {
     const [offers] = await db.query(`
       SELECT 
           ofr.OFFER_ID as offer_id,
-          inv.item_name,
+          MAX(inv.item_name) as item_name,
           ofr.ITEM_CODE as item_code,
           ofr.OFFER_QUANTITY as offer_quantity,
           ofr.FREE_ITEM_CODE as free_item_code,
-          freeinv.item_name AS free_item,
+          MAX(freeinv.item_name) AS free_item,
           DATE_FORMAT(ofr.OFFER_DATE, '%Y-%m-%d') as offer_date,
-          ofr.STATUS as status,
+
+          CASE 
+            WHEN CURDATE() < ofr.OFFER_DATE THEN 'Scheduled'
+            WHEN ofr.END_DATE IS NULL AND CURDATE() >= ofr.OFFER_DATE THEN 'Active'
+            WHEN CURDATE() BETWEEN ofr.OFFER_DATE AND ofr.END_DATE THEN 'Active'
+            ELSE 'Inactive'
+          END as status,
+
           ofr.MESSAGE as message,
           DATE_FORMAT(ofr.END_DATE, '%Y-%m-%d') as end_date,
           ofr.FREE_ITEM_QUANTITY as free_item_quantity
+
       FROM xxafmc_offers ofr
       LEFT JOIN xxafmc_inventory inv 
         ON ofr.ITEM_CODE = inv.item_code
       LEFT JOIN xxafmc_inventory freeinv 
         ON ofr.FREE_ITEM_CODE = freeinv.item_code
+
+      GROUP BY 
+          ofr.OFFER_ID, 
+          ofr.ITEM_CODE, 
+          ofr.FREE_ITEM_CODE, 
+          ofr.OFFER_QUANTITY, 
+          ofr.OFFER_DATE,
+          ofr.MESSAGE, 
+          ofr.END_DATE, 
+          ofr.FREE_ITEM_QUANTITY
+
       ORDER BY ofr.OFFER_ID DESC
     `);
 
@@ -28,6 +47,7 @@ exports.getAllOffers = async (req, res) => {
       message: "Offers fetched successfully",
       offers,
     });
+
   } catch (err) {
     console.log("Get All Offers Error:", err);
     res.status(500).json({ message: "Internal server error" });
@@ -123,7 +143,7 @@ exports.createOffer = async (req, res) => {
     const itemName = itemInfo[0]?.item_name || null;
     const freeItemName = freeItemInfo[0]?.item_name || null;
 
-    // Insert - OFFER_ID auto-generated, STATUS defaults to 'Active', END_DATE not required
+    // Insert - OFFER_ID auto-generated, STATUS will be calculated dynamically
     const [result] = await db.query(
       `INSERT INTO xxafmc_offers (
           ITEM_CODE,
@@ -134,12 +154,11 @@ exports.createOffer = async (req, res) => {
           FREE_ITEM_QUANTITY,
           OFFER_DATE,
           MESSAGE,
-          STATUS,
           CREATED_BY,
           CREATION_DATE,
           LAST_UPDATED_BY,
           LAST_UPDATED_DATE
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Active', ?, NOW(), ?, NOW())`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, NOW())`,
       [
         item_code,
         itemName,
@@ -169,19 +188,17 @@ exports.createOffer = async (req, res) => {
   }
 };
 
-// Update Offer - Always set end_date to current date, Status to 'Inactive'
 exports.updateOffer = async (req, res) => {
   try {
     const { id } = req.params;
     const username = req.user?.username || "SYSTEM";
+    const { endDate } = req.body;
 
-    console.log("Deactivating Offer - ID:", id);
-    
-    // Always use current date
-    const today = new Date();
-    const end_date = today.toISOString().split('T')[0];
-    
-    console.log("Setting end date to:", end_date);
+    console.log("Updating Offer - ID:", id, "EndDate:", endDate);
+
+    if (!endDate) {
+      return res.status(400).json({ message: "End date is required" });
+    }
 
     // Check if offer exists
     const [existing] = await db.query(
@@ -193,22 +210,20 @@ exports.updateOffer = async (req, res) => {
       return res.status(404).json({ message: "Offer not found" });
     }
 
-    // Update end_date with current date and set status to 'Inactive'
+    // ✅ ONLY update END_DATE (NO STATUS)
     await db.query(
       `UPDATE xxafmc_offers 
        SET END_DATE = ?,
-           STATUS = 'Inactive',
            LAST_UPDATED_BY = ?,
            LAST_UPDATED_DATE = NOW()
        WHERE OFFER_ID = ?`,
-      [end_date, username, id]
+      [endDate, username, id]
     );
 
     res.status(200).json({
-      message: "Offer deactivated successfully",
+      message: "Offer updated successfully",
       offer_id: id,
-      end_date: end_date,
-      status: "Inactive"
+      end_date: endDate
     });
 
   } catch (err) {

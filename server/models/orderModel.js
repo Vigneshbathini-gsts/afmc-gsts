@@ -1,18 +1,32 @@
 const db = require("../config/db");
 
-const normalizeDate = (value, isEndOfDay = false) => {
+const normalizeDate = (value) => {
   if (!value) {
     return null;
   }
 
-  const suffix = isEndOfDay ? "T23:59:59" : "T00:00:00";
-  const parsed = new Date(`${value}${suffix}`);
+  const trimmed = String(value).trim();
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    return trimmed;
+  }
+
+  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(trimmed)) {
+    const [month, day, year] = trimmed.split("/");
+    return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  }
+
+  const parsed = new Date(trimmed);
 
   if (Number.isNaN(parsed.getTime())) {
     return null;
   }
 
-  return parsed.toISOString().slice(0, 19).replace("T", " ");
+  const year = parsed.getFullYear();
+  const month = String(parsed.getMonth() + 1).padStart(2, "0");
+  const day = String(parsed.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
 };
 
 async function getAdminOrderHistory({
@@ -180,11 +194,11 @@ async function getAdminOrderHistory({
         GROUP BY xxoh.order_num, xxoh.order_total
       ) t
     ) final_data
-    ORDER BY ord ASC, order_num DESC
+    ORDER BY ord DESC, order_num DESC
   `;
 
-  const fromDate = normalizeDate(from, false);
-  const toDate = normalizeDate(to, true);
+  const fromDate = normalizeDate(from);
+  const toDate = normalizeDate(to);
   const requestedUser = username?.trim() || null;
   const activeUser = appUser?.trim() || null;
 
@@ -275,8 +289,8 @@ async function getActiveOrders({
     ORDER BY creation_date DESC, oh.order_num DESC
   `;
 
-  const fromDate = normalizeDate(from, false);
-  const toDate = normalizeDate(to, true);
+  const fromDate = normalizeDate(from);
+  const toDate = normalizeDate(to);
   const searchTerm = search?.trim() || null;
   const searchLike = searchTerm ? `%${searchTerm}%` : null;
   const normalizedAppUser = appUser?.trim() || null;
@@ -302,19 +316,26 @@ async function getActiveOrders({
 
 async function getOrderDetails(orderNumber) {
   const query = `
-    SELECT
-      od.order_line_id,
-      od.order_id AS order_num,
-      od.item_id,
-      COALESCE(xi.item_name, od.item_id) AS item_name,
-      od.quantity,
-      xi.type,
-      COALESCE(NULLIF(od.order_status, ''), 'Pending') AS status
-    FROM xxafmc_order_details od
-    LEFT JOIN xxafmc_inventory xi
-      ON xi.item_code = od.item_id
-    WHERE od.order_id = ?
-    ORDER BY od.order_line_id ASC
+  SELECT
+  od.order_line_id,
+  od.order_id AS order_num,
+  od.item_id,
+  COALESCE(xi.item_name, od.item_id) AS item_name,
+  od.quantity,
+  COALESCE(NULLIF(xi.type, ''), 'NA') AS type,
+  COALESCE(NULLIF(od.order_status, ''), 'Pending') AS status
+FROM xxafmc_order_details od
+LEFT JOIN (
+    SELECT 
+      item_code,
+      MAX(item_name) AS item_name,
+      MAX(COALESCE(NULLIF(type, ''), 'NA')) AS type
+    FROM xxafmc_inventory
+    GROUP BY item_code
+) xi
+  ON xi.item_code = od.item_id
+WHERE od.order_id = ?
+ORDER BY od.order_line_id ASC;
   `;
 
   const [rows] = await db.execute(query, [orderNumber]);

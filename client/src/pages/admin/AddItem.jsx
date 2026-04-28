@@ -41,7 +41,7 @@ export default function AddItem() {
   const createdBy = useMemo(() => {
     try {
       const rawUser = localStorage.getItem("user");
-      if (!rawUser) return "ADMIN";
+      if (!rawUser) return "";
       const user = JSON.parse(rawUser);
       return user?.username || user?.email || user?.user_name || user?.name || "ADMIN";
     } catch (_error) {

@@ -2,10 +2,12 @@ const roleRedirectMap = {
   10: "/admin/dashboard",
   20: "/attendant/dashboard",
   30: "/user/dashboard",
+  80: "/admin/dashboard",
   40: {
     KITCHEN: "/kitchen/dashboard",
     BAR: "/bar/dashboard",
   },
+  
 };
 
 function getRedirectPath(roleId, outletType = null) {

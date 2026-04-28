@@ -37,16 +37,30 @@ export default function PriceUpdate() {
   // Input Change
   // =========================
   const handleChange = (e) => {
-    const { name, value } = e.target;
+  const { name, value } = e.target;
 
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+  // 🔥 If barcode is cleared → reset everything
+  if (name === "barcode" && value.trim() === "") {
+    setFormData({
+      barcode: "",
+      itemCode: "",
+      itemName: "",
+      unitPrice: "",
+    });
 
     setError("");
     setMessage("");
-  };
+    return;
+  }
+
+  setFormData((prev) => ({
+    ...prev,
+    [name]: value,
+  }));
+
+  setError("");
+  setMessage("");
+};
 
   // =========================
   // Fetch Item By Barcode
@@ -350,11 +364,11 @@ export default function PriceUpdate() {
           </div>
 
           {/* Status */}
-          {fetchingItem && (
+          {/* {fetchingItem && (
             <div className="bg-blue-100 text-blue-700 text-sm px-4 py-3 rounded-2xl border border-blue-200">
               Fetching item details...
             </div>
-          )}
+          )} */}
 
           {message && (
             <div className="bg-green-100 text-green-700 text-sm px-4 py-3 rounded-2xl border border-green-200">

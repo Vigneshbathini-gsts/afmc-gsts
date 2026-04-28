@@ -1135,13 +1135,16 @@ exports.getOrderHistoryItemDetails = async (req, res) => {
         xo.order_line_id,
         xo.order_id,
         xo.item_id,
-        COALESCE(xo.type, 'NA') AS type,
+        IFNULL(xo.type, 'NA') AS type,
         xi.item_name,
         xo.quantity,
 
         xo.subtotal,
-        xo.price,
-        IFNULL(xo.food_pr_charges, 0) AS pr_charges,
+        (xo.price - IFNULL(xo.food_pr_charges, 0)) AS price,
+        CASE
+          WHEN xo.order_status IS NULL THEN IFNULL(xo.food_pr_charges, 0)
+          ELSE 0
+        END AS pr_charges,
 
         xo.created_by,
         xo.creation_date,
@@ -1156,19 +1159,9 @@ exports.getOrderHistoryItemDetails = async (req, res) => {
       JOIN xxafmc_inventory xi 
         ON xo.item_id = xi.item_code
 
-      JOIN xxafmc_order_header xoh 
-        ON xo.order_id = xoh.order_num
-
-      JOIN xxafmc_users xu 
-        ON xoh.user_id = xu.user_id
-
-      JOIN xxafmc_role r 
-        ON xu.role_id = r.role_id
-
       -- ✅ critical join (same as APEX)
-      JOIN xxafmc_kitchen_notification xxkn 
+      LEFT JOIN xxafmc_kitchen_notification xxkn 
         ON xxkn.ordernumber = xo.order_id
-       AND xxkn.item_id = xo.item_id
 
       WHERE xo.order_id = ?
 
@@ -1181,11 +1174,13 @@ exports.getOrderHistoryItemDetails = async (req, res) => {
         xo.quantity,
         xo.subtotal,
         xo.price,
+        xo.order_status,
         xo.food_pr_charges,
         xo.created_by,
         xo.creation_date,
         xo.last_updated_date,
         xo.last_updated_by
+      ORDER BY xo.order_line_id
     `;
 
     // 🔹 Total query
@@ -1193,9 +1188,6 @@ exports.getOrderHistoryItemDetails = async (req, res) => {
       SELECT 
         SUM(xo.subtotal) AS total_amount
       FROM xxafmc_order_details xo
-      JOIN xxafmc_kitchen_notification xxkn 
-        ON xxkn.ordernumber = xo.order_id
-       AND xxkn.item_id = xo.item_id
       WHERE xo.order_id = ?
     `;
 

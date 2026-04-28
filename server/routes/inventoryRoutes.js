@@ -5,7 +5,7 @@ const upload = require("../utils/uploadMiddleware");
 
 router.get("/", inventoryController.getInventory);
 router.get("/categories", inventoryController.getCategories);
-router.get("/items", inventoryController.getItems);
+router.get("/items", inventoryController.getItems); 
 router.get("/subcategories", inventoryController.getSubCategories);
 router.get("/bar-types", inventoryController.getBarTypes);
 router.get("/barcode/:barcode/exists", inventoryController.checkBarcodeExists);
