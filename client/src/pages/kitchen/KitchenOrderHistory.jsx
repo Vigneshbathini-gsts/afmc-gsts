@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from "react-router-dom";
 import { barOrdersAPI } from '../../services/api';
 import {
   FaTimesCircle,
@@ -10,10 +11,12 @@ import {
   FaCalendarAlt,
   FaSync,
   FaHistory,
+  FaArrowLeft,
 } from "react-icons/fa";
 import { exportTableToPdf } from '../../utils/pdfExport';
 
 const KitchenOrderHistory = () => {
+  const navigate = useNavigate();
   const [orders, setOrders] = useState([]);
   const [filteredOrders, setFilteredOrders] = useState([]);
   const [fromDate, setFromDate] = useState('');
@@ -240,27 +243,33 @@ const KitchenOrderHistory = () => {
       case 'CANCELLED': return 'bg-red-100 text-red-700 border border-red-300';
       case 'PARTIALLY COMPLETED':
       case 'PARTIAL': return 'bg-orange-100 text-orange-700 border border-orange-300';
-      default: return 'bg-blue-100 text-blue-700 border border-blue-300';
+      default: return 'bg-afmc-maroon/10 text-afmc-maroon border border-afmc-maroon/30';
     }
   };
 
   return (
-    <div className="p-4 md:p-6 space-y-5">
-      <div className="flex justify-end">
-        <button
-          onClick={downloadPDF}
-          disabled={filteredOrders.length === 0}
-          className="bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-xl flex items-center gap-2 disabled:bg-gray-400 transition-colors"
-        >
-          <FaDownload />
-          Download
-        </button>
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-afmc-bg via-white to-afmc-bg2 relative">
+      <div className="absolute top-16 left-12 w-72 h-72 bg-afmc-maroon/10 rounded-full blur-3xl"></div>
+      <div className="absolute bottom-20 right-20 w-80 h-80 bg-afmc-maroon2/10 rounded-full blur-3xl"></div>
 
+      <div className="relative z-10 p-6 md:p-8 space-y-6">
+        <div className="flex items-center justify-between gap-4">
+          <h1 className="text-2xl font-semibold text-afmc-maroon">
+            Kitchen Order History
+          </h1>
+          <button
+            type="button"
+            onClick={() => navigate("/kitchen/dashboard")}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-white shadow hover:shadow-md border border-afmc-gold/30 text-gray-700 hover:text-afmc-maroon hover:bg-afmc-maroon/5 transition"
+          >
+            <FaArrowLeft />
+            Go To Dashboard
+          </button>
+        </div>
 
-      <div className="bg-white rounded-3xl shadow-lg border border-gray-100 overflow-hidden">
+        <div className="bg-white/80 border border-white/60 rounded-3xl shadow-xl backdrop-blur-sm overflow-hidden">
         {/* Filter Section */}
-        <div className="px-5 py-4 border-b bg-gradient-to-r from-gray-50 to-gray-100">
+        <div className="px-5 py-4 border-b bg-gradient-to-r from-gray-50 to-white">
           <div className="flex flex-col gap-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* From Date */}
@@ -273,7 +282,7 @@ const KitchenOrderHistory = () => {
                   type="date"
                   value={tempFromDate}
                   onChange={(e) => setTempFromDate(e.target.value)}
-                  className="w-full border border-gray-300 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
                 />
               </div>
 
@@ -287,7 +296,7 @@ const KitchenOrderHistory = () => {
                   type="date"
                   value={tempToDate}
                   onChange={(e) => setTempToDate(e.target.value)}
-                  className="w-full border border-gray-300 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
                 />
               </div>
 
@@ -295,14 +304,14 @@ const KitchenOrderHistory = () => {
               <div className="flex gap-2 items-end">
                 <button
                   onClick={handleApplyFilters}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl transition-colors flex items-center gap-2 flex-1 justify-center"
+                  className="px-6 py-3 rounded-2xl bg-[#5b5b5b] text-white font-semibold flex items-center gap-2 shadow hover:shadow-md flex-1 justify-center"
                 >
                   <FaSearch />
                   Apply Filters
                 </button>
                 <button
                   onClick={handleReset}
-                  className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2.5 rounded-xl transition-colors flex items-center gap-2"
+                  className="px-4 py-3 rounded-2xl bg-gray-500 hover:bg-gray-600 text-white font-semibold flex items-center gap-2 shadow hover:shadow-md"
                 >
                   <FaSync />
                   Reset
@@ -321,7 +330,7 @@ const KitchenOrderHistory = () => {
               {fromDate && toDate && ` from ${formatDate(fromDate)} to ${formatDate(toDate)}`}
             </p>
           </div>
-          <div className="flex gap-3">
+          <div className="flex gap-3 items-center w-full md:w-auto">
             <div className="relative w-full md:w-80">
               <FaSearch className="absolute top-1/2 left-3 -translate-y-1/2 text-gray-400 text-sm" />
               <input
@@ -329,7 +338,7 @@ const KitchenOrderHistory = () => {
                 placeholder="Search by order  , name or phone..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                className="w-full pl-10 pr-4 py-3 rounded-2xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-afmc-maroon2/20 text-sm"
               />
               {searchTerm && (
                 <button
@@ -340,7 +349,14 @@ const KitchenOrderHistory = () => {
                 </button>
               )}
             </div>
-
+            <button
+              onClick={downloadPDF}
+              disabled={filteredOrders.length === 0}
+              className="px-6 py-3 rounded-2xl bg-afmc-maroon hover:bg-afmc-maroon2 text-white font-semibold flex items-center gap-2 shadow hover:shadow-md transition disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap"
+            >
+              <FaDownload />
+              Download PDF
+            </button>
           </div>
         </div>
 
@@ -359,7 +375,7 @@ const KitchenOrderHistory = () => {
           <>
             <div className="overflow-x-auto">
               <table className="min-w-full text-sm">
-                <thead className="bg-blue-50 text-gray-700 uppercase text-xs tracking-wider">
+                <thead className="bg-gray-50 text-gray-700 uppercase text-xs tracking-wider">
                   <tr>
                     <th className="px-6 py-4 text-left">Order  </th>
                     <th className="px-6 py-4 text-left">Order Date</th>
@@ -371,11 +387,11 @@ const KitchenOrderHistory = () => {
                 </thead>
                 <tbody>
                   {paginatedOrders.map((order, index) => (
-                    <tr key={order.order_num || index} className="border-t border-gray-100 hover:bg-blue-50/30 transition">
+                    <tr key={order.order_num || index} className="border-t border-gray-100 hover:bg-gray-50 transition">
                       <td className="px-6 py-4 font-semibold">
                         <button
                           onClick={() => handleOrderClick(order)}
-                          className="text-blue-600 hover:text-blue-800 hover:underline font-medium cursor-pointer"
+                          className="text-afmc-maroon hover:text-afmc-maroon2 hover:underline font-medium cursor-pointer"
                         >
                           {order.order_num}
                         </button>
@@ -414,7 +430,7 @@ const KitchenOrderHistory = () => {
                 >
                   <FaChevronLeft />
                 </button>
-                <span className="px-4 py-2 rounded-lg bg-blue-100 text-blue-700 font-semibold text-sm">
+                <span className="px-4 py-2 rounded-lg bg-afmc-maroon/10 text-afmc-maroon font-semibold text-sm">
                   Page {currentPage} of {safeTotalPages}
                 </span>
                 <button
@@ -435,13 +451,13 @@ const KitchenOrderHistory = () => {
       {/* Modal for Order Details */}
       {modalOpen && selectedOrder && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-5xl w-full max-h-[90vh] overflow-hidden">
-            <div className="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-4 flex justify-between items-center">
+          <div className="bg-white rounded-2xl shadow-xl max-w-5xl w-full max-h-[90vh] overflow-hidden">
+            <div className="bg-gradient-to-r from-afmc-maroon to-afmc-maroon2 px-6 py-4 flex justify-between items-center">
               <div>
                 <h3 className="text-xl font-bold text-white">
                   Order Details:  {selectedOrder.order_num}
                 </h3>
-                <p className="text-sm text-blue-100 mt-1">
+                <p className="text-sm text-white/80 mt-1">
                   Customer: {selectedOrder.first_name || 'N/A'} |
                   Phone: {selectedOrder.phone_number || 'N/A'}
                 </p>
@@ -454,7 +470,7 @@ const KitchenOrderHistory = () => {
             <div className="px-6 py-4 overflow-y-auto max-h-[calc(90vh-120px)]">
               {loadingDetails ? (
                 <div className="text-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-afmc-maroon mx-auto"></div>
                   <p className="mt-2 text-gray-600">Loading order details...</p>
                 </div>
               ) : orderItemDetails[selectedOrder.order_num]?.items?.length > 0 ? (
@@ -501,7 +517,7 @@ const KitchenOrderHistory = () => {
                     <div className="bg-gray-50 rounded-lg p-4 min-w-[300px]">
                       <div className="flex justify-between items-center pt-2 border-t border-gray-200">
                         <span className="text-lg font-bold text-gray-900">Grand Total:</span>
-                        <span className="text-xl font-bold text-blue-600">
+                        <span className="text-xl font-bold text-afmc-maroon">
                           ₹{orderItemDetails[selectedOrder.order_num].summary?.totalAmount
                             ? parseFloat(orderItemDetails[selectedOrder.order_num].summary.totalAmount).toFixed(2)
                             : orderItemDetails[selectedOrder.order_num].items
@@ -528,6 +544,7 @@ const KitchenOrderHistory = () => {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 };
