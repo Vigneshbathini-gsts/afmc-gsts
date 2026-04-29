@@ -14,6 +14,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { API_BASE_URL, barOrdersAPI } from "../../services/api";
 import { Html5Qrcode } from "html5-qrcode";
+import { toInitCap } from "../../utils/textFormat";
 
 export default function OutletOrderDetails() {
   const location = useLocation();
@@ -451,19 +452,28 @@ export default function OutletOrderDetails() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-6 space-y-6">
-      {/* Back Button */}
-      <div className="flex justify-between items-center">
-        <button onClick={() => navigate(-1)} className="text-gray-500 hover:text-gray-700 transition">
-          <div className="flex items-center gap-1">
-            <FaArrowLeft className="text-xl" />
-            <p className="text-sm font-medium">Back to Orders</p>
-          </div>
-        </button>
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-afmc-bg via-white to-afmc-bg2 relative">
+      <div className="absolute top-16 left-12 w-72 h-72 bg-afmc-maroon/10 rounded-full blur-3xl"></div>
+      <div className="absolute bottom-20 right-20 w-80 h-80 bg-afmc-maroon2/10 rounded-full blur-3xl"></div>
+
+      <div className="relative z-10 p-4 md:p-6 space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between gap-4">
+          <h1 className="text-2xl font-semibold text-afmc-maroon">
+            Order Details
+          </h1>
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-white shadow hover:shadow-md border border-afmc-gold/30 text-gray-700 hover:text-afmc-maroon hover:bg-afmc-maroon/5 transition whitespace-nowrap"
+          >
+            <FaArrowLeft />
+            Back to Orders
+          </button>
+        </div>
 
       {/* Header Card with Order Summary */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
+      <div className="bg-white/80 border border-white/60 rounded-3xl shadow-xl backdrop-blur-sm p-5">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
             <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider">Order Number</label>
@@ -493,7 +503,7 @@ export default function OutletOrderDetails() {
         {/* Left Column */}
         <div className="lg:col-span-2 space-y-6">
           {/* Order Items Table */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className="bg-white/80 border border-white/60 rounded-3xl shadow-xl backdrop-blur-sm overflow-hidden">
             <div className="border-b border-gray-100 px-6 py-4">
               <h2 className="text-base font-semibold text-gray-800">Order Items</h2>
             </div>
@@ -523,9 +533,11 @@ export default function OutletOrderDetails() {
                           <td className="px-6 py-4 text-sm text-gray-800">
                             {item.LINK_ENABLED === "Y" ? (
                               <button onClick={() => handleItemClick(item)} className="text-pink-600 hover:underline">
-                                {item.ITEM_NAME}
+                                {toInitCap(item.ITEM_NAME || "")}
                               </button>
-                            ) : (item.ITEM_NAME)}
+                            ) : (
+                              toInitCap(item.ITEM_NAME || "")
+                            )}
                           </td>
                           <td className="px-6 py-4 text-sm font-medium">{item.quantity}</td>
                           <td className="px-6 py-4 text-sm text-green-600 font-medium">{scannedQty}</td>
@@ -550,7 +562,7 @@ export default function OutletOrderDetails() {
           </div>
 
           {/* Barcode Scanner Section */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className="bg-white/80 border border-white/60 rounded-3xl shadow-xl backdrop-blur-sm overflow-hidden">
             <div className="border-b border-gray-100 px-6 py-4">
               <h2 className="text-base font-semibold text-gray-800">Scan Barcode</h2>
             </div>
@@ -675,7 +687,7 @@ export default function OutletOrderDetails() {
                     scannedItems.map((item) => (
                       <tr key={item.id} className="hover:bg-gray-50">
                         <td className="px-4 py-3 text-sm font-mono text-gray-600">{item.itemCode}</td>
-                        <td className="px-4 py-3 text-sm text-gray-800">{item.itemName}</td>
+                        <td className="px-4 py-3 text-sm text-gray-800">{toInitCap(item.itemName || "")}</td>
                         <td className="px-4 py-3 text-sm text-center font-medium">{item.scanQuantity}</td>
                         <td className="px-4 py-3 text-sm text-gray-500">
                           {new Date(item.scannedAt).toLocaleTimeString()}
@@ -693,7 +705,7 @@ export default function OutletOrderDetails() {
 
         {/* Right Column - Scanned Item Details */}
         <div className="space-y-6">
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className="bg-white/80 border border-white/60 rounded-3xl shadow-xl backdrop-blur-sm overflow-hidden">
             <div className="border-b border-gray-100 px-6 py-4">
               <h2 className="text-base font-semibold text-gray-800">Current Scanned Item</h2>
             </div>
@@ -704,7 +716,7 @@ export default function OutletOrderDetails() {
               </div>
               <div className="bg-gray-50 rounded-lg p-4">
                 <p className="text-xs text-gray-400 uppercase tracking-wider">Item Name</p>
-                <p className="mt-1 font-medium text-gray-800">{itemName || "-"}</p>
+                <p className="mt-1 font-medium text-gray-800">{itemName ? toInitCap(itemName) : "-"}</p>
               </div>
               <div className="bg-gray-50 rounded-lg p-4">
                 <p className="text-xs text-gray-400 uppercase tracking-wider">Price</p>
@@ -737,7 +749,7 @@ export default function OutletOrderDetails() {
                   {scannedCocktailData.ingredients?.map((ing, idx) => (
                     <tr key={idx}>
                       <td className="px-4 py-2">{ing.item_code}</td>
-                      <td className="px-4 py-2">{ing.item_name}</td>
+                      <td className="px-4 py-2">{toInitCap(ing.item_name || "")}</td>
                       <td className="px-4 py-2 text-center">{ing.pegs || 0}</td>
                       <td className="px-4 py-2 text-center">{ing.quantity || 1}</td>
                     </tr>
@@ -753,6 +765,7 @@ export default function OutletOrderDetails() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

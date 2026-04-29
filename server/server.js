@@ -101,12 +101,6 @@ const notificationRoutes = require("./routes/notificationRoutes");
 const cancelledOrdersRoutes = require("./routes/cancelledOrdersRoutes");
 const menuRoutesbeer = require("./routes/MenuRoutesbeer");
 
-
-
-
-
-
-
 const apiPrefixes = ["/api", API_BASE_PATH];
 for (const prefix of apiPrefixes) {
   app.use(`${prefix}/auth`, authRoutes);
@@ -122,6 +116,7 @@ for (const prefix of apiPrefixes) {
   app.use(`${prefix}/profit`, profitRoutes);
   app.use(`${prefix}/notifications`, notificationRoutes);
   app.use(`${prefix}/cancelled-orders`, cancelledOrdersRoutes);
+  // End-user + attendant menu endpoints (e.g. GET {API_BASE_URL}/menubar)
   app.use(prefix, menuRoutesbeer);
 }
 

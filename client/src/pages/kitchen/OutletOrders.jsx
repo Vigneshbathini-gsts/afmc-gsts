@@ -10,6 +10,7 @@ import {
 } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { barOrdersAPI } from "../../services/api";
+import { toInitCap } from "../../utils/textFormat";
 
 /* THEME */
 const MAROON = "#6B1A4F";
@@ -64,6 +65,7 @@ export default function OutletOrders({ kitchenType = "Bar" }) {
 
   /* PAGINATION */
   const totalPages = Math.ceil(filteredOrders.length / rowsPerPage);
+  const safeTotalPages = Math.max(1, totalPages || 0);
 
   const paginatedOrders = useMemo(() => {
     const start = (currentPage - 1) * rowsPerPage;
@@ -71,6 +73,14 @@ export default function OutletOrders({ kitchenType = "Bar" }) {
   }, [filteredOrders, currentPage]);
 
   useEffect(() => setCurrentPage(1), [searchTerm]);
+
+  // Clamp current page when filtered results change (prevents going to Page 2 of 1, etc.)
+  useEffect(() => {
+    setCurrentPage((prev) => {
+      const next = Math.min(Math.max(prev, 1), safeTotalPages);
+      return next === prev ? prev : next;
+    });
+  }, [safeTotalPages]);
 
   /* HANDLERS */
   const handleOrderClick = async (order) => {
@@ -250,7 +260,7 @@ export default function OutletOrders({ kitchenType = "Bar" }) {
                       </span>
                     </td>
 
-                    <td style={td}>{o.FIRST_NAME}</td>
+                    <td style={td}>{toInitCap(o.FIRST_NAME || "")}</td>
 
                     <td style={td}>
                       <span
@@ -262,13 +272,13 @@ export default function OutletOrders({ kitchenType = "Bar" }) {
                           ...getStatusStyle(o.STATUS),
                         }}
                       >
-                        {o.STATUS}
+                        {toInitCap(o.STATUS || "")}
                       </span>
                     </td>
 
                     <td style={td}>{o.CREATION_DATE}</td>
-                    <td style={td}>{o.Handled_by_bar}</td>
-                    <td style={td}>{o.Handled_by_kitchen}</td>
+                    <td style={td}>{toInitCap(o.Handled_by_bar || "")}</td>
+                    <td style={td}>{toInitCap(o.Handled_by_kitchen || "")}</td>
 
                     <td style={{ ...td, textAlign: "center" }}>
                       <FaTimesCircle
@@ -298,15 +308,32 @@ export default function OutletOrders({ kitchenType = "Bar" }) {
               }}
             >
               <span style={{ fontSize: 12 }}>
-                Page {currentPage} of {totalPages || 1}
+                Page {currentPage} of {safeTotalPages}
               </span>
 
               <div style={{ display: "flex", gap: 10 }}>
-                <button onClick={() => setCurrentPage((p) => p - 1)}>
+                <button
+                  onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+                  disabled={currentPage <= 1}
+                  style={{
+                    opacity: currentPage <= 1 ? 0.5 : 1,
+                    cursor: currentPage <= 1 ? "not-allowed" : "pointer",
+                  }}
+                >
                   <FaChevronLeft />
                 </button>
 
-                <button onClick={() => setCurrentPage((p) => p + 1)}>
+                <button
+                  onClick={() =>
+                    setCurrentPage((p) => Math.min(p + 1, safeTotalPages))
+                  }
+                  disabled={currentPage >= safeTotalPages}
+                  style={{
+                    opacity: currentPage >= safeTotalPages ? 0.5 : 1,
+                    cursor:
+                      currentPage >= safeTotalPages ? "not-allowed" : "pointer",
+                  }}
+                >
                   <FaChevronRight />
                 </button>
               </div>
