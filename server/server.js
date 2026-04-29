@@ -99,6 +99,13 @@ const inventoryRoutes = require("./routes/inventoryRoutes");
 const profitRoutes = require("./routes/profitRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const cancelledOrdersRoutes = require("./routes/cancelledOrdersRoutes");
+const menuRoutesbeer = require("./routes/MenuRoutesbeer");
+
+
+
+
+
+
 
 const apiPrefixes = ["/api", API_BASE_PATH];
 for (const prefix of apiPrefixes) {
@@ -115,6 +122,7 @@ for (const prefix of apiPrefixes) {
   app.use(`${prefix}/profit`, profitRoutes);
   app.use(`${prefix}/notifications`, notificationRoutes);
   app.use(`${prefix}/cancelled-orders`, cancelledOrdersRoutes);
+  app.use(prefix, menuRoutesbeer);
 }
 
 const PORT = process.env.PORT || 5000;
