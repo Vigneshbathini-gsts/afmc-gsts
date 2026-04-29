@@ -516,7 +516,7 @@ exports.processBarcodeScan = async (req, res) => {
 
     if (isFreeItem && Number(scanItemCode) === Number(freeItemRows[0].item_id)) {
 
-      // ✅ FREE ITEM
+      //   FREE ITEM
       calculatedPrice = 0;
       isFree = true;
 
@@ -537,7 +537,7 @@ exports.processBarcodeScan = async (req, res) => {
         ? unitPrice / pegsFromStock
         : unitPrice;
 
-      // ✅ SAME logic for both (you had duplicate branches → simplified)
+      //   SAME logic for both (you had duplicate branches → simplified)
       if (roleId === 20) {
         const profit =
           pricePerPeg +
@@ -919,7 +919,7 @@ exports.getCancelledOrders = async (req, res) => {
 
     // console.log("Fetching cancelled orders from", fromDate, "to", toDate);
 
-    // ✅ Normalize input dates (important)
+    //   Normalize input dates (important)
     const normalizeDate = (date) => {
       if (!date) return null;
       const d = new Date(date);
@@ -1025,7 +1025,7 @@ exports.getOrderHistory = async (req, res) => {
 
   CONCAT(UPPER(LEFT(xp.pubmed_name, 1)), LOWER(SUBSTRING(xp.pubmed_name, 2))) AS pubmed_name,
 
-  -- ✅ ADDED SUBTOTAL
+  --   ADDED SUBTOTAL
   FORMAT(nm.order_total, 2) AS subtotal,
 
   CASE
@@ -1151,7 +1151,7 @@ exports.getOrderHistoryItemDetails = async (req, res) => {
         xo.last_updated_date,
         xo.last_updated_by,
 
-        -- ✅ item-level status (avoid duplicates)
+        --   item-level status (avoid duplicates)
         MAX(xxkn.status) AS status
 
       FROM xxafmc_order_details xo
@@ -1159,7 +1159,7 @@ exports.getOrderHistoryItemDetails = async (req, res) => {
       JOIN xxafmc_inventory xi 
         ON xo.item_id = xi.item_code
 
-      -- ✅ critical join (same as APEX)
+      --   critical join (same as APEX)
       LEFT JOIN xxafmc_kitchen_notification xxkn 
         ON xxkn.ordernumber = xo.order_id
 
