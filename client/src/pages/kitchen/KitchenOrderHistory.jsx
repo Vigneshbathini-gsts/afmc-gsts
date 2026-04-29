@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { barOrdersAPI } from '../../services/api';
 import {
   FaTimesCircle,
@@ -17,6 +17,12 @@ import { exportTableToPdf } from '../../utils/pdfExport';
 
 const KitchenOrderHistory = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const dashboardPath = useMemo(() => {
+    const pathname = location?.pathname || "";
+    return pathname.startsWith("/bar") ? "/bar/dashboard" : "/kitchen/dashboard";
+  }, [location?.pathname]);
   const [orders, setOrders] = useState([]);
   const [filteredOrders, setFilteredOrders] = useState([]);
   const [fromDate, setFromDate] = useState('');
@@ -259,7 +265,7 @@ const KitchenOrderHistory = () => {
           </h1>
           <button
             type="button"
-            onClick={() => navigate("/kitchen/dashboard")}
+            onClick={() => navigate(dashboardPath)}
             className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-white shadow hover:shadow-md border border-afmc-gold/30 text-gray-700 hover:text-afmc-maroon hover:bg-afmc-maroon/5 transition"
           >
             <FaArrowLeft />
