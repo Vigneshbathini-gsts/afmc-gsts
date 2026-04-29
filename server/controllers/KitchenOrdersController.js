@@ -334,7 +334,7 @@ exports.getOrderItems = async (req, res) => {
 exports.processBarcodeScan = async (req, res) => {
   let connection;
   try {
-    const { ORDERNUMBER, BARCODE, QUANTITY = 1, KITCHEN = "Bar" } = req.body;
+    const { ORDERNUMBER, BARCODE, QUANTITY = 1, KITCHEN = "Bar", PARENT_ITEM } = req.body;
 
     if (!ORDERNUMBER || !BARCODE) {
       return res.status(400).json({ success: false, message: "Order number and barcode are required" });
@@ -381,18 +381,73 @@ exports.processBarcodeScan = async (req, res) => {
       return res.status(400).json({ success: false, message: `Scanned Barcode ${BARCODE} has no stock` });
     }
 
-    // Get parent item
+    // Get parent item (cocktail/mocktail item code)
+    // If an ingredient belongs to multiple cocktails/mocktails in the same order,
+    // we must know which parent item it should be attributed to.
+    const forcedParentItem = String(PARENT_ITEM || "").trim();
+
+    if (!forcedParentItem) {
+      const [possibleParentRows] = await connection.query(
+        `
+        SELECT DISTINCT inventory_item_code FROM (
+          SELECT inventory_item_code
+          FROM xxafmc_custom_cocktails_mocktails_details
+          WHERE order_number = ? AND item_code = ?
+          UNION ALL
+          SELECT inventory_item_code
+          FROM xxafmc_custom_cocktails_mocktails_details_dummy
+          WHERE order_number = ? AND item_code = ?
+          UNION ALL
+          SELECT inventory_item_code
+          FROM xxafmc_cocktails_mocktails_details
+          WHERE item_code = ?
+            AND inventory_item_code IN (
+              SELECT item_id FROM xxafmc_order_details WHERE order_id = ?
+            )
+        ) p
+        `,
+        [ORDERNUMBER, scanItemCode, ORDERNUMBER, scanItemCode, scanItemCode, ORDERNUMBER]
+      );
+
+      const possibleParents = (possibleParentRows || [])
+        .map((r) => String(r.inventory_item_code || "").trim())
+        .filter(Boolean);
+
+      if (possibleParents.length > 1) {
+        await connection.rollback();
+        return res.status(400).json({
+          success: false,
+          message: "Please open the cocktail/mocktail item (recipe) and then scan its ingredients.",
+        });
+      }
+    }
     const [parentRows] = await connection.query(`
       SELECT inventory_item_code FROM (
         SELECT inventory_item_code FROM xxafmc_custom_cocktails_mocktails_details WHERE order_number = ? AND item_code = ?
         UNION ALL
         SELECT inventory_item_code FROM xxafmc_custom_cocktails_mocktails_details_dummy WHERE order_number = ? AND item_code = ?
         UNION ALL
+        SELECT inventory_item_code
+        FROM xxafmc_cocktails_mocktails_details
+        WHERE item_code = ?
+          AND inventory_item_code IN (
+            SELECT item_id FROM xxafmc_order_details WHERE order_id = ?
+          )
+        UNION ALL
         SELECT CAST(item_id AS CHAR) FROM xxafmc_order_details WHERE order_id = ? AND item_id = ?
       ) x LIMIT 1`,
-      [ORDERNUMBER, scanItemCode, ORDERNUMBER, scanItemCode, ORDERNUMBER, scanItemCode]);
+      [
+        ORDERNUMBER,
+        scanItemCode,
+        ORDERNUMBER,
+        scanItemCode,
+        scanItemCode,
+        ORDERNUMBER,
+        ORDERNUMBER,
+        scanItemCode,
+      ]);
 
-    const parentItem = parentRows.length > 0 ? parentRows[0].inventory_item_code : String(scanItemCode);
+    const parentItem = forcedParentItem || (parentRows.length > 0 ? parentRows[0].inventory_item_code : String(scanItemCode));
 
     // Get role
     const [userRows] = await connection.query(
@@ -401,21 +456,59 @@ exports.processBarcodeScan = async (req, res) => {
     const roleId = userRows.length > 0 ? Number(userRows[0].ROLE_ID) : null;
 
     // Get ordered quantity (l_ord_qty_item)
+    // If PARENT_ITEM is provided, cap is calculated only for that cocktail/mocktail item.
     const [orderQtyRows] = await connection.query(`
       SELECT SUM(quantity) AS total_quantity FROM (
         SELECT (x.pegs * x.quantity) AS quantity FROM xxafmc_custom_cocktails_mocktails_details x 
         JOIN xxafmc_order_details xo ON x.inventory_item_code = xo.item_id 
         WHERE x.order_number = ? AND x.item_code = ?
+          AND (? = '' OR x.inventory_item_code = ?)
         UNION ALL
         SELECT (x.pegs * x.quantity) AS quantity FROM xxafmc_custom_cocktails_mocktails_details_dummy x 
         JOIN xxafmc_order_details xo ON x.inventory_item_code = xo.item_id 
         WHERE x.order_number = ? AND x.item_code = ?
+          AND (? = '' OR x.inventory_item_code = ?)
+        UNION ALL
+        SELECT (xcmd.pegs * xcmd.quantity) AS quantity
+        FROM xxafmc_cocktails_mocktails_details xcmd
+        WHERE (
+            (? <> '' AND xcmd.inventory_item_code = ?)
+            OR
+            (? = '' AND xcmd.inventory_item_code IN (
+              SELECT item_id FROM xxafmc_order_details WHERE order_id = ?
+            ))
+          )
+          AND xcmd.item_code = ?
+          AND NOT EXISTS (
+            SELECT 1
+            FROM xxafmc_custom_cocktails_mocktails_details x
+            WHERE x.inventory_item_code = xcmd.inventory_item_code
+              AND x.order_number = ?
+          )
         UNION ALL
         SELECT (CASE WHEN xo.type = 'Large' THEN 2 ELSE 1 END * xo.quantity) AS quantity 
         FROM xxafmc_order_details xo JOIN xxafmc_inventory xi ON xi.item_code = xo.item_id 
         WHERE xo.order_id = ? AND xi.unit_price IS NOT NULL AND xi.item_code = ?
       ) a`,
-      [ORDERNUMBER, scanItemCode, ORDERNUMBER, scanItemCode, ORDERNUMBER, scanItemCode]);
+      [
+        ORDERNUMBER,
+        scanItemCode,
+        forcedParentItem,
+        forcedParentItem,
+        ORDERNUMBER,
+        scanItemCode,
+        forcedParentItem,
+        forcedParentItem,
+        forcedParentItem,
+        forcedParentItem,
+        forcedParentItem,
+        ORDERNUMBER,
+        scanItemCode,
+        ORDERNUMBER,
+        forcedParentItem,
+        ORDERNUMBER,
+        scanItemCode,
+      ]);
 
     const orderedQty = Number(orderQtyRows[0]?.total_quantity || 0);
 
@@ -564,17 +657,56 @@ exports.processBarcodeScan = async (req, res) => {
         SELECT DISTINCT x.item_code, x.item_name, (x.pegs*x.quantity) AS quantity, x.inventory_item_code, 'MO' AS Mix
         FROM xxafmc_custom_cocktails_mocktails_details x JOIN xxafmc_order_details xo ON x.inventory_item_code = xo.item_id
         WHERE x.order_number = ? AND x.item_code = ?
+          AND (? = '' OR x.inventory_item_code = ?)
         UNION ALL
         SELECT DISTINCT x.item_code, x.item_name, (x.pegs*x.quantity) AS quantity, x.inventory_item_code, 'MO' AS Mix
         FROM xxafmc_custom_cocktails_mocktails_details_dummy x JOIN xxafmc_order_details xo ON x.inventory_item_code = xo.item_id
         WHERE x.order_number = ? AND x.item_code = ?
+          AND (? = '' OR x.inventory_item_code = ?)
+        UNION ALL
+        SELECT DISTINCT xcmd.item_code, xcmd.item_name, (xcmd.pegs * xcmd.quantity) AS quantity,
+               xcmd.inventory_item_code, 'MO' AS Mix
+        FROM xxafmc_cocktails_mocktails_details xcmd
+        WHERE (
+            (? <> '' AND xcmd.inventory_item_code = ?)
+            OR
+            (? = '' AND xcmd.inventory_item_code IN (
+              SELECT item_id FROM xxafmc_order_details WHERE order_id = ?
+            ))
+          )
+          AND xcmd.item_code = ?
+          AND NOT EXISTS (
+            SELECT 1
+            FROM xxafmc_custom_cocktails_mocktails_details x
+            WHERE x.inventory_item_code = xcmd.inventory_item_code
+              AND x.order_number = ?
+          )
         UNION ALL
         SELECT xi.item_code, xi.item_name, (CASE WHEN xo.type='Large' THEN 2 ELSE 1 END * xo.quantity) AS quantity,
                CAST(xo.ITEM_ID AS CHAR) AS inventory_item_code, 'I' AS Mix
         FROM xxafmc_order_details xo JOIN xxafmc_inventory xi ON xi.item_code = xo.ITEM_ID
         WHERE xo.order_id = ? AND xi.UNIT_PRICE IS NOT NULL AND xi.item_code = ?
       ) A`,
-      [ORDERNUMBER, scanItemCode, ORDERNUMBER, scanItemCode, ORDERNUMBER, scanItemCode]);
+      [
+        ORDERNUMBER,
+        scanItemCode,
+        forcedParentItem,
+        forcedParentItem,
+        ORDERNUMBER,
+        scanItemCode,
+        forcedParentItem,
+        forcedParentItem,
+        forcedParentItem,
+        forcedParentItem,
+        forcedParentItem,
+        ORDERNUMBER,
+        scanItemCode,
+        ORDERNUMBER,
+        forcedParentItem,
+        ORDERNUMBER,
+        ORDERNUMBER,
+        scanItemCode,
+      ]);
 
     const currentScanned = req.session[sessionKey] || [];
 
@@ -646,7 +778,11 @@ exports.processBarcodeScan = async (req, res) => {
   } catch (error) {
     if (connection) await connection.rollback();
     console.error("Barcode scan error:", error);
-    return res.status(500).json({ success: false, message: "Failed to process scan" });
+    return res.status(500).json({
+      success: false,
+      message: "Failed to process scan",
+      error: error?.message || String(error),
+    });
   } finally {
     if (connection) connection.release();
   }
