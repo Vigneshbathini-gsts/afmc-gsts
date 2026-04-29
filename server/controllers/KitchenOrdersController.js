@@ -459,17 +459,17 @@ exports.processBarcodeScan = async (req, res) => {
     // If PARENT_ITEM is provided, cap is calculated only for that cocktail/mocktail item.
     const [orderQtyRows] = await connection.query(`
       SELECT SUM(quantity) AS total_quantity FROM (
-        SELECT (x.pegs * x.quantity) AS quantity FROM xxafmc_custom_cocktails_mocktails_details x 
+        SELECT (COALESCE(x.pegs, 1) * COALESCE(x.quantity, 0)) AS quantity FROM xxafmc_custom_cocktails_mocktails_details x 
         JOIN xxafmc_order_details xo ON x.inventory_item_code = xo.item_id 
         WHERE x.order_number = ? AND x.item_code = ?
           AND (? = '' OR x.inventory_item_code = ?)
         UNION ALL
-        SELECT (x.pegs * x.quantity) AS quantity FROM xxafmc_custom_cocktails_mocktails_details_dummy x 
+        SELECT (COALESCE(x.pegs, 1) * COALESCE(x.quantity, 0)) AS quantity FROM xxafmc_custom_cocktails_mocktails_details_dummy x 
         JOIN xxafmc_order_details xo ON x.inventory_item_code = xo.item_id 
         WHERE x.order_number = ? AND x.item_code = ?
           AND (? = '' OR x.inventory_item_code = ?)
         UNION ALL
-        SELECT (xcmd.pegs * xcmd.quantity) AS quantity
+        SELECT (COALESCE(xcmd.pegs, 1) * COALESCE(xcmd.quantity, 0)) AS quantity
         FROM xxafmc_cocktails_mocktails_details xcmd
         WHERE (
             (? <> '' AND xcmd.inventory_item_code = ?)
@@ -486,9 +486,9 @@ exports.processBarcodeScan = async (req, res) => {
               AND x.order_number = ?
           )
         UNION ALL
-        SELECT (CASE WHEN xo.type = 'Large' THEN 2 ELSE 1 END * xo.quantity) AS quantity 
-        FROM xxafmc_order_details xo JOIN xxafmc_inventory xi ON xi.item_code = xo.item_id 
-        WHERE xo.order_id = ? AND xi.unit_price IS NOT NULL AND xi.item_code = ?
+        SELECT (CASE WHEN xo.type = 'Large' THEN 2 ELSE 1 END * COALESCE(xo.quantity, 0)) AS quantity 
+        FROM xxafmc_order_details xo 
+        WHERE xo.order_id = ? AND xo.item_id = ?
       ) a`,
       [
         ORDERNUMBER,
@@ -505,7 +505,6 @@ exports.processBarcodeScan = async (req, res) => {
         ORDERNUMBER,
         scanItemCode,
         ORDERNUMBER,
-        forcedParentItem,
         ORDERNUMBER,
         scanItemCode,
       ]);
@@ -682,10 +681,10 @@ exports.processBarcodeScan = async (req, res) => {
               AND x.order_number = ?
           )
         UNION ALL
-        SELECT xi.item_code, xi.item_name, (CASE WHEN xo.type='Large' THEN 2 ELSE 1 END * xo.quantity) AS quantity,
+        SELECT COALESCE(xi.item_code, xo.ITEM_ID) AS item_code, COALESCE(xi.item_name, 'Unknown') AS item_name, (CASE WHEN xo.type='Large' THEN 2 ELSE 1 END * xo.quantity) AS quantity,
                CAST(xo.ITEM_ID AS CHAR) AS inventory_item_code, 'I' AS Mix
-        FROM xxafmc_order_details xo JOIN xxafmc_inventory xi ON xi.item_code = xo.ITEM_ID
-        WHERE xo.order_id = ? AND xi.UNIT_PRICE IS NOT NULL AND xi.item_code = ?
+        FROM xxafmc_order_details xo LEFT JOIN xxafmc_inventory xi ON xi.item_code = xo.ITEM_ID
+        WHERE xo.order_id = ? AND xo.item_id = ?
       ) A`,
       [
         ORDERNUMBER,
@@ -702,12 +701,9 @@ exports.processBarcodeScan = async (req, res) => {
         ORDERNUMBER,
         scanItemCode,
         ORDERNUMBER,
-        forcedParentItem,
-        ORDERNUMBER,
         ORDERNUMBER,
         scanItemCode,
       ]);
-
     const currentScanned = req.session[sessionKey] || [];
 
     let componentsWithRemaining = componentRows
