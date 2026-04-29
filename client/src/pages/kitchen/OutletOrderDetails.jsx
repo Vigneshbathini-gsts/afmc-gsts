@@ -50,6 +50,7 @@ export default function OutletOrderDetails() {
 
   const [scannedCocktailData, setScannedCocktailData] = useState(null);
   const [showCocktailModal, setShowCocktailModal] = useState(false);
+  const [activeRecipeParentItem, setActiveRecipeParentItem] = useState("");
 
   const scannerRef = useRef(null);
   const hasScannedRef = useRef(false);
@@ -180,6 +181,7 @@ export default function OutletOrderDetails() {
       BARCODE: scannedBarcode,
       QUANTITY: qty || 1,
       KITCHEN: department,
+      PARENT_ITEM: activeRecipeParentItem || "",
     });
 
     const scanData = res.data?.data || {};
@@ -198,6 +200,8 @@ export default function OutletOrderDetails() {
 
       // Cocktail modal
       if (scanData.isCocktailIngredient && Array.isArray(scanData.addedThisScan) && scanData.addedThisScan.length > 0) {
+        const parent = String(scanData.addedThisScan?.[0]?.parentItem || "").trim();
+        if (parent) setActiveRecipeParentItem(parent);
         setScannedCocktailData({
           name: scanData.itemName || "Cocktail",
           ingredients: scanData.addedThisScan.map(ing => ({
@@ -219,11 +223,20 @@ export default function OutletOrderDetails() {
     } 
     // Backend returned error (400, etc.)
     else {
-      setScanError(scanData.message || res.data?.message || "Scan failed");
+      const message = scanData.message || res.data?.message || "Scan failed";
+      setScanError(message);
+      if (
+        typeof message === "string" &&
+        (message.toLowerCase().includes("morethan order quantity") ||
+          message.toLowerCase().includes("duplicate bottle scan") ||
+          message.toLowerCase().includes("morethen stock"))
+      ) {
+        window.alert(message);
+      }
     }
 
   } catch (error) {
-    const errMsg = error.response?.data?.message || error.message || "Failed to process scan.";
+    const errMsg = error.response?.data?.error || error.response?.data?.message || error.message || "Failed to process scan.";
     setScanError(errMsg);
     console.error("Process Scan Error:", error);
   } finally {
@@ -236,7 +249,7 @@ export default function OutletOrderDetails() {
       }
     }, 4000);
   }
-}, [orderData, department, qty]);
+}, [orderData, department, qty, activeRecipeParentItem]);
 
   const startScanner = async () => {
     try {
@@ -349,6 +362,7 @@ export default function OutletOrderDetails() {
       name: cocktail?.ITEM_NAME || item.ITEM_NAME,
       ingredients,
     });
+    setActiveRecipeParentItem(String(item.ITEM_ID || "").trim());
     setShowCocktailModal(true);
   } catch (error) {
     console.error("Error fetching cocktail details:", error);
