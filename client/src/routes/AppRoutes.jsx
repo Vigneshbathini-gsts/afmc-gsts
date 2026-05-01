@@ -45,6 +45,7 @@ import AttendantPayment from "../pages/attendant/Payment";
 import AttendantInvoice from "../pages/attendant/Invoice";
 import AttendantActiveOrders from "../pages/attendant/ActiveOrders";
 import AttendantOrderStatus from "../pages/attendant/OrderStatus";
+import AttendantMenuDashboard from "../pages/attendant/MenuDashboard";
 
 // User Pages
 import UserDashboard from "../pages/user/Dashboard";
@@ -150,7 +151,7 @@ export default function AppRoutes() {
         }
       >
         <Route path="dashboard" element={<AttendantDashboard />} />
-        <Route path="menudash" element={<MenuDashboard />} />
+        <Route path="menudash" element={<AttendantMenuDashboard />} />
         <Route path="register-member" element={<RegisterMember />} />
         <Route path="cart" element={<AttendantCart />} />
         <Route path="confirm-order" element={<AttendantConfirmOrder />} />

@@ -7,7 +7,7 @@ export default function KitchenOrderBell({ kitchen = "Bar" }) {
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef(null);
 
-  // ✅ Fetch Orders
+
   const fetchOrders = async () => {
     try {
       const res = await barOrdersAPI.getActiveOrders();

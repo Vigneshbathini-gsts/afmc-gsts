@@ -27,13 +27,10 @@ const KitchenOrderHistory = () => {
   const [loading, setLoading] = useState(false);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-
   const [orderItemDetails, setOrderItemDetails] = useState({});
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
-
   const rowsPerPage = 10;
-
   // Set default dates (Today) when component mounts
   useEffect(() => {
     const today = new Date().toISOString().split('T')[0];
@@ -44,7 +41,6 @@ const KitchenOrderHistory = () => {
     // Fetch orders immediately with today's date
     fetchOrderHistory(today, today);
   }, []);
-
   // Fetch orders from API (only dates)
   const fetchOrderHistory = async (startDate, endDate, page = 1) => {
     setLoading(true);
@@ -53,7 +49,6 @@ const KitchenOrderHistory = () => {
         page,
         limit: rowsPerPage,
       };
-
       if (startDate) params.fromDate = startDate;
       if (endDate) params.toDate = endDate;
 
@@ -69,7 +64,6 @@ const KitchenOrderHistory = () => {
       } else if (response?.data && Array.isArray(response.data)) {
         ordersData = response.data;
       }
-
       setOrders(ordersData);
     } catch (error) {
       console.error('Error fetching order history:', error);
@@ -79,7 +73,6 @@ const KitchenOrderHistory = () => {
       setLoading(false);
     }
   };
-
   // Handle search/apply button click
   const handleApplyFilters = () => {
     setFromDate(tempFromDate);
@@ -88,7 +81,6 @@ const KitchenOrderHistory = () => {
     setCurrentPage(1);
     setSearchTerm(''); // Optional: clear search on new date filter
   };
-
   // Handle reset button click
   const handleReset = () => {
     const today = new Date().toISOString().split('T')[0];
@@ -100,11 +92,9 @@ const KitchenOrderHistory = () => {
     fetchOrderHistory(today, today, 1);
     setCurrentPage(1);
   };
-
   // Frontend Search Filter (Order Num, Customer Name, Phone)
   const filteredAndSearchedOrders = useMemo(() => {
     let result = [...orders];
-
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase().trim();
       result = result.filter(order =>
@@ -113,15 +103,12 @@ const KitchenOrderHistory = () => {
         (order.phone_number && order.phone_number.toLowerCase().includes(term))
       );
     }
-
     return result;
   }, [orders, searchTerm]);
-
   // Update displayed orders
   useEffect(() => {
     setFilteredOrders(filteredAndSearchedOrders);
   }, [filteredAndSearchedOrders]);
-
   // Pagination
   const totalPages = Math.ceil(filteredOrders.length / rowsPerPage);
   const safeTotalPages = Math.max(1, totalPages || 0);
@@ -159,7 +146,6 @@ const KitchenOrderHistory = () => {
       } else if (Array.isArray(response?.data)) {
         details = response.data;
       }
-
       setOrderItemDetails(prev => ({
         ...prev,
         [orderNumber]: { items: details, summary }

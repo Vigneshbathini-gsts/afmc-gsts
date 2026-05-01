@@ -8,7 +8,6 @@ const toInitCap = (str) => {
   if (typeof str !== "string") str = String(str);
   return str.toLowerCase().replace(/\b\w/g, (char) => char.toUpperCase());
 };
-
 const getStatusClassName = (status) => {
   const normalizedStatus = String(status || "").toLowerCase();
 
@@ -45,9 +44,7 @@ export default function OrderDetailsModal({ isOpen, onClose, orderNumber }) {
 
     fetchOrderDetails();
   }, [isOpen, orderNumber]);
-
   if (!isOpen) return null;
-
   return (
     <div className="fixed inset-0 bg-black/40 z-[100] flex items-center justify-center px-4">
       <div className="bg-white w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl p-6 relative animate-fadeIn">
@@ -73,7 +70,6 @@ export default function OrderDetailsModal({ isOpen, onClose, orderNumber }) {
             </p>
           </div>
         </div>
-
         {/* Content */}
         {loading ? (
           <div className="text-center py-10 text-gray-500">Loading...</div>

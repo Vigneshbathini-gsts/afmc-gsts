@@ -26,13 +26,11 @@ const KitchenCancelledOrder = () => {
     const [loading, setLoading] = useState(false);
     const [loadingDetails, setLoadingDetails] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
-
     const [orderItemDetails, setOrderItemDetails] = useState({});
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [modalOpen, setModalOpen] = useState(false);
 
     const rowsPerPage = 10;
-
     // Set default dates (Today) when component mounts
     useEffect(() => {
         const today = new Date().toISOString().split('T')[0];
