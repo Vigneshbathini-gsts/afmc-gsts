@@ -239,7 +239,9 @@ exports.updateOffer = async (req, res) => {
 exports.getAllItemsForOffer = async (req, res) => {
   try {
     const [items] = await db.query(`
-      SELECT item_code, item_name FROM xxafmc_inventory ORDER BY item_name
+      SELECT DISTINCT item_code, item_name 
+      FROM xxafmc_inventory 
+      ORDER BY item_name
     `);
 
     res.status(200).json({

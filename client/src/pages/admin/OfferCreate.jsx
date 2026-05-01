@@ -33,6 +33,15 @@ export default function OfferCreate() {
     return `${year}-${month}-${day}`;
   };
 
+  // Helper function to get today's date in YYYY-MM-DD format
+  // const getTodayDate = () => {
+  //   const today = new Date();
+  //   const year = today.getFullYear();
+  //   const month = String(today.getMonth() + 1).padStart(2, '0');
+  //   const day = String(today.getDate()).padStart(2, '0');
+  //   return `${year}-${month}-${day}`;
+  // };
+
   const [formData, setFormData] = useState({
     itemCode: "",
     itemName: "",
@@ -40,7 +49,7 @@ export default function OfferCreate() {
     freeItemCode: "",
     freeItemName: "",
     freeItemQuantity: "",
-    offerDate: getTodayDate(),
+    offerDate: getTodayDate(), // Set default to today's date
     message: "",
   });
 
@@ -276,27 +285,27 @@ return (
               <FaChevronDown className="text-gray-400 text-sm" />
             </button>
 
-            {showItemDropdown && (
-              <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg max-h-56 overflow-y-auto">
-                {loadingItems ? (
-                  <div className="px-3 py-2 text-xs text-gray-500">Loading items...</div>
-                ) : items.length === 0 ? (
-                  <div className="px-3 py-2 text-xs text-gray-500">No items found</div>
-                ) : (
-                  items.map((item) => (
-                    <button
-                      key={item.item_code}
-                      type="button"
-                      onClick={() => handleSelectItem(item)}
-                      className="w-full text-left px-3 py-2 hover:bg-afmc-maroon/5 transition border-b border-gray-100 last:border-b-0"
-                    >
-                      <p className="font-medium text-gray-800 text-sm">{item.item_name}</p>
-                    </button>
-                  ))
-                )}
-              </div>
-            )}
-          </div>
+              {showItemDropdown && (
+                <div className="absolute z-20 mt-2 w-full bg-white border border-gray-200 rounded-2xl shadow-xl max-h-64 overflow-y-auto">
+                  {loadingItems ? (
+                    <div className="px-4 py-3 text-sm text-gray-500">Loading items...</div>
+                  ) : items.length === 0 ? (
+                    <div className="px-4 py-3 text-sm text-gray-500">No items found</div>
+                  ) : (
+                    items.map((item) => (
+                      <button
+                        key={item.item_code}
+                        type="button"
+                        onClick={() => handleSelectItem(item)}
+                        className="w-full text-left px-4 py-3 hover:bg-afmc-maroon/5 transition border-b border-gray-100 last:border-b-0"
+                      >
+                        <p className="font-medium text-gray-800">{item.item_name}</p>
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
 
           {/* Item Quantity */}
           <div>
