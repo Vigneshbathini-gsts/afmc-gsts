@@ -134,9 +134,10 @@ export default function OutletOrderDetails() {
 
   // Helper function to get scanned quantity for an item
   const getScannedQuantityByItemCode = useCallback((itemCode) => {
+    const normalizedItemCode = String(itemCode ?? "").trim();
     return scannedItems
-      .filter(item => item.itemCode === itemCode)
-      .reduce((sum, item) => sum + item.scanQuantity, 0);
+      .filter(item => String(item.itemCode ?? "").trim() === normalizedItemCode)
+      .reduce((sum, item) => sum + Number(item.scanQuantity || 0), 0);
   }, [scannedItems]);
 
   const handleBarcodeBlur = async () => {
@@ -389,7 +390,7 @@ export default function OutletOrderDetails() {
   // Complete order
   const handleCompleteOrder = async () => {
     const totalOrderedQty = items.reduce((sum, item) => sum + (item.quantity || 0), 0);
-    const totalScannedQty = scannedItems.reduce((sum, item) => sum + item.scanQuantity, 0);
+    const totalScannedQty = scannedItems.reduce((sum, item) => sum + Number(item.scanQuantity || 0), 0);
 
     if (totalScannedQty < totalOrderedQty) {
       alert(`Cannot complete order. Only ${totalScannedQty} of ${totalOrderedQty} items scanned.`);
@@ -451,7 +452,7 @@ export default function OutletOrderDetails() {
   };
 
   const totalOrderedQty = items.reduce((sum, item) => sum + (item.quantity || 0), 0);
-  const totalScannedQty = scannedItems.reduce((sum, item) => sum + item.scanQuantity, 0);
+  const totalScannedQty = scannedItems.reduce((sum, item) => sum + Number(item.scanQuantity || 0), 0);
   const isComplete = totalScannedQty >= totalOrderedQty && totalOrderedQty > 0;
 
   if (!orderData) {

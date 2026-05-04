@@ -1,16 +1,55 @@
 const pool = require("../config/db");
 
+const getRequestUsername = (req) =>
+  String(req.user?.username || req.user?.user_name || req.body?.appUser || "").trim();
+
+const getSessionUserKey = (req) => getRequestUsername(req) || "unknown";
+
+const getScanSessionKey = (req, orderNumber) =>
+  `scannedItems_${orderNumber}_${getSessionUserKey(req)}`;
+
+const normalizeKitchen = (value) => {
+  const kitchen = String(value || "Bar").trim().toLowerCase();
+  return kitchen === "kitchen" ? "Kitchen" : "Bar";
+};
+
+const getKitchenConfig = (value) => {
+  const kitchen = normalizeKitchen(value);
+  const isBar = kitchen === "Bar";
+
+  return {
+    kitchen,
+    categoryId: isBar ? 10 : 14,
+    handledByField: isBar ? "handled_by_bar" : "handled_by_kitchen",
+  };
+};
+
+const sameCode = (left, right) => String(left ?? "").trim() === String(right ?? "").trim();
+
+const saveSession = (req) =>
+  new Promise((resolve, reject) => {
+    if (!req.session?.save) return resolve();
+    req.session.save((err) => (err ? reject(err) : resolve()));
+  });
+
+const inventorySummarySql = `
+  SELECT
+    item_code,
+    MAX(item_name) AS item_name,
+    MAX(category_id) AS category_id,
+    MAX(sub_category) AS sub_category,
+    MAX(profit) AS profit,
+    MAX(non_member_profit) AS non_member_profit,
+    MAX(pr_charges) AS pr_charges,
+    MAX(food_pr_charges) AS food_pr_charges
+  FROM xxafmc_inventory
+  GROUP BY item_code
+`;
+
 exports.getOrders = async (req, res) => {
   try {
-    const appUser = req.user?.user_name || req.user?.username || "";
-    const kitchen = req.query.kitchen || "Bar";
-
-    const isBar = kitchen === "Bar";
-
-    const categoryName = isBar ? "Liquor" : "Snacks";
-    const handledByColumn = isBar
-      ? "a.HANDLED_BY_bar"
-      : "a.HANDLED_BY_kitchen";
+    const appUser = getRequestUsername(req);
+    const { categoryId, handledByField } = getKitchenConfig(req.query.kitchen);
 
     // console.log(`Fetching ${kitchen} orders for user: ${appUser}`);
 
@@ -22,29 +61,39 @@ exports.getOrders = async (req, res) => {
           MAX(
             COALESCE(
               (SELECT xnm.FIRST_NAME FROM xxafmc_non_members xnm WHERE xnm.ID = oh.member_id),
-              (SELECT xu2.FIRST_NAME FROM xxafmc_users xu2 WHERE xu2.user_id = oh.user_id)
+              (SELECT xu2.FIRST_NAME FROM xxafmc_users xu2 WHERE xu2.user_id = oh.user_id),
+              (SELECT xu4.FIRST_NAME FROM xxafmc_users xu4 WHERE xu4.user_id = a.user_name),
+              CONCAT('Order ', a.ordernumber)
             )
           ) AS FIRST_NAME,
 
-          MAX(a.STATUS) AS STATUS,
-          MAX(a.STATUS) AS Status1,
+          CASE
+            WHEN SUM(CASE WHEN a.STATUS = 'Received' THEN 1 ELSE 0 END) > 0 THEN 'Received'
+            WHEN SUM(CASE WHEN a.STATUS = 'Preparing' THEN 1 ELSE 0 END) > 0 THEN 'Preparing'
+            WHEN SUM(CASE WHEN a.STATUS = 'Completed' THEN 1 ELSE 0 END) > 0 THEN 'Completed'
+            ELSE MAX(a.STATUS)
+          END AS STATUS,
 
-          MAX(
-            CASE
-              WHEN a.STATUS = 'Completed' THEN '3-green'
-              WHEN a.STATUS = 'Preparing' THEN '2-red'
-              WHEN a.STATUS = 'Received' THEN '1-yellow'
-            END
-          ) AS COLOR,
+          CASE
+            WHEN SUM(CASE WHEN a.STATUS = 'Received' THEN 1 ELSE 0 END) > 0 THEN 'Received'
+            WHEN SUM(CASE WHEN a.STATUS = 'Preparing' THEN 1 ELSE 0 END) > 0 THEN 'Preparing'
+            WHEN SUM(CASE WHEN a.STATUS = 'Completed' THEN 1 ELSE 0 END) > 0 THEN 'Completed'
+            ELSE MAX(a.STATUS)
+          END AS Status1,
 
-          MAX(
-            CASE
-              WHEN a.STATUS = 'Completed' THEN 3
-              WHEN a.STATUS = 'Preparing' THEN 2
-              WHEN a.STATUS = 'Received' THEN 1
-              ELSE 4
-            END
-          ) AS seq,
+          CASE
+            WHEN SUM(CASE WHEN a.STATUS = 'Received' THEN 1 ELSE 0 END) > 0 THEN '1-yellow'
+            WHEN SUM(CASE WHEN a.STATUS = 'Preparing' THEN 1 ELSE 0 END) > 0 THEN '2-red'
+            WHEN SUM(CASE WHEN a.STATUS = 'Completed' THEN 1 ELSE 0 END) > 0 THEN '3-green'
+            ELSE '4-grey'
+          END AS COLOR,
+
+          CASE
+            WHEN SUM(CASE WHEN a.STATUS = 'Received' THEN 1 ELSE 0 END) > 0 THEN 1
+            WHEN SUM(CASE WHEN a.STATUS = 'Preparing' THEN 1 ELSE 0 END) > 0 THEN 2
+            WHEN SUM(CASE WHEN a.STATUS = 'Completed' THEN 1 ELSE 0 END) > 0 THEN 3
+            ELSE 4
+          END AS seq,
 
           MAX(a.NOTIFICATION_ID) AS NOTIFICATION_ID,
           MAX(a.CREATION_DATE) AS CREATION_DATE,
@@ -59,46 +108,44 @@ exports.getOrders = async (req, res) => {
           MAX(a.handled_by_bar) AS Handled_by_bar,
           MAX(a.handled_by_kitchen) AS Handled_by_kitchen,
 
-          MAX(
-            CASE
-              WHEN a.STATUS = 'Received' THEN 'Y'
-              ELSE 'N'
-            END
-          ) AS CAN_CANCEL,
+          CASE
+            WHEN SUM(CASE WHEN a.STATUS = 'Received' THEN 1 ELSE 0 END) > 0 THEN 'Y'
+            ELSE 'N'
+          END AS CAN_CANCEL,
 
-          MAX(
-            CASE
-              WHEN a.STATUS IN ('Received','Preparing') THEN 'Y'
-              ELSE 'N'
-            END
-          ) AS CAN_NAVIGATE
+          CASE
+            WHEN SUM(CASE WHEN a.STATUS IN ('Received','Preparing') THEN 1 ELSE 0 END) > 0 THEN 'Y'
+            ELSE 'N'
+          END AS CAN_NAVIGATE
 
         FROM xxafmc_kitchen_notification a
-        JOIN xxafmc_inventory inv ON a.item_id = inv.item_code
-        JOIN xxafmc_categories ct ON inv.category_id = ct.category_id
-        JOIN xxafmc_users xu ON a.user_name = xu.user_id
-        JOIN xxafmc_order_header oh ON a.ordernumber = oh.order_num
+        JOIN (${inventorySummarySql}) inv ON a.item_id = inv.item_code
+        LEFT JOIN xxafmc_order_header oh ON a.ordernumber = oh.order_num
 
-        WHERE ct.category_name = ?
+        WHERE inv.category_id = ?
           AND (
             a.STATUS IN ('Received','Completed')
             OR (
-              a.STATUS IN ('Received','Preparing')
-              AND ${handledByColumn} = (
-                SELECT xu3.FIRST_NAME
-                FROM xxafmc_users xu3
-                WHERE LOWER(xu3.user_name) = LOWER(?)
+              a.STATUS = 'Preparing'
+              AND (
+                TRIM(IFNULL(a.${handledByField}, '')) = ''
+                OR a.${handledByField} = (
+                  SELECT xu3.FIRST_NAME
+                  FROM xxafmc_users xu3
+                  WHERE LOWER(xu3.user_name) = LOWER(?)
+                  LIMIT 1
+                )
               )
             )
           )
 
-        GROUP BY a.ordernumber, a.status
+        GROUP BY a.ordernumber
 
       ) tbl
       ORDER BY seq ASC, ORDERNUMBER DESC
     `;
 
-    const [rows] = await pool.query(query, [categoryName, appUser]);
+    const [rows] = await pool.query(query, [categoryId, appUser]);
     // console.log(rows);
     res.status(200).json(rows);
 
@@ -115,7 +162,7 @@ exports.updateBarOrderStatus = async (req, res) => {
   let connection;
   try {
     const { ORDERNUMBER, KITCHEN = "Bar", STATUS = "Preparing" } = req.body;
-    const appUser = req.user?.username || req.body.appUser || "";
+    const appUser = getRequestUsername(req);
 
     if (!ORDERNUMBER) {
       return res.status(400).json({
@@ -137,15 +184,14 @@ exports.updateBarOrderStatus = async (req, res) => {
     }
 
     const handledBy = userRows[0].first_name;
-    const handledByField = KITCHEN === "Bar" ? "handled_by_bar" : "handled_by_kitchen";
-    const categoryName = KITCHEN === "Bar" ? "Liquor" : "Snacks";
+    const { categoryId, handledByField } = getKitchenConfig(KITCHEN);
     const normalizedStatus = String(STATUS || "Preparing").trim();
 
     let result;
 
     if (normalizedStatus === "Completed") {
       // First, get scanned items from session and insert into database
-      const sessionKey = `scannedItems_${ORDERNUMBER}_${req.user?.username || 'unknown'}`;
+      const sessionKey = getScanSessionKey(req, ORDERNUMBER);
       const scannedItems = req.session[sessionKey] || [];
 
       connection = await pool.getConnection();
@@ -194,34 +240,41 @@ exports.updateBarOrderStatus = async (req, res) => {
       [result] = await connection.query(
         `
         UPDATE xxafmc_kitchen_notification a
-        JOIN xxafmc_inventory inv ON a.item_id = inv.item_code
-        JOIN xxafmc_categories ct ON inv.category_id = ct.category_id
         SET a.status = 'Completed'
         WHERE a.ordernumber = ?
           AND a.status IN ('Received', 'Preparing')
-          AND ct.category_name = ?
+          AND EXISTS (
+            SELECT 1
+            FROM (${inventorySummarySql}) inv
+            WHERE inv.item_code = a.item_id
+              AND inv.category_id = ?
+          )
         `,
-        [ORDERNUMBER, categoryName]
+        [ORDERNUMBER, categoryId]
       );
 
       await connection.commit();
 
       // Clear the session only after commit succeeds.
       delete req.session[sessionKey];
+      await saveSession(req);
     } else {
       [result] = await pool.query(
         `
         UPDATE xxafmc_kitchen_notification a
-        JOIN xxafmc_inventory inv ON a.item_id = inv.item_code
-        JOIN xxafmc_categories ct ON inv.category_id = ct.category_id
         SET
           a.status = 'Preparing',
           a.${handledByField} = ?
         WHERE a.ordernumber = ?
           AND a.status = 'Received'
-          AND ct.category_name = ?
+          AND EXISTS (
+            SELECT 1
+            FROM (${inventorySummarySql}) inv
+            WHERE inv.item_code = a.item_id
+              AND inv.category_id = ?
+          )
         `,
-        [handledBy, ORDERNUMBER, categoryName]
+        [handledBy, ORDERNUMBER, categoryId]
       );
     }
 
@@ -254,15 +307,7 @@ exports.getOrderItems = async (req, res) => {
       return res.status(400).json({ success: false, message: "ORDERNUMBER is required" });
     }
 
-    let categoryFilter = "";
-    const params = [ORDERNUMBER];
-
-    if (KITCHEN === "Bar") {
-      categoryFilter = "AND xi.CATEGORY_ID = 10";
-    } else if (KITCHEN === "Kitchen") {
-      categoryFilter = "AND xi.CATEGORY_ID = 14";
-    }
-    // else → no filter (returns all)
+    const { categoryId } = getKitchenConfig(KITCHEN);
 
     const query = `
   SELECT 
@@ -281,29 +326,17 @@ exports.getOrderItems = async (req, res) => {
 
   FROM xxafmc_order_details xod
 
-  LEFT JOIN (
-    SELECT 
-      ITEM_CODE,
-      ITEM_NAME,
-      SUB_CATEGORY,
-      CATEGORY_ID,
-      ROW_NUMBER() OVER (
-        PARTITION BY ITEM_CODE 
-        ORDER BY (UNIT_PRICE IS NULL), UNIT_PRICE DESC, ITEM_NAME
-      ) as rn
-    FROM xxafmc_inventory
-  ) xi 
-    ON xod.ITEM_ID = xi.ITEM_CODE 
-   AND xi.rn = 1
+  LEFT JOIN (${inventorySummarySql}) xi
+    ON xod.ITEM_ID = xi.ITEM_CODE
 
   WHERE xod.ORDER_ID = ?
     AND (xod.ORDER_STATUS IS NULL OR xod.ORDER_STATUS = '')
-    ${categoryFilter}
+    AND xi.CATEGORY_ID = ?
 
   ORDER BY xod.ORDER_LINE_ID ASC;
 `;
 
-    const [rows] = await pool.query(query, [ORDERNUMBER]);
+    const [rows] = await pool.query(query, [ORDERNUMBER, categoryId]);
 
     const formattedData = rows.map((row) => ({
       ORDER_LINE_ID: row.ORDER_LINE_ID,
@@ -333,6 +366,7 @@ exports.getOrderItems = async (req, res) => {
 
 exports.processBarcodeScan = async (req, res) => {
   let connection;
+  let transactionCommitted = false;
   try {
     const { ORDERNUMBER, BARCODE, QUANTITY = 1, KITCHEN = "Bar", PARENT_ITEM } = req.body;
 
@@ -341,7 +375,8 @@ exports.processBarcodeScan = async (req, res) => {
     }
 
     const requestedQty = Number(QUANTITY) || 1;
-    const sessionKey = `scannedItems_${ORDERNUMBER}_${req.user?.username || 'unknown'}`;
+    const { kitchen } = getKitchenConfig(KITCHEN);
+    const sessionKey = getScanSessionKey(req, ORDERNUMBER);
 
     connection = await pool.getConnection();
     await connection.beginTransaction();
@@ -349,10 +384,12 @@ exports.processBarcodeScan = async (req, res) => {
     // STEP 1: Get item details
     const [itemRows] = await connection.query(`
       SELECT xso.ITEM_CODE, xso.STOCK_QUANTITY, xso.UNIT_PRICE, xso.\`A/C_UNIT\` AS ac_unit,
-             xso.PEGS, xi.CATEGORY_ID, xi.ITEM_NAME, xi.SUB_CATEGORY,
-             xi.PROFIT, xi.NON_MEMBER_PROFIT, xi.PR_CHARGES, xi.FOOD_PR_CHARGES
+             xso.PEGS, xi.category_id AS CATEGORY_ID, xi.item_name AS ITEM_NAME,
+             xi.sub_category AS SUB_CATEGORY, xi.profit AS PROFIT,
+             xi.non_member_profit AS NON_MEMBER_PROFIT, xi.pr_charges AS PR_CHARGES,
+             xi.food_pr_charges AS FOOD_PR_CHARGES
       FROM xxafmc_stock_out xso
-      LEFT JOIN xxafmc_inventory xi ON xso.ITEM_CODE = xi.ITEM_CODE
+      LEFT JOIN (${inventorySummarySql}) xi ON xso.ITEM_CODE = xi.item_code
       WHERE xso.BARCODE = ? LIMIT 1`, [BARCODE]);
 
     if (itemRows.length === 0) {
@@ -367,11 +404,11 @@ exports.processBarcodeScan = async (req, res) => {
 
     // Kitchen validation
     const categoryId = Number(item.CATEGORY_ID) || 0;
-    if (KITCHEN === "Bar" && categoryId === 14) {
+    if (kitchen === "Bar" && categoryId === 14) {
       await connection.rollback();
       return res.status(400).json({ success: false, message: "Scanned Barcode is for Kitchen" });
     }
-    if (KITCHEN === "Kitchen" && categoryId === 10) {
+    if (kitchen === "Kitchen" && categoryId === 10) {
       await connection.rollback();
       return res.status(400).json({ success: false, message: "Scanned Barcode is for Bar" });
     }
@@ -520,13 +557,13 @@ exports.processBarcodeScan = async (req, res) => {
     const scannedCollection = req.session[sessionKey] || [];
 
     const l_scan_item_qty = scannedCollection
-      .filter(s => Number(s.itemCode) === Number(scanItemCode))
+      .filter(s => sameCode(s.itemCode, scanItemCode))
       .reduce((sum, s) => sum + Number(s.scanQuantity || 0), 0);
 
     const l_total_scanned_qty = scannedCollection
-      .filter(s => Number(s.itemCode) === Number(scanItemCode) &&
+      .filter(s => sameCode(s.itemCode, scanItemCode) &&
         s.barcode === BARCODE &&
-        Number(s.parentItem) === Number(parentItem))
+        sameCode(s.parentItem, parentItem))
       .reduce((sum, s) => sum + Number(s.scanQuantity || 0), 0);
 
     const l_barcode_scanned_qty = scannedCollection.filter(s => s.barcode === BARCODE).length;
@@ -648,8 +685,6 @@ exports.processBarcodeScan = async (req, res) => {
       }
     }
 
-    await connection.commit();
-
     const [componentRows] = await connection.query(`
       SELECT item_code, item_name, quantity AS total_quantity, inventory_item_code, Mix
       FROM (
@@ -683,7 +718,7 @@ exports.processBarcodeScan = async (req, res) => {
         UNION ALL
         SELECT COALESCE(xi.item_code, xo.ITEM_ID) AS item_code, COALESCE(xi.item_name, 'Unknown') AS item_name, (CASE WHEN xo.type='Large' THEN 2 ELSE 1 END * xo.quantity) AS quantity,
                CAST(xo.ITEM_ID AS CHAR) AS inventory_item_code, 'I' AS Mix
-        FROM xxafmc_order_details xo LEFT JOIN xxafmc_inventory xi ON xi.item_code = xo.ITEM_ID
+        FROM xxafmc_order_details xo LEFT JOIN (${inventorySummarySql}) xi ON xi.item_code = xo.ITEM_ID
         WHERE xo.order_id = ? AND xo.item_id = ?
       ) A`,
       [
@@ -709,8 +744,8 @@ exports.processBarcodeScan = async (req, res) => {
     let componentsWithRemaining = componentRows
       .map(comp => {
         const already = currentScanned
-          .filter(s => Number(s.itemCode) === Number(comp.item_code) &&
-            Number(s.parentItem || s.itemCode) === Number(comp.inventory_item_code))
+          .filter(s => sameCode(s.itemCode, comp.item_code) &&
+            sameCode(s.parentItem || s.itemCode, comp.inventory_item_code))
           .reduce((sum, s) => sum + Number(s.scanQuantity || 0), 0);
         return { ...comp, coll_qty: Math.max(0, Number(comp.total_quantity) - already) };
       })
@@ -719,6 +754,7 @@ exports.processBarcodeScan = async (req, res) => {
 
     // CRITICAL: If nothing left to add → show exact Oracle error
     if (componentsWithRemaining.length === 0) {
+      await connection.rollback();
       return res.status(400).json({
         success: false,
         message: 'Error: Scanned Qty is morethan Order quantity'
@@ -758,6 +794,10 @@ exports.processBarcodeScan = async (req, res) => {
       reqQtyLeft -= qtyToAdd;
     }
 
+    await connection.commit();
+    transactionCommitted = true;
+    await saveSession(req);
+
     // Final Response - Only success if we actually added something
     return res.status(201).json({
       success: true,
@@ -767,12 +807,13 @@ exports.processBarcodeScan = async (req, res) => {
         itemName: item.ITEM_NAME,
         calculatedPrice,
         barcode: BARCODE,
+        isCocktailIngredient: addedThisScan.some((entry) => entry.isCocktailIngredient),
         addedThisScan
       }
     });
 
   } catch (error) {
-    if (connection) await connection.rollback();
+    if (connection && !transactionCommitted) await connection.rollback();
     console.error("Barcode scan error:", error);
     return res.status(500).json({
       success: false,
@@ -787,7 +828,7 @@ exports.processBarcodeScan = async (req, res) => {
 exports.getScannedItemsFromSession = async (req, res) => {
   try {
     const { orderNumber } = req.params;
-    const sessionKey = `scannedItems_${orderNumber}_${req.user?.username || 'unknown'}`;
+    const sessionKey = getScanSessionKey(req, orderNumber);
     const scannedItems = req.session[sessionKey] || [];
 
     return res.status(200).json({
@@ -807,8 +848,9 @@ exports.getScannedItemsFromSession = async (req, res) => {
 exports.clearScannedItemsFromSession = async (req, res) => {
   try {
     const { orderNumber } = req.params;
-    const sessionKey = `scannedItems_${orderNumber}_${req.user?.username || 'unknown'}`;
+    const sessionKey = getScanSessionKey(req, orderNumber);
     delete req.session[sessionKey];
+    await saveSession(req);
 
     return res.status(200).json({
       success: true,
@@ -1044,8 +1086,6 @@ exports.getCocktailDetailsById = async (req, res) => {
 
 
 exports.getCancelledOrders = async (req, res) => {
-  let connection;
-
   try {
     let { fromDate, toDate } = req.query;
 
@@ -1061,6 +1101,13 @@ exports.getCancelledOrders = async (req, res) => {
     const from = normalizeDate(fromDate);
     const to = normalizeDate(toDate);
 
+
+    const dateExpression = `
+      CASE 
+        WHEN xxkn.order_date LIKE '%/%' THEN STR_TO_DATE(xxkn.order_date, '%m/%d/%Y')
+        ELSE DATE(xxkn.order_date)
+      END
+    `;
 
     const query = `
       SELECT 
@@ -1084,16 +1131,10 @@ exports.getCancelledOrders = async (req, res) => {
           WHERE xod.order_id = xxkn.order_num
           GROUP BY xod.order_id
           HAVING COUNT(*) = COUNT(
-              CASE WHEN UPPER(xod.order_status) = 'CANCELLED' THEN 1 END
+              CASE WHEN TRIM(UPPER(IFNULL(xod.order_status, ''))) = 'CANCELLED' THEN 1 END
           )
       )
-      AND (
-        CASE 
-          WHEN xxkn.order_date LIKE '%/%' 
-            THEN STR_TO_DATE(xxkn.order_date, '%m/%d/%Y')
-          ELSE xxkn.order_date
-        END
-      ) BETWEEN COALESCE(?, CURDATE()) AND COALESCE(?, CURDATE())
+      AND ${dateExpression} BETWEEN COALESCE(?, CURDATE()) AND COALESCE(?, CURDATE())
       ORDER BY xxkn.order_num DESC
     `;
 
@@ -1118,8 +1159,6 @@ exports.getCancelledOrders = async (req, res) => {
       message: err.message || "Failed to fetch cancelled orders",
     });
 
-  } finally {
-    if (connection) await connection.close();
   }
 };
 
@@ -1147,6 +1186,13 @@ exports.getOrderHistory = async (req, res) => {
     const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
     const offset = (pageNum - 1) * limitNum;
 
+    const dateExpression = `
+      CASE
+        WHEN nm.order_date LIKE '%/%' THEN STR_TO_DATE(nm.order_date, '%m/%d/%Y')
+        ELSE DATE(nm.order_date)
+      END
+    `;
+
    const query = `
     SELECT 
   kn.ordernumber AS order_num,
@@ -1161,6 +1207,9 @@ exports.getOrderHistory = async (req, res) => {
   FORMAT(nm.order_total, 2) AS subtotal,
 
   CASE
+    WHEN SUM(CASE WHEN UPPER(kn.status) = 'CANCELLED' THEN 1 ELSE 0 END) = COUNT(*)
+    THEN 'CANCELLED'
+
     WHEN SUM(CASE WHEN UPPER(kn.status) = 'PREPARING' THEN 1 ELSE 0 END) > 0
          AND SUM(CASE WHEN UPPER(kn.status) = 'COMPLETED' THEN 1 ELSE 0 END) > 0
     THEN 'PARTIALLY COMPLETED'
@@ -1171,9 +1220,6 @@ exports.getOrderHistory = async (req, res) => {
 
     WHEN SUM(CASE WHEN UPPER(kn.status) IN ('COMPLETED','CANCELLED') THEN 1 ELSE 0 END) = COUNT(*)
     THEN 'COMPLETED'
-
-    WHEN SUM(CASE WHEN UPPER(kn.status) = 'CANCELLED' THEN 1 ELSE 0 END) = COUNT(*)
-    THEN 'CANCELLED'
 
     ELSE 'PREPARING'
   END AS status
@@ -1192,25 +1238,28 @@ LEFT JOIN xxafmc_users xu
 JOIN xxafmc_pubmed xp 
   ON xp.pubmed_id = nm.pubmed
 
-WHERE STR_TO_DATE(nm.order_date, '%m/%d/%Y') 
-      BETWEEN STR_TO_DATE(?, '%Y-%m-%d') 
-      AND STR_TO_DATE(?, '%Y-%m-%d')
+WHERE ${dateExpression} BETWEEN STR_TO_DATE(?, '%Y-%m-%d') AND STR_TO_DATE(?, '%Y-%m-%d')
 
 GROUP BY kn.ordernumber, nm.order_date, first_name, phone_number, xp.pubmed_name, nm.order_total
 
 HAVING 
-  SUM(CASE WHEN UPPER(kn.status) IN ('PREPARING','CANCELLED','RECEIVED') THEN 1 ELSE 0 END) < COUNT(*)
+  SUM(CASE WHEN UPPER(kn.status) = 'COMPLETED' THEN 1 ELSE 0 END) > 0
 
 ORDER BY kn.ordernumber DESC
 LIMIT ? OFFSET ?
 `;
 
     const countQuery = `
-      SELECT COUNT(DISTINCT nm.order_num) as total
-      FROM xxafmc_order_header nm
-      WHERE STR_TO_DATE(nm.order_date, '%m/%d/%Y') 
-            BETWEEN STR_TO_DATE(?, '%Y-%m-%d') 
-            AND STR_TO_DATE(?, '%Y-%m-%d')
+      SELECT COUNT(*) as total
+      FROM (
+        SELECT kn.ordernumber
+        FROM xxafmc_kitchen_notification kn
+        LEFT JOIN xxafmc_order_header nm 
+          ON nm.order_num = kn.ordernumber
+        WHERE ${dateExpression} BETWEEN STR_TO_DATE(?, '%Y-%m-%d') AND STR_TO_DATE(?, '%Y-%m-%d')
+        GROUP BY kn.ordernumber
+        HAVING SUM(CASE WHEN UPPER(kn.status) = 'COMPLETED' THEN 1 ELSE 0 END) > 0
+      ) history_orders
     `;
 
     const dateParams = [from, to];
@@ -1283,17 +1332,17 @@ exports.getOrderHistoryItemDetails = async (req, res) => {
         xo.last_updated_date,
         xo.last_updated_by,
 
-        --   item-level status (avoid duplicates)
-        MAX(xxkn.status) AS status
+        COALESCE(NULLIF(xo.order_status, ''), MAX(xxkn.status), 'Pending') AS status
 
       FROM xxafmc_order_details xo
 
-      JOIN xxafmc_inventory xi 
+      JOIN (${inventorySummarySql}) xi
         ON xo.item_id = xi.item_code
 
       --   critical join (same as APEX)
       LEFT JOIN xxafmc_kitchen_notification xxkn 
         ON xxkn.ordernumber = xo.order_id
+       AND xxkn.item_id = xo.item_id
 
       WHERE xo.order_id = ?
 
@@ -1370,18 +1419,20 @@ exports.getOrderDetailsByOrderNumber = async (req, res) => {
     const sql = `
       SELECT 
         xod.item_id,
-        xkn.item_name,
+        inv.item_name,
         xkn.status AS item_kitchen_status,
         xod.quantity,
         COALESCE(xod.type, 'NA') AS type,
         xod.order_status AS status,
         xkn.status AS kitchen_status
       FROM xxafmc_order_details xod
+      LEFT JOIN (${inventorySummarySql}) inv
+        ON inv.item_code = xod.item_id
       LEFT JOIN xxafmc_kitchen_notification xkn 
         ON xod.order_id = xkn.ordernumber 
         AND xod.item_id = xkn.item_id
       WHERE xod.order_id = ?
-      AND TRIM(UPPER(xod.order_status)) = 'CANCELLED'
+      AND TRIM(UPPER(IFNULL(xod.order_status, ''))) = 'CANCELLED'
     `;
 
     const [rows] = await connection.execute(sql, [orderNumber]);

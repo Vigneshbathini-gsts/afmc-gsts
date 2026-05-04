@@ -86,7 +86,7 @@ async function runSuccessScenario() {
         }]],
       },
       {
-        match: "FROM (\n         SELECT inventory_item_code",
+        match: "SELECT DISTINCT inventory_item_code",
         reply: () => [[{ inventory_item_code: "2001" }]],
       },
       {
@@ -193,7 +193,7 @@ async function runStandardRecipeCapScenario() {
         }]],
       },
       {
-        match: "FROM (\n         SELECT inventory_item_code",
+        match: "SELECT DISTINCT inventory_item_code",
         reply: () => [[{ inventory_item_code: "9000" }]], // parent cocktail/mocktail item_code
       },
       {
@@ -283,6 +283,10 @@ async function runDuplicateBottleScenario() {
           ITEM_NAME: "Beer",
           SUB_CATEGORY: 10,
         }]],
+      },
+      {
+        match: "SELECT DISTINCT inventory_item_code",
+        reply: () => [[{ inventory_item_code: "1001" }]],
       },
       {
         match: "SELECT inventory_item_code FROM (",

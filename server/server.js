@@ -96,6 +96,7 @@ const collectionRoutes = require("./routes/collectionRoutes");
 const priceRoutes = require("./routes/priceRoutes");
 const offerRoutes = require("./routes/offerRoutes");
 const inventoryRoutes = require("./routes/inventoryRoutes");
+const cartRoutes = require("./routes/cartRoutes");
 const profitRoutes = require("./routes/profitRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const cancelledOrdersRoutes = require("./routes/cancelledOrdersRoutes");
@@ -113,6 +114,7 @@ for (const prefix of apiPrefixes) {
   app.use(`${prefix}/price`, priceRoutes);
   app.use(`${prefix}/offers`, offerRoutes);
   app.use(`${prefix}/inventory`, inventoryRoutes);
+  app.use(`${prefix}/cart`, cartRoutes);
   app.use(`${prefix}/profit`, profitRoutes);
   app.use(`${prefix}/notifications`, notificationRoutes);
   app.use(`${prefix}/cancelled-orders`, cancelledOrdersRoutes);

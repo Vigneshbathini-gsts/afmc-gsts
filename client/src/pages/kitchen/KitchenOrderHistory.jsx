@@ -33,6 +33,7 @@ const KitchenOrderHistory = () => {
   const [loading, setLoading] = useState(false);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [pagination, setPagination] = useState(null);
 
   const [orderItemDetails, setOrderItemDetails] = useState({});
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -77,10 +78,13 @@ const KitchenOrderHistory = () => {
       }
 
       setOrders(ordersData);
+      setPagination(response?.data?.pagination || null);
+      setCurrentPage(response?.data?.pagination?.currentPage || page);
     } catch (error) {
       console.error('Error fetching order history:', error);
       alert('Failed to fetch order history');
       setOrders([]);
+      setPagination(null);
     } finally {
       setLoading(false);
     }
@@ -128,26 +132,26 @@ const KitchenOrderHistory = () => {
     setFilteredOrders(filteredAndSearchedOrders);
   }, [filteredAndSearchedOrders]);
 
-  // Pagination
-  const totalPages = Math.ceil(filteredOrders.length / rowsPerPage);
-  const safeTotalPages = Math.max(1, totalPages || 0);
-  const paginatedOrders = useMemo(() => {
-    const startIndex = (currentPage - 1) * rowsPerPage;
-    return filteredOrders.slice(startIndex, startIndex + rowsPerPage);
-  }, [filteredOrders, currentPage]);
-
-  // Clamp current page when result set changes (prevents going to Page 2 of 1, etc.)
-  useEffect(() => {
-    setCurrentPage((prev) => {
-      const next = Math.min(Math.max(prev, 1), safeTotalPages);
-      return next === prev ? prev : next;
-    });
-  }, [safeTotalPages]);
+  const backendTotalPages = pagination?.totalPages || 1;
+  const backendTotalRecords = pagination?.totalRecords || filteredOrders.length;
+  const safeTotalPages = searchTerm.trim()
+    ? Math.max(1, Math.ceil(filteredOrders.length / rowsPerPage) || 0)
+    : Math.max(1, backendTotalPages);
+  const paginatedOrders = filteredOrders;
 
   // Reset to page 1 when search term changes
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm]);
+
+  const handlePageChange = (nextPage) => {
+    const page = Math.min(Math.max(nextPage, 1), safeTotalPages);
+    if (searchTerm.trim()) {
+      setCurrentPage(page);
+      return;
+    }
+    fetchOrderHistory(fromDate, toDate, page);
+  };
 
   const fetchOrderItemDetails = async (orderNumber) => {
     if (!orderNumber) return;
@@ -332,7 +336,7 @@ const KitchenOrderHistory = () => {
           <div>
             <h2 className="text-lg font-bold text-gray-800">Orders List</h2>
             <p className="text-sm text-gray-500">
-              Showing {filteredOrders.length} orders
+              Showing {searchTerm.trim() ? filteredOrders.length : backendTotalRecords} orders
               {fromDate && toDate && ` from ${formatDate(fromDate)} to ${formatDate(toDate)}`}
             </p>
           </div>
@@ -426,11 +430,11 @@ const KitchenOrderHistory = () => {
             {/* Pagination */}
             <div className="flex flex-col md:flex-row items-center justify-between gap-3 px-5 py-4 border-t bg-gray-50">
               <p className="text-sm text-gray-600">
-                Showing {(currentPage - 1) * rowsPerPage + 1} to {Math.min(currentPage * rowsPerPage, filteredOrders.length)} of {filteredOrders.length} orders
+                Showing {filteredOrders.length === 0 ? 0 : (currentPage - 1) * rowsPerPage + 1} to {Math.min(currentPage * rowsPerPage, searchTerm.trim() ? filteredOrders.length : backendTotalRecords)} of {searchTerm.trim() ? filteredOrders.length : backendTotalRecords} orders
               </p>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                  onClick={() => handlePageChange(currentPage - 1)}
                   disabled={currentPage === 1}
                   className="px-3 py-2 rounded-lg border bg-white text-gray-600 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
@@ -440,9 +444,7 @@ const KitchenOrderHistory = () => {
                   Page {currentPage} of {safeTotalPages}
                 </span>
                 <button
-                  onClick={() =>
-                    setCurrentPage((prev) => Math.min(prev + 1, safeTotalPages))
-                  }
+                  onClick={() => handlePageChange(currentPage + 1)}
                   disabled={currentPage >= safeTotalPages}
                   className="px-3 py-2 rounded-lg border bg-white text-gray-600 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
