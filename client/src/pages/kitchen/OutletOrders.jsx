@@ -99,7 +99,11 @@ export default function OutletOrders({ kitchenType = "Bar" }) {
         updated.STATUS = "Preparing";
       }
 
-      navigate("../order-details", {
+      const params = new URLSearchParams();
+      if (updated.ORDERNUMBER) params.set("orderNumber", String(updated.ORDERNUMBER));
+      params.set("kitchenType", String(kitchenType || "Bar"));
+
+      navigate(`../order-details?${params.toString()}`, {
         state: { ...updated, kitchenType },
       });
     } catch (err) {

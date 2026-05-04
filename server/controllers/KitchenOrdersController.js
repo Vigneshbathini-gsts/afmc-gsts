@@ -874,8 +874,18 @@ exports.cancelBarOrderItem = async (req, res) => {
 
 exports.getActiveBarOrders = async (req, res) => {
   try {
+    const kitchen = req.query.kitchen || "Bar";
+    const isBar = kitchen === "Bar";
+    const categoryName = isBar ? "Liquor" : "Snacks";
+
     const [rows] = await pool.query(
-      `SELECT * FROM xxafmc_kitchen_notification WHERE MSG_READ = 'N'`
+      `SELECT kn.*
+       FROM xxafmc_kitchen_notification kn
+       JOIN xxafmc_inventory inv ON kn.item_id = inv.item_code
+       JOIN xxafmc_categories ct ON inv.category_id = ct.category_id
+       WHERE kn.MSG_READ = 'N'
+         AND ct.category_name = ?`,
+      [categoryName]
     );
     // console.log("Active bar orders:", rows.length);
     res.status(200).json({
