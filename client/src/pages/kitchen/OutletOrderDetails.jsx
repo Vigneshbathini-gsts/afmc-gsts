@@ -10,16 +10,31 @@ import {
   FaBan,
   FaTrash,
 } from "react-icons/fa";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import { API_BASE_URL, barOrdersAPI } from "../../services/api";
+import { barOrdersAPI } from "../../services/api";
 import { Html5Qrcode } from "html5-qrcode";
 import { toInitCap } from "../../utils/textFormat";
 
 export default function OutletOrderDetails() {
   const location = useLocation();
   const navigate = useNavigate();
-  const orderData = location.state;
+  const [searchParams] = useSearchParams();
+
+  const orderDataFromState = location.state;
+  const orderNumberFromQuery = searchParams.get("orderNumber") || "";
+  const kitchenTypeFromQuery = searchParams.get("kitchenType") || "";
+
+  const [orderData, setOrderData] = useState(() => {
+    if (orderDataFromState) return orderDataFromState;
+
+    try {
+      const raw = sessionStorage.getItem("outletOrderDetails:lastOrder");
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  });
   const { user } = useAuth();
 
   const department = useMemo(() => {
@@ -58,7 +73,7 @@ export default function OutletOrderDetails() {
   const isMountedRef = useRef(true);
   const isManualScanRef = useRef(false);
   const processingScanRef = useRef(false);
-  const clearOnExitStartedRef = useRef(false);
+
 
   // Fetch order items and scanned items from session
   const fetchOrderItems = useCallback(async () => {
@@ -95,7 +110,35 @@ export default function OutletOrderDetails() {
 
   useEffect(() => {
     isMountedRef.current = true;
-    if (orderData?.ORDERNUMBER) {
+
+    // Persist/restore order data so refresh doesn't lose the context.
+    // Priority: navigation state -> sessionStorage -> query params.
+    const nextFromState = orderDataFromState || null;
+    if (nextFromState && nextFromState !== orderData) {
+      setOrderData(nextFromState);
+      try {
+        sessionStorage.setItem("outletOrderDetails:lastOrder", JSON.stringify(nextFromState));
+      } catch {
+        // ignore
+      }
+    }
+
+    // If we don't have full order data but we do have an order number, at least restore that,
+    // so we can fetch items + scanned history from the backend.
+    if (!orderData?.ORDERNUMBER && orderNumberFromQuery) {
+      const minimal = {
+        ORDERNUMBER: orderNumberFromQuery,
+        kitchenType: kitchenTypeFromQuery || undefined,
+      };
+      setOrderData(minimal);
+      try {
+        sessionStorage.setItem("outletOrderDetails:lastOrder", JSON.stringify(minimal));
+      } catch {
+        // ignore
+      }
+    }
+
+    if ((orderDataFromState?.ORDERNUMBER || orderData?.ORDERNUMBER || orderNumberFromQuery) && fetchOrderItems) {
       fetchOrderItems();
     }
 
@@ -103,34 +146,16 @@ export default function OutletOrderDetails() {
       isMountedRef.current = false;
       if (scannerRef.current) stopScanner();
     };
-  }, [orderData?.ORDERNUMBER, fetchOrderItems]);
+  }, [
+    orderDataFromState,
+    orderData,
+    orderNumberFromQuery,
+    kitchenTypeFromQuery,
+    fetchOrderItems,
+  ]);
 
-  // Clear scanned-items session data when the tab is closed.
-  // Note: browser may still cancel the request in some cases, but `keepalive` improves reliability.
-  useEffect(() => {
-    const orderNumber = orderData?.ORDERNUMBER;
-    if (!orderNumber) return;
-
-    const clearOnExit = () => {
-      if (clearOnExitStartedRef.current) return;
-      clearOnExitStartedRef.current = true;
-
-      const token = localStorage.getItem("token");
-      try {
-        fetch(`${API_BASE_URL}/bar-orders/scanned-items/${orderNumber}`, {
-          method: "DELETE",
-          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-          credentials: "include",
-          keepalive: true,
-        });
-      } catch (e) {
-        // best-effort only
-      }
-    };
-
-    window.addEventListener("pagehide", clearOnExit);
-    return () => window.removeEventListener("pagehide", clearOnExit);
-  }, [orderData?.ORDERNUMBER]);
+  // NOTE: Do not auto-clear scanned-items on `pagehide` / refresh.
+  // `pagehide` fires on browser-level refresh as well, which would wipe the history the user expects to see.
 
   // Helper function to get scanned quantity for an item
   const getScannedQuantityByItemCode = useCallback((itemCode) => {
