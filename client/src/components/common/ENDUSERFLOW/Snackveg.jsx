@@ -17,7 +17,7 @@ function Snackveg() {
       const result = await response.json();
       setdata(result.data || []);
     } catch (error) {
-      console.log("error", error);
+      console.error("Failed to fetch veg snacks:", error);
       seterror(error.message);
     }
   };

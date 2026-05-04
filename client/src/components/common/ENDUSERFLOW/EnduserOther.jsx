@@ -17,7 +17,7 @@ function EnduserOther() {
       const result = await response.json();
       setdata(result.data || []);
     } catch (error) {
-      console.log("error", error);
+      console.error("Failed to fetch menu items:", error);
       seterror(error.message);
     }
   };

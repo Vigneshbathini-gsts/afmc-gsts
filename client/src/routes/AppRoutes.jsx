@@ -160,14 +160,6 @@ export default function AppRoutes() {
         <Route path="order-status" element={<AttendantOrderStatus />} />
 
 
-         {/* --------------------------------------------------------------- */}
-        <Route path="Enduserbar" element={<EnduserOther />} />
-        <Route path="EnduserMocktail" element={<EnduserMocktail />} />
-        <Route path="Snackveg" element={<Snackveg />} />
-        <Route path="Snacknonveg" element={<Snacknonveg />} />
-        <Route path="Drinkharddrink" element={<Drinkharddrink />} />
-
-        {/* ----------------------------------------------------------------- */}
       </Route>
 
       {/* ================= USER ================= */}
@@ -191,6 +183,13 @@ export default function AppRoutes() {
         <Route path="invoice" element={<UserInvoice />} />
         <Route path="active-orders" element={<ActiveOrders />} />
         <Route path="order-status" element={<UserOrderStatus />} />
+
+        {/* Enduser flow routes (moved from attendant; endusers are roleId 30) */}
+        <Route path="Enduserbar" element={<EnduserOther />} />
+        <Route path="EnduserMocktail" element={<EnduserMocktail />} />
+        <Route path="Snackveg" element={<Snackveg />} />
+        <Route path="Snacknonveg" element={<Snacknonveg />} />
+        <Route path="Drinkharddrink" element={<Drinkharddrink />} />
 
        
 
