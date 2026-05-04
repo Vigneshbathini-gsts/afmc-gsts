@@ -314,7 +314,16 @@ export default function OutletOrderDetails() {
 
         await scannerInstance.start(
           { facingMode: "environment" },
-          { fps: 10, qrbox: { width: 340, height: 200 }, aspectRatio: 1.7778 },
+          {
+            fps: 10,
+            aspectRatio: 16 / 9,
+            qrbox: (viewfinderWidth, viewfinderHeight) => {
+              const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+              const width = Math.floor(minEdge * 0.9);
+              const height = Math.floor(width * 0.55);
+              return { width, height };
+            },
+          },
           async (decodedText) => {
             if (hasScannedRef.current || processingScan) return;
             hasScannedRef.current = true;
@@ -471,6 +480,13 @@ export default function OutletOrderDetails() {
       <div className="absolute bottom-20 right-20 w-80 h-80 bg-afmc-maroon2/10 rounded-full blur-3xl"></div>
 
       <div className="relative z-10 p-4 md:p-6 space-y-6">
+        <style>{`
+          #qr-reader video, #qr-reader canvas {
+            width: 100% !important;
+            height: 100% !important;
+            object-fit: cover;
+          }
+        `}</style>
         {/* Header */}
         <div className="flex items-center justify-between gap-4">
           <h1 className="text-2xl font-semibold text-afmc-maroon">
@@ -610,7 +626,11 @@ export default function OutletOrderDetails() {
                   <button
                     onClick={scanning ? stopScanner : startScanner}
                     disabled={processingScan}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-afmc-maroon hover:bg-afmc-maroon2 transition text-white font-medium disabled:opacity-50"
+                    className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg transition text-white font-medium disabled:opacity-50 ${
+                      scanning
+                        ? "bg-gray-700 hover:bg-gray-800"
+                        : "bg-afmc-maroon hover:bg-afmc-maroon2"
+                    }`}
                   >
                     <FaCamera /> {scanning ? "Stop Camera" : "Start Camera"}
                   </button>
@@ -630,9 +650,9 @@ export default function OutletOrderDetails() {
                   )}
                 </div>
                 <div>
-                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-2 h-full">
-                    <div className="relative" style={{ height: "300px" }}>
-                      <div id="qr-reader" className="w-full h-full rounded-lg overflow-hidden" />
+                  <div className="rounded-lg border border-gray-200 bg-black p-0 overflow-hidden">
+                    <div className="relative w-full aspect-video min-h-[240px]">
+                      <div id="qr-reader" className="absolute inset-0 w-full h-full" />
                       {!scanSuccess && scanning && (
                         <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-white text-sm rounded-lg">
                           Position barcode in frame
