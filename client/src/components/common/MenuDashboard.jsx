@@ -562,8 +562,8 @@ function MenuHeader({ onBack }) {
 
 function ScrollTabs({ items, activeKey, onChange }) {
   return (
-    <div className="-mx-4 mb-6 px-4">
-      <div className="flex snap-x snap-mandatory gap-2 overflow-x-auto pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <div className="w-full">
+      <div className="flex snap-x snap-mandatory items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {items.map((it) => {
           const active = activeKey === it.key;
           return (
@@ -579,6 +579,50 @@ function ScrollTabs({ items, activeKey, onChange }) {
               aria-current={active ? "page" : undefined}
             >
               {it.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function SegmentedTabs({ items, activeKey, onChange }) {
+  const cols =
+    items.length === 1
+      ? "grid-cols-1"
+      : items.length === 2
+        ? "grid-cols-2"
+        : items.length === 3
+          ? "grid-cols-3"
+          : "grid-cols-4";
+
+  return (
+    <div className="w-full rounded-2xl border border-gray-200 bg-white shadow-sm">
+      <div className={`grid ${cols}`}>
+        {items.map((it, idx) => {
+          const active = activeKey === it.key;
+          return (
+            <button
+              key={it.key}
+              type="button"
+              onClick={() => onChange(it.key)}
+              className={`group relative px-4 py-4 text-center text-sm font-bold transition ${
+                idx === 0 ? "rounded-l-2xl" : ""
+              } ${idx === items.length - 1 ? "rounded-r-2xl" : ""} ${
+                active
+                  ? "bg-gray-50 text-gray-900"
+                  : "bg-white text-gray-700 hover:bg-gray-50 hover:text-afmc-maroon"
+              }`}
+              aria-current={active ? "page" : undefined}
+            >
+              <span className="relative z-10">{it.label}</span>
+              <span
+                aria-hidden="true"
+                className={`pointer-events-none absolute left-6 right-6 bottom-2 h-[2px] rounded-full transition ${
+                  active ? "bg-afmc-maroon" : "bg-transparent group-hover:bg-afmc-maroon/30"
+                }`}
+              />
             </button>
           );
         })}
@@ -1135,30 +1179,30 @@ function MenuDashboard() {
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         <OffersScroller offers={offers} loading={offersLoading} onShare={handleShareOffer} />
 
-        {/* Tabs - Horizontal Scroll */}
-        <ScrollTabs
-          items={Object.entries(menuConfig).map(([key, tab]) => ({ key, label: tab.label }))}
-          activeKey={mainTab}
-          onChange={handleMainTabChange}
-        />
-
-        {/* Section Tabs */}
-        <ScrollTabs
-          items={Object.entries(menuConfig[mainTab].sections).map(([key, section]) => ({ key, label: section.label }))}
-          activeKey={currentSectionKey}
-          onChange={(sectionKey) =>
-            mainTab === "drinks" ? handleDrinkSectionChange(sectionKey) : setSnackSection(sectionKey)
-          }
-        />
-
-        {/* Category Filters */}
-        {currentSection.categories.length > 0 && (
-          <ScrollTabs
-            items={currentSection.categories.map((c) => ({ key: c.key, label: c.label }))}
-            activeKey={softDrinkCategory}
-            onChange={setSoftDrinkCategory}
+        {/* Tabs */}
+        <div className="space-y-4">
+          <SegmentedTabs
+            items={Object.entries(menuConfig).map(([key, tab]) => ({ key, label: tab.label }))}
+            activeKey={mainTab}
+            onChange={handleMainTabChange}
           />
-        )}
+
+          <SegmentedTabs
+            items={Object.entries(menuConfig[mainTab].sections).map(([key, section]) => ({ key, label: section.label }))}
+            activeKey={currentSectionKey}
+            onChange={(sectionKey) =>
+              mainTab === "drinks" ? handleDrinkSectionChange(sectionKey) : setSnackSection(sectionKey)
+            }
+          />
+
+          {currentSection.categories.length > 0 && (
+            <ScrollTabs
+              items={currentSection.categories.map((c) => ({ key: c.key, label: c.label }))}
+              activeKey={softDrinkCategory}
+              onChange={setSoftDrinkCategory}
+            />
+          )}
+        </div>
 
         {/* Content Area */}
         <div>
