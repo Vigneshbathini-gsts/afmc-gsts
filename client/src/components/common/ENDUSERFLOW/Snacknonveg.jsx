@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { API_BASE_URL } from "../../../services/api";
+import { API_BASE_URL, authFetchJson } from "../../../services/api";
 
 function Snacknonveg() {
   const [data, setdata] = useState([]);
   const [error, seterror] = useState("");
+  const [selectedItem, setSelectedItem] = useState("");
 
   const BASEAPI = "https://afmc.globalsparkteksolutions.com/AFMCIMAGES/";
 
@@ -13,11 +14,10 @@ function Snacknonveg() {
 
   const fetchdata = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/Snakcnonveg`);
-      const result = await response.json();
-      setdata(result.data || []);
+      const result = await authFetchJson(`${API_BASE_URL}/Snakcnonveg`);
+      setdata(result?.data || []);
     } catch (error) {
-      console.log("error", error);
+      console.error("Failed to fetch non-veg snacks:", error);
       seterror(error.message);
     }
   };
@@ -25,6 +25,8 @@ function Snacknonveg() {
   if (error) {
     return <div>{error}</div>;
   }
+
+  const visibleItems = selectedItem ? data.filter((it) => it.item_name === selectedItem) : data;
 
   return (
     <div style={{ padding: "20px", background: "#f5f5f5" }}>
@@ -45,8 +47,8 @@ function Snacknonveg() {
       <div style={styles.filterBox}>
         <div>
           <label>Item Name</label>
-          <select style={styles.select}>
-            <option>Select Item</option>
+          <select style={styles.select} value={selectedItem} onChange={(e) => setSelectedItem(e.target.value)}>
+            <option value="">All Items</option>
             {data.map((item, index) => (
               <option key={index}>{item.item_name}</option>
             ))}
@@ -56,7 +58,7 @@ function Snacknonveg() {
 
       {/* Items Grid */}
       <div style={styles.grid}>
-        {data.map((item, index) => (
+        {visibleItems.map((item, index) => (
           <div key={index} style={styles.card}>
 
             {/* Image */}

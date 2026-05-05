@@ -17,6 +17,7 @@ function matchesAllowedRole(user, allowedRoles) {
 export default function ProtectedRoute({
   allowedRoles,
   allowedOutletTypes,
+  roleLoginTypeRules,
   children,
 }) {
   const { user, isLoading } = useAuth();
@@ -33,6 +34,20 @@ export default function ProtectedRoute({
 
   if (!matchesAllowedRole(user, allowedRoles)) {
     return <Navigate to="/unauthorized" replace state={{ from: location }} />;
+  }
+
+  if (roleLoginTypeRules && typeof roleLoginTypeRules === "object") {
+    const roleKey = String(user?.roleId ?? "");
+    const allowedLoginTypes = roleLoginTypeRules[roleKey];
+    if (Array.isArray(allowedLoginTypes) && allowedLoginTypes.length > 0) {
+      const normalized = String(user?.loginType || "").trim().toUpperCase();
+      const ok = allowedLoginTypes.some(
+        (t) => String(t || "").trim().toUpperCase() === normalized
+      );
+      if (!ok) {
+        return <Navigate to="/unauthorized" replace state={{ from: location }} />;
+      }
+    }
   }
 
   if (

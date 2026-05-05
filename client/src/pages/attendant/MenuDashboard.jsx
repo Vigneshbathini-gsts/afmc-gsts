@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { FaArrowLeft, FaSearch, FaTimes } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
-import { API_BASE_URL } from "../../services/api";
+import { API_BASE_URL, authFetchJson } from "../../services/api";
 
 const BASEAPI = "https://afmc.globalsparkteksolutions.com/AFMCIMAGES/";
 
@@ -324,11 +324,8 @@ function useMenuData(endpoint) {
       setLoading(true);
       setError("");
       try {
-        const response = await fetch(`${API_BASE_URL}/${endpoint}`);
-        const result = await response.json();
-        if (!cancelled) {
-          setData(result.data || []);
-        }
+        const result = await authFetchJson(`${API_BASE_URL}/${endpoint}`);
+        if (!cancelled) setData(result?.data || []);
       } catch (fetchError) {
         if (!cancelled) {
           setError(fetchError.message || "Failed to load menu items.");

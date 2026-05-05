@@ -38,6 +38,7 @@ export function AuthProvider({ children }) {
       username: userData.username,
       email: userData.email,
       phoneNumber: userData.phoneNumber,
+      loginType: userData.loginType || null,
       roleId: userData.roleId,
       roleCode: userData.roleCode,
       roleName: userData.roleName,

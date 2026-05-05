@@ -69,6 +69,50 @@ api.interceptors.response.use(
 );
 
 // ================================
+// Auth-aware fetch helper (for legacy fetch usage)
+// ================================
+export async function authFetchJson(input, init = {}) {
+  const token = localStorage.getItem("token");
+  const headers = new Headers(init.headers || {});
+
+  if (token && !headers.has("Authorization")) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+
+  const res = await fetch(input, {
+    ...init,
+    headers,
+    credentials: init.credentials ?? "include",
+  });
+
+  if (res.status === 401 && !window.location.pathname.includes("/login")) {
+    localStorage.removeItem("token");
+    localStorage.removeItem("authUser");
+    window.location.href = "/login";
+    throw new Error("Unauthorized");
+  }
+
+  let data;
+  try {
+    data = await res.json();
+  } catch {
+    data = null;
+  }
+
+  if (!res.ok) {
+    const message =
+      (data && (data.message || data.error)) || `Request failed (${res.status})`;
+    throw new Error(message);
+  }
+
+  if (data?.success === false) {
+    throw new Error(data?.message || "Request failed");
+  }
+
+  return data;
+}
+
+// ================================
 // AUTH API
 // ================================
 export const authAPI = {
