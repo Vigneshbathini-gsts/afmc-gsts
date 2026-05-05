@@ -149,6 +149,7 @@ export default function AppRoutes() {
           </ProtectedRoute>
         }
       >
+        <Route index element={<Navigate to="register-member" replace />} />
         <Route path="dashboard" element={<AttendantDashboard />} />
         <Route path="menudash" element={<MenuDashboard />} />
         <Route path="register-member" element={<RegisterMember />} />
