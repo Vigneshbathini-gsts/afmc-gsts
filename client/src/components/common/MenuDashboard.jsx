@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { FaTimes } from "react-icons/fa";
 import { ChevronsLeft } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { API_BASE_URL } from "../../services/api";
 
 const BASEAPI = "https://afmc.globalsparkteksolutions.com/AFMCIMAGES/";
@@ -96,7 +96,7 @@ function formatPrice(value) {
   return numericValue.toFixed(2);
 }
 
-function MenuPopup({ item, loading, onClose }) {
+function MenuPopup({ item, loading, onClose, onBuy }) {
   const [qty, setQty] = useState("1");
   const [remarks, setRemarks] = useState("Din");
 
@@ -215,6 +215,7 @@ function MenuPopup({ item, loading, onClose }) {
                 </button>
                 <button
                   type="button"
+                  onClick={() => onBuy?.(item, qty, remarks)}
                   className="min-w-[90px] rounded-full bg-[#5f8728] px-8 py-3 text-[18px] font-semibold text-white transition hover:brightness-105"
                 >
                   Buy
@@ -617,6 +618,7 @@ function SnackNonVegSection({ onItemClick }) {
 function MenuDashboard() {
   console.log("hello");
   const navigate = useNavigate();
+  const location = useLocation();
   const [mainTab, setMainTab] = useState("drinks");
   const [drinkSection, setDrinkSection] = useState("soft");
   const [snackSection, setSnackSection] = useState("veg");
@@ -624,6 +626,20 @@ function MenuDashboard() {
   const [popupItem, setPopupItem] = useState(null);
   const [popupOpen, setPopupOpen] = useState(false);
   const [popupLoading, setPopupLoading] = useState(false);
+
+  const handleBuy = (item, qty, remarks) => {
+    const baseSegment = location.pathname.startsWith("/user") ? "/user" : "/attendant";
+    navigate(`${baseSegment}/menudash/buy`, {
+      state: {
+        item: {
+          ...item,
+          quantity: Number(qty) || 1,
+          remarks,
+        },
+      },
+    });
+    closePopup();
+  };
 
   const handleItemClick = async (item) => {
     if (!item?.item_code || !item?.item_id) {
@@ -777,7 +793,12 @@ function MenuDashboard() {
       </div>
 
       {popupOpen && (
-        <MenuPopup item={popupItem} loading={popupLoading} onClose={closePopup} />
+        <MenuPopup
+          item={popupItem}
+          loading={popupLoading}
+          onClose={closePopup}
+          onBuy={handleBuy}
+        />
       )}
     </div>
   );

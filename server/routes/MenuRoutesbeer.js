@@ -24,8 +24,4 @@ router.get("/DrinkhardTequila", menuControllerbeer.DrinkhardTequila);
 router.get("/DrinkhardCocktail", menuControllerbeer.DrinkhardCocktail);
 
 
-
-
-
-
 module.exports = router;
