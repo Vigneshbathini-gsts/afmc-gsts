@@ -105,7 +105,8 @@ function OfferIcon({ kind }) {
   return <Icon className="h-4 w-4" />;
 }
 
-function OffersScroller({ offers, loading, onShare }) {
+// eslint-disable-next-line no-unused-vars
+function _OffersScroller({ offers, loading, onShare }) {
   const [likedIds, setLikedIds] = useState(() => new Set());
 
   const visibleOffers = useMemo(() => {
@@ -603,6 +604,200 @@ function ScrollTabs({ items, activeKey, onChange }) {
             </button>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+function OffersScrollerPro({ offers, loading, onShare }) {
+  const [likedIds, setLikedIds] = useState(() => new Set());
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  const visibleOffers = useMemo(() => {
+    const list = Array.isArray(offers) ? offers : [];
+    const activeFirst = [...list].sort(
+      (a, b) => Number(isOfferActive(b?.status)) - Number(isOfferActive(a?.status))
+    );
+    return activeFirst.slice(0, 10);
+  }, [offers]);
+
+  useEffect(() => {
+    setActiveIndex(0);
+  }, [visibleOffers.length]);
+
+  if (loading) {
+    return (
+      <div className="mb-8">
+        <div className="mb-4 flex items-end justify-between gap-4">
+          <div>
+            <div className="h-5 w-44 animate-pulse rounded bg-gray-200" />
+            <div className="mt-2 h-4 w-72 animate-pulse rounded bg-gray-100" />
+          </div>
+        </div>
+        <div className="flex gap-4 overflow-hidden">
+          {Array.from({ length: 3 }).map((_, idx) => (
+            <div
+              key={idx}
+              className="h-[140px] w-[320px] shrink-0 animate-pulse rounded-3xl border border-gray-200 bg-white"
+            />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (!visibleOffers.length) {
+    return null;
+  }
+
+  return (
+    <div className="mb-8">
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <h2 className="text-base font-extrabold tracking-tight text-gray-900">Offers for you</h2>
+            <span className="inline-flex items-center gap-1 rounded-full bg-afmc-maroon/5 px-2.5 py-1 text-[11px] font-semibold text-afmc-maroon ring-1 ring-afmc-maroon/10">
+              <Flame className="h-3.5 w-3.5" />
+              Today
+            </span>
+          </div>
+          <p className="mt-1 text-xs text-gray-600">Limited-time deals, updated frequently.</p>
+        </div>
+
+        <span className="rounded-full bg-gray-100 px-3 py-1 text-[11px] font-semibold text-gray-700 ring-1 ring-gray-200">
+          {visibleOffers.length} available
+        </span>
+      </div>
+
+      <div className="relative -mx-4 px-4">
+        <div
+          className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-3 pr-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          onScroll={(event) => {
+            const el = event.currentTarget;
+            const firstCard = el.querySelector("[data-offer-card='true']");
+            if (!firstCard) return;
+            const cardWidth = firstCard.getBoundingClientRect().width;
+            const nextIndex = Math.max(
+              0,
+              Math.min(visibleOffers.length - 1, Math.round(el.scrollLeft / (cardWidth + 16)))
+            );
+            setActiveIndex(nextIndex);
+          }}
+        >
+          {visibleOffers.map((offer) => {
+            const offerId = String(
+              offer?.offer_id ?? offer?.id ?? `${offer?.item_code ?? "x"}-${offer?.free_item_code ?? "y"}`
+            );
+            const active = isOfferActive(offer?.status);
+            const liked = likedIds.has(offerId);
+            const kind = active ? "hot" : "new";
+            const headline = formatOfferLine(offer);
+            const secondary = offer?.message
+              ? String(offer.message)
+              : "Add from the menu below to apply this deal.";
+
+            return (
+              <div
+                key={offerId}
+                data-offer-card="true"
+                className="group relative w-[320px] shrink-0 snap-start overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+              >
+                <div className="absolute inset-0 opacity-[0.22] transition group-hover:opacity-[0.32]">
+                  <svg viewBox="0 0 720 280" className="h-full w-full">
+                    <defs>
+                      <linearGradient id={`g2-${offerId}`} x1="0" y1="0" x2="1" y2="1">
+                        <stop offset="0%" stopColor="#7a0b2e" />
+                        <stop offset="55%" stopColor="#caa84a" />
+                        <stop offset="100%" stopColor="#7a0b2e" />
+                      </linearGradient>
+                      <radialGradient id={`r2-${offerId}`} cx="30%" cy="30%" r="70%">
+                        <stop offset="0%" stopColor="#ffffff" stopOpacity="0.9" />
+                        <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
+                      </radialGradient>
+                    </defs>
+                    <path
+                      d="M0,190 C130,120 240,250 380,180 C520,110 610,30 720,100 L720,280 L0,280 Z"
+                      fill={`url(#g2-${offerId})`}
+                    />
+                    <circle cx="120" cy="84" r="26" fill={`url(#g2-${offerId})`} opacity="0.55" />
+                    <circle cx="612" cy="80" r="34" fill={`url(#g2-${offerId})`} opacity="0.45" />
+                    <circle cx="320" cy="60" r="90" fill={`url(#r2-${offerId})`} opacity="0.35" />
+                  </svg>
+                </div>
+
+                <div className="relative p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="inline-flex items-center gap-2 rounded-full bg-white/90 px-3 py-1 text-[11px] font-semibold text-gray-900 ring-1 ring-black/5">
+                        <span className={`inline-flex items-center gap-1.5 ${active ? "text-red-700" : "text-afmc-maroon"}`}>
+                          <OfferIcon kind={kind} />
+                          {active ? "Hot deal" : "Promo"}
+                        </span>
+                        <span className="text-gray-300">•</span>
+                        <span className="text-gray-700">
+                          {offer?.offer_date ? String(offer.offer_date).slice(0, 10) : "Today"}
+                        </span>
+                      </div>
+
+                      <div className="mt-3 line-clamp-2 text-[15px] font-extrabold leading-snug tracking-tight text-gray-900">
+                        {headline}
+                      </div>
+
+                      <div className="mt-1 line-clamp-2 text-xs text-gray-700">{secondary}</div>
+
+                      <div className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-white/80 px-3 py-2 text-xs font-semibold text-gray-800 ring-1 ring-black/5">
+                        <ShoppingCart className="h-4 w-4 text-afmc-maroon" />
+                        Add to cart from menu
+                      </div>
+                    </div>
+
+                    <div className="flex shrink-0 flex-col items-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setLikedIds((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(offerId)) next.delete(offerId);
+                            else next.add(offerId);
+                            return next;
+                          })
+                        }
+                        className={`inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-white/90 ring-1 ring-black/5 transition hover:bg-white ${
+                          liked ? "text-red-600" : "text-gray-800"
+                        }`}
+                        aria-label={liked ? "Unlike offer" : "Like offer"}
+                      >
+                        <Heart className={`h-5 w-5 ${liked ? "fill-current" : ""}`} />
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => onShare?.(offer)}
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-white/90 text-gray-800 ring-1 ring-black/5 transition hover:bg-white"
+                        aria-label="Share offer"
+                      >
+                        <Share2 className="h-5 w-5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="mt-3 flex items-center justify-center gap-1.5">
+          {visibleOffers.map((offer, idx) => {
+            const key = String(offer?.offer_id ?? offer?.id ?? idx);
+            const isActive = idx === activeIndex;
+            return (
+              <div
+                key={key}
+                className={`h-1.5 rounded-full transition-all ${isActive ? "w-6 bg-afmc-maroon" : "w-2 bg-gray-300"}`}
+              />
+            );
+          })}
+        </div>
       </div>
     </div>
   );
@@ -1207,7 +1402,7 @@ function MenuDashboard() {
 
       {/* Main Content */}
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-        <OffersScroller offers={offers} loading={offersLoading} onShare={handleShareOffer} />
+        <OffersScrollerPro offers={offers} loading={offersLoading} onShare={handleShareOffer} />
 
         {/* Tabs */}
         <div className="space-y-4">
