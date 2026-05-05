@@ -11,3 +11,4 @@ router.get("/stock-out", getStockOutNotifications);
 router.put("/stock-out/read/:itemCode", markStockOutRead);
 
 module.exports = router;
+

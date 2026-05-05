@@ -52,3 +52,5 @@ upload.uploadPath = uploadPath;
 upload.publicBaseUrl = publicBaseUrl.replace(/\/+$/, "");
 
 module.exports = upload;
+
+

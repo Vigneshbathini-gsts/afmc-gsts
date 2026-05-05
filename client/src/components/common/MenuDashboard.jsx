@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { FaTimes } from "react-icons/fa";
 import { ChevronsLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { API_BASE_URL } from "../../services/api";
+import { API_BASE_URL, cartAPI } from "../../services/api";
+import { useAuth } from "../../context/AuthContext";
 
 const BASEAPI = "https://afmc.globalsparkteksolutions.com/AFMCIMAGES/";
 
@@ -56,15 +58,13 @@ function TabButton({ active, label, onClick }) {
     <button
       type="button"
       onClick={onClick}
-      className={`relative flex-1 px-4 py-4 text-base font-medium transition ${
-        active ? "text-gray-900" : "text-gray-600 hover:text-gray-900"
-      }`}
+      className={`relative flex-1 px-4 py-4 text-base font-medium transition ${active ? "text-gray-900" : "text-gray-600 hover:text-gray-900"
+        }`}
     >
       <span className="relative z-10">{label}</span>
       <span
-        className={`absolute inset-x-0 bottom-0 h-[2px] transition ${
-          active ? "bg-[#5a8c59]" : "bg-transparent"
-        }`}
+        className={`absolute inset-x-0 bottom-0 h-[2px] transition ${active ? "bg-[#5a8c59]" : "bg-transparent"
+          }`}
       />
     </button>
   );
@@ -75,41 +75,283 @@ function CategoryButton({ active, label, onClick }) {
     <button
       type="button"
       onClick={onClick}
-      className={`border-b-2 px-3 py-2 text-base transition ${
-        active
+      className={`border-b-2 px-3 py-2 text-base transition ${active
           ? "border-[#5a8c59] text-gray-900"
           : "border-transparent text-gray-700 hover:border-[#5a8c59]/50 hover:text-gray-900"
-      }`}
+        }`}
     >
       {label}
     </button>
   );
 }
 
-function MenuGrid({ items, showStockStatus = false }) {
+function formatPrice(value) {
+  const numericValue = Number(value);
+  if (Number.isNaN(numericValue)) {
+    return "0.00";
+  }
+
+  return numericValue.toFixed(2);
+}
+
+function MenuPopup({ item, loading, onClose }) {
+  const navigate = useNavigate();
+  const { user, setCartCount } = useAuth();
+
+
+  const userId = user?.userId;
+
+  const [qty, setQty] = useState("1");
+  const [remarks, setRemarks] = useState("Din");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  const fetchCartCount = async () => {
+
+    if (!userId) {
+      return;
+    }
+
+    try {
+      const response = await cartAPI.getByUserId(userId);
+
+
+      const items = response.data.data || [];
+
+
+
+
+      setCartCount(items.length);
+      console.log(" Cart count updated to:", items.length);
+    } catch (err) {
+      console.error(" Error fetching cart count:", err);
+      console.error("Error details:", err.response?.data || err.message);
+    }
+  };
+
+
+
+  useEffect(() => {
+    if (!item && !loading) {
+      return undefined;
+    }
+
+    const handleEscape = (event) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    };
+
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [item, loading, onClose]);
+
+  const handleAddToCart = async () => {
+    console.log("🎯 Adding to cart started...");
+    console.log("Current userId:", userId); // Debug log
+
+    try {
+      setIsSubmitting(true);
+      setError("");
+      setSuccess("");
+
+      const cartData = {
+        item_id: item?.item_id || item?.item_code,
+        item_name: item?.item_name,
+        quantity: parseInt(qty, 10) || 1,
+        unit_price: item?.unit_price,
+        remarks,
+      };
+
+
+      const response = await cartAPI.addItem(cartData);
+
+      setSuccess("Item added to cart!");
+if(response.status === 201)
+      {
+        await fetchCartCount();
+      }
+     
+
+      setTimeout(() => {
+        onClose();
+      }, 1500);
+
+    } catch (err) {
+      console.error("❌ Error adding to cart:", err);
+      console.error("Error response:", err.response?.data);
+      setError(err.response?.data?.message || "Failed to add item to cart");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (!item && !loading) {
+    return null;
+  }
+
   return (
-    <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-      {items.map((item, index) => (
-        <div
-          key={`${item.item_name}-${index}`}
-          className="flex items-center gap-3 rounded-xl border border-stone-200 bg-white p-4 shadow-[0_4px_16px_rgba(0,0,0,0.08)]"
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 px-4 py-6">
+      <div className="relative w-full max-w-[980px] rounded-[24px] border border-stone-200 bg-white shadow-[0_20px_60px_rgba(0,0,0,0.18)]">
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute right-4 top-4 flex h-12 w-12 items-center justify-center rounded-xl border border-dashed border-stone-400 bg-white text-xl text-stone-700 transition hover:text-black"
+          aria-label="Close popup"
         >
-          <img
-            src={`${BASEAPI}${item.image || "default.jpg"}`}
-            alt={item.item_name}
-            className="h-10 w-10 rounded-lg object-cover"
-          />
-          <div>
-            <div className="text-sm font-semibold text-gray-900">
-              {item.item_name}
+          <FaTimes />
+        </button>
+
+        {loading ? (
+          <div className="p-16 text-center text-stone-500">Loading item details...</div>
+        ) : (
+          <div className="grid gap-6 px-6 py-14 md:grid-cols-[190px_minmax(0,1fr)] md:px-10">
+            <div className="flex items-center justify-center">
+              <img
+                src={`${BASEAPI}${item?.image || "default.jpg"}`}
+                alt={item?.item_name || "Item"}
+                className="max-h-32 w-auto object-contain"
+              />
             </div>
+
+            <div className="flex flex-col justify-center">
+              <div className="grid gap-4 md:grid-cols-[1.25fr_0.65fr]">
+                <div className="grid grid-cols-[100px_1fr] items-start gap-x-4 gap-y-2">
+                  <div className="text-[18px] font-medium leading-6 text-stone-600">
+                    Item
+                    <br />
+                    Name
+                  </div>
+                  <div className="pt-1 text-[18px] font-semibold text-stone-900">
+                    {item?.item_name || "-"}
+                  </div>
+
+                  <div className="pt-3 text-[18px] font-medium text-stone-600">
+                    A/C Unit
+                  </div>
+                  <div className="pt-2">
+                    <select
+                      value={item?.ac_unit || "Nos"}
+                      disabled
+                      className="h-12 w-full max-w-[110px] rounded-md border border-stone-300 bg-stone-50 px-4 text-[16px] text-stone-500 outline-none"
+                    >
+                      <option>{item?.ac_unit || "Nos"}</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-[88px_1fr] items-start gap-x-4 gap-y-2">
+                  <div className="pt-1 text-[18px] font-medium text-stone-600">
+                    Price
+                  </div>
+                  <div className="pt-1 text-[18px] font-semibold text-stone-900">
+                    {formatPrice(item?.unit_price)}
+                  </div>
+
+                  <div className="pt-3 text-[18px] font-medium text-stone-600">
+                    Qty
+                  </div>
+                  <div className="pt-2">
+                    <input
+                      type="number"
+                      min="1"
+                      value={qty}
+                      onChange={(event) => setQty(event.target.value)}
+                      className="h-12 w-full max-w-[90px] rounded-md border border-stone-400 px-4 text-[16px] text-stone-800 outline-none"
+                    />
+                  </div>
+
+                  <div className="pt-3 text-[18px] font-medium text-stone-600">
+                    Remarks
+                  </div>
+                  <div className="pt-2">
+                    <select
+                      value={remarks}
+                      onChange={(event) => setRemarks(event.target.value)}
+                      className="h-12 w-full max-w-[90px] rounded-md border border-stone-400 bg-white px-3 text-[16px] text-stone-800 outline-none"
+                    >
+                      <option value="Din">Din</option>
+                      <option value="Take Away">Take Away</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {error && (
+                <div className="mt-4 rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {error}
+                </div>
+              )}
+              {success && (
+                <div className="mt-4 rounded-md bg-green-50 px-4 py-3 text-sm text-green-700">
+                  {success}
+                </div>
+              )}
+
+              <div className="mt-8 flex flex-wrap gap-4">
+                <button
+                  type="button"
+                  onClick={handleAddToCart}
+                  disabled={isSubmitting}
+                  className="min-w-[185px] rounded-full border border-[#7ca23a] px-8 py-3 text-[18px] font-semibold text-[#6f9a2e] transition hover:bg-[#7ca23a]/5 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {isSubmitting ? "Adding..." : "Add to cart"}
+                </button>
+                <button
+                  type="button"
+                  className="min-w-[90px] rounded-full bg-[#5f8728] px-8 py-3 text-[18px] font-semibold text-white transition hover:brightness-105"
+                >
+                  Buy
+                </button>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="min-w-[150px] rounded-full border border-[#ff4b32] px-8 py-3 text-[18px] font-semibold text-[#ff4b32] transition hover:bg-red-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function MenuGrid({ items, showStockStatus = false, onItemClick }) {
+  return (
+    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
+      {items.map((item, index) => (
+        <button
+          type="button"
+          onClick={() => onItemClick?.(item)}
+          key={item.item_id || item.item_code || `${item.item_name}-${index}`}
+          className="group overflow-hidden rounded-[24px] border border-stone-200/80 bg-white text-left shadow-[0_8px_24px_rgba(15,23,42,0.08)] transition duration-300 hover:-translate-y-1 hover:border-[#5a8c59]/35 hover:shadow-[0_18px_38px_rgba(15,23,42,0.14)]"
+        >
+          <div className="relative aspect-[4/3] w-full overflow-hidden bg-gradient-to-br from-[#fff6ef] via-[#fffaf6] to-[#f7f7f7]">
+            <img
+              src={`${BASEAPI}${item.image || "default.jpg"}`}
+              alt={item.item_name}
+              className="h-full w-full object-contain p-6 transition duration-500 group-hover:scale-105"
+            />
             {showStockStatus && item.stock_status && (
-              <div className="mt-1 text-xs font-medium text-red-600">
+              <div className="absolute left-4 top-4 rounded-full bg-red-50 px-3 py-1 text-xs font-semibold text-red-600 shadow-sm">
                 {item.stock_status}
               </div>
             )}
           </div>
-        </div>
+
+          <div className="space-y-2 p-4 sm:p-5">
+            <div className="line-clamp-2 text-base font-semibold tracking-[0.01em] text-stone-900 sm:text-[17px]">
+              {item.item_name}
+            </div>
+            {/* <div className="text-xs font-medium uppercase tracking-[0.18em] text-stone-400">
+              AFMC Menu
+            </div> */}
+          </div>
+        </button>
       ))}
     </div>
   );
@@ -135,6 +377,11 @@ function SelectField({
   placeholder,
   disabled = false,
 }) {
+  const normalizedOptions = useMemo(
+    () => Array.from(new Set(options.filter(Boolean))),
+    [options]
+  );
+
   return (
     <label className="block">
       <div className="mb-2 text-base font-medium text-gray-700">{label}</div>
@@ -145,7 +392,7 @@ function SelectField({
         className="w-full rounded-md border border-stone-300 bg-white px-4 py-3 text-sm text-gray-800 outline-none transition disabled:cursor-not-allowed disabled:bg-stone-100 focus:border-[#5a8c59] focus:ring-2 focus:ring-[#5a8c59]/20"
       >
         <option value="">{placeholder}</option>
-        {options.map((option) => (
+        {normalizedOptions.map((option) => (
           <option key={option} value={option}>
             {option}
           </option>
@@ -155,7 +402,7 @@ function SelectField({
   );
 }
 
-function EnduserOtherSection() {
+function EnduserOtherSection({ onItemClick }) {
   const [data, setData] = useState([]);
   const [error, setError] = useState("");
   const [selectedItem, setSelectedItem] = useState("");
@@ -165,7 +412,7 @@ function EnduserOtherSection() {
       try {
         const response = await fetch(`${API_BASE_URL}/menubar`);
         const result = await response.json();
-        console.log("1",result.data);
+        console.log("1", result.data);
 
         setData(result.data || []);
       } catch (fetchError) {
@@ -195,7 +442,7 @@ function EnduserOtherSection() {
         <SelectField
           label="Category"
           value=""
-          onChange={() => {}}
+          onChange={() => { }}
           options={[]}
           placeholder="All Categories"
           disabled
@@ -211,12 +458,12 @@ function EnduserOtherSection() {
         />
       }
     >
-      <MenuGrid items={visibleItems} />
+      <MenuGrid items={visibleItems} onItemClick={onItemClick} />
     </FilterShell>
   );
 }
 
-function EnduserMocktailSection() {
+function EnduserMocktailSection({ onItemClick }) {
   const [data, setData] = useState([]);
   const [error, setError] = useState("");
   const [selectedItem, setSelectedItem] = useState("");
@@ -226,7 +473,7 @@ function EnduserMocktailSection() {
       try {
         const response = await fetch(`${API_BASE_URL}/fetchmocktail`);
         const result = await response.json();
-        console.log("2",result.data);
+        console.log("2", result.data);
         setData(result.data || []);
       } catch (fetchError) {
         console.log("error", fetchError);
@@ -264,12 +511,12 @@ function EnduserMocktailSection() {
         />
       }
     >
-      <MenuGrid items={visibleItems} />
+      <MenuGrid items={visibleItems} onItemClick={onItemClick} />
     </FilterShell>
   );
 }
 
-function DrinkHardDrinkSection() {
+function DrinkHardDrinkSection({ onItemClick }) {
   const [data, setData] = useState([]);
   const [error, setError] = useState("");
   const [category, setCategory] = useState("beer");
@@ -282,7 +529,7 @@ function DrinkHardDrinkSection() {
           `${API_BASE_URL}/Drinkhard${category}`
         );
         const result = await response.json();
-        console.log("3",result.data);
+        console.log("3", result.data);
         setData(result.data || []);
       } catch (fetchError) {
         console.log("error", fetchError);
@@ -332,12 +579,16 @@ function DrinkHardDrinkSection() {
         />
       </div>
 
-      <MenuGrid items={visibleItems} showStockStatus />
+      <MenuGrid
+        items={visibleItems}
+        showStockStatus
+        onItemClick={onItemClick}
+      />
     </div>
   );
 }
 
-function SnackVegSection() {
+function SnackVegSection({ onItemClick }) {
   const [data, setData] = useState([]);
   const [error, setError] = useState("");
   const [selectedItem, setSelectedItem] = useState("");
@@ -347,7 +598,8 @@ function SnackVegSection() {
       try {
         const response = await fetch(`${API_BASE_URL}/Snacksveg`);
         const result = await response.json();
-        console.log("4",result.data);
+        console.log("4", result.data);
+        console.log("4", result, "sai");
         setData(result.data || []);
       } catch (fetchError) {
         console.log("error", fetchError);
@@ -385,12 +637,12 @@ function SnackVegSection() {
         />
       }
     >
-      <MenuGrid items={visibleItems} />
+      <MenuGrid items={visibleItems} onItemClick={onItemClick} />
     </FilterShell>
   );
 }
 
-function SnackNonVegSection() {
+function SnackNonVegSection({ onItemClick }) {
   const [data, setData] = useState([]);
   const [error, setError] = useState("");
   const [selectedItem, setSelectedItem] = useState("");
@@ -400,7 +652,7 @@ function SnackNonVegSection() {
       try {
         const response = await fetch(`${API_BASE_URL}/Snakcnonveg`);
         const result = await response.json();
-        console.log("5",result.data);
+        console.log("5", result.data);
         setData(result.data || []);
       } catch (fetchError) {
         console.log("error", fetchError);
@@ -438,18 +690,63 @@ function SnackNonVegSection() {
         />
       }
     >
-      <MenuGrid items={visibleItems} showStockStatus />
+      <MenuGrid
+        items={visibleItems}
+        showStockStatus
+        onItemClick={onItemClick}
+      />
     </FilterShell>
   );
 }
 
 function MenuDashboard() {
-  console.log("hello");
   const navigate = useNavigate();
   const [mainTab, setMainTab] = useState("drinks");
   const [drinkSection, setDrinkSection] = useState("soft");
   const [snackSection, setSnackSection] = useState("veg");
   const [softDrinkCategory, setSoftDrinkCategory] = useState("Others");
+  const [popupItem, setPopupItem] = useState(null);
+  const [popupOpen, setPopupOpen] = useState(false);
+  const [popupLoading, setPopupLoading] = useState(false);
+
+  const handleItemClick = async (item) => {
+    if (!item?.item_code || !item?.item_id) {
+      return;
+    }
+
+    setPopupOpen(true);
+    setPopupLoading(true);
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/memupopup?itemCode=${item.item_code}&itemId=${item.item_id}`
+      );
+      const result = await response.json();
+
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.message || "Failed to fetch popup details");
+      }
+
+      setPopupItem(result.data);
+    } catch (error) {
+      console.error("Popup fetch error:", error);
+      setPopupItem({
+        ...item,
+        description: item.description || "",
+        unit_price: item.unit_price || 0,
+        ac_unit: item.ac_unit || "Nos",
+        quantity: item.quantity || 0,
+      });
+    } finally {
+      setPopupLoading(false);
+    }
+  };
+
+  const closePopup = () => {
+    setPopupOpen(false);
+    setPopupItem(null);
+    setPopupLoading(false);
+  };
 
   const currentSectionKey = mainTab === "drinks" ? drinkSection : snackSection;
   const currentSection = useMemo(
@@ -460,21 +757,21 @@ function MenuDashboard() {
   const renderedContent = useMemo(() => {
     if (mainTab === "drinks" && drinkSection === "soft") {
       return softDrinkCategory === "Mocktail" ? (
-        <EnduserMocktailSection />
+        <EnduserMocktailSection onItemClick={handleItemClick} />
       ) : (
-        <EnduserOtherSection />
+        <EnduserOtherSection onItemClick={handleItemClick} />
       );
     }
 
     if (mainTab === "drinks" && drinkSection === "hard") {
-      return <DrinkHardDrinkSection />;
+      return <DrinkHardDrinkSection onItemClick={handleItemClick} />;
     }
 
     if (mainTab === "snacks" && snackSection === "veg") {
-      return <SnackVegSection />;
+      return <SnackVegSection onItemClick={handleItemClick} />;
     }
 
-    return <SnackNonVegSection />;
+    return <SnackNonVegSection onItemClick={handleItemClick} />;
   }, [drinkSection, mainTab, snackSection, softDrinkCategory]);
 
   const handleMainTabChange = (tabKey) => {
@@ -562,6 +859,10 @@ function MenuDashboard() {
           <div className="bg-white/60 p-2 md:p-4">{renderedContent}</div>
         </div>
       </div>
+
+      {popupOpen && (
+        <MenuPopup item={popupItem} loading={popupLoading} onClose={closePopup} />
+      )}
     </div>
   );
 }

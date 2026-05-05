@@ -39,7 +39,7 @@ export default function KitchenNavbar({ onMenuClick }) {
 
         {/* Right */}
         <div className="flex items-center gap-3 md:gap-4">
-          <KitchenOrderBell />
+          <KitchenOrderBell kitchen={isBar ? "Bar" : "Kitchen"} />
 
           <UserMenuDropdown />
         </div>

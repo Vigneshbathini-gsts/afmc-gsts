@@ -7,3 +7,5 @@ router.get("/stock-report", getStockReport);
 router.get("/stock_report", getStockReport);
 
 module.exports = router;
+
+

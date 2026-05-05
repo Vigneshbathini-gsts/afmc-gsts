@@ -10,16 +10,31 @@ import {
   FaBan,
   FaTrash,
 } from "react-icons/fa";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import { API_BASE_URL, barOrdersAPI } from "../../services/api";
+import { barOrdersAPI } from "../../services/api";
 import { Html5Qrcode } from "html5-qrcode";
 import { toInitCap } from "../../utils/textFormat";
 
 export default function OutletOrderDetails() {
   const location = useLocation();
   const navigate = useNavigate();
-  const orderData = location.state;
+  const [searchParams] = useSearchParams();
+
+  const orderDataFromState = location.state;
+  const orderNumberFromQuery = searchParams.get("orderNumber") || "";
+  const kitchenTypeFromQuery = searchParams.get("kitchenType") || "";
+
+  const [orderData, setOrderData] = useState(() => {
+    if (orderDataFromState) return orderDataFromState;
+
+    try {
+      const raw = sessionStorage.getItem("outletOrderDetails:lastOrder");
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  });
   const { user } = useAuth();
 
   const department = useMemo(() => {
@@ -58,7 +73,7 @@ export default function OutletOrderDetails() {
   const isMountedRef = useRef(true);
   const isManualScanRef = useRef(false);
   const processingScanRef = useRef(false);
-  const clearOnExitStartedRef = useRef(false);
+
 
   // Fetch order items and scanned items from session
   const fetchOrderItems = useCallback(async () => {
@@ -95,7 +110,35 @@ export default function OutletOrderDetails() {
 
   useEffect(() => {
     isMountedRef.current = true;
-    if (orderData?.ORDERNUMBER) {
+
+    // Persist/restore order data so refresh doesn't lose the context.
+    // Priority: navigation state -> sessionStorage -> query params.
+    const nextFromState = orderDataFromState || null;
+    if (nextFromState && nextFromState !== orderData) {
+      setOrderData(nextFromState);
+      try {
+        sessionStorage.setItem("outletOrderDetails:lastOrder", JSON.stringify(nextFromState));
+      } catch {
+        // ignore
+      }
+    }
+
+    // If we don't have full order data but we do have an order number, at least restore that,
+    // so we can fetch items + scanned history from the backend.
+    if (!orderData?.ORDERNUMBER && orderNumberFromQuery) {
+      const minimal = {
+        ORDERNUMBER: orderNumberFromQuery,
+        kitchenType: kitchenTypeFromQuery || undefined,
+      };
+      setOrderData(minimal);
+      try {
+        sessionStorage.setItem("outletOrderDetails:lastOrder", JSON.stringify(minimal));
+      } catch {
+        // ignore
+      }
+    }
+
+    if ((orderDataFromState?.ORDERNUMBER || orderData?.ORDERNUMBER || orderNumberFromQuery) && fetchOrderItems) {
       fetchOrderItems();
     }
 
@@ -103,34 +146,16 @@ export default function OutletOrderDetails() {
       isMountedRef.current = false;
       if (scannerRef.current) stopScanner();
     };
-  }, [orderData?.ORDERNUMBER, fetchOrderItems]);
+  }, [
+    orderDataFromState,
+    orderData,
+    orderNumberFromQuery,
+    kitchenTypeFromQuery,
+    fetchOrderItems,
+  ]);
 
-  // Clear scanned-items session data when the tab is closed.
-  // Note: browser may still cancel the request in some cases, but `keepalive` improves reliability.
-  useEffect(() => {
-    const orderNumber = orderData?.ORDERNUMBER;
-    if (!orderNumber) return;
-
-    const clearOnExit = () => {
-      if (clearOnExitStartedRef.current) return;
-      clearOnExitStartedRef.current = true;
-
-      const token = localStorage.getItem("token");
-      try {
-        fetch(`${API_BASE_URL}/bar-orders/scanned-items/${orderNumber}`, {
-          method: "DELETE",
-          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-          credentials: "include",
-          keepalive: true,
-        });
-      } catch (e) {
-        // best-effort only
-      }
-    };
-
-    window.addEventListener("pagehide", clearOnExit);
-    return () => window.removeEventListener("pagehide", clearOnExit);
-  }, [orderData?.ORDERNUMBER]);
+  // NOTE: Do not auto-clear scanned-items on `pagehide` / refresh.
+  // `pagehide` fires on browser-level refresh as well, which would wipe the history the user expects to see.
 
   // Helper function to get scanned quantity for an item
   const getScannedQuantityByItemCode = useCallback((itemCode) => {
@@ -315,7 +340,16 @@ export default function OutletOrderDetails() {
 
         await scannerInstance.start(
           { facingMode: "environment" },
-          { fps: 10, qrbox: { width: 340, height: 200 }, aspectRatio: 1.7778 },
+          {
+            fps: 10,
+            aspectRatio: 16 / 9,
+            qrbox: (viewfinderWidth, viewfinderHeight) => {
+              const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+              const width = Math.floor(minEdge * 0.9);
+              const height = Math.floor(width * 0.55);
+              return { width, height };
+            },
+          },
           async (decodedText) => {
             if (hasScannedRef.current || processingScan) return;
             hasScannedRef.current = true;
@@ -472,6 +506,13 @@ export default function OutletOrderDetails() {
       <div className="absolute bottom-20 right-20 w-80 h-80 bg-afmc-maroon2/10 rounded-full blur-3xl"></div>
 
       <div className="relative z-10 p-4 md:p-6 space-y-6">
+        <style>{`
+          #qr-reader video, #qr-reader canvas {
+            width: 100% !important;
+            height: 100% !important;
+            object-fit: cover;
+          }
+        `}</style>
         {/* Header */}
         <div className="flex items-center justify-between gap-4">
           <h1 className="text-2xl font-semibold text-afmc-maroon">
@@ -611,7 +652,11 @@ export default function OutletOrderDetails() {
                   <button
                     onClick={scanning ? stopScanner : startScanner}
                     disabled={processingScan}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-afmc-maroon hover:bg-afmc-maroon2 transition text-white font-medium disabled:opacity-50"
+                    className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg transition text-white font-medium disabled:opacity-50 ${
+                      scanning
+                        ? "bg-gray-700 hover:bg-gray-800"
+                        : "bg-afmc-maroon hover:bg-afmc-maroon2"
+                    }`}
                   >
                     <FaCamera /> {scanning ? "Stop Camera" : "Start Camera"}
                   </button>
@@ -631,9 +676,9 @@ export default function OutletOrderDetails() {
                   )}
                 </div>
                 <div>
-                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-2 h-full">
-                    <div className="relative" style={{ height: "300px" }}>
-                      <div id="qr-reader" className="w-full h-full rounded-lg overflow-hidden" />
+                  <div className="rounded-lg border border-gray-200 bg-black p-0 overflow-hidden">
+                    <div className="relative w-full aspect-video min-h-[240px]">
+                      <div id="qr-reader" className="absolute inset-0 w-full h-full" />
                       {!scanSuccess && scanning && (
                         <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-white text-sm rounded-lg">
                           Position barcode in frame

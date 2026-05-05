@@ -19,3 +19,4 @@ router.post("/", authMiddleware, createOffer);
 router.put("/:id", authMiddleware, updateOffer);
 
 module.exports = router;
+

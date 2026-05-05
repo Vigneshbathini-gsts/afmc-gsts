@@ -2,8 +2,10 @@ import React from "react";
 import { FaBars, FaShoppingCart } from "react-icons/fa";
 import UserMenuDropdown from "../common/UserMenuDropdown";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
 
 export default function AttendantNavbar({ onMenuClick }) {
+  const { cartCount } = useAuth();
   const navigate = useNavigate();
 
   return (
@@ -28,11 +30,12 @@ export default function AttendantNavbar({ onMenuClick }) {
 
         {/* Right */}
         <div className="flex items-center gap-3 md:gap-4">
-          <button className="relative p-3 rounded-xl bg-gray-100 hover:bg-afmc-maroon/10 transition" onClick={() => navigate("cart")}>
+          <button className="relative p-3 rounded-xl bg-gray-100 hover:bg-afmc-maroon/10 transition" onClick={() => navigate("/attendant/cart")}>
             <FaShoppingCart className="text-gray-700" />
-            <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full"></span>
+            {cartCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center">{cartCount}</span>
+            )}
           </button>
-
           <UserMenuDropdown />
         </div>
       </div>

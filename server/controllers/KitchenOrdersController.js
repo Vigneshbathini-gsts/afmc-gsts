@@ -916,8 +916,18 @@ exports.cancelBarOrderItem = async (req, res) => {
 
 exports.getActiveBarOrders = async (req, res) => {
   try {
+    const kitchen = req.query.kitchen || "Bar";
+    const isBar = kitchen === "Bar";
+    const categoryName = isBar ? "Liquor" : "Snacks";
+
     const [rows] = await pool.query(
-      `SELECT * FROM xxafmc_kitchen_notification WHERE MSG_READ = 'N'`
+      `SELECT kn.*
+       FROM xxafmc_kitchen_notification kn
+       JOIN xxafmc_inventory inv ON kn.item_id = inv.item_code
+       JOIN xxafmc_categories ct ON inv.category_id = ct.category_id
+       WHERE kn.MSG_READ = 'N'
+         AND ct.category_name = ?`,
+      [categoryName]
     );
     // console.log("Active bar orders:", rows.length);
     res.status(200).json({
@@ -1302,7 +1312,7 @@ LIMIT ? OFFSET ?
 exports.getOrderHistoryItemDetails = async (req, res) => {
   try {
     const { orderNumber } = req.params;
-    console.log("Fetching item details for order:", orderNumber);
+    // console.log("Fetching item details for order:", orderNumber);
     if (!orderNumber) {
       return res.status(400).json({
         success: false,
@@ -1376,7 +1386,7 @@ exports.getOrderHistoryItemDetails = async (req, res) => {
     const [totalResult] = await pool.execute(totalQuery, [orderNumber]);
 
     const totalAmount = totalResult[0]?.total_amount || 0;
-    console.log(`Fetched ${items.length} items for order ${orderNumber} with total amount ${totalAmount}`);
+    // console.log(`Fetched ${items.length} items for order ${orderNumber} with total amount ${totalAmount}`);
     res.json({
       success: true,
       data: {
@@ -1458,3 +1468,5 @@ exports.getOrderDetailsByOrderNumber = async (req, res) => {
     }
   }
 };
+
+

@@ -18,3 +18,5 @@ router.post("/add-stock", inventoryController.addStock);
 router.post("/stock-out", inventoryController.addStockOut);
 
 module.exports = router;
+
+

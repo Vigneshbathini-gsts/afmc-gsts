@@ -27,3 +27,5 @@ function getRedirectPath(roleId, outletType = null) {
 }
 
 module.exports = { getRedirectPath };
+
+
