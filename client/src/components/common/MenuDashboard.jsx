@@ -1,14 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { FaTimes } from "react-icons/fa";
-<<<<<<< HEAD
-import { ChevronsLeft } from "lucide-react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { API_BASE_URL } from "../../services/api";
-=======
 import { ChevronsLeft, ShoppingCart, Heart, Share2, Star, Flame, Leaf, Zap } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { API_BASE_URL, authFetchJson, offersAPI } from "../../services/api";
->>>>>>> main
 
 const BASEAPI = "https://afmc.globalsparkteksolutions.com/AFMCIMAGES/";
 
@@ -83,9 +77,6 @@ function formatPrice(value) {
   return numericValue.toFixed(2);
 }
 
-<<<<<<< HEAD
-function MenuPopup({ item, loading, onClose, onBuy }) {
-=======
 function isOfferActive(statusValue) {
   if (statusValue === true || statusValue === 1) return true;
   if (typeof statusValue === "string") {
@@ -258,7 +249,6 @@ function _OffersScroller({ offers, loading, onShare }) {
 }
 
 function MenuPopup({ item, loading, onClose }) {
->>>>>>> main
   const [qty, setQty] = useState("1");
   const [remarks, setRemarks] = useState("Din");
 
@@ -401,28 +391,9 @@ function MenuPopup({ item, loading, onClose }) {
                   onChange={(e) => setRemarks(e.target.value)}
                   className="h-11 w-full rounded-xl border border-gray-300 bg-white px-3 text-sm font-bold text-gray-800 outline-none transition focus:border-afmc-maroon focus:ring-2 focus:ring-afmc-maroon/20"
                 >
-<<<<<<< HEAD
-                  Add to cart
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onBuy?.(item, qty, remarks)}
-                  className="min-w-[90px] rounded-full bg-[#5f8728] px-8 py-3 text-[18px] font-semibold text-white transition hover:brightness-105"
-                >
-                  Buy
-                </button>
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="min-w-[150px] rounded-full border border-[#ff4b32] px-8 py-3 text-[18px] font-semibold text-[#ff4b32] transition hover:bg-red-50"
-                >
-                  Cancel
-                </button>
-=======
                   <option value="Din">Dine In</option>
                   <option value="Take Away">Take Away</option>
                 </select>
->>>>>>> main
               </div>
             </div>
           </div>
@@ -1283,7 +1254,7 @@ function SnackNonVegSection({ onItemClick }) {
 
 function MenuDashboard() {
   const navigate = useNavigate();
-  const location = useLocation();
+   const location = useLocation();
   const [mainTab, setMainTab] = useState("drinks");
   const [drinkSection, setDrinkSection] = useState("soft");
   const [snackSection, setSnackSection] = useState("veg");
