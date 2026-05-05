@@ -103,5 +103,3 @@ exports.deleteCartItem = async (req, res) => {
     return res.status(500).json({ success: false, message: "Failed to remove cart item" });
   }
 };
-
-
