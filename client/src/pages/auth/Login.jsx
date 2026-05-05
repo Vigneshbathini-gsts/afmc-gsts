@@ -63,16 +63,19 @@ export default function Login() {
   }, [user, isLoading, navigate]);
 
   const getRedirectPath = (user) => {
-    switch (user.roleId) {
+    const normalizedLoginType = String(user?.loginType || "").trim().toUpperCase();
+    const isNonMember = normalizedLoginType === "NON MEMBER";
+
+    switch (Number(user?.roleId)) {
       case 10: return "/admin/dashboard";
-      case 20: return "/attendant/dashboard";
-      case 30: return "/user/dashboard";
+      case 20: return "/user/dashboard";
+      case 30: return isNonMember ? "/user/dashboard" : "/attendant/dashboard";
       case 40:
         if (user.outletType === "KITCHEN") return "/kitchen/dashboard";
         if (user.outletType === "BAR") return "/bar/dashboard";
         return "/kitchen/dashboard";
       case 50: return "/storekeeper/dashboard";
-      default: return "/";
+      default: return "/unauthorized";
     }
   };
 
