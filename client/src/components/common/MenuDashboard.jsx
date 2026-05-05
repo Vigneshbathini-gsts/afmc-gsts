@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { FaTimes } from "react-icons/fa";
 import { ChevronsLeft, ShoppingCart, Heart, Share2, Star, Flame, Leaf, Zap } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { API_BASE_URL, offersAPI } from "../../services/api";
+import { API_BASE_URL, authFetchJson, offersAPI } from "../../services/api";
 
 const BASEAPI = "https://afmc.globalsparkteksolutions.com/AFMCIMAGES/";
 
@@ -277,20 +277,28 @@ function MenuPopup({ item, loading, onClose }) {
   }
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-start justify-center bg-black/40 px-4 py-6 backdrop-blur-sm overflow-y-auto overscroll-contain sm:items-center">
-      <div className="relative w-full max-w-lg rounded-2xl border border-gray-300 bg-white shadow-xl overflow-hidden max-h-[90vh]">
-        {/* Close Button */}
-        <button
-          type="button"
-          onClick={onClose}
-          className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 text-gray-700 transition-all hover:bg-red-100 hover:text-red-600 z-10 text-lg"
-          aria-label="Close popup"
-        >
-          <FaTimes size={16} />
-        </button>
+    <div
+      className="fixed inset-0 z-[100] flex items-end justify-center bg-black/40 p-4 backdrop-blur-sm sm:items-center sm:p-6"
+      role="dialog"
+      aria-modal="true"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className="relative flex w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl max-h-[calc(100svh-2rem)] sm:max-h-[calc(100svh-3rem)]">
+        <div className="sticky top-0 z-20 flex items-center justify-end border-b border-gray-100 bg-white/95 p-3 backdrop-blur">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 text-gray-700 transition-all hover:bg-red-100 hover:text-red-600"
+            aria-label="Close popup"
+          >
+            <FaTimes size={16} />
+          </button>
+        </div>
 
         {loading ? (
-          <div className="animate-pulse">
+          <div className="animate-pulse overflow-y-auto">
             <div className="h-64 w-full bg-gray-200" />
             <div className="p-6 space-y-3">
               <div className="h-5 bg-gray-200 rounded w-3/4" />
@@ -298,53 +306,61 @@ function MenuPopup({ item, loading, onClose }) {
             </div>
           </div>
         ) : (
-          <div className="p-6 space-y-5 overflow-y-auto">
-            {/* Image Section */}
-            <div className="flex justify-center">
-              <div className="w-48 h-48 rounded-lg bg-gray-100 overflow-hidden flex items-center justify-center">
-                <img
-                  src={`${BASEAPI}${item?.image || "default.jpg"}`}
-                  alt={item?.item_name || "Item"}
-                  className="h-full w-full object-contain p-4"
-                />
+          <div className="flex-1 overflow-y-auto px-4 pt-4 pb-28 sm:px-6 sm:pt-6 space-y-4">
+            <div className="grid gap-4 sm:grid-cols-[160px_1fr] sm:items-start">
+              {/* Image */}
+              <div className="flex justify-center sm:justify-start">
+                <div className="h-28 w-28 sm:h-40 sm:w-40 rounded-2xl bg-gray-100 overflow-hidden flex items-center justify-center ring-1 ring-black/5">
+                  <img
+                    src={`${BASEAPI}${item?.image || "default.jpg"}`}
+                    alt={item?.item_name || "Item"}
+                    className="h-full w-full object-contain p-3 sm:p-4"
+                  />
+                </div>
+              </div>
+
+              {/* Title + meta */}
+              <div className="min-w-0">
+                <div className="flex flex-col gap-2 sm:gap-2.5">
+                  <div className="text-center sm:text-left">
+                    <h2 className="text-lg sm:text-xl font-extrabold text-gray-900 leading-tight break-words">
+                      {item?.item_name || "-"}
+                    </h2>
+                    {item.stock_status ? (
+                      <div className="mt-2">
+                        <span className="inline-flex items-center rounded-full bg-red-50 px-3 py-1 text-[11px] font-bold text-red-700 ring-1 ring-red-200">
+                          {item.stock_status}
+                        </span>
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-xs font-bold uppercase tracking-wider text-gray-500">Price</div>
+                      <div className="text-xl font-extrabold text-afmc-maroon">
+                        ₹{formatPrice(item?.unit_price)}
+                      </div>
+                    </div>
+                    <div className="mt-2 flex items-center justify-between gap-3">
+                      <div className="text-xs font-bold uppercase tracking-wider text-gray-500">Unit</div>
+                      <div className="text-sm font-bold text-gray-900">{item?.ac_unit || "Nos"}</div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* Header */}
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                {item?.item_name || "-"}
-              </h2>
-              {item.stock_status && (
-                <span className="inline-block bg-red-100 text-red-700 text-xs font-bold px-3 py-1 rounded">
-                  {item.stock_status}
-                </span>
-              )}
-            </div>
-
-            {/* Info Section */}
-            <div className="bg-gray-50 rounded-lg p-4 space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-gray-600 font-semibold">Price:</span>
-                <span className="text-2xl font-bold text-afmc-maroon">
-                  ₹{formatPrice(item?.unit_price)}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-gray-600 font-semibold">Unit:</span>
-                <span className="text-gray-900 font-semibold">{item?.ac_unit || "Nos"}</span>
-              </div>
-            </div>
-
-            {/* Form Controls */}
-            <div className="space-y-3">
-              {/* Quantity */}
+            {/* Controls */}
+            <div className="grid gap-3 sm:grid-cols-2">
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">Quantity</label>
-                <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden">
+                <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-700">Quantity</label>
+                <div className="flex items-center overflow-hidden rounded-xl border border-gray-300 bg-white">
                   <button
+                    type="button"
                     onClick={() => setQty(String(Math.max(1, Number(qty) - 1)))}
-                    className="px-4 py-2 hover:bg-gray-100 font-bold text-gray-700 text-lg"
+                    className="h-11 w-12 font-extrabold text-gray-700 transition hover:bg-gray-50"
+                    aria-label="Decrease quantity"
                   >
                     −
                   </button>
@@ -353,49 +369,54 @@ function MenuPopup({ item, loading, onClose }) {
                     min="1"
                     value={qty}
                     onChange={(e) => setQty(e.target.value)}
-                    className="flex-1 text-center py-2 font-bold text-gray-900 border-l border-r border-gray-300 outline-none"
+                    className="h-11 w-full min-w-0 border-l border-r border-gray-300 text-center text-base font-extrabold text-gray-900 outline-none"
+                    inputMode="numeric"
                   />
                   <button
+                    type="button"
                     onClick={() => setQty(String(Number(qty) + 1))}
-                    className="px-4 py-2 hover:bg-gray-100 font-bold text-gray-700 text-lg"
+                    className="h-11 w-12 font-extrabold text-gray-700 transition hover:bg-gray-50"
+                    aria-label="Increase quantity"
                   >
                     +
                   </button>
                 </div>
               </div>
 
-              {/* Type/Remarks */}
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">Type</label>
+                <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-700">Type</label>
                 <select
                   value={remarks}
                   onChange={(e) => setRemarks(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 font-semibold text-gray-800 outline-none focus:border-afmc-maroon focus:ring-1 focus:ring-afmc-maroon"
+                  className="h-11 w-full rounded-xl border border-gray-300 bg-white px-3 text-sm font-bold text-gray-800 outline-none transition focus:border-afmc-maroon focus:ring-2 focus:ring-afmc-maroon/20"
                 >
                   <option value="Din">Dine In</option>
                   <option value="Take Away">Take Away</option>
                 </select>
               </div>
             </div>
+          </div>
+        )}
 
-            {/* Action Buttons */}
+        {!loading ? (
+          <div className="sticky bottom-0 z-20 border-t border-gray-100 bg-white/95 p-4 backdrop-blur">
             <div className="space-y-2">
               <button
                 type="button"
-                className="w-full py-3 px-4 rounded-lg font-bold bg-afmc-maroon text-white transition-all hover:bg-afmc-maroon/90 active:scale-95"
+                className="w-full rounded-lg bg-afmc-maroon px-4 py-3 font-bold text-white transition-all hover:bg-afmc-maroon/90 active:scale-[0.99]"
               >
                 Add to Cart
               </button>
               <button
                 type="button"
                 onClick={onClose}
-                className="w-full py-2 px-4 rounded-lg font-semibold text-gray-700 border border-gray-300 hover:bg-gray-50"
+                className="w-full rounded-lg border border-gray-300 px-4 py-2 font-semibold text-gray-700 hover:bg-gray-50"
               >
                 Cancel
               </button>
             </div>
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   );
@@ -578,7 +599,7 @@ function ScrollTabs({ items, activeKey, onChange }) {
               }`}
               aria-current={active ? "page" : undefined}
             >
-              {it.label}
+              <span className="whitespace-nowrap">{it.label}</span>
             </button>
           );
         })}
@@ -607,7 +628,7 @@ function SegmentedTabs({ items, activeKey, onChange }) {
               key={it.key}
               type="button"
               onClick={() => onChange(it.key)}
-              className={`group relative px-4 py-4 text-center text-sm font-bold transition ${
+              className={`group relative min-w-0 overflow-hidden px-3 py-3 text-center text-sm font-bold transition sm:px-4 sm:py-4 ${
                 idx === 0 ? "rounded-l-2xl" : ""
               } ${idx === items.length - 1 ? "rounded-r-2xl" : ""} ${
                 active
@@ -616,7 +637,7 @@ function SegmentedTabs({ items, activeKey, onChange }) {
               }`}
               aria-current={active ? "page" : undefined}
             >
-              <span className="relative z-10">{it.label}</span>
+              <span className="relative z-10 block truncate whitespace-nowrap">{it.label}</span>
               <span
                 aria-hidden="true"
                 className={`pointer-events-none absolute left-6 right-6 bottom-2 h-[2px] rounded-full transition ${
@@ -676,7 +697,7 @@ function SelectField({
   disabled = false,
 }) {
   const normalizedOptions = useMemo(
-    () => Array.from(new Set(options.filter(Boolean))),
+    () => Array.from(new Set((options || []).filter(Boolean))),
     [options]
   );
 
@@ -690,11 +711,15 @@ function SelectField({
         className="w-full rounded-xl border-2 border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-gray-800 outline-none transition disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500 focus:border-afmc-maroon focus:ring-2 focus:ring-afmc-maroon/20 hover:border-afmc-maroon/40"
       >
         <option value="">{placeholder}</option>
-        {normalizedOptions.map((option) => (
-          <option key={option} value={option}>
-            {option}
-          </option>
-        ))}
+        {normalizedOptions.map((option) => {
+          const value = option?.value ?? option?.id ?? option;
+          const label = option?.label ?? option?.name ?? String(value);
+          return (
+            <option key={String(value)} value={String(value)}>
+              {label}
+            </option>
+          );
+        })}
       </select>
     </label>
   );
@@ -704,18 +729,15 @@ function EnduserOtherSection({ onItemClick }) {
   const [data, setData] = useState([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedItem, setSelectedItem] = useState("");
 
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const response = await fetch(`${API_BASE_URL}/menubar`);
-        const result = await response.json();
-        if (!response.ok || result?.success === false) {
-          throw new Error(result?.message || "Failed to fetch menu items");
-        }
-        setData(result.data || []);
+        const result = await authFetchJson(`${API_BASE_URL}/menubar`);
+        setData(result?.data || []);
       } catch (fetchError) {
         setError(fetchError.message);
       } finally {
@@ -727,23 +749,49 @@ function EnduserOtherSection({ onItemClick }) {
   }, []);
 
   const visibleItems = useMemo(() => {
-    if (!selectedItem) {
-      return data;
+    let list = data;
+
+    if (selectedCategory) {
+      const categoryId = Number(selectedCategory);
+      list = list.filter((item) => Number(item?.sub_category) === categoryId);
     }
 
-    return data.filter((item) => item.item_name === selectedItem);
-  }, [data, selectedItem]);
+    if (!selectedItem) {
+      return list;
+    }
+
+    return list.filter((item) => item.item_name === selectedItem);
+  }, [data, selectedCategory, selectedItem]);
+
+  const categoryOptions = useMemo(() => {
+    const map = new Map();
+    (Array.isArray(data) ? data : []).forEach((item) => {
+      const id = item?.sub_category;
+      const name = item?.sub_category_name;
+      if (id === null || id === undefined || id === "") return;
+      if (!map.has(String(id))) {
+        map.set(String(id), { value: String(id), label: name ? String(name) : String(id) });
+      }
+    });
+    return Array.from(map.values());
+  }, [data]);
+
+  const itemOptions = useMemo(() => {
+    return visibleItems.map((item) => item.item_name);
+  }, [visibleItems]);
 
   return (
     <FilterShell
       leftFilter={
         <SelectField
           label="Category"
-          value=""
-          onChange={() => {}}
-          options={[]}
+          value={selectedCategory}
+          onChange={(event) => {
+            setSelectedCategory(event.target.value);
+            setSelectedItem("");
+          }}
+          options={categoryOptions}
           placeholder="All Categories"
-          disabled
         />
       }
       rightFilter={
@@ -751,7 +799,7 @@ function EnduserOtherSection({ onItemClick }) {
           label="Item Name"
           value={selectedItem}
           onChange={(event) => setSelectedItem(event.target.value)}
-          options={data.map((item) => item.item_name)}
+          options={itemOptions}
           placeholder="Select Item"
         />
       }
@@ -778,12 +826,8 @@ function EnduserMocktailSection({ onItemClick }) {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const response = await fetch(`${API_BASE_URL}/fetchmocktail`);
-        const result = await response.json();
-        if (!response.ok || result?.success === false) {
-          throw new Error(result?.message || "Failed to fetch mocktails");
-        }
-        setData(result.data || []);
+        const result = await authFetchJson(`${API_BASE_URL}/fetchmocktail`);
+        setData(result?.data || []);
       } catch (fetchError) {
         setError(fetchError.message);
       } finally {
@@ -840,14 +884,8 @@ function DrinkHardDrinkSection({ onItemClick }) {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const response = await fetch(
-          `${API_BASE_URL}/Drinkhard${category}`
-        );
-        const result = await response.json();
-        if (!response.ok || result?.success === false) {
-          throw new Error(result?.message || "Failed to fetch hard drinks");
-        }
-        setData(result.data || []);
+        const result = await authFetchJson(`${API_BASE_URL}/Drinkhard${category}`);
+        setData(result?.data || []);
       } catch (fetchError) {
         setError(fetchError.message);
       } finally {
@@ -915,12 +953,8 @@ function SnackVegSection({ onItemClick }) {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const response = await fetch(`${API_BASE_URL}/Snacksveg`);
-        const result = await response.json();
-        if (!response.ok || result?.success === false) {
-          throw new Error(result?.message || "Failed to fetch veg snacks");
-        }
-        setData(result.data || []);
+        const result = await authFetchJson(`${API_BASE_URL}/Snacksveg`);
+        setData(result?.data || []);
       } catch (fetchError) {
         setError(fetchError.message);
       } finally {
@@ -976,12 +1010,8 @@ function SnackNonVegSection({ onItemClick }) {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const response = await fetch(`${API_BASE_URL}/Snakcnonveg`);
-        const result = await response.json();
-        if (!response.ok || result?.success === false) {
-          throw new Error(result?.message || "Failed to fetch non-veg snacks");
-        }
-        setData(result.data || []);
+        const result = await authFetchJson(`${API_BASE_URL}/Snakcnonveg`);
+        setData(result?.data || []);
       } catch (fetchError) {
         setError(fetchError.message);
       } finally {

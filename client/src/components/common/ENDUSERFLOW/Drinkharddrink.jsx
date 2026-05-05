@@ -1,21 +1,19 @@
 import React, { useEffect, useState } from "react";
-import { API_BASE_URL } from "../../../services/api";
+import { API_BASE_URL, authFetchJson } from "../../../services/api";
 
 function Drinkharddrink() {
   const [data, setdata] = useState([]);
   const [error, seterror] = useState("");
   const [category, setCategory] = useState("beer"); // default
+  const [selectedItem, setSelectedItem] = useState("");
 
   const BASEAPI = "https://afmc.globalsparkteksolutions.com/AFMCIMAGES/";
 
   // 🔥 Dynamic API call
   const fetchdata = async (type) => {
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/Drinkhard${type}`
-      );
-      const result = await response.json();
-      setdata(result.data || []);
+      const result = await authFetchJson(`${API_BASE_URL}/Drinkhard${type}`);
+      setdata(result?.data || []);
     } catch (error) {
       console.error("Failed to fetch hard drinks:", error);
       seterror(error.message);
@@ -30,6 +28,8 @@ function Drinkharddrink() {
   if (error) {
     return <div>{error}</div>;
   }
+
+  const visibleItems = selectedItem ? data.filter((it) => it.item_name === selectedItem) : data;
 
   return (
     <div style={{ padding: "20px", background: "#f5f5f5" }}>
@@ -55,8 +55,12 @@ function Drinkharddrink() {
       <div style={styles.filterBox}>
         <div>
           <label>Item Name</label>
-          <select style={styles.select}>
-            <option>Select Item</option>
+          <select
+            style={styles.select}
+            value={selectedItem}
+            onChange={(e) => setSelectedItem(e.target.value)}
+          >
+            <option value="">All Items</option>
             {data.map((item, index) => (
               <option key={index}>{item.item_name}</option>
             ))}
@@ -66,7 +70,7 @@ function Drinkharddrink() {
 
       {/* Items Grid */}
       <div style={styles.grid}>
-        {data.map((item, index) => (
+        {visibleItems.map((item, index) => (
           <div key={index} style={styles.card}>
             
             {/* Image */}

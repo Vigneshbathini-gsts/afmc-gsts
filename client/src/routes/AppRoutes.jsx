@@ -144,7 +144,7 @@ export default function AppRoutes() {
       <Route
         path="/attendant"
         element={
-          <ProtectedRoute allowedRoles={[20]}>
+          <ProtectedRoute allowedRoles={[30]} roleLoginTypeRules={{ 30: ["Member"] }}>
             <AttendantLayout />
           </ProtectedRoute>
         }
@@ -166,7 +166,7 @@ export default function AppRoutes() {
       <Route
         path="/user"
         element={
-          <ProtectedRoute allowedRoles={[30]}>
+          <ProtectedRoute allowedRoles={[20, 30]} roleLoginTypeRules={{ 30: ["Non Member"] }}>
             <UserLayout />
           </ProtectedRoute>
         }

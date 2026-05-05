@@ -630,7 +630,10 @@ exports.processBarcodeScan = async (req, res) => {
         : unitPrice;
 
       //   SAME logic for both (you had duplicate branches → simplified)
-      if (roleId === 20) {
+      const normalizedLoginType = String(req.user?.loginType || "").trim().toUpperCase();
+      const isNonMember = normalizedLoginType === "NON MEMBER";
+
+      if (!isNonMember) {
         const profit =
           pricePerPeg +
           (pricePerPeg * profitPercent / 100) +
