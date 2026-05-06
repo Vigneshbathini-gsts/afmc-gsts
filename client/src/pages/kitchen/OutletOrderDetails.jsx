@@ -10,15 +10,31 @@ import {
   FaBan,
   FaTrash,
 } from "react-icons/fa";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import { API_BASE_URL, barOrdersAPI } from "../../services/api";
+import { barOrdersAPI } from "../../services/api";
 import { Html5Qrcode } from "html5-qrcode";
+import { toInitCap } from "../../utils/textFormat";
 
 export default function OutletOrderDetails() {
   const location = useLocation();
   const navigate = useNavigate();
-  const orderData = location.state;
+  const [searchParams] = useSearchParams();
+
+  const orderDataFromState = location.state;
+  const orderNumberFromQuery = searchParams.get("orderNumber") || "";
+  const kitchenTypeFromQuery = searchParams.get("kitchenType") || "";
+
+  const [orderData, setOrderData] = useState(() => {
+    if (orderDataFromState) return orderDataFromState;
+
+    try {
+      const raw = sessionStorage.getItem("outletOrderDetails:lastOrder");
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  });
   const { user } = useAuth();
 
   const department = useMemo(() => {
@@ -49,6 +65,7 @@ export default function OutletOrderDetails() {
 
   const [scannedCocktailData, setScannedCocktailData] = useState(null);
   const [showCocktailModal, setShowCocktailModal] = useState(false);
+  const [activeRecipeParentItem, setActiveRecipeParentItem] = useState("");
 
   const scannerRef = useRef(null);
   const hasScannedRef = useRef(false);
@@ -56,7 +73,7 @@ export default function OutletOrderDetails() {
   const isMountedRef = useRef(true);
   const isManualScanRef = useRef(false);
   const processingScanRef = useRef(false);
-  const clearOnExitStartedRef = useRef(false);
+
 
   // Fetch order items and scanned items from session
   const fetchOrderItems = useCallback(async () => {
@@ -93,7 +110,35 @@ export default function OutletOrderDetails() {
 
   useEffect(() => {
     isMountedRef.current = true;
-    if (orderData?.ORDERNUMBER) {
+
+    // Persist/restore order data so refresh doesn't lose the context.
+    // Priority: navigation state -> sessionStorage -> query params.
+    const nextFromState = orderDataFromState || null;
+    if (nextFromState && nextFromState !== orderData) {
+      setOrderData(nextFromState);
+      try {
+        sessionStorage.setItem("outletOrderDetails:lastOrder", JSON.stringify(nextFromState));
+      } catch {
+        // ignore
+      }
+    }
+
+    // If we don't have full order data but we do have an order number, at least restore that,
+    // so we can fetch items + scanned history from the backend.
+    if (!orderData?.ORDERNUMBER && orderNumberFromQuery) {
+      const minimal = {
+        ORDERNUMBER: orderNumberFromQuery,
+        kitchenType: kitchenTypeFromQuery || undefined,
+      };
+      setOrderData(minimal);
+      try {
+        sessionStorage.setItem("outletOrderDetails:lastOrder", JSON.stringify(minimal));
+      } catch {
+        // ignore
+      }
+    }
+
+    if ((orderDataFromState?.ORDERNUMBER || orderData?.ORDERNUMBER || orderNumberFromQuery) && fetchOrderItems) {
       fetchOrderItems();
     }
 
@@ -101,34 +146,16 @@ export default function OutletOrderDetails() {
       isMountedRef.current = false;
       if (scannerRef.current) stopScanner();
     };
-  }, [orderData?.ORDERNUMBER, fetchOrderItems]);
+  }, [
+    orderDataFromState,
+    orderData,
+    orderNumberFromQuery,
+    kitchenTypeFromQuery,
+    fetchOrderItems,
+  ]);
 
-  // Clear scanned-items session data when the tab is closed.
-  // Note: browser may still cancel the request in some cases, but `keepalive` improves reliability.
-  useEffect(() => {
-    const orderNumber = orderData?.ORDERNUMBER;
-    if (!orderNumber) return;
-
-    const clearOnExit = () => {
-      if (clearOnExitStartedRef.current) return;
-      clearOnExitStartedRef.current = true;
-
-      const token = localStorage.getItem("token");
-      try {
-        fetch(`${API_BASE_URL}/bar-orders/scanned-items/${orderNumber}`, {
-          method: "DELETE",
-          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-          credentials: "include",
-          keepalive: true,
-        });
-      } catch (e) {
-        // best-effort only
-      }
-    };
-
-    window.addEventListener("pagehide", clearOnExit);
-    return () => window.removeEventListener("pagehide", clearOnExit);
-  }, [orderData?.ORDERNUMBER]);
+  // NOTE: Do not auto-clear scanned-items on `pagehide` / refresh.
+  // `pagehide` fires on browser-level refresh as well, which would wipe the history the user expects to see.
 
   // Helper function to get scanned quantity for an item
   const getScannedQuantityByItemCode = useCallback((itemCode) => {
@@ -179,6 +206,7 @@ export default function OutletOrderDetails() {
       BARCODE: scannedBarcode,
       QUANTITY: qty || 1,
       KITCHEN: department,
+      PARENT_ITEM: activeRecipeParentItem || "",
     });
 
     const scanData = res.data?.data || {};
@@ -197,6 +225,8 @@ export default function OutletOrderDetails() {
 
       // Cocktail modal
       if (scanData.isCocktailIngredient && Array.isArray(scanData.addedThisScan) && scanData.addedThisScan.length > 0) {
+        const parent = String(scanData.addedThisScan?.[0]?.parentItem || "").trim();
+        if (parent) setActiveRecipeParentItem(parent);
         setScannedCocktailData({
           name: scanData.itemName || "Cocktail",
           ingredients: scanData.addedThisScan.map(ing => ({
@@ -218,11 +248,20 @@ export default function OutletOrderDetails() {
     } 
     // Backend returned error (400, etc.)
     else {
-      setScanError(scanData.message || res.data?.message || "Scan failed");
+      const message = scanData.message || res.data?.message || "Scan failed";
+      setScanError(message);
+      if (
+        typeof message === "string" &&
+        (message.toLowerCase().includes("morethan order quantity") ||
+          message.toLowerCase().includes("duplicate bottle scan") ||
+          message.toLowerCase().includes("morethen stock"))
+      ) {
+        window.alert(message);
+      }
     }
 
   } catch (error) {
-    const errMsg = error.response?.data?.message || error.message || "Failed to process scan.";
+    const errMsg = error.response?.data?.error || error.response?.data?.message || error.message || "Failed to process scan.";
     setScanError(errMsg);
     console.error("Process Scan Error:", error);
   } finally {
@@ -235,7 +274,7 @@ export default function OutletOrderDetails() {
       }
     }, 4000);
   }
-}, [orderData, department, qty]);
+}, [orderData, department, qty, activeRecipeParentItem]);
 
   const startScanner = async () => {
     try {
@@ -300,7 +339,16 @@ export default function OutletOrderDetails() {
 
         await scannerInstance.start(
           { facingMode: "environment" },
-          { fps: 10, qrbox: { width: 340, height: 200 }, aspectRatio: 1.7778 },
+          {
+            fps: 10,
+            aspectRatio: 16 / 9,
+            qrbox: (viewfinderWidth, viewfinderHeight) => {
+              const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+              const width = Math.floor(minEdge * 0.9);
+              const height = Math.floor(width * 0.55);
+              return { width, height };
+            },
+          },
           async (decodedText) => {
             if (hasScannedRef.current || processingScan) return;
             hasScannedRef.current = true;
@@ -348,6 +396,7 @@ export default function OutletOrderDetails() {
       name: cocktail?.ITEM_NAME || item.ITEM_NAME,
       ingredients,
     });
+    setActiveRecipeParentItem(String(item.ITEM_ID || "").trim());
     setShowCocktailModal(true);
   } catch (error) {
     console.error("Error fetching cocktail details:", error);
@@ -451,19 +500,35 @@ export default function OutletOrderDetails() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-6 space-y-6">
-      {/* Back Button */}
-      <div className="flex justify-between items-center">
-        <button onClick={() => navigate(-1)} className="text-gray-500 hover:text-gray-700 transition">
-          <div className="flex items-center gap-1">
-            <FaArrowLeft className="text-xl" />
-            <p className="text-sm font-medium">Back to Orders</p>
-          </div>
-        </button>
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-afmc-bg via-white to-afmc-bg2 relative">
+      <div className="absolute top-16 left-12 w-72 h-72 bg-afmc-maroon/10 rounded-full blur-3xl"></div>
+      <div className="absolute bottom-20 right-20 w-80 h-80 bg-afmc-maroon2/10 rounded-full blur-3xl"></div>
+
+      <div className="relative z-10 p-4 md:p-6 space-y-6">
+        <style>{`
+          #qr-reader video, #qr-reader canvas {
+            width: 100% !important;
+            height: 100% !important;
+            object-fit: cover;
+          }
+        `}</style>
+        {/* Header */}
+        <div className="flex items-center justify-between gap-4">
+          <h1 className="text-2xl font-semibold text-afmc-maroon">
+            Order Details
+          </h1>
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-white shadow hover:shadow-md border border-afmc-gold/30 text-gray-700 hover:text-afmc-maroon hover:bg-afmc-maroon/5 transition whitespace-nowrap"
+          >
+            <FaArrowLeft />
+            Back to Orders
+          </button>
+        </div>
 
       {/* Header Card with Order Summary */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
+      <div className="bg-white/80 border border-white/60 rounded-3xl shadow-xl backdrop-blur-sm p-5">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
             <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider">Order Number</label>
@@ -493,7 +558,7 @@ export default function OutletOrderDetails() {
         {/* Left Column */}
         <div className="lg:col-span-2 space-y-6">
           {/* Order Items Table */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className="bg-white/80 border border-white/60 rounded-3xl shadow-xl backdrop-blur-sm overflow-hidden">
             <div className="border-b border-gray-100 px-6 py-4">
               <h2 className="text-base font-semibold text-gray-800">Order Items</h2>
             </div>
@@ -523,9 +588,11 @@ export default function OutletOrderDetails() {
                           <td className="px-6 py-4 text-sm text-gray-800">
                             {item.LINK_ENABLED === "Y" ? (
                               <button onClick={() => handleItemClick(item)} className="text-pink-600 hover:underline">
-                                {item.ITEM_NAME}
+                                {toInitCap(item.ITEM_NAME || "")}
                               </button>
-                            ) : (item.ITEM_NAME)}
+                            ) : (
+                              toInitCap(item.ITEM_NAME || "")
+                            )}
                           </td>
                           <td className="px-6 py-4 text-sm font-medium">{item.quantity}</td>
                           <td className="px-6 py-4 text-sm text-green-600 font-medium">{scannedQty}</td>
@@ -550,7 +617,7 @@ export default function OutletOrderDetails() {
           </div>
 
           {/* Barcode Scanner Section */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className="bg-white/80 border border-white/60 rounded-3xl shadow-xl backdrop-blur-sm overflow-hidden">
             <div className="border-b border-gray-100 px-6 py-4">
               <h2 className="text-base font-semibold text-gray-800">Scan Barcode</h2>
             </div>
@@ -584,7 +651,11 @@ export default function OutletOrderDetails() {
                   <button
                     onClick={scanning ? stopScanner : startScanner}
                     disabled={processingScan}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-afmc-maroon hover:bg-afmc-maroon2 transition text-white font-medium disabled:opacity-50"
+                    className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg transition text-white font-medium disabled:opacity-50 ${
+                      scanning
+                        ? "bg-gray-700 hover:bg-gray-800"
+                        : "bg-afmc-maroon hover:bg-afmc-maroon2"
+                    }`}
                   >
                     <FaCamera /> {scanning ? "Stop Camera" : "Start Camera"}
                   </button>
@@ -604,9 +675,9 @@ export default function OutletOrderDetails() {
                   )}
                 </div>
                 <div>
-                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-2 h-full">
-                    <div className="relative" style={{ height: "300px" }}>
-                      <div id="qr-reader" className="w-full h-full rounded-lg overflow-hidden" />
+                  <div className="rounded-lg border border-gray-200 bg-black p-0 overflow-hidden">
+                    <div className="relative w-full aspect-video min-h-[240px]">
+                      <div id="qr-reader" className="absolute inset-0 w-full h-full" />
                       {!scanSuccess && scanning && (
                         <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-white text-sm rounded-lg">
                           Position barcode in frame
@@ -675,7 +746,7 @@ export default function OutletOrderDetails() {
                     scannedItems.map((item) => (
                       <tr key={item.id} className="hover:bg-gray-50">
                         <td className="px-4 py-3 text-sm font-mono text-gray-600">{item.itemCode}</td>
-                        <td className="px-4 py-3 text-sm text-gray-800">{item.itemName}</td>
+                        <td className="px-4 py-3 text-sm text-gray-800">{toInitCap(item.itemName || "")}</td>
                         <td className="px-4 py-3 text-sm text-center font-medium">{item.scanQuantity}</td>
                         <td className="px-4 py-3 text-sm text-gray-500">
                           {new Date(item.scannedAt).toLocaleTimeString()}
@@ -693,7 +764,7 @@ export default function OutletOrderDetails() {
 
         {/* Right Column - Scanned Item Details */}
         <div className="space-y-6">
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className="bg-white/80 border border-white/60 rounded-3xl shadow-xl backdrop-blur-sm overflow-hidden">
             <div className="border-b border-gray-100 px-6 py-4">
               <h2 className="text-base font-semibold text-gray-800">Current Scanned Item</h2>
             </div>
@@ -704,7 +775,7 @@ export default function OutletOrderDetails() {
               </div>
               <div className="bg-gray-50 rounded-lg p-4">
                 <p className="text-xs text-gray-400 uppercase tracking-wider">Item Name</p>
-                <p className="mt-1 font-medium text-gray-800">{itemName || "-"}</p>
+                <p className="mt-1 font-medium text-gray-800">{itemName ? toInitCap(itemName) : "-"}</p>
               </div>
               <div className="bg-gray-50 rounded-lg p-4">
                 <p className="text-xs text-gray-400 uppercase tracking-wider">Price</p>
@@ -737,7 +808,7 @@ export default function OutletOrderDetails() {
                   {scannedCocktailData.ingredients?.map((ing, idx) => (
                     <tr key={idx}>
                       <td className="px-4 py-2">{ing.item_code}</td>
-                      <td className="px-4 py-2">{ing.item_name}</td>
+                      <td className="px-4 py-2">{toInitCap(ing.item_name || "")}</td>
                       <td className="px-4 py-2 text-center">{ing.pegs || 0}</td>
                       <td className="px-4 py-2 text-center">{ing.quantity || 1}</td>
                     </tr>
@@ -753,6 +824,7 @@ export default function OutletOrderDetails() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

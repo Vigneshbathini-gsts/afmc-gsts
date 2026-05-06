@@ -100,6 +100,7 @@ exports.loginUser = async (req, res) => {
         u.USER_NAME,
         u.EMAIL,
         u.PHONE_NUMBER,
+        u.LOGIN_TYPE,
         u.ROLE_ID,
         r.ROLE_CODE,
         r.ROLE_NAME
@@ -141,7 +142,7 @@ exports.loginUser = async (req, res) => {
       });
     }
 
-    const redirectPath = getRedirectPath(user.ROLE_ID, outletType);
+    const redirectPath = getRedirectPath(user.ROLE_ID, outletType, user.LOGIN_TYPE);
     console.log("redirectPath",redirectPath);
 
 
@@ -151,6 +152,7 @@ exports.loginUser = async (req, res) => {
         username: user.USER_NAME,
         roleId: user.ROLE_ID,
         roleCode: user.ROLE_CODE,
+        loginType: user.LOGIN_TYPE || null,
         outletType: outletType || null,
       },
       process.env.JWT_SECRET,
@@ -167,6 +169,7 @@ exports.loginUser = async (req, res) => {
         username: user.USER_NAME,
         email: user.EMAIL,
         phoneNumber: user.PHONE_NUMBER,
+        loginType: user.LOGIN_TYPE || null,
         roleId: user.ROLE_ID,
         roleCode: user.ROLE_CODE,
         roleName: user.ROLE_NAME,

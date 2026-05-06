@@ -144,11 +144,12 @@ export default function AppRoutes() {
       <Route
         path="/attendant"
         element={
-          <ProtectedRoute allowedRoles={[20]}>
+          <ProtectedRoute allowedRoles={[30]} roleLoginTypeRules={{ 30: ["Member"] }}>
             <AttendantLayout />
           </ProtectedRoute>
         }
       >
+        <Route index element={<Navigate to="register-member" replace />} />
         <Route path="dashboard" element={<AttendantDashboard />} />
         <Route path="menudash" element={<MenuDashboard />} />
         <Route path="register-member" element={<RegisterMember />} />
@@ -160,21 +161,13 @@ export default function AppRoutes() {
         <Route path="order-status" element={<AttendantOrderStatus />} />
 
 
-         {/* --------------------------------------------------------------- */}
-        <Route path="Enduserbar" element={<EnduserOther />} />
-        <Route path="EnduserMocktail" element={<EnduserMocktail />} />
-        <Route path="Snackveg" element={<Snackveg />} />
-        <Route path="Snacknonveg" element={<Snacknonveg />} />
-        <Route path="Drinkharddrink" element={<Drinkharddrink />} />
-
-        {/* ----------------------------------------------------------------- */}
       </Route>
 
       {/* ================= USER ================= */}
       <Route
         path="/user"
         element={
-          <ProtectedRoute allowedRoles={[30]}>
+          <ProtectedRoute allowedRoles={[20, 30]} roleLoginTypeRules={{ 30: ["Non Member"] }}>
             <UserLayout />
           </ProtectedRoute>
         }
@@ -191,6 +184,13 @@ export default function AppRoutes() {
         <Route path="invoice" element={<UserInvoice />} />
         <Route path="active-orders" element={<ActiveOrders />} />
         <Route path="order-status" element={<UserOrderStatus />} />
+
+        {/* Enduser flow routes (moved from attendant; endusers are roleId 30) */}
+        <Route path="Enduserbar" element={<EnduserOther />} />
+        <Route path="EnduserMocktail" element={<EnduserMocktail />} />
+        <Route path="Snackveg" element={<Snackveg />} />
+        <Route path="Snacknonveg" element={<Snacknonveg />} />
+        <Route path="Drinkharddrink" element={<Drinkharddrink />} />
 
        
 

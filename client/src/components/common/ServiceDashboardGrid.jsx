@@ -1,17 +1,18 @@
 import React from "react";
 import { HeartPulse, Scissors, Wine } from "lucide-react";
-import {useNavigate } from 'react-router-dom';
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
 
 const defaultItems = [
-  { name: "Pubmed", color: "bg-blue-600", icon: Wine ,Path : "/attendant/menudash"},
-  { name: "Synapse", color: "bg-slate-600", icon: Wine,Path : "/attendant/menudash" },
-  { name: "Blue Room", color: "bg-teal-600", icon: Wine,Path : "/attendant/menudash" },
-  { name: "Silver Room", color: "bg-green-600", icon: Wine,Path : "/attendant/menudash" },
-  { name: "Grove", color: "bg-green-800", icon: Wine,Path : "/attendant/menudash" },
-  { name: "Tapovan", color: "bg-gray-600", icon: Wine,Path : "/attendant/menudash" },
-  { name: "Madhuban", color: "bg-yellow-700", icon: Wine,Path : "/attendant/menudash" },
-  { name: "Lounge Room", color: "bg-orange-600", icon: Wine ,Path : "/attendant/menudash"},
-  { name: "Pizza", color: "bg-red-600", icon: Wine,Path : "/attendant/menudash" },
+  { name: "Pubmed", color: "bg-blue-600", icon: Wine, Path: "menudash" },
+  { name: "Synapse", color: "bg-slate-600", icon: Wine, Path: "menudash" },
+  { name: "Blue Room", color: "bg-teal-600", icon: Wine, Path: "menudash" },
+  { name: "Silver Room", color: "bg-green-600", icon: Wine, Path: "menudash" },
+  { name: "Grove", color: "bg-green-800", icon: Wine, Path: "menudash" },
+  { name: "Tapovan", color: "bg-gray-600", icon: Wine, Path: "menudash" },
+  { name: "Madhuban", color: "bg-yellow-700", icon: Wine, Path: "menudash" },
+  { name: "Lounge Room", color: "bg-orange-600", icon: Wine, Path: "menudash" },
+  { name: "Pizza", color: "bg-red-600", icon: Wine, Path: "menudash" },
   {
     name: "Gym",
     color: "bg-afmc-maroon",
@@ -28,44 +29,69 @@ const defaultItems = [
 
 function DashboardCard({ item }) {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const Icon = item.icon;
-  const handleclick = (item) => {
-    console.log("handle cliked");
-    console.log(item.Path);
-    if (item.Path) {
-      navigate(item.Path)
-    }
-  }
+  const isDisabled = Boolean(item.pending) || !item?.Path;
+
+  const normalizedLoginType = String(user?.loginType || "").trim().toUpperCase();
+  const isNonMember = normalizedLoginType === "NON MEMBER";
+  const basePath = Number(user?.roleId) === 30 && !isNonMember ? "/attendant" : "/user";
+  const rawPath = item?.Path ?? "";
+  const destination = rawPath.startsWith("/") ? rawPath : `${basePath}/${rawPath}`;
 
   return (
-    <div onClick={()=>handleclick(item)}>
-    <div className="flex items-center gap-4 rounded-xl border bg-white p-5 shadow-sm transition hover:shadow-md">
-      <div
-        className={`flex h-14 w-14 items-center justify-center rounded-full text-white ${item.color}`}
-      >
-        <Icon size={22} />
+    <button
+      type="button"
+      onClick={() => !isDisabled && navigate(destination)}
+      disabled={isDisabled}
+      className={`group w-full overflow-hidden rounded-2xl border bg-white/80 p-4 text-left shadow-sm backdrop-blur-sm transition
+        hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-afmc-maroon2/25
+        ${isDisabled ? "cursor-not-allowed opacity-70 hover:translate-y-0 hover:shadow-sm" : ""}`}
+    >
+      <div className="flex items-center gap-4">
+        <div
+          className={`flex h-11 w-11 items-center justify-center rounded-2xl text-white shadow-sm ring-1 ring-black/5 transition group-hover:scale-[1.03] ${item.color}`}
+        >
+          <Icon size={18} />
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="truncate text-[15px] font-semibold tracking-[0.01em] text-gray-900">
+              {item.name}
+            </h3>
+            {item.pending ? (
+              <span className="shrink-0 rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700 ring-1 ring-amber-200">
+                Coming soon
+              </span>
+            ) : (
+              ""
+            )}
+          </div>
+
+         
+        </div>
       </div>
 
-      <div>
-        <h3 className="text-lg font-semibold text-gray-800">{item.name}</h3>
-        {item.pending && (
-          <p className="mt-1 text-sm text-gray-500">
-            Pending development. This section is in the pipeline.
-          </p>
-        )}
-      </div>
-      </div>
-      </div>
+      <div className="mt-4 h-px w-full bg-gradient-to-r from-transparent via-afmc-gold/30 to-transparent" />
+    </button>
   );
 }
 
 export default function ServiceDashboardGrid({ items = defaultItems }) {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-afmc-bg via-white to-afmc-bg2 p-6">
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="min-h-screen bg-gradient-to-br from-afmc-bg via-white to-afmc-bg2 p-6 md:p-8">
+      <div className="mx-auto max-w-6xl">
+        <div className="mb-6">
+          <h1 className="text-2xl font-semibold text-afmc-maroon">Services</h1>
+          <p className="mt-1 text-sm text-gray-600">Select a location to continue.</p>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {items.map((item) => (
           <DashboardCard key={item.name} item={item} />
         ))}
+      </div>
       </div>
     </div>
   );

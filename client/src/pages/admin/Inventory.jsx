@@ -711,6 +711,8 @@ export default function Inventory() {
       }));
       setImagePreviewUrl("");
       fetchInventory();
+      setShowImageModal(false);
+      navigate("/admin/stock-reports/barstock");
     } catch (err) {
       console.error("Failed to update image:", err);
       setImageError(err.response?.data?.message || "Failed to update image.");

@@ -12,6 +12,7 @@ import {
   FaUserShield,
 } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { authAPI } from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
 import logo from "../../assets/AFMC_Logo.png";
@@ -45,6 +46,18 @@ export default function Login() {
   const [isCheckingRole, setIsCheckingRole] = useState(false);
   const { user, isLoading, setUser } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    if (location.state?.reason === "sessionEnded") {
+      // eslint-disable-next-line no-alert
+      alert("Session is over. Please login again.");
+      // Clear history state so it doesn't alert repeatedly
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+    // Intentionally depends on location.state only
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state]);
 
   // Load saved credentials
   useEffect(() => {
@@ -63,16 +76,19 @@ export default function Login() {
   }, [user, isLoading, navigate]);
 
   const getRedirectPath = (user) => {
-    switch (user.roleId) {
+    const normalizedLoginType = String(user?.loginType || "").trim().toUpperCase();
+    const isNonMember = normalizedLoginType === "NON MEMBER";
+
+    switch (Number(user?.roleId)) {
       case 10: return "/admin/dashboard";
-      case 20: return "/attendant/dashboard";
-      case 30: return "/user/dashboard";
+      case 20: return "/user/dashboard";
+      case 30: return isNonMember ? "/user/dashboard" : "/attendant/register-member";
       case 40:
         if (user.outletType === "KITCHEN") return "/kitchen/dashboard";
         if (user.outletType === "BAR") return "/bar/dashboard";
         return "/kitchen/dashboard";
       case 50: return "/storekeeper/dashboard";
-      default: return "/";
+      default: return "/unauthorized";
     }
   };
 

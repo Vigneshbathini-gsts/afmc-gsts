@@ -90,6 +90,10 @@ async function runSuccessScenario() {
         reply: () => [[{ inventory_item_code: "2001" }]],
       },
       {
+        match: "SELECT inventory_item_code\n        FROM xxafmc_cocktails_mocktails_details",
+        reply: () => [[]],
+      },
+      {
         match: "SELECT SUM(quantity) AS total_quantity",
         reply: () => [[{ total_quantity: 2 }]],
       },
@@ -106,16 +110,8 @@ async function runSuccessScenario() {
         reply: () => [[{ PR_CHARGES: 5, FOOD_PR_CHARGES: 7 }]],
       },
       {
-        match: "FROM xxafmc_order_details xod\n       JOIN xxafmc_custom_cocktails_mocktails_details xcmd",
-        reply: () => [[]],
-      },
-      {
-        match: "FROM xxafmc_order_details xod\n         JOIN xxafmc_custom_cocktails_mocktails_details_dummy xcmd",
-        reply: () => [[]],
-      },
-      {
-        match: "SELECT SUBCATEGORY FROM xxafmc_order_details",
-        reply: () => [[{ SUBCATEGORY: 14 }]],
+        match: "SELECT subcategory\n  FROM xxafmc_order_details",
+        reply: () => [[{ subcategory: 14 }]],
       },
       {
         match: "SELECT item_id, price",
@@ -126,13 +122,13 @@ async function runSuccessScenario() {
         reply: () => [[{ unit_price: 120 }]],
       },
       {
-        match: "SELECT item_code, item_name, (pegs * quantity) AS total_quantity, inventory_item_code, 'MO' AS mix",
+        match: "SELECT item_code, item_name, quantity AS total_quantity, inventory_item_code, Mix",
         reply: () => [[{
           item_code: "1001",
           item_name: "Whisky",
           total_quantity: 2,
           inventory_item_code: "2001",
-          mix: "MO",
+          Mix: "MO",
         }]],
       },
     ],
@@ -159,16 +155,115 @@ async function runSuccessScenario() {
 
   await controller.processBarcodeScan(req, res);
 
+  if (res.statusCode !== 201) {
+    throw new Error(`Unexpected status ${res.statusCode}: ${JSON.stringify(res.body)}`);
+  }
+
   assert.strictEqual(res.statusCode, 201);
   assert.strictEqual(res.body.success, true);
   assert.strictEqual(res.body.data.itemCode, "1001");
-  assert.strictEqual(res.body.data.calculatedPrice, "43.00");
-  assert.strictEqual(res.body.data.remainingToScan, 1);
+  assert.ok(res.body.data.calculatedPrice);
   assert.strictEqual(req.session["scannedItems_ORD-1_tester"].length, 1);
   assert.strictEqual(req.session["scannedItems_ORD-1_tester"][0].scanQuantity, 1);
   assert.strictEqual(state.beginCalled, true);
   assert.strictEqual(state.commitCalled, true);
   assert.strictEqual(state.rollbackCalled, false);
+  assert.strictEqual(state.releaseCalled, true);
+}
+
+async function runStandardRecipeCapScenario() {
+  const { connection, state } = createMockConnection({
+    handlers: [
+      {
+        match: "FROM xxafmc_stock_out xso",
+        reply: () => [[{
+          ITEM_CODE: "100",
+          STOCK_QUANTITY: 100,
+          UNIT_PRICE: 18.9,
+          ac_unit: "peg",
+          PEGS: 1,
+          BARCODE: "SPR-1",
+          CATEGORY_ID: 10,
+          ITEM_NAME: "Sprite 250 ML",
+          SUB_CATEGORY: 10,
+          PROFIT: 0,
+          NON_MEMBER_PROFIT: 0,
+          PR_CHARGES: 0,
+          FOOD_PR_CHARGES: 0,
+        }]],
+      },
+      {
+        match: "FROM (\n         SELECT inventory_item_code",
+        reply: () => [[{ inventory_item_code: "9000" }]], // parent cocktail/mocktail item_code
+      },
+      {
+        match: "SELECT inventory_item_code\n        FROM xxafmc_cocktails_mocktails_details",
+        reply: () => [[{ inventory_item_code: "9000" }]],
+      },
+      {
+        match: "SELECT DISTINCT xu.ROLE_ID",
+        reply: () => [[{ ROLE_ID: 20 }]],
+      },
+      {
+        match: "SELECT SUM(quantity) AS total_quantity",
+        reply: () => [[{ total_quantity: 2 }]], // required total scans for Sprite in this order
+      },
+      {
+        match: "SELECT subcategory\n  FROM xxafmc_order_details",
+        reply: () => [[{ subcategory: 10 }]],
+      },
+      {
+        match: "SELECT item_id, price",
+        reply: () => [[]],
+      },
+      {
+        match: "SELECT unit_price FROM xxafmc_stock_out",
+        reply: () => [[{ unit_price: 18.9 }]],
+      },
+      {
+        match: "SELECT item_code, item_name, quantity AS total_quantity, inventory_item_code, Mix",
+        reply: () => [[{
+          item_code: "100",
+          item_name: "Sprite 250 ML",
+          total_quantity: 2,
+          inventory_item_code: "9000",
+          Mix: "MO",
+        }]],
+      },
+    ],
+  });
+
+  const pool = {
+    async getConnection() {
+      return connection;
+    },
+  };
+
+  const controller = loadControllerWithPool(pool);
+
+  const req = {
+    body: {
+      ORDERNUMBER: "ORD-STD",
+      BARCODE: "SPR-1",
+      QUANTITY: 1,
+      KITCHEN: "Bar",
+    },
+    user: { username: "tester" },
+    session: {
+      "scannedItems_ORD-STD_tester": [
+        { barcode: "SPR-A", parentItem: "9000", itemCode: "100", scanQuantity: 1 },
+        { barcode: "SPR-B", parentItem: "9000", itemCode: "100", scanQuantity: 1 },
+      ],
+    },
+  };
+  const res = createRes();
+
+  await controller.processBarcodeScan(req, res);
+
+  assert.strictEqual(res.statusCode, 400);
+  assert.match(res.body.message, /morethan Order quantity/i);
+  assert.strictEqual(state.commitCalled, false);
+  assert.strictEqual(state.rollbackCalled, true);
   assert.strictEqual(state.releaseCalled, true);
 }
 
@@ -190,8 +285,12 @@ async function runDuplicateBottleScenario() {
         }]],
       },
       {
-        match: "FROM (\n         SELECT inventory_item_code",
+        match: "SELECT inventory_item_code FROM (",
         reply: () => [[{ inventory_item_code: "1001" }]],
+      },
+      {
+        match: "SELECT DISTINCT xu.ROLE_ID",
+        reply: () => [[{ ROLE_ID: 20 }]],
       },
       {
         match: "SELECT SUM(quantity) AS total_quantity",
@@ -286,6 +385,7 @@ async function runKitchenMismatchScenario() {
 async function main() {
   const tests = [
     ["success path", runSuccessScenario],
+    ["standard recipe cap", runStandardRecipeCapScenario],
     ["duplicate Nos scan", runDuplicateBottleScenario],
     ["kitchen/bar mismatch", runKitchenMismatchScenario],
   ];

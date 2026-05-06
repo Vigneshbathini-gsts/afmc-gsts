@@ -1,16 +1,23 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { FaBell, FaUtensils } from "react-icons/fa";
+import { useNavigate } from "react-router-dom";
 import { barOrdersAPI } from "../../services/api";
+import { useAuth } from "../../context/AuthContext";
 
 export default function KitchenOrderBell({ kitchen = "Bar" }) {
   const [notifications, setNotifications] = useState([]);
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef(null);
+  const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const basePath =
+    String(user?.outletType || "").toUpperCase() === "KITCHEN" ? "/kitchen" : "/bar";
 
   // ✅ Fetch Orders
-  const fetchOrders = async () => {
+  const fetchOrders = useCallback(async () => {
     try {
-      const res = await barOrdersAPI.getActiveOrders();
+      const res = await barOrdersAPI.getActiveOrders(kitchen);
 
       const orders = res?.data?.data || [];
 
@@ -22,14 +29,14 @@ export default function KitchenOrderBell({ kitchen = "Bar" }) {
     } catch (error) {
       console.error("Error fetching orders:", error);
     }
-  };
+  }, [kitchen]);
 
   // ✅ Polling
   useEffect(() => {
     fetchOrders();
     const interval = setInterval(fetchOrders, 10000);
     return () => clearInterval(interval);
-  }, [kitchen]);
+  }, [fetchOrders]);
 
   // ✅ Close dropdown on outside click
   useEffect(() => {
@@ -60,10 +67,22 @@ export default function KitchenOrderBell({ kitchen = "Bar" }) {
   };
 
   // ✅ Handle click
-  const handleOrderClick = (order) => {
-    // console.log("Order clicked:", order.NOTIFICATION_ID);
-    // navigate("/bar/order-details", { state: order });
-    handleMarkAsRead(order.NOTIFICATION_ID);
+  const handleOrderClick = async (order) => {
+    const orderNumber = order?.ORDERNUMBER ?? order?.orderNumber;
+    if (!orderNumber) return;
+
+    try {
+      await handleMarkAsRead(order.NOTIFICATION_ID);
+    } finally {
+      const params = new URLSearchParams();
+      params.set("orderNumber", String(orderNumber));
+      params.set("kitchenType", String(kitchen || "Bar"));
+
+      navigate(`${basePath}/order-details?${params.toString()}`, {
+        state: { ...order, ORDERNUMBER: orderNumber, kitchenType: kitchen },
+      });
+      setOpen(false);
+    }
   };
 
   return (

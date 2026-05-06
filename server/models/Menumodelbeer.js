@@ -6,6 +6,8 @@ SELECT
     inv.item_code, 
     inv.item_name, 
     inv.image, 
+    inv.sub_category,
+    sc.SUB_CATEGORY_NAME AS sub_category_name,
     MIN(inv.item_id) AS item_id,
 
     (
@@ -20,6 +22,8 @@ SELECT
     ) AS stock_status
 
 FROM xxafmc_inventory inv
+LEFT JOIN xxafmc_sub_categories sc
+  ON sc.SUB_CATEGORY_ID = inv.sub_category
 
 WHERE 
     inv.item_code IN (
@@ -30,19 +34,20 @@ WHERE
 
     AND inv.category_id = 10
     AND inv.sub_category IN (4, 6, 9, 18)
-    AND inv.item_code = IFNULL(NULL, inv.item_code)
-    AND inv.sub_category = IFNULL(NULL, inv.sub_category)
+    AND inv.item_code = IFNULL(?, inv.item_code)
+    AND inv.sub_category = IFNULL(?, inv.sub_category)
 
 GROUP BY 
     inv.item_code, 
     inv.item_name, 
-    inv.image
+    inv.image,
+    inv.sub_category,
+    sc.SUB_CATEGORY_NAME
 
 ORDER BY 
     item_id ASC`;
 
     const [rows] = await pool.execute(query, [itemCode, subCategory]);
-    console.log(rows);
     return rows;
 };
 
