@@ -1,5 +1,11 @@
 const db = require("../config/db");
 
+const createValidationError = (message) => {
+  const error = new Error(message);
+  error.status = 400;
+  return error;
+};
+
 const getStockQuantity = async (conn, itemCode) => {
   const [rows] = await conn.execute(
     `SELECT IFNULL(SUM(STOCK_QUANTITY), 0) AS stock
@@ -80,7 +86,7 @@ const addCartItem = async (userId, itemData) => {
 
     if (!isCocktailOrMocktail && existingCartQty + quantity + orderReservedQty > stockQty) {
       const availableQty = Math.max(0, stockQty - orderReservedQty - existingCartQty);
-      throw new Error(`Available stock is : ${availableQty}`);
+      throw createValidationError(`Out of stock. Available quantity: ${availableQty}`);
     }
 
     // -------------------------------
@@ -93,6 +99,7 @@ const addCartItem = async (userId, itemData) => {
     );
 
     let newQty = quantity;
+    let insertId = null;
 
     if (existing.length > 0) {
       newQty = existing[0].quantity + quantity;
@@ -104,7 +111,7 @@ const addCartItem = async (userId, itemData) => {
         [newQty, newQty, existing[0].cart_id]
       );
     } else {
-      await conn.execute(
+      const [insertResult] = await conn.execute(
         `INSERT INTO xxafmc_cart_items
         (user_id, item_id, quantity, price, total, description, created_by, creation_date)
         VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
@@ -118,6 +125,7 @@ const addCartItem = async (userId, itemData) => {
           userId,
         ]
       );
+      insertId = insertResult.insertId;
 
 
 
@@ -166,7 +174,7 @@ const addCartItem = async (userId, itemData) => {
 
     if (offers.length === 0) {
       await conn.commit();
-      return { message: "Item added (no offer)" };
+      return { message: "Item added (no offer)", insertId, isCocktailItem: isCocktailOrMocktail };
     }
 
     const offer = offers[0];
@@ -180,9 +188,8 @@ const addCartItem = async (userId, itemData) => {
     // -------------------------------
     if (newQty < offerQty) {
 
-
       await conn.commit();
-      return { message: "Item added (offer not applicable yet)" };
+      return { message: "Item added (offer not applicable yet)", insertId, isCocktailItem: isCocktailOrMocktail };
     }
 
     // -------------------------------
@@ -244,6 +251,8 @@ const addCartItem = async (userId, itemData) => {
 
     return {
       message: "Item + free item added successfully",
+      insertId,
+      isCocktailItem: isCocktailOrMocktail,
       freeItem: {
         item_id: freeItemCode,
         quantity: totalFree,
@@ -299,15 +308,10 @@ const getCartItemsByUser = async (userId) => {
 
     const rawPrice = row.price ?? row.inventory_price;
     const price = Number(rawPrice || 0);
-
-
     const subcategory = Number(row.inventory_subcategory || 0);
-
-    const isFreeItem = row.price === 0;
-
+    const isFreeItem = price === 0;
 
     const isCocktailItem = [14, 15].includes(subcategory);
-
 
     const canEdit = isCocktailItem && !isFreeItem;
 
@@ -424,7 +428,7 @@ const updateCartItemQuantity = async (cartId, userId, quantity) => {
 
       if (futureFreeQty + freeReservedQty > freeStockQty) {
         const availableFreeQty = Math.max(0, freeStockQty - freeReservedQty - (existingFreeQtyGlobal - existingFreeQtyForParent));
-        throw new Error(`Available stock for free item : ${availableFreeQty}`);
+        throw createValidationError(`Out of stock for free item. Available quantity: ${availableFreeQty}`);
       }
 
       // Update or delete free item
@@ -530,11 +534,83 @@ const deleteCartItem = async (cartId, userId) => {
   }
 };
 
+const getCartItemById = async (cartId, userId) => {
+  const [rows] = await db.execute(
+    `SELECT c.cart_id, c.item_id, c.quantity, xi.category_id, xi.sub_category
+     FROM xxafmc_cart_items c
+     LEFT JOIN xxafmc_inventory xi ON c.item_id = xi.item_code
+     WHERE c.cart_id = ?
+       AND c.user_id = ?
+       AND c.price != 0
+     LIMIT 1`,
+    [cartId, userId]
+  );
+
+  return rows[0] || null;
+};
+
+const getCartItemByCode = async (userId, itemCode) => {
+  const [rows] = await db.execute(
+    `SELECT c.cart_id, c.item_id, c.quantity, xi.category_id, xi.sub_category
+     FROM xxafmc_cart_items c
+     LEFT JOIN xxafmc_inventory xi ON c.item_id = xi.item_code
+     WHERE c.user_id = ?
+       AND c.item_id = ?
+       AND c.price != 0
+     LIMIT 1`,
+    [userId, itemCode]
+  );
+
+  return rows[0] || null;
+};
+
+
+
+
+
+const getLovIngredients = async (subCategory) => {
+  let connection;
+  try {
+    connection = await db.getConnection();
+
+    const query = `
+      SELECT xi.item_name AS d,
+             xi.item_code AS r
+      FROM xxafmc_inventory xi
+      WHERE EXISTS (
+          SELECT 1
+          FROM xxafmc_stock_out xso
+          WHERE xso.item_code = xi.item_code
+            AND xso.stock_quantity > 0
+      )
+      AND (
+        (? = 14 AND xi.sub_category IN (9, 6, 4, 18))
+        OR
+        (? = 15 AND xi.sub_category IN (2, 5, 6, 11, 12, 13, 10, 17, 16, 18))
+      )
+      AND xi.\`A/C_UNIT\` <> 'Glass'
+    `;
+
+    const [rows] = await connection.query(query, [subCategory, subCategory]);
+
+    return rows;
+
+  } catch (error) {
+    console.error("Model Error:", error);
+    throw error;
+  } finally {
+    if (connection) connection.release();
+  }
+};
+
 module.exports = {
   addCartItem,
   getCartItemsByUser,
   updateCartItemQuantity,
   deleteCartItem,
+  getCartItemById,
+  getCartItemByCode,
+  getLovIngredients,
 };
 
 

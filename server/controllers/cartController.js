@@ -1,9 +1,218 @@
+const db = require("../config/db");
 const cartModel = require("../models/cartModel");
+const cocktailModel = require("../models/cocktailModel");
+
+const getSessionUserKey = (req) =>
+  String(req.user?.username || req.user?.user_name || req.user?.userId || "").trim() || "unknown";
+
+const getCocktailSessionKey = (req, parentItemCode, orderNumber = "") =>
+  `cocktailCollection_${String(orderNumber || "").trim()}_${String(parentItemCode || "").trim()}_${getSessionUserKey(req)}`;
+
+const saveSession = (req) =>
+  new Promise((resolve, reject) => {
+    if (!req.session?.save) return resolve();
+    req.session.save((err) => (err ? reject(err) : resolve()));
+  });
+
+const getStockQuantities = async (conn, itemCodes) => {
+  if (!Array.isArray(itemCodes) || itemCodes.length === 0) {
+    return {};
+  }
+
+  const placeholders = itemCodes.map(() => "?").join(",");
+  const [rows] = await conn.execute(
+    `
+    SELECT item_code, IFNULL(SUM(stock_quantity), 0) AS stock_quantity
+    FROM xxafmc_stock_out
+    WHERE item_code IN (${placeholders})
+    GROUP BY item_code
+    `,
+    itemCodes
+  );
+
+  return rows.reduce((acc, row) => {
+    acc[String(row.item_code)] = Number(row.stock_quantity || 0);
+    return acc;
+  }, {});
+};
+
+const normalizeCocktailIngredientRow = (row, loginType, cartItemQuantity = 1, overrideQuantity = null) => {
+  const itemCode = Number(row.ITEM_CODE || 0);
+  const itemName = String(row.ITEM_NAME || "").trim();
+  const basePegs = Number(row.PEGS || 0);
+  const normalizedLoginType = String(loginType || "").trim().toUpperCase();
+  const selectedPrice = normalizedLoginType === "NON MEMBER"
+    ? Number(row.NON_MEMBER_PRICE ?? row.PRICE ?? 0)
+    : Number(row.PRICE ?? row.NON_MEMBER_PRICE ?? 0);
+  const quantity = overrideQuantity != null
+    ? Number(overrideQuantity)
+    : basePegs * Number(cartItemQuantity || 1);
+  const unitPrice = basePegs > 0 ? selectedPrice / basePegs : selectedPrice;
+  const lineTotal = Number((unitPrice * quantity).toFixed(2));
+
+  return {
+    itemCode,
+    itemName,
+    basePegs,
+    quantity,
+    price: Number(selectedPrice.toFixed(2)),
+    unitPrice: Number(unitPrice.toFixed(2)),
+    lineTotal,
+    inventoryItemCode: row.INVENTORY_ITEM_CODE,
+    isCocktailIngredient: true,
+    requiredPegs: quantity,
+    hideAddButton: false,
+    stockQuantity: 0,
+    stockStatus: "Unknown",
+    parentItem: row.INVENTORY_ITEM_CODE,
+  };
+};
+
+const buildCocktailCollection = async (req, parentItemCode, cartItemQuantity = 1, orderNumber = "") => {
+  const loginType = String(req.user?.loginType || "").trim().toUpperCase();
+  const detailRows = await cocktailModel.getCocktailDetailRows(parentItemCode);
+
+  const collectionRows = detailRows.map((row) =>
+    normalizeCocktailIngredientRow(row, loginType, cartItemQuantity)
+  );
+
+  const itemCodes = [...new Set(collectionRows.map((row) => row.itemCode).filter(Boolean))];
+  const stockMap = await getStockQuantities(db, itemCodes);
+
+  const ingredients = collectionRows.map((row) => {
+    const stockQuantity = stockMap[String(row.itemCode)] || 0;
+    const enoughStock = stockQuantity >= row.quantity;
+
+    return {
+      ...row,
+      stockQuantity,
+      stockStatus: enoughStock ? "In Stock" : "Out Of Stock",
+      hideAddButton: enoughStock ? "N" : "Y",
+    };
+  });
+
+  const totalPrice = Number(
+    ingredients.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0).toFixed(2)
+  );
+
+  return {
+    parentItemCode,
+    cartItemQuantity,
+    orderNumber: orderNumber || null,
+    ingredients,
+    totalPrice,
+  };
+};
+
+const getCocktailSessionCollection = async (req, parentItemCode, cartItemQuantity = 1, orderNumber = "") => {
+  const sessionKey = getCocktailSessionKey(req, parentItemCode, orderNumber);
+  let collection = req.session?.[sessionKey];
+
+  if (!collection || Number(collection.cartItemQuantity) !== Number(cartItemQuantity)) {
+    collection = await buildCocktailCollection(req, parentItemCode, cartItemQuantity, orderNumber);
+    req.session[sessionKey] = collection;
+    await saveSession(req);
+  }
+
+  return { sessionKey, collection };
+};
+
+const applyCocktailIngredientUpdates = (collection, updates) => {
+  const updatesByCode = (Array.isArray(updates) ? updates : []).reduce((acc, item) => {
+    if (item && item.itemCode != null) {
+      acc[String(item.itemCode)] = item;
+    }
+    return acc;
+  }, {});
+
+  const ingredients = collection.ingredients.map((row) => {
+    const update = updatesByCode[String(row.itemCode)];
+    const quantity = update?.quantity != null ? Number(update.quantity) : Number(row.quantity || 0);
+    const unitPrice = Number(row.unitPrice || 0);
+    const lineTotal = Number((unitPrice * quantity).toFixed(2));
+    const stockQuantity = Number(row.stockQuantity || 0);
+    const enoughStock = stockQuantity >= quantity;
+
+    return {
+      ...row,
+      quantity,
+      requiredPegs: quantity,
+      lineTotal,
+      stockStatus: enoughStock ? "In Stock" : "Out Of Stock",
+      hideAddButton: enoughStock ? "N" : "Y",
+    };
+  });
+
+  const totalPrice = Number(
+    ingredients.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0).toFixed(2)
+  );
+
+  return {
+    ...collection,
+    ingredients,
+    totalPrice,
+  };
+};
+
+const getCartItemById = async (req, cartId) => {
+  const userId = req.user?.userId;
+  if (!userId || Number.isNaN(Number(cartId))) {
+    return null;
+  }
+
+  return cartModel.getCartItemById(Number(cartId), userId);
+};
+
+const getCartItemByCode = async (req, itemCode) => {
+  const userId = req.user?.userId;
+  if (!userId || itemCode == null) {
+    return null;
+  }
+
+  return cartModel.getCartItemByCode(userId, itemCode);
+};
+
+const isCocktailCartItem = (cartItem) => {
+  return Boolean(
+    cartItem && cartItem.category_id === 10 && [14, 15].includes(Number(cartItem.sub_category))
+  );
+};
+
+const validateCocktailItemOrFail = (cartItem) => {
+  if (!cartItem) {
+    const error = new Error("Cart item not found");
+    error.status = 404;
+    throw error;
+  }
+
+  if (!isCocktailCartItem(cartItem)) {
+    const error = new Error("Cart item is not a cocktail or mocktail");
+    error.status = 400;
+    throw error;
+  }
+};
+
+const getCocktailCollectionResponse = async (req, cartItem, orderNumber = "") => {
+  const { collection } = await getCocktailSessionCollection(
+    req,
+    cartItem.item_id,
+    cartItem.quantity,
+    orderNumber
+  );
+
+  return {
+    parentItemCode: collection.parentItemCode,
+    orderNumber: collection.orderNumber,
+    quantity: collection.cartItemQuantity,
+    totalPrice: collection.totalPrice,
+    ingredients: collection.ingredients,
+  };
+};
 
 exports.addCartItem = async (req, res) => {
   try {
     const userId = req.user?.userId;
-    const { item_id, quantity, unit_price, remarks } = req.body;
+    const { item_id, quantity, unit_price, remarks, orderNumber } = req.body;
 
     if (!userId) {
       return res.status(400).json({ success: false, message: "User ID is required" });
@@ -11,31 +220,107 @@ exports.addCartItem = async (req, res) => {
     if (!item_id) {
       return res.status(400).json({ success: false, message: "Item ID is required" });
     }
-    if (!unit_price) {
+    if (unit_price == null || Number.isNaN(Number(unit_price))) {
       return res.status(400).json({ success: false, message: "Unit price is required" });
     }
 
     const itemData = {
       item_id,
-      quantity: quantity || 1,
-      unit_price,
+      quantity: Number(quantity) || 1,
+      unit_price: Number(unit_price),
       remarks: remarks || "Din",
     };
 
     const result = await cartModel.addCartItem(userId, itemData);
+
+    if (result?.isCocktailItem) {
+      const cartItem = await cartModel.getCartItemByCode(userId, item_id);
+      if (cartItem) {
+        await getCocktailSessionCollection(req, cartItem.item_id, cartItem.quantity, orderNumber);
+      }
+    }
+
     return res.status(201).json({
       success: true,
-      message: "Item added to cart",
-      data: { cartId: result.insertId },
+      message: result.message || "Item added to cart",
+      data: {
+        cartId: result.insertId || null,
+      },
     });
   } catch (error) {
     console.error("Error adding item to cart:", error);
-    const validationMessage = error.message?.includes("Available stock") || error.message?.includes("free item")
-      ? error.message
-      : "Failed to add item to cart";
+    const status = error?.status || (error?.message?.includes("Out of stock") ? 400 : 500);
+    const message = error?.message || "Failed to add item to cart";
+    return res.status(status).json({ success: false, message });
+  }
+};
 
-    const status = validationMessage === error.message ? 400 : 500;
-    return res.status(status).json({ success: false, message: validationMessage });
+exports.getCocktailDetails = async (req, res) => {
+  try {
+    const userId = req.user?.userId;
+    const { cartId } = req.params;
+    const orderNumber = String(req.query.orderNumber || "").trim();
+
+    if (!userId) {
+      return res.status(400).json({ success: false, message: "User ID is required" });
+    }
+    if (!cartId || Number.isNaN(Number(cartId))) {
+      return res.status(400).json({ success: false, message: "Cart ID is required and must be a valid number" });
+    }
+
+    const cartItem = await cartModel.getCartItemById(Number(cartId), userId);
+    validateCocktailItemOrFail(cartItem);
+
+    const { collection } = await getCocktailSessionCollection(
+      req,
+      cartItem.item_id,
+      cartItem.quantity,
+      orderNumber
+    );
+
+    return res.status(200).json({ success: true, data: collection });
+  } catch (error) {
+    console.error("Error fetching cocktail details:", error);
+    const status = error.status || 500;
+    return res.status(status).json({ success: false, message: error.message || "Failed to fetch cocktail details" });
+  }
+};
+
+exports.updateCocktailIngredients = async (req, res) => {
+  try {
+    const userId = req.user?.userId;
+    const { cartId } = req.params;
+    const { ingredients, orderNumber } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ success: false, message: "User ID is required" });
+    }
+    if (!cartId || Number.isNaN(Number(cartId))) {
+      return res.status(400).json({ success: false, message: "Cart ID is required and must be a valid number" });
+    }
+    if (!Array.isArray(ingredients)) {
+      return res.status(400).json({ success: false, message: "Ingredients must be an array" });
+    }
+
+    const cartItem = await cartModel.getCartItemById(Number(cartId), userId);
+    validateCocktailItemOrFail(cartItem);
+
+    const { sessionKey, collection } = await getCocktailSessionCollection(
+      req,
+      cartItem.item_id,
+      cartItem.quantity,
+      String(orderNumber || "").trim()
+    );
+
+    const updatedCollection = applyCocktailIngredientUpdates(collection, ingredients);
+    req.session[sessionKey] = updatedCollection;
+    await saveSession(req);
+
+    return res.status(200).json({ success: true, data: updatedCollection });
+  } catch (error) {
+    console.error("Error updating cocktail ingredients:", error);
+    const status = error.status || 500;
+    return res.status(status).json({ success: false, message: error.message || "Failed to update cocktail ingredients" });
   }
 };
 
@@ -80,10 +365,11 @@ exports.updateCartItemQuantity = async (req, res) => {
     return res.status(200).json({ success: true, message: "Quantity updated", data: items });
   } catch (error) {
     console.error("Error updating cart item quantity:", error);
-    const isNotFound = error?.message === "Cart item not found";
-    return res.status(isNotFound ? 404 : 500).json({
+    const status = error?.status || (error?.message?.includes("Out of stock") ? 400 : 500);
+    const message = error?.message || "Failed to update cart quantity";
+    return res.status(status).json({
       success: false,
-      message: isNotFound ? error.message : "Failed to update cart quantity",
+      message,
     });
   }
 };
@@ -110,5 +396,36 @@ exports.deleteCartItem = async (req, res) => {
   } catch (error) {
     console.error("Error deleting cart item:", error);
     return res.status(500).json({ success: false, message: "Failed to remove cart item" });
+  }
+};
+
+
+
+
+exports.getLovIngredients = async (req, res) => {
+  try {
+    const { subCategory } = req.query;
+
+    if (!subCategory) {
+      return res.status(400).json({
+        success: false,
+        message: "subCategory is required",
+      });
+    }
+
+    const data = await cartModel.getLovIngredients(subCategory);
+
+    return res.status(200).json({
+      success: true,
+      data,
+    });
+
+  } catch (error) {
+    console.error("Controller Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch items",
+      error: error.message,
+    });
   }
 };

@@ -241,7 +241,7 @@ export default function CartPage({ isAttendant = false }) {
                                 {/* Action Buttons Overlay - Top Right */}
                                 <div className="absolute right-1 top-1 flex gap-1 z-10">
                                     {/* Edit Button - Only show for items with subcategory 14 or 15 and not attendant */}
-                                    {item.subcategory && [14, 15].includes(Number(item.subcategory)) && !isAttendant && (
+                                    {item.subcategory && [14, 15].includes(Number(item.subcategory)) && !isAttendant && !item.isFreeItem && (
                                         <button
                                             type="button"
                                             onClick={() => handleEditItem(item.itemId)}

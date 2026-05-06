@@ -205,8 +205,11 @@ export const inventoryAPI = {
 export const cartAPI = {
   getByUserId: (userId) => api.get("/cart", { params: { userId } }),
   addItem: (cartData) => api.post("/cart", cartData),
+  getCocktailDetails: (cartId, params) => api.get(`/cart/cocktail/${cartId}`, { params }),
+  updateCocktailIngredients: (cartId, data) => api.patch(`/cart/cocktail/${cartId}/ingredients`, data),
   updateQuantity: (cartId, quantity) => api.patch(`/cart/${cartId}`, { quantity }),
   deleteItem: (cartId) => api.delete(`/cart/${cartId}`),
+  getLovIngredients: (subCategory) => api.get("/cart/lov-ingredients", { params: { subCategory } }),
 };
 
 // ================================

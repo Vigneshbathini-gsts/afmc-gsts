@@ -4,6 +4,7 @@ import { ChevronsLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { API_BASE_URL, cartAPI } from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
+import { toast } from "react-toastify";
 
 const BASEAPI = "https://afmc.globalsparkteksolutions.com/AFMCIMAGES/";
 
@@ -104,8 +105,6 @@ function MenuPopup({ item, loading, onClose }) {
   const [qty, setQty] = useState("1");
   const [remarks, setRemarks] = useState("Din");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
 
   const fetchCartCount = async () => {
 
@@ -151,8 +150,6 @@ function MenuPopup({ item, loading, onClose }) {
 
     try {
       setIsSubmitting(true);
-      setError("");
-      setSuccess("");
 
       const cartData = {
         item_id: item?.item_id || item?.item_code,
@@ -165,8 +162,8 @@ function MenuPopup({ item, loading, onClose }) {
 
       const response = await cartAPI.addItem(cartData);
 
-      setSuccess("Item added to cart!");
-if(response.status === 201)
+      toast.success("Item added to cart!");
+      if(response.status === 201)
       {
         await fetchCartCount();
       }
@@ -179,7 +176,8 @@ if(response.status === 201)
     } catch (err) {
       console.error("❌ Error adding to cart:", err);
       console.error("Error response:", err.response?.data);
-      setError(err.response?.data?.message || "Failed to add item to cart");
+      const errorMessage = err.response?.data?.message || "Failed to add item to cart";
+      toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -275,17 +273,6 @@ if(response.status === 201)
                   </div>
                 </div>
               </div>
-
-              {error && (
-                <div className="mt-4 rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
-                  {error}
-                </div>
-              )}
-              {success && (
-                <div className="mt-4 rounded-md bg-green-50 px-4 py-3 text-sm text-green-700">
-                  {success}
-                </div>
-              )}
 
               <div className="mt-8 flex flex-wrap gap-4">
                 <button

@@ -292,6 +292,38 @@ const getInventoryItemByCode = async (itemCode) => {
   return rows && rows.length ? rows[0] : null;
 };
 
+const getItemById = async (itemId) => {
+  const sql = `
+    SELECT 
+      ITEM_ID,
+      ITEM_NAME,
+      DESCRIPTION,
+      ITEM_CODE,
+      CATEGORY_ID,
+      SUB_CATEGORY,
+      UNIT_PRICE,
+      FOOD_PR_CHARGES,
+      PROFIT,
+      NON_MEMBER_PROFIT,
+      PR_CHARGES,
+      \`A/C_UNIT\`,
+      STOCK_QUANTITY,
+      CASE
+        WHEN IFNULL(TRIM(IMAGE), '') = '' THEN NULL
+        WHEN IMAGE LIKE 'http%' THEN IMAGE
+        WHEN IMAGE LIKE '/uploads/%' THEN IMAGE
+        ELSE CONCAT('/apex_image_endpoint?item_id=', ITEM_ID)
+      END AS IMAGE_URL,
+      CREATED_BY,
+      CREATION_DATE
+    FROM xxafmc_inventory
+    WHERE ITEM_ID = ?
+    LIMIT 1
+  `;
+  const [rows] = await db.execute(sql, [Number(itemId)]);
+  return rows && rows.length ? rows[0] : null;
+};
+
 const getStockOutItemByBarcode = async (barcode, executor = db) => {
   const sql = `
     SELECT
@@ -815,6 +847,7 @@ module.exports = {
   getSubCategories,
   createItem,
   getBarTypes,
+  getItemById,
   getStockOutItemByBarcode,
   barcodeExistsInDb,
   stockOutBarcodeExistsInDb,
