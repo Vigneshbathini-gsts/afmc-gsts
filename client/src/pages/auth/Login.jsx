@@ -13,6 +13,7 @@ import {
 } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { useLocation } from "react-router-dom";
+import { useRef } from "react";
 import { authAPI } from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
 import logo from "../../assets/AFMC_Logo.png";
@@ -47,17 +48,21 @@ export default function Login() {
   const { user, isLoading, setUser } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const sessionAlertShownRef = useRef(false);
 
   useEffect(() => {
+    // In React 18 dev mode (StrictMode), effects can run twice on mount.
+    // This ref guarantees the alert is shown only once per page load.
+    if (sessionAlertShownRef.current) return;
+
     if (location.state?.reason === "sessionEnded") {
+      sessionAlertShownRef.current = true;
       // eslint-disable-next-line no-alert
       alert("Session is over. Please login again.");
-      // Clear history state so it doesn't alert repeatedly
-      navigate(location.pathname, { replace: true, state: {} });
+      // Clear history state so it doesn't alert repeatedly (including back/refresh)
+      navigate(location.pathname, { replace: true, state: null });
     }
-    // Intentionally depends on location.state only
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.state]);
+  }, [location.pathname, location.state, navigate]);
 
   // Load saved credentials
   useEffect(() => {
