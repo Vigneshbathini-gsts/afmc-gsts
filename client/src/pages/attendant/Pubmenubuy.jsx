@@ -73,10 +73,8 @@ export default function Pubmenubuy() {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const orderNumber = searchParams.get("orderNumber") || location.state?.orderNumber || "";
-  console.log("orderNumber",orderNumber);
-  const [items, setItems] = useState(() =>
-    fallbackItemFromState(location.state?.item).map((item, index) => normalizeItem(item, index))
-  );
+  const [items, setItems] = useState([]);
+  const [orderHeader, setOrderHeader] = useState(null);
   const [loading, setLoading] = useState(Boolean(orderNumber));
   const [error, setError] = useState("");
 
@@ -94,9 +92,10 @@ export default function Pubmenubuy() {
 
       try {
         const response = await Pubmenubuyservice.getByOrderNumber(orderNumber);
-        console.log("orderNumber1",orderNumber)
-        const rows = Array.isArray(response?.data?.data) ? response.data.data : [];
+        const data = response?.data?.data || {};
+        const rows = Array.isArray(data?.items) ? data.items : [];
         if (!ignore) {
+          setOrderHeader(data?.header || null);
           setItems(rows.map((item, index) => normalizeItem(item, index)));
         }
       } catch (fetchError) {
@@ -167,12 +166,14 @@ export default function Pubmenubuy() {
             <div className="rounded-md border border-dashed border-stone-400 px-3 py-2">
               <div className="text-sm text-stone-600">Order Number</div>
               <div className="text-3xl font-medium text-stone-900">
-                {orderNumber }
+                {orderHeader?.order_num || orderNumber}
               </div>
             </div>
             <div className="rounded-md border border-dashed border-stone-400 px-3 py-2">
               <div className="text-sm text-stone-600">Order Date</div>
-              <div className="text-3xl font-medium text-stone-900">{formatDate()}</div>
+              <div className="text-3xl font-medium text-stone-900">
+                {formatDate(orderHeader?.order_date)}
+              </div>
             </div>
           </div>
         </div>

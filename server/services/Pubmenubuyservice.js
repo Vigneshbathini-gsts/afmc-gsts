@@ -1,9 +1,14 @@
-const Pubmenubuymodel = require('../models/Pubmenubuymodel');
+const Pubmenubuymodel = require("../models/Pubmenubuymodel");
 
-const Pubmenubuyservice = async (ORDER_NUMBER) => {
-    return await Pubmenubuymodel.Pubmenubuymodel(ORDER_NUMBER);
+const getOrderSummary = async (orderNumber) => {
+  return Pubmenubuymodel.getOrderSummary(orderNumber);
+};
+
+const createOrder = async (payload, authUser) => {
+  return Pubmenubuymodel.createOrder(payload, authUser);
 };
 
 module.exports = {
-    Pubmenubuyservice,
+  createOrder,
+  getOrderSummary,
 };
