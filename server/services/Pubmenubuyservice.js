@@ -8,7 +8,12 @@ const createOrder = async (payload, authUser) => {
   return Pubmenubuymodel.createOrder(payload, authUser);
 };
 
+const cancelOrder = async (orderNumber) => {
+  return Pubmenubuymodel.cancelOrder(orderNumber);
+};
+
 module.exports = {
   createOrder,
   getOrderSummary,
+  cancelOrder,
 };

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { CheckCircle2, ChevronLeft, Minus, Plus, ShoppingCart, Trash2, XCircle } from "lucide-react";
 import Pubmenubuyservice from "../../services/Pubmenubuyservice";
+import ConfirmOrderservice from "../../services/ConfirmOrderservice";
 
 const BASEAPI = "https://afmc.globalsparkteksolutions.com/AFMCIMAGES/";
 
@@ -76,7 +77,12 @@ export default function Pubmenubuy() {
   const [items, setItems] = useState([]);
   const [orderHeader, setOrderHeader] = useState(null);
   const [loading, setLoading] = useState(Boolean(orderNumber));
+  const [cancelling, setCancelling] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState("");
+  const currentBasePath = location.pathname.startsWith("/attendant")
+    ? "/attendant"
+    : "/user";
 
   useEffect(() => {
     let ignore = false;
@@ -136,6 +142,53 @@ export default function Pubmenubuy() {
     setItems((current) => current.filter((item) => item.id !== id));
   };
 
+  const handleCancelOrder = async () => {
+    if (!orderNumber || cancelling) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Are you sure you want to cancel order`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setCancelling(true);
+      setError("");
+      const response = await Pubmenubuyservice.cancelOrder(orderNumber);
+      // window.alert(response?.data?.message || "Order cancelled");
+      navigate(location.pathname.replace(/\/buy$/, ""), { replace: true });
+    } catch (cancelError) {
+      setError(
+        cancelError.response?.data?.message || "Unable to cancel this order."
+      );
+    } finally {
+      setCancelling(false);
+    }
+  };
+
+  const handleConfirmOrder = async () => {
+    if (!orderNumber || confirming || loading) {
+      return;
+    }
+
+    try {
+      setConfirming(true);
+      setError("");
+      await ConfirmOrderservice.confirmOrder(orderNumber);
+      navigate(`${currentBasePath}/confirm-order-page?orderNumber=${orderNumber}`);
+    } catch (confirmError) {
+      setError(
+        confirmError.response?.data?.message || "Unable to confirm this order."
+      );
+    } finally {
+      setConfirming(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#f6f2ee] px-4 py-6 md:px-8">
       <div className="mx-auto max-w-[1280px] space-y-5">
@@ -151,13 +204,21 @@ export default function Pubmenubuy() {
                 <ChevronLeft className="h-4 w-4" />
                 Back
               </ActionButton>
-              <ActionButton className="bg-[#6f9d24] hover:bg-[#618a1f]">
+              <ActionButton
+                onClick={handleConfirmOrder}
+                disabled={confirming || loading}
+                className="bg-[#6f9d24] hover:bg-[#618a1f] disabled:cursor-not-allowed disabled:opacity-60"
+              >
                 <CheckCircle2 className="h-4 w-4" />
-                Confirm Order
+                {confirming ? "Confirming..." : "Confirm Order"}
               </ActionButton>
-              <ActionButton className="bg-[#f0261e] hover:bg-[#d91d17]">
+              <ActionButton
+                onClick={handleCancelOrder}
+                disabled={cancelling || loading}
+                className="bg-[#f0261e] hover:bg-[#d91d17] disabled:cursor-not-allowed disabled:opacity-60"
+              >
                 <XCircle className="h-4 w-4" />
-                Cancel Order
+                {cancelling ? "Cancelling..." : "Cancel Order"}
               </ActionButton>
             </div>
           </div>

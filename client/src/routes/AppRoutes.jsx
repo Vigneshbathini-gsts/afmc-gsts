@@ -41,6 +41,7 @@ import AttendantDashboard from "../pages/attendant/Dashboard";
 import RegisterMember from "../pages/attendant/RegisterMember";
 import AttendantCart from "../pages/attendant/Cart";
 import AttendantConfirmOrder from "../pages/attendant/ConfirmOrder";
+import ConfirmOrderpage from "../pages/attendant/ConfirmOrderpage";
 import AttendantPayment from "../pages/attendant/Payment";
 import AttendantInvoice from "../pages/attendant/Invoice";
 import AttendantActiveOrders from "../pages/attendant/ActiveOrders";
@@ -156,6 +157,7 @@ export default function AppRoutes() {
         <Route path="register-member" element={<RegisterMember />} />
         <Route path="cart" element={<AttendantCart />} />
         <Route path="confirm-order" element={<AttendantConfirmOrder />} />
+        <Route path="confirm-order-page" element={<ConfirmOrderpage />} />
         <Route path="payment" element={<AttendantPayment />} />
         <Route path="invoice" element={<AttendantInvoice />} />
         <Route path="active-orders" element={<AttendantActiveOrders />} />
@@ -182,6 +184,7 @@ export default function AppRoutes() {
         <Route path="item/:id" element={<ItemDetails />} />
         <Route path="cart" element={<UserCart />} />
         <Route path="confirm-order" element={<UserConfirmOrder />} />
+        <Route path="confirm-order-page" element={<ConfirmOrderpage />} />
         <Route path="payment" element={<UserPayment />} />
         <Route path="invoice" element={<UserInvoice />} />
         <Route path="active-orders" element={<ActiveOrders />} />

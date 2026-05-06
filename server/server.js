@@ -101,6 +101,7 @@ const notificationRoutes = require("./routes/notificationRoutes");
 const cancelledOrdersRoutes = require("./routes/cancelledOrdersRoutes");
 const menuRoutesbeer = require("./routes/MenuRoutesbeer");
 const Pubmenubuyroutes = require("./routes/Pubmenubuyroutes");
+const ConfirmOrderroutes = require("./routes/ConfirmOrderroutes");
 
 const apiPrefixes = ["/api", API_BASE_PATH];
 for (const prefix of apiPrefixes) {
@@ -120,6 +121,7 @@ for (const prefix of apiPrefixes) {
   // End-user + attendant menu endpoints (e.g. GET {API_BASE_URL}/menubar)
   app.use(prefix, menuRoutesbeer);
   app.use(prefix, Pubmenubuyroutes);
+  app.use(prefix, ConfirmOrderroutes);
 }
 
 const PORT = process.env.PORT || 5000;

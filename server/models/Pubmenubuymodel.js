@@ -83,6 +83,83 @@ async function getOrderSummary(orderNumber) {
   };
 }
 
+async function cancelOrder(orderNumber) {
+  const normalizedOrderNumber = Number(orderNumber);
+  if (!Number.isFinite(normalizedOrderNumber) || normalizedOrderNumber <= 0) {
+    const error = new Error("Valid order number is required");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const connection = await db.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    const [[orderRow]] = await connection.execute(
+      `
+        SELECT order_num
+        FROM xxafmc_order_header
+        WHERE order_num = ?
+        LIMIT 1
+      `,
+      [normalizedOrderNumber]
+    );
+
+    if (!orderRow) {
+      const error = new Error("Order not found");
+      error.statusCode = 404;
+      throw error;
+    }
+
+    const [[notificationRow]] = await connection.execute(
+      `
+        SELECT COUNT(*) AS notificationCount
+        FROM xxafmc_kitchen_notification
+        WHERE ordernumber = ?
+          AND status IS NOT NULL
+      `,
+      [normalizedOrderNumber]
+    );
+
+    const notificationCount = Number(notificationRow?.notificationCount || 0);
+
+    if (notificationCount > 0) {
+      const error = new Error("Order cannot be cancelled because kitchen processing has already started");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    await connection.execute(
+      `
+        DELETE FROM xxafmc_order_details
+        WHERE order_id = ?
+      `,
+      [normalizedOrderNumber]
+    );
+
+    await connection.execute(
+      `
+        DELETE FROM xxafmc_order_header
+        WHERE order_num = ?
+      `,
+      [normalizedOrderNumber]
+    );
+
+    await connection.commit();
+
+    return {
+      orderNumber: normalizedOrderNumber,
+      message: "Order cancelled",
+    };
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
 async function createOrder(payload = {}, authUser = {}) {
   const itemCode = Number(payload.itemCode);
   const quantity = Number(payload.quantity || 1);
@@ -329,4 +406,5 @@ async function createOrder(payload = {}, authUser = {}) {
 module.exports = {
   createOrder,
   getOrderSummary,
+  cancelOrder,
 };
