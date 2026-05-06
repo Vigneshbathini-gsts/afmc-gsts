@@ -94,10 +94,6 @@ const validatePayload = (payload) => {
     throw new Error("Non member PR charges are required");
   }
 
-  if (!rows.length) {
-    throw new Error("At least one cocktail detail row is required");
-  }
-
   const invalidRow = rows.find(
     (row) =>
       row.itemCode == null ||

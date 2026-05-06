@@ -1,8 +1,9 @@
 ﻿import React, { useEffect, useMemo, useState } from "react";
 import { FaTimes } from "react-icons/fa";
 import { ChevronsLeft, ShoppingCart, Heart, Share2, Star, Flame, Leaf, Zap } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { API_BASE_URL, authFetchJson, offersAPI } from "../../services/api";
+import Pubmenubuyservice from "../../services/Pubmenubuyservice";
 
 const BASEAPI = "https://afmc.globalsparkteksolutions.com/AFMCIMAGES/";
 
@@ -481,6 +482,175 @@ function MenuGrid({ items, showStockStatus = false, onItemClick }) {
           </div>
         </button>
       ))}
+    </div>
+  );
+}
+
+function MenuPopupCompact({ item, loading, onClose, onBuy }) {
+  const [qty, setQty] = useState("1");
+  const [remarks, setRemarks] = useState("Din");
+
+  useEffect(() => {
+    if (!item && !loading) {
+      return undefined;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const handleEscape = (event) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    };
+
+    window.addEventListener("keydown", handleEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleEscape);
+    };
+  }, [item, loading, onClose]);
+
+  if (!item && !loading) {
+    return null;
+  }
+
+  const imageSrc = `${BASEAPI}${item?.image || "default.jpg"}`;
+  const acUnit = item?.ac_unit || item?.["A/C_UNIT"] || "Nos";
+
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/35 p-4 backdrop-blur-[2px] sm:p-6"
+      role="dialog"
+      aria-modal="true"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className="relative w-full max-w-4xl overflow-hidden rounded-[18px] border border-stone-200 bg-white shadow-[0_28px_80px_rgba(0,0,0,0.22)]">
+        <div className="flex items-center justify-end border-b border-stone-200 px-4 py-4 sm:px-6">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-9 w-9 items-center justify-center rounded-full text-stone-500 transition hover:bg-stone-100 hover:text-stone-800"
+            aria-label="Close popup"
+          >
+            <FaTimes size={16} />
+          </button>
+        </div>
+
+        {loading ? (
+          <div className="animate-pulse p-6 sm:p-8">
+            <div className="grid gap-6 md:grid-cols-[140px_minmax(0,1fr)]">
+              <div className="h-28 rounded bg-gray-200" />
+              <div className="space-y-3">
+                <div className="h-5 w-2/3 rounded bg-gray-200" />
+                <div className="h-16 w-full rounded bg-gray-100" />
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div className="h-12 rounded bg-gray-100" />
+                  <div className="h-12 rounded bg-gray-100" />
+                  <div className="h-12 rounded bg-gray-100" />
+                </div>
+                <div className="flex gap-3">
+                  <div className="h-11 w-36 rounded-full bg-gray-200" />
+                  <div className="h-11 w-24 rounded-full bg-gray-100" />
+                  <div className="h-11 w-28 rounded-full bg-gray-100" />
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="p-4 sm:p-6 md:p-8">
+            <div className="grid gap-6 md:grid-cols-[140px_minmax(0,1fr)] md:items-start">
+              <div className="flex items-start justify-center md:justify-start">
+                <div className="flex h-28 w-28 items-center justify-center overflow-hidden rounded bg-white">
+                  <img
+                    src={imageSrc}
+                    alt={item?.item_name || "Item"}
+                    className="h-full w-full object-contain"
+                  />
+                </div>
+              </div>
+
+              <div className="min-w-0 space-y-5">
+                <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_140px] md:items-start">
+                  <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
+                    <div className="text-[14px] font-semibold leading-5 text-stone-600">Item Name</div>
+                    <h2 className="text-[18px] font-bold uppercase leading-6 text-stone-900">
+                      {item?.item_name || "-"}
+                    </h2>
+
+                    <div className="text-[14px] font-semibold leading-5 text-stone-600">A/C Unit</div>
+                    <div>
+                      <div className="h-11 w-full rounded border border-stone-300 bg-white px-3 text-[15px] font-medium text-stone-700">
+                        <span className="flex h-full items-center">{acUnit}</span>
+                      </div>
+                    </div>
+
+                    <div className="text-[14px] font-semibold leading-5 text-stone-600">Qty</div>
+                    <div>
+                      <input
+                        type="number"
+                        min="1"
+                        value={qty}
+                        onChange={(e) => setQty(e.target.value)}
+                        className="h-11 w-full rounded border border-stone-300 bg-white px-3 text-[15px] font-medium text-stone-900 outline-none transition focus:border-afmc-maroon focus:ring-2 focus:ring-afmc-maroon/20"
+                        inputMode="numeric"
+                      />
+                    </div>
+
+                    <div className="text-[14px] font-semibold leading-5 text-stone-600">Remarks</div>
+                    <div>
+                      <select
+                        value={remarks}
+                        onChange={(e) => setRemarks(e.target.value)}
+                        className="h-11 w-full rounded border border-stone-300 bg-white px-3 text-[15px] font-medium text-stone-800 outline-none transition focus:border-afmc-maroon focus:ring-2 focus:ring-afmc-maroon/20"
+                      >
+                        <option value="Din">Din</option>
+                        <option value="Take Away">Take Away</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-[auto_auto] items-start justify-start gap-x-4 gap-y-1 md:justify-end">
+                    <div className="text-[14px] font-semibold leading-5 text-stone-600">Price</div>
+                    <div className="text-[18px] font-bold text-stone-900">{formatPrice(item?.unit_price)}</div>
+                    {item?.stock_status ? (
+                      <>
+                        <div className="text-[14px] font-semibold leading-5 text-stone-600">Status</div>
+                        <div className="text-[14px] font-medium text-red-600">{item.stock_status}</div>
+                      </>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-3 md:pl-[calc(4rem+140px)]">
+                  <button
+                    type="button"
+                    className="min-w-[170px] rounded-full border border-[#7BA43A] px-8 py-3 text-sm font-semibold text-[#5F8A22] transition hover:bg-[#7BA43A]/10"
+                  >
+                    Add to cart
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onBuy?.(item, qty, remarks)}
+                    className="min-w-[90px] rounded-full border border-[#7BA43A] px-8 py-3 text-sm font-semibold text-[#5F8A22] transition hover:bg-[#7BA43A]/10"
+                  >
+                    Buy
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="min-w-[130px] rounded-full border border-red-400 px-8 py-3 text-sm font-semibold text-red-500 transition hover:bg-red-50"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -1274,6 +1444,7 @@ function SnackNonVegSection({ onItemClick }) {
 
 function MenuDashboard() {
   const navigate = useNavigate();
+   const location = useLocation();
   const [mainTab, setMainTab] = useState("drinks");
   const [drinkSection, setDrinkSection] = useState("soft");
   const [snackSection, setSnackSection] = useState("veg");
@@ -1283,6 +1454,34 @@ function MenuDashboard() {
   const [popupLoading, setPopupLoading] = useState(false);
   const [offers, setOffers] = useState([]);
   const [offersLoading, setOffersLoading] = useState(false);
+
+  const handleBuy = async (item, qty, remarks) => {
+    try {
+      const response = await Pubmenubuyservice.createOrder({
+        itemCode: item?.item_code,
+        itemId: item?.item_id,
+        quantity: Number(qty) || 1,
+        remarks,
+        categoryId: item?.category_id,
+        type: item?.ac_unit || "Nos",
+      });
+
+      const orderNumber = response?.data?.data?.orderNumber;
+      if (!orderNumber) {
+        throw new Error("Order number was not returned");
+      }
+
+      const baseSegment = location.pathname.startsWith("/user") ? "/user" : "/attendant";
+      navigate(`${baseSegment}/menudash/buy?orderNumber=${orderNumber}`, {
+        state: { orderNumber },
+      });
+      closePopup();
+    } catch (error) {
+      window.alert(
+        error?.response?.data?.message || error?.message || "Unable to create order."
+      );
+    }
+  };
 
   const handleItemClick = async (item) => {
     if (!item?.item_code || !item?.item_id) {
@@ -1457,7 +1656,12 @@ function MenuDashboard() {
 
       {/* Popup */}
       {popupOpen && (
-        <MenuPopup item={popupItem} loading={popupLoading} onClose={closePopup} />
+        <MenuPopupCompact
+          item={popupItem}
+          loading={popupLoading}
+          onClose={closePopup}
+          onBuy={handleBuy}
+        />
       )}
     </div>
   );

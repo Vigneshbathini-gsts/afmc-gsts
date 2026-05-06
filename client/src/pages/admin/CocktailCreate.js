@@ -240,13 +240,8 @@ export default function CocktailCreate() {
           ...row,
           itemCode: String(row.itemCode ?? "").trim(),
           pegs: String(row.pegs ?? "").trim(),
-        }))
+        })) 
         .filter((row) => row.itemCode && Number(row.pegs) > 0);
-
-      if (!normalizedRows.length) {
-        setError("Please add at least one ingredient with a valid peg value.");
-        return;
-      }
 
       const payload = new FormData();
       payload.append("itemName", form.itemName.trim());

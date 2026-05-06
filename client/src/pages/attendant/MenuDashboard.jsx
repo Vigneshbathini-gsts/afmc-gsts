@@ -117,7 +117,7 @@ function MenuCard({ item, showStockStatus = false, onSelect }) {
   );
 }
 
-function ItemDetailsModal({ item, onClose }) {
+function ItemDetailsModal({ item, onClose, onBuy }) {
   const [qty, setQty] = useState("1");
   const [remarks, setRemarks] = useState("Dining");
 
@@ -249,6 +249,7 @@ function ItemDetailsModal({ item, onClose }) {
               </button>
               <button
                 type="button"
+                onClick={() => onBuy?.(item, qty, remarks)}
                 className="rounded-full border border-[#6aa02b] px-8 py-3 text-sm font-semibold text-[#5c8b24] transition hover:bg-[#6aa02b]/5"
               >
                 Buy
@@ -466,6 +467,19 @@ export default function AttendantMenuDashboard() {
   const [softDrinkCategory, setSoftDrinkCategory] = useState("Others");
   const [selectedItemDetails, setSelectedItemDetails] = useState(null);
 
+  const handleBuy = (item, qty, remarks) => {
+    navigate("/attendant/menudash/buy", {
+      state: {
+        item: {
+          ...item,
+          quantity: Number(qty) || 1,
+          remarks,
+        },
+      },
+    });
+    setSelectedItemDetails(null);
+  };
+
   const currentSectionKey = mainTab === "drinks" ? drinkSection : snackSection;
   const currentSection = useMemo(
     () => menuConfig[mainTab].sections[currentSectionKey],
@@ -594,6 +608,7 @@ export default function AttendantMenuDashboard() {
       <ItemDetailsModal
         item={selectedItemDetails}
         onClose={() => setSelectedItemDetails(null)}
+        onBuy={handleBuy}
       />
     </div>
   );
