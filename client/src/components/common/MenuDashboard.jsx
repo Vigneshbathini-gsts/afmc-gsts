@@ -123,7 +123,6 @@ function MenuPopup({ item, loading, onClose }) {
 
 
       setCartCount(items.length);
-      console.log(" Cart count updated to:", items.length);
     } catch (err) {
       console.error(" Error fetching cart count:", err);
       console.error("Error details:", err.response?.data || err.message);
@@ -148,8 +147,7 @@ function MenuPopup({ item, loading, onClose }) {
   }, [item, loading, onClose]);
 
   const handleAddToCart = async () => {
-    console.log("🎯 Adding to cart started...");
-    console.log("Current userId:", userId); // Debug log
+   
 
     try {
       setIsSubmitting(true);
@@ -412,7 +410,7 @@ function EnduserOtherSection({ onItemClick }) {
       try {
         const response = await fetch(`${API_BASE_URL}/menubar`);
         const result = await response.json();
-        console.log("1", result.data);
+       
 
         setData(result.data || []);
       } catch (fetchError) {
@@ -473,7 +471,7 @@ function EnduserMocktailSection({ onItemClick }) {
       try {
         const response = await fetch(`${API_BASE_URL}/fetchmocktail`);
         const result = await response.json();
-        console.log("2", result.data);
+        
         setData(result.data || []);
       } catch (fetchError) {
         console.log("error", fetchError);
@@ -529,7 +527,7 @@ function DrinkHardDrinkSection({ onItemClick }) {
           `${API_BASE_URL}/Drinkhard${category}`
         );
         const result = await response.json();
-        console.log("3", result.data);
+ 
         setData(result.data || []);
       } catch (fetchError) {
         console.log("error", fetchError);
@@ -598,8 +596,7 @@ function SnackVegSection({ onItemClick }) {
       try {
         const response = await fetch(`${API_BASE_URL}/Snacksveg`);
         const result = await response.json();
-        console.log("4", result.data);
-        console.log("4", result, "sai");
+    
         setData(result.data || []);
       } catch (fetchError) {
         console.log("error", fetchError);
@@ -652,7 +649,7 @@ function SnackNonVegSection({ onItemClick }) {
       try {
         const response = await fetch(`${API_BASE_URL}/Snakcnonveg`);
         const result = await response.json();
-        console.log("5", result.data);
+      
         setData(result.data || []);
       } catch (fetchError) {
         console.log("error", fetchError);

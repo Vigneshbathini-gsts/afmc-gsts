@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { cartAPI } from "../../services/api";
-import { Trash2, Minus, Plus, X } from "lucide-react";
+import { Trash2, Minus, Plus, X, Pencil } from "lucide-react";
 
 const BASEAPI = "https://afmc.globalsparkteksolutions.com/AFMCIMAGES/";
 
@@ -80,6 +80,7 @@ export default function CartPage({ isAttendant = false }) {
         try {
             const response = await cartAPI.getByUserId(userId);
             const items = response.data.data || [];
+            console.log(items);
             setCartItems(items);
             setCartCount(items.length);
         } catch (err) {
@@ -88,13 +89,17 @@ export default function CartPage({ isAttendant = false }) {
         } finally {
             setLoading(false);
         }
-    }, [userId]);
+    }, [userId, setCartCount]);
 
     useEffect(() => {
         fetchCartItems();
     }, [fetchCartItems]);
 
     const handleQuantityUpdate = useCallback(async (cartId, newQuantity) => {
+        if (!cartId || Number.isNaN(Number(cartId))) {
+            showToast("Invalid cart item selected", 'error');
+            return;
+        }
         if (newQuantity < 1) return;
 
         setUpdatingItemId(cartId);
@@ -115,7 +120,10 @@ export default function CartPage({ isAttendant = false }) {
 
     const handleRemoveItem = useCallback(async () => {
         const { cartId } = confirmModal;
-        if (!cartId) return;
+        if (!cartId || Number.isNaN(Number(cartId))) {
+            showToast("Invalid cart item selected", 'error');
+            return;
+        }
 
         setConfirmModal({ isOpen: false, cartId: null });
 
@@ -219,7 +227,7 @@ export default function CartPage({ isAttendant = false }) {
                         className={`flex flex-col rounded-xl border border-gray-200 bg-white p-3 shadow-sm transition hover:shadow-md ${updatingItemId === item.cartId ? 'opacity-70' : ''
                             }`}
                     >
-                        {/* Image */}
+                        {/* Image and Action Buttons Row */}
                         <div className="relative mb-2 flex items-center justify-center bg-gray-50 rounded-lg overflow-hidden">
                             <div className="relative w-full h-32 flex items-center justify-center">
                                 <img
@@ -230,16 +238,31 @@ export default function CartPage({ isAttendant = false }) {
                                         e.target.src = "https://via.placeholder.com/200x150?text=No+Image";
                                     }}
                                 />
-                                {!item.isFreeItem && (
-                                    <button
-                                        type="button"
-                                        onClick={() => confirmRemove(item.cartId)}
-                                        className="absolute right-1 top-1 rounded-full bg-white/90 p-1.5 text-red-600 shadow-md transition hover:bg-red-50 z-10"
-                                        title="Remove item"
-                                    >
-                                        <Trash2 size={14} />
-                                    </button>
-                                )}
+                                {/* Action Buttons Overlay - Top Right */}
+                                <div className="absolute right-1 top-1 flex gap-1 z-10">
+                                    {/* Edit Button - Only show for items with subcategory 14 or 15 and not attendant */}
+                                    {item.subcategory && [14, 15].includes(Number(item.subcategory)) && !isAttendant && (
+                                        <button
+                                            type="button"
+                                            onClick={() => handleEditItem(item.itemId)}
+                                            className="rounded-full bg-white/90 p-1.5 text-blue-600 shadow-md transition hover:bg-blue-50"
+                                            title="Edit item"
+                                        >
+                                            <Pencil size={14} />
+                                        </button>
+                                    )}
+                                    {/* Remove Button - Only for non-free items */}
+                                    {!item.isFreeItem && (
+                                        <button
+                                            type="button"
+                                            onClick={() => confirmRemove(item.cartId)}
+                                            className="rounded-full bg-white/90 p-1.5 text-red-600 shadow-md transition hover:bg-red-50"
+                                            title="Remove item"
+                                        >
+                                            <Trash2 size={14} />
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                         </div>
 
@@ -255,7 +278,7 @@ export default function CartPage({ isAttendant = false }) {
                             </p>
                         </div>
 
-                        {/* Actions */}
+                        {/* Quantity Controls */}
                         <div className="mt-2 flex items-center justify-between gap-2 border-t border-gray-100 pt-2">
                             {!item.isFreeItem ? (
                                 <div className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 px-2 py-1">
@@ -283,19 +306,6 @@ export default function CartPage({ isAttendant = false }) {
                                 </div>
                             )}
                         </div>
-
-                        {/* Edit Button */}
-                        {item.subcategory && [14, 15].includes(Number(item.subcategory)) && !isAttendant && (
-                            <div className="mt-2">
-                                <button
-                                    type="button"
-                                    onClick={() => handleEditItem(item.itemId)}
-                                    className="w-full rounded-full border border-red-700/20 bg-white px-2 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-50"
-                                >
-                                    Edit Item
-                                </button>
-                            </div>
-                        )}
                     </div>
                 ))}
             </div>
