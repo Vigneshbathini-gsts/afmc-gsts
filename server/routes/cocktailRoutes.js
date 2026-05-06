@@ -20,3 +20,5 @@ router.get("/:id", getCocktailById);
 router.put("/:id", authMiddleware, upload.single("image"), updateCocktail);
 
 module.exports = router;
+
+

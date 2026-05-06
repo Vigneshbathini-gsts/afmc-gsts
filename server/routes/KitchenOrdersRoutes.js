@@ -17,3 +17,4 @@ router.get("/order-history", authMiddleware, KitchenOrdersController.getOrderHis
 router.get("/cancelled-order-details/:orderNumber", authMiddleware, KitchenOrdersController.getOrderDetailsByOrderNumber);
 router.get("/order-history-details/:orderNumber", authMiddleware, KitchenOrdersController.getOrderHistoryItemDetails);
 module.exports = router;
+

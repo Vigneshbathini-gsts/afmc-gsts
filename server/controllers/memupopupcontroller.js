@@ -48,3 +48,5 @@ const getMenuPopupDetails = async (req, res) => {
 module.exports = {
   getMenuPopupDetails,
 };
+
+

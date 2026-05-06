@@ -33,3 +33,5 @@ router.delete("/:id", authMiddleware, deleteFromCollection);
 router.delete("/:orderNumber/clear", authMiddleware, clearCollection);
 
 module.exports = router;
+
+

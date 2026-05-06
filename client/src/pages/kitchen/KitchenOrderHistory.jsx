@@ -33,6 +33,7 @@ const KitchenOrderHistory = () => {
   const [loading, setLoading] = useState(false);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [pagination, setPagination] = useState(null);
   const [orderItemDetails, setOrderItemDetails] = useState({});
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -71,10 +72,13 @@ const KitchenOrderHistory = () => {
         ordersData = response.data;
       }
       setOrders(ordersData);
+      setPagination(response?.data?.pagination || null);
+      setCurrentPage(response?.data?.pagination?.currentPage || page);
     } catch (error) {
       console.error('Error fetching order history:', error);
       alert('Failed to fetch order history');
       setOrders([]);
+      setPagination(null);
     } finally {
       setLoading(false);
     }
@@ -116,12 +120,20 @@ const KitchenOrderHistory = () => {
     setFilteredOrders(filteredAndSearchedOrders);
   }, [filteredAndSearchedOrders]);
   // Pagination
-  const totalPages = Math.ceil(filteredOrders.length / rowsPerPage);
+  const isSearching = searchTerm.trim().length > 0;
+  const backendTotalRecords = Number(pagination?.totalRecords || orders.length || 0);
+  const totalPages = isSearching
+    ? Math.ceil(filteredOrders.length / rowsPerPage)
+    : Number(pagination?.totalPages || 1);
   const safeTotalPages = Math.max(1, totalPages || 0);
   const paginatedOrders = useMemo(() => {
+    if (!isSearching) {
+      return filteredOrders;
+    }
+
     const startIndex = (currentPage - 1) * rowsPerPage;
     return filteredOrders.slice(startIndex, startIndex + rowsPerPage);
-  }, [filteredOrders, currentPage]);
+  }, [filteredOrders, currentPage, isSearching]);
 
   // Clamp current page when result set changes (prevents going to Page 2 of 1, etc.)
   useEffect(() => {
@@ -135,6 +147,15 @@ const KitchenOrderHistory = () => {
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm]);
+
+  const handlePageChange = (nextPage) => {
+    const page = Math.min(Math.max(nextPage, 1), safeTotalPages);
+    if (isSearching) {
+      setCurrentPage(page);
+      return;
+    }
+    fetchOrderHistory(fromDate, toDate, page);
+  };
 
   const fetchOrderItemDetails = async (orderNumber) => {
     if (!orderNumber) return;
@@ -179,6 +200,11 @@ const KitchenOrderHistory = () => {
     if (!dateString) return "-";
     const date = new Date(dateString);
     return date.toLocaleDateString('en-IN');
+  };
+
+  const formatCurrency = (value) => {
+    const numericValue = Number(String(value ?? 0).replace(/,/g, ""));
+    return Number.isNaN(numericValue) ? "0.00" : numericValue.toFixed(2);
   };
 
   // Download PDF using exportTableToPdf utility
@@ -318,7 +344,7 @@ const KitchenOrderHistory = () => {
           <div>
             <h2 className="text-lg font-bold text-gray-800">Orders List</h2>
             <p className="text-sm text-gray-500">
-              Showing {filteredOrders.length} orders
+              Showing {isSearching ? filteredOrders.length : backendTotalRecords} orders
               {fromDate && toDate && ` from ${formatDate(fromDate)} to ${formatDate(toDate)}`}
             </p>
           </div>
@@ -395,7 +421,7 @@ const KitchenOrderHistory = () => {
                       <td className="px-6 py-4 text-gray-600">{order.phone_number || 'N/A'}</td>
                       <td className="px-6 py-4">
                         <span className="text-sm font-medium text-gray-900">
-                          ₹{order.subtotal || '0'}
+                          Rs. {formatCurrency(order.subtotal)}
                         </span>
                       </td>
                       <td className="px-6 py-4">
@@ -412,11 +438,11 @@ const KitchenOrderHistory = () => {
             {/* Pagination */}
             <div className="flex flex-col md:flex-row items-center justify-between gap-3 px-5 py-4 border-t bg-gray-50">
               <p className="text-sm text-gray-600">
-                Showing {(currentPage - 1) * rowsPerPage + 1} to {Math.min(currentPage * rowsPerPage, filteredOrders.length)} of {filteredOrders.length} orders
+                Showing {filteredOrders.length === 0 ? 0 : (currentPage - 1) * rowsPerPage + 1} to {Math.min(currentPage * rowsPerPage, isSearching ? filteredOrders.length : backendTotalRecords)} of {isSearching ? filteredOrders.length : backendTotalRecords} orders
               </p>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                  onClick={() => handlePageChange(currentPage - 1)}
                   disabled={currentPage === 1}
                   className="px-3 py-2 rounded-lg border bg-white text-gray-600 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
@@ -426,9 +452,7 @@ const KitchenOrderHistory = () => {
                   Page {currentPage} of {safeTotalPages}
                 </span>
                 <button
-                  onClick={() =>
-                    setCurrentPage((prev) => Math.min(prev + 1, safeTotalPages))
-                  }
+                  onClick={() => handlePageChange(currentPage + 1)}
                   disabled={currentPage >= safeTotalPages}
                   className="px-3 py-2 rounded-lg border bg-white text-gray-600 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
@@ -486,10 +510,10 @@ const KitchenOrderHistory = () => {
                             <td className="px-4 py-3 text-sm text-gray-600">{item.quantity}</td>
                             <td className="px-4 py-3 text-sm text-gray-600">{item.type || 'N/A'}</td>
                             <td className="px-4 py-3 text-sm text-gray-600">
-                              ₹{item.pr_charges ? parseFloat(item.pr_charges).toFixed(2) : '0.00'}
+                              Rs. {formatCurrency(item.pr_charges)}
                             </td>
                             <td className="px-4 py-3 text-sm font-medium text-gray-900">
-                              ₹{item.subtotal ? parseFloat(item.subtotal).toFixed(2) : '0.00'}
+                              Rs. {formatCurrency(item.subtotal)}
                             </td>
                             <td className="px-4 py-3">
                               <span className={`px-2 py-1 rounded-full text-xs font-medium ${item.status?.toUpperCase() === 'CANCELLED' ? 'bg-red-100 text-red-800' :
@@ -510,8 +534,8 @@ const KitchenOrderHistory = () => {
                       <div className="flex justify-between items-center pt-2 border-t border-gray-200">
                         <span className="text-lg font-bold text-gray-900">Grand Total:</span>
                         <span className="text-xl font-bold text-afmc-maroon">
-                          ₹{orderItemDetails[selectedOrder.order_num].summary?.totalAmount
-                            ? parseFloat(orderItemDetails[selectedOrder.order_num].summary.totalAmount).toFixed(2)
+                          Rs. {orderItemDetails[selectedOrder.order_num].summary?.totalAmount
+                            ? formatCurrency(orderItemDetails[selectedOrder.order_num].summary.totalAmount)
                             : orderItemDetails[selectedOrder.order_num].items
                               .reduce((sum, item) => sum + (parseFloat(item.subtotal) || 0), 0)
                               .toFixed(2)}

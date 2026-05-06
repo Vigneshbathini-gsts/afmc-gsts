@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { cartAPI } from "../services/api";
 
 const AuthContext = createContext(null);
 const AUTH_USER_STORAGE_KEY = "authUser";
@@ -6,6 +7,24 @@ const AUTH_USER_STORAGE_KEY = "authUser";
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [cartCount, setCartCount] = useState(0);
+
+  const fetchCartCount = async (userId) => {
+    if (!userId) {
+      setCartCount(0);
+      return;
+    }
+
+    try {
+      const response = await cartAPI.getByUserId(userId);
+      const items = response.data?.data || [];
+      const count = items.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+      setCartCount(count);
+    } catch (error) {
+      console.error("Failed to load cart count:", error);
+      setCartCount(0);
+    }
+  };
 
   useEffect(() => {
     const storedUser = localStorage.getItem(AUTH_USER_STORAGE_KEY);
@@ -25,10 +44,15 @@ export function AuthProvider({ children }) {
     setIsLoading(false);
   }, []);
 
+  useEffect(() => {
+    fetchCartCount(user?.userId);
+  }, [user?.userId]);
+
   const setAuthenticatedUser = (userData) => {
     if (!userData) {
       localStorage.removeItem(AUTH_USER_STORAGE_KEY);
       setUser(null);
+      setCartCount(0);
       setIsLoading(false);
       return;
     }
@@ -57,8 +81,8 @@ export function AuthProvider({ children }) {
   };
 
   const value = useMemo(
-    () => ({ user, isLoading, setUser: setAuthenticatedUser, clearUser }),
-    [user, isLoading]
+    () => ({ user, isLoading, setUser: setAuthenticatedUser, clearUser, cartCount, setCartCount }),
+    [user, isLoading, cartCount]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

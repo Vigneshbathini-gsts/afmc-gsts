@@ -129,7 +129,7 @@ export default function OfferCreate() {
     setFormData((prev) => ({
       ...prev,
       itemCode: item.item_code,
-      itemName: item.item_name, // Already in INITCAP from fetch
+      itemName: item.item_name, //   
     }));
     setShowItemDropdown(false);
   };
@@ -139,7 +139,7 @@ export default function OfferCreate() {
     setFormData((prev) => ({
       ...prev,
       freeItemCode: item.item_code,
-      freeItemName: item.item_name, // Already in INITCAP from fetch
+      freeItemName: item.item_name, //   
     }));
     setShowFreeItemDropdown(false);
   };

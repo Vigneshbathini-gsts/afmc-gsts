@@ -19,3 +19,5 @@ router.post("/non-member", authMiddleware, createOrUpdateNonMember);
 router.get("/:id", authMiddleware, fetchOrderDetails);
 
 module.exports = router;
+
+

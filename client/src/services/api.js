@@ -202,6 +202,13 @@ export const inventoryAPI = {
   deleteStock: (id) => api.delete(`/inventory/${id}`),
 };
 
+export const cartAPI = {
+  getByUserId: (userId) => api.get("/cart", { params: { userId } }),
+  addItem: (cartData) => api.post("/cart", cartData),
+  updateQuantity: (cartId, quantity) => api.patch(`/cart/${cartId}`, { quantity }),
+  deleteItem: (cartId) => api.delete(`/cart/${cartId}`),
+};
+
 // ================================
 // ORDERS API
 // ================================
