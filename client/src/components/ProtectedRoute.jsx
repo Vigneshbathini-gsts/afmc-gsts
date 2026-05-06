@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
@@ -12,6 +12,21 @@ function matchesAllowedRole(user, allowedRoles) {
 
     return user?.roleCode === role || user?.roleName === role;
   });
+}
+
+function ForceLogoutNavigate({ to, state }) {
+  const { clearUser } = useAuth();
+
+  useEffect(() => {
+    try {
+      localStorage.removeItem("token");
+    } catch (e) {
+      // ignore
+    }
+    clearUser();
+  }, [clearUser]);
+
+  return <Navigate to={to} replace state={state} />;
 }
 
 export default function ProtectedRoute({
@@ -30,9 +45,8 @@ export default function ProtectedRoute({
 
   if (!token || !user) {
     return (
-      <Navigate
+      <ForceLogoutNavigate
         to="/login"
-        replace
         state={{ from: location, reason: "sessionEnded" }}
       />
     );
@@ -40,9 +54,8 @@ export default function ProtectedRoute({
 
   if (!matchesAllowedRole(user, allowedRoles)) {
     return (
-      <Navigate
+      <ForceLogoutNavigate
         to="/login"
-        replace
         state={{ from: location, reason: "sessionEnded" }}
       />
     );
@@ -58,9 +71,8 @@ export default function ProtectedRoute({
       );
       if (!ok) {
         return (
-          <Navigate
+          <ForceLogoutNavigate
             to="/login"
-            replace
             state={{ from: location, reason: "sessionEnded" }}
           />
         );
@@ -73,9 +85,8 @@ export default function ProtectedRoute({
     !allowedOutletTypes.includes((user.outletType || "").toUpperCase())
   ) {
     return (
-      <Navigate
+      <ForceLogoutNavigate
         to="/login"
-        replace
         state={{ from: location, reason: "sessionEnded" }}
       />
     );
