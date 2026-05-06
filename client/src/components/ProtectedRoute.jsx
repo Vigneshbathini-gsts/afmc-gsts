@@ -29,11 +29,23 @@ export default function ProtectedRoute({
   }
 
   if (!token || !user) {
-    return <Navigate to="/login" replace state={{ from: location }} />;
+    return (
+      <Navigate
+        to="/login"
+        replace
+        state={{ from: location, reason: "sessionEnded" }}
+      />
+    );
   }
 
   if (!matchesAllowedRole(user, allowedRoles)) {
-    return <Navigate to="/unauthorized" replace state={{ from: location }} />;
+    return (
+      <Navigate
+        to="/login"
+        replace
+        state={{ from: location, reason: "sessionEnded" }}
+      />
+    );
   }
 
   if (roleLoginTypeRules && typeof roleLoginTypeRules === "object") {
@@ -45,7 +57,13 @@ export default function ProtectedRoute({
         (t) => String(t || "").trim().toUpperCase() === normalized
       );
       if (!ok) {
-        return <Navigate to="/unauthorized" replace state={{ from: location }} />;
+        return (
+          <Navigate
+            to="/login"
+            replace
+            state={{ from: location, reason: "sessionEnded" }}
+          />
+        );
       }
     }
   }
@@ -54,7 +72,13 @@ export default function ProtectedRoute({
     allowedOutletTypes?.length &&
     !allowedOutletTypes.includes((user.outletType || "").toUpperCase())
   ) {
-    return <Navigate to="/unauthorized" replace state={{ from: location }} />;
+    return (
+      <Navigate
+        to="/login"
+        replace
+        state={{ from: location, reason: "sessionEnded" }}
+      />
+    );
   }
 
   return children || <Outlet />;

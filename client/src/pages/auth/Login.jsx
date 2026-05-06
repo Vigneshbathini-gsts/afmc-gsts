@@ -12,6 +12,7 @@ import {
   FaUserShield,
 } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { authAPI } from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
 import logo from "../../assets/AFMC_Logo.png";
@@ -45,6 +46,18 @@ export default function Login() {
   const [isCheckingRole, setIsCheckingRole] = useState(false);
   const { user, isLoading, setUser } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    if (location.state?.reason === "sessionEnded") {
+      // eslint-disable-next-line no-alert
+      alert("Session is over. Please login again.");
+      // Clear history state so it doesn't alert repeatedly
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+    // Intentionally depends on location.state only
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state]);
 
   // Load saved credentials
   useEffect(() => {
