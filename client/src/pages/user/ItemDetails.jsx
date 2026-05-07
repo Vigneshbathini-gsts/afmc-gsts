@@ -23,17 +23,29 @@ export default function ItemDetails() {
                 setLoading(true);
                 const response = await inventoryAPI.getById(id);
                 if (response.data.success) {
-                    setItem(response.data.data);
-                    // Initialize quantities from details
-                    if (response.data.data.details) {
-                        const initialQuantities = {};
-                        response.data.data.details.forEach((detail, idx) => {
-                            if (detail.pegs !== 0 && detail.pegs !== null) {
-                                initialQuantities[idx] = detail.pegs || 1;
-                            }
-                        });
-                        setQuantities(initialQuantities);
+                    const fetchedItem = response.data.data;
+                    let details = fetchedItem.details || [];
+                    let initialQuantities = {};
+
+                    details.forEach((detail, idx) => {
+                        if (detail.pegs !== 0 && detail.pegs !== null) {
+                            initialQuantities[idx] = detail.pegs || 1;
+                        }
+                    });
+
+                    try {
+                        const savedResponse = await cartAPI.getCustomItemDetails(fetchedItem.ITEM_ID || fetchedItem.ITEM_CODE);
+                        if (savedResponse.data.success && savedResponse.data.data) {
+                            const saved = savedResponse.data.data;
+                            details = saved.details || details;
+                            initialQuantities = saved.quantities || initialQuantities;
+                        }
+                    } catch (err) {
+                        console.warn("Could not load saved custom item details:", err);
                     }
+
+                    setItem({ ...fetchedItem, details });
+                    setQuantities(initialQuantities);
                 } else {
                     setError(response.data.message || "Failed to load item");
                 }
@@ -50,22 +62,45 @@ export default function ItemDetails() {
         }
     }, [id]);
 
-    const isCocktail = item?.SUB_CATEGORY === 14 || item?.SUB_CATEGORY === 15;
+    const persistCustomDetails = async (details, quantitiesState) => {
+        if (!item) return;
+        const itemId = item.ITEM_ID || item.ITEM_CODE;
+        if (!itemId) return;
+        try {
+            await cartAPI.saveCustomItemDetails(itemId, { details, quantities: quantitiesState });
+        } catch (err) {
+            console.error("Error saving custom item details:", err);
+        }
+    };
 
     const updateQuantity = (index, delta) => {
         setQuantities(prev => {
             const newVal = (prev[index] || 1) + delta;
             if (newVal < 1) return prev;
-            return { ...prev, [index]: newVal };
+            const newQuantities = { ...prev, [index]: newVal };
+            persistCustomDetails(item?.details || [], newQuantities);
+            return newQuantities;
         });
     };
 
     const deleteIngredient = (index) => {
-        setQuantities(prev => {
-            const newQuantities = { ...prev };
-            delete newQuantities[index];
-            return newQuantities;
+        setItem((prev) => {
+            const newDetails = (prev.details || []).filter((_, idx) => idx !== index);
+            const newQuantities = {};
+            Object.entries(quantities).forEach(([key, value]) => {
+                const idx = Number(key);
+                if (idx === index) return;
+                const newIndex = idx > index ? idx - 1 : idx;
+                newQuantities[newIndex] = value;
+            });
+            persistCustomDetails(newDetails, newQuantities);
+            setQuantities(newQuantities);
+            return {
+                ...prev,
+                details: newDetails,
+            };
         });
+
         toast.info("Ingredient removed from recipe");
     };
 
@@ -99,8 +134,14 @@ export default function ItemDetails() {
             return;
         }
 
-        if (selectedIngredients.find(item => item.d === ingredient.d)) {
-            toast.warning("Ingredient already selected");
+        const alreadySelected = selectedIngredients.some(item => item.d === ingredient.d);
+        const alreadyInRecipe = item?.details?.some(
+            (detail) => String(detail.itemName || detail.ITEM_NAME || "").trim().toLowerCase() === String(ingredient.d || "").trim().toLowerCase()
+                || String(detail.itemCode || detail.ITEM_CODE || "").trim() === String(ingredient.r || "").trim()
+        );
+
+        if (alreadySelected || alreadyInRecipe) {
+            toast.warning("Ingredient already exists in the recipe");
             return;
         }
 
@@ -128,18 +169,18 @@ export default function ItemDetails() {
             });
         });
 
-        setItem(prev => ({
-            ...prev,
-            details: newDetails
-        }));
-
-        // Initialize quantities for new ingredients
         const newQuantities = { ...quantities };
         const startIndex = item.details?.length || 0;
         selectedIngredients.forEach((_, index) => {
             newQuantities[startIndex + index] = 1;
         });
+
+        setItem(prev => ({
+            ...prev,
+            details: newDetails
+        }));
         setQuantities(newQuantities);
+        persistCustomDetails(newDetails, newQuantities);
 
         setShowModal(false);
         setSelectedIngredients([]);
@@ -150,21 +191,47 @@ export default function ItemDetails() {
         item.d.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    const handleAddToCart = () => {
+    const handleAddToCart = async () => {
+        if (!item) {
+            toast.error("Unable to add item to cart");
+            return;
+        }
+
         const selectedIngredients = item.details
             .filter((_, idx) => quantities[idx] !== undefined)
             .map((detail, idx) => ({
                 name: detail.itemName,
                 quantity: quantities[idx],
-                price: detail.memberPrice
+                price: detail.memberPrice,
             }));
 
-        toast.success(
-            `Added ${item.ITEM_NAME} to cart with ${selectedIngredients.length} ingredients`
-        );
+        const ingredientSummary = selectedIngredients
+            .map((detail) => `${detail.name}:${detail.quantity}`)
+            .join(", ");
 
+        const payload = {
+            item_id: item.ITEM_ID || item.ITEM_CODE,
+            quantity: 1,
+            unit_price: item.UNIT_PRICE || 0,
+            remarks: ingredientSummary
+                ? `Custom ingredients: ${ingredientSummary}`
+                : "Din",
+        };
 
-        navigate("/user/cart");
+        try {
+            const response = await cartAPI.addItem(payload);
+            if (response?.data?.success) {
+                toast.success(
+                    `Added ${item.ITEM_NAME} to cart with ${selectedIngredients.length} ingredients`
+                );
+                navigate("/user/cart");
+            } else {
+                toast.error(response?.data?.message || "Failed to add item to cart");
+            }
+        } catch (err) {
+            console.error("Error adding item to cart:", err);
+            toast.error(err.response?.data?.message || err.message || "Failed to add item to cart");
+        }
     };
 
     if (loading) {

@@ -8,11 +8,42 @@ const getSessionUserKey = (req) =>
 const getCocktailSessionKey = (req, parentItemCode, orderNumber = "") =>
   `cocktailCollection_${String(orderNumber || "").trim()}_${String(parentItemCode || "").trim()}_${getSessionUserKey(req)}`;
 
+const getCustomItemDetailsSessionKey = (req, itemId) =>
+  `customItemDetails_${String(itemId || "").trim()}_${getSessionUserKey(req)}`;
+
 const saveSession = (req) =>
   new Promise((resolve, reject) => {
     if (!req.session?.save) return resolve();
     req.session.save((err) => (err ? reject(err) : resolve()));
   });
+
+const clearCocktailSessionCollections = async (req, parentItemCode = null, orderNumber = null) => {
+  if (!req.session) return;
+
+  const sessionKeyPrefix = "cocktailCollection_";
+  const userKey = getSessionUserKey(req);
+  let removedAny = false;
+
+  for (const key of Object.keys(req.session)) {
+    if (!key.startsWith(sessionKeyPrefix)) continue;
+
+    const parts = key.split("_");
+    const keyOrderNumber = parts[1] || "";
+    const keyParentItemCode = parts[2] || "";
+    const keyUserKey = parts.slice(3).join("_");
+
+    if (keyUserKey !== userKey) continue;
+    if (parentItemCode != null && String(keyParentItemCode) !== String(parentItemCode)) continue;
+    if (orderNumber != null && String(keyOrderNumber) !== String(orderNumber)) continue;
+
+    delete req.session[key];
+    removedAny = true;
+  }
+
+  if (removedAny) {
+    await saveSession(req);
+  }
+};
 
 const getStockQuantities = async (conn, itemCodes) => {
   if (!Array.isArray(itemCodes) || itemCodes.length === 0) {
@@ -207,6 +238,73 @@ const getCocktailCollectionResponse = async (req, cartItem, orderNumber = "") =>
     totalPrice: collection.totalPrice,
     ingredients: collection.ingredients,
   };
+};
+
+const getCustomItemDetails = async (req, itemId) => {
+  const sessionKey = getCustomItemDetailsSessionKey(req, itemId);
+  return req.session?.[sessionKey] || null;
+};
+
+exports.getCustomItemDetails = async (req, res) => {
+  try {
+    const itemId = Number(req.params.itemId);
+    if (!itemId || Number.isNaN(itemId)) {
+      return res.status(400).json({ success: false, message: "Valid item ID is required" });
+    }
+
+    const customDetails = await getCustomItemDetails(req, itemId);
+    return res.status(200).json({ success: true, data: customDetails });
+  } catch (error) {
+    console.error("Error fetching custom item details:", error);
+    return res.status(500).json({ success: false, message: "Failed to load custom item details" });
+  }
+};
+
+exports.saveCustomItemDetails = async (req, res) => {
+  try {
+    const itemId = Number(req.params.itemId);
+    if (!itemId || Number.isNaN(itemId)) {
+      return res.status(400).json({ success: false, message: "Valid item ID is required" });
+    }
+
+    const { details, quantities } = req.body;
+    if (!Array.isArray(details)) {
+      return res.status(400).json({ success: false, message: "Details must be an array" });
+    }
+
+    const sessionKey = getCustomItemDetailsSessionKey(req, itemId);
+    req.session[sessionKey] = {
+      details,
+      quantities: quantities || {},
+      savedAt: new Date().toISOString(),
+    };
+    await saveSession(req);
+
+    return res.status(200).json({ success: true, data: req.session[sessionKey] });
+  } catch (error) {
+    console.error("Error saving custom item details:", error);
+    return res.status(500).json({ success: false, message: "Failed to save custom item details" });
+  }
+};
+
+exports.clearCustomItemDetails = async (req, res) => {
+  try {
+    const itemId = Number(req.params.itemId);
+    if (!itemId || Number.isNaN(itemId)) {
+      return res.status(400).json({ success: false, message: "Valid item ID is required" });
+    }
+
+    const sessionKey = getCustomItemDetailsSessionKey(req, itemId);
+    if (req.session && req.session[sessionKey]) {
+      delete req.session[sessionKey];
+      await saveSession(req);
+    }
+
+    return res.status(200).json({ success: true });
+  } catch (error) {
+    console.error("Error clearing custom item details:", error);
+    return res.status(500).json({ success: false, message: "Failed to clear custom item details" });
+  }
 };
 
 exports.addCartItem = async (req, res) => {
@@ -452,6 +550,8 @@ exports.confirmOrder = async (req, res) => {
 
     await connection.commit();
 
+    await clearCocktailSessionCollections(req, null, orderNumber);
+
     return res.status(200).json({
       success: true,
       message: "Order confirmed successfully",
@@ -486,9 +586,18 @@ exports.updateCartItemQuantity = async (req, res) => {
       return res.status(400).json({ success: false, message: "Quantity is required and must be a number" });
     }
 
+    const cartItem = await getCartItemById(req, Number(cartId));
+    if (!cartItem) {
+      return res.status(404).json({ success: false, message: "Cart item not found" });
+    }
+
     const result = await cartModel.updateCartItemQuantity(Number(cartId), userId, Number(quantity));
     if (result?.affectedRows === 0) {
       return res.status(404).json({ success: false, message: "Cart item not found" });
+    }
+
+    if (isCocktailCartItem(cartItem)) {
+      await clearCocktailSessionCollections(req, cartItem.item_id);
     }
 
     // Return updated cart items to avoid full refresh
@@ -516,9 +625,15 @@ exports.deleteCartItem = async (req, res) => {
       return res.status(400).json({ success: false, message: "Cart ID is required and must be a valid number" });
     }
 
+    const cartItem = await getCartItemById(req, Number(cartId));
+
     const result = await cartModel.deleteCartItem(Number(cartId), userId);
     if (result?.affectedRows === 0) {
       return res.status(404).json({ success: false, message: "Cart item not found" });
+    }
+
+    if (cartItem && isCocktailCartItem(cartItem)) {
+      await clearCocktailSessionCollections(req, cartItem.item_id);
     }
 
     // Return updated cart items

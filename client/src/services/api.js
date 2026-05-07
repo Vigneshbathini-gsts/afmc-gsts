@@ -211,6 +211,9 @@ export const cartAPI = {
   deleteItem: (cartId) => api.delete(`/cart/${cartId}`),
   confirmOrder: (data) => api.post("/cart/confirm-order", data),
   getLovIngredients: (subCategory) => api.get("/cart/lov-ingredients", { params: { subCategory } }),
+  getCustomItemDetails: (itemId) => api.get(`/cart/item/${itemId}/custom-details`),
+  saveCustomItemDetails: (itemId, data) => api.post(`/cart/item/${itemId}/custom-details`, data),
+  clearCustomItemDetails: (itemId) => api.delete(`/cart/item/${itemId}/custom-details`),
 };
 
 // ================================

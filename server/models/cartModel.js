@@ -316,7 +316,7 @@ const getCartItemsByUser = async (userId) => {
     const canEdit = isCocktailItem && !isFreeItem;
 
     const stockQty = Number(row.stock_quantity || 0);
-    const stockStatus = stockQty === 0 ? "Out Of Stock" : "In Stock";
+    const stockStatus = isCocktailItem ? "In Stock" : stockQty === 0 ? "Out Of Stock" : "In Stock";
 
 
     return {

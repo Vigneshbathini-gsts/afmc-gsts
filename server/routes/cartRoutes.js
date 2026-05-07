@@ -12,6 +12,9 @@ router.patch("/cocktail/:cartId/ingredients", authMiddleware, cartController.upd
 router.patch("/:cartId", authMiddleware, cartController.updateCartItemQuantity);
 router.delete("/:cartId", authMiddleware, cartController.deleteCartItem);
 router.get("/lov-ingredients", authMiddleware, cartController.getLovIngredients);
+router.get("/item/:itemId/custom-details", authMiddleware, cartController.getCustomItemDetails);
+router.post("/item/:itemId/custom-details", authMiddleware, cartController.saveCustomItemDetails);
+router.delete("/item/:itemId/custom-details", authMiddleware, cartController.clearCustomItemDetails);
 
 module.exports = router;
 
