@@ -27,7 +27,7 @@ const Toast = ({ message, type, onClose }) => {
 };
 
 // Confirmation Modal component
-const ConfirmModal = ({ isOpen, onClose, onConfirm, title, message }) => {
+const ConfirmModal = ({ isOpen, onClose, onConfirm, title, message, confirmLabel = "Confirm" }) => {
     if (!isOpen) return null;
 
     return (
@@ -47,7 +47,7 @@ const ConfirmModal = ({ isOpen, onClose, onConfirm, title, message }) => {
                             onClick={onConfirm}
                             className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
                         >
-                            Remove
+                            {confirmLabel}
                         </button>
                     </div>
                 </div>
@@ -65,6 +65,7 @@ export default function CartPage({ isAttendant = false }) {
     const [updatingItemId, setUpdatingItemId] = useState(null);
     const [toast, setToast] = useState(null);
     const [confirmModal, setConfirmModal] = useState({ isOpen: false, cartId: null });
+    const [proceedConfirmOpen, setProceedConfirmOpen] = useState(false);
 
     const userId = user?.userId;
 
@@ -144,12 +145,21 @@ export default function CartPage({ isAttendant = false }) {
     }, [navigate]);
 
     const handleProceedToBuy = useCallback(() => {
-        navigate("/checkout");
-    }, [navigate]);
+        if (cartItems.length === 0) return;
+        setProceedConfirmOpen(true);
+    }, [cartItems.length]);
+
+    const handleProceedConfirm = useCallback(() => {
+        const orderNumber = `ORD-${Date.now()}`;
+        setProceedConfirmOpen(false);
+        const basePath = isAttendant ? "/attendant" : "/user";
+        navigate(`${basePath}/confirm-order?orderNumber=${encodeURIComponent(orderNumber)}`);
+    }, [navigate, isAttendant]);
 
     const handleGoToMenu = useCallback(() => {
-        navigate("/user/menudash");
-    }, [navigate]);
+        const basePath = isAttendant ? "/attendant" : "/user";
+        navigate(`${basePath}/menudash`);
+    }, [navigate, isAttendant]);
 
     // Show remove confirmation
     const confirmRemove = useCallback((cartId) => {
@@ -174,6 +184,16 @@ export default function CartPage({ isAttendant = false }) {
                 onConfirm={handleRemoveItem}
                 title="Remove Item"
                 message="Are you sure you want to remove this item from your cart?"
+                confirmLabel="Remove"
+            />
+
+            <ConfirmModal
+                isOpen={proceedConfirmOpen}
+                onClose={() => setProceedConfirmOpen(false)}
+                onConfirm={handleProceedConfirm}
+                title="Confirm Purchase"
+                message="Are you sure you want to proceed to buy?"
+                confirmLabel="Yes, proceed"
             />
 
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

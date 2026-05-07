@@ -339,6 +339,137 @@ exports.getCartItems = async (req, res) => {
   }
 };
 
+exports.confirmOrder = async (req, res) => {
+  const userId = req.user?.userId;
+  const { orderNumber } = req.body || {};
+
+  if (!userId) {
+    return res.status(400).json({ success: false, message: "User ID is required" });
+  }
+  if (!orderNumber || typeof orderNumber !== "string") {
+    return res.status(400).json({ success: false, message: "Order number is required" });
+  }
+
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    const [cartRows] = await connection.execute(
+      "SELECT item_id, quantity FROM xxafmc_cart_items WHERE user_id = ?",
+      [userId]
+    );
+
+    const cartQuantityMap = new Map(
+      cartRows.map((row) => [String(row.item_id), Number(row.quantity || 0)])
+    );
+
+    const [collectionRows] = await connection.execute(
+      `SELECT
+          seq_id,
+          c001 AS item_code,
+          c002 AS item_name,
+          c003 AS pegs,
+          c005 AS inventory_item_code,
+          c006 AS user_id,
+          c009 AS stock_quantity
+        FROM apex_collections
+        WHERE collection_name = 'M_COLLECTION'
+          AND c006 = ?`,
+      [userId]
+    );
+
+    let mainInserted = 0;
+    for (const row of collectionRows) {
+      const inventoryItemCode = String(row.inventory_item_code);
+      const quantity = cartQuantityMap.get(inventoryItemCode);
+      if (!quantity) continue;
+
+      const requiredQuantity = Number(row.pegs || 0) * Number(quantity);
+      if (Number(row.stock_quantity || 0) < requiredQuantity) continue;
+
+      const [existingRows] = await connection.execute(
+        `SELECT 1 FROM xxafmc_custom_cocktails_mocktails_details WHERE inventory_item_code = ? AND order_number = ? LIMIT 1`,
+        [row.inventory_item_code, orderNumber]
+      );
+      if (existingRows.length > 0) continue;
+
+      await connection.execute(
+        `INSERT INTO xxafmc_custom_cocktails_mocktails_details
+          (item_code, item_name, pegs, inventory_item_code, user_id, quantity, order_number, creation_date)
+        VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
+        [row.item_code, row.item_name, row.pegs, row.inventory_item_code, row.user_id, quantity, orderNumber]
+      );
+      mainInserted += 1;
+    }
+
+    const [cocktailRows] = await connection.execute(
+      `SELECT
+          xcmd.inventory_item_code,
+          xcmd.pegs,
+          xcmd.item_name,
+          xcmd.item_code
+        FROM xxafmc_cocktails_mocktails_details xcmd
+        JOIN xxafmc_cart_items xc ON xc.item_id = xcmd.inventory_item_code AND xc.user_id = ?
+        WHERE NOT EXISTS (
+          SELECT 1
+          FROM apex_collections ac
+          WHERE ac.collection_name = 'M_COLLECTION'
+            AND ac.c006 = ?
+            AND ac.c005 = xcmd.inventory_item_code
+        )
+        GROUP BY xcmd.inventory_item_code, xcmd.pegs, xcmd.item_name, xcmd.item_code`,
+      [userId, userId]
+    );
+
+    let dummyInserted = 0;
+    for (const row of cocktailRows) {
+      const inventoryItemCode = String(row.inventory_item_code);
+      const quantity = cartQuantityMap.get(inventoryItemCode);
+      if (!quantity) continue;
+
+      const [stockRows] = await connection.execute(
+        `SELECT COALESCE(SUM(stock_quantity), 0) AS total_stock FROM xxafmc_stock_out WHERE item_code = ?`,
+        [row.item_code]
+      );
+      const totalStock = Number(stockRows[0]?.total_stock || 0);
+      const requiredQuantity = Number(row.pegs || 0) * Number(quantity);
+      if (totalStock < requiredQuantity) continue;
+
+      const [existingRows] = await connection.execute(
+        `SELECT 1 FROM xxafmc_custom_cocktails_mocktails_details_dummy WHERE inventory_item_code = ? AND order_number = ? LIMIT 1`,
+        [row.inventory_item_code, orderNumber]
+      );
+      if (existingRows.length > 0) continue;
+
+      await connection.execute(
+        `INSERT INTO xxafmc_custom_cocktails_mocktails_details_dummy
+          (item_code, item_name, pegs, inventory_item_code, user_id, quantity, order_number, creation_date)
+        VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
+        [row.item_code, row.item_name, row.pegs, row.inventory_item_code, userId, quantity, orderNumber]
+      );
+      dummyInserted += 1;
+    }
+
+    await connection.commit();
+
+    return res.status(200).json({
+      success: true,
+      message: "Order confirmed successfully",
+      data: { orderNumber, mainInserted, dummyInserted },
+    });
+  } catch (error) {
+    console.error("Error confirming order:", error);
+    await connection.rollback();
+    const status = error?.status || 500;
+    return res.status(status).json({
+      success: false,
+      message: error?.message || "Failed to confirm order",
+    });
+  } finally {
+    connection.release();
+  }
+};
+
 exports.updateCartItemQuantity = async (req, res) => {
   try {
     const userId = req.user?.userId;

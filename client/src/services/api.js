@@ -209,6 +209,7 @@ export const cartAPI = {
   updateCocktailIngredients: (cartId, data) => api.patch(`/cart/cocktail/${cartId}/ingredients`, data),
   updateQuantity: (cartId, quantity) => api.patch(`/cart/${cartId}`, { quantity }),
   deleteItem: (cartId) => api.delete(`/cart/${cartId}`),
+  confirmOrder: (data) => api.post("/cart/confirm-order", data),
   getLovIngredients: (subCategory) => api.get("/cart/lov-ingredients", { params: { subCategory } }),
 };
 

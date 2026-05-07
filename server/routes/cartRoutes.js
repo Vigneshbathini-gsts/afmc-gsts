@@ -5,6 +5,7 @@ const authMiddleware = require("../middleware/authMiddleware");
 const router = express.Router();
 
 router.post("/", authMiddleware, cartController.addCartItem);
+router.post("/confirm-order", authMiddleware, cartController.confirmOrder);
 router.get("/", authMiddleware, cartController.getCartItems);
 router.get("/cocktail/:cartId", authMiddleware, cartController.getCocktailDetails);
 router.patch("/cocktail/:cartId/ingredients", authMiddleware, cartController.updateCocktailIngredients);
