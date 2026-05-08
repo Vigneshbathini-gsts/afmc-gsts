@@ -190,130 +190,157 @@ export default function Pubmenubuy() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f6f2ee] px-4 py-6 md:px-8">
-      <div className="mx-auto max-w-[1280px] space-y-5">
-        <div className="rounded-3xl border border-stone-200 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.08)]">
-          <div className="flex flex-col gap-4 border-b border-stone-200 px-4 py-4 md:flex-row md:items-center md:justify-between md:px-6">
-            <h1 className="text-2xl font-semibold text-stone-900">order details</h1>
+  <div className="min-h-screen bg-[#f6f2ee] px-3 py-4 md:px-6">
+    <div className="mx-auto max-w-[1180px] space-y-4">
+      {/* Header */}
+      <div className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
+        <div className="bg-gradient-to-r from-[#6f9d24] to-[#88b63a] px-5 py-5 text-white">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-[0.18em] text-white/80">
+                Order Details
+              </p>
 
-            <div className="flex flex-wrap gap-3">
+            </div>
+
+            <div className="flex flex-wrap gap-2">
               <ActionButton
                 onClick={() => navigate(-1)}
-                className="bg-[#7f766f] hover:bg-[#6f665f]"
+                className="bg-white/15 px-4 py-2 hover:bg-white/25"
               >
                 <ChevronLeft className="h-4 w-4" />
                 Back
               </ActionButton>
+
               <ActionButton
                 onClick={handleConfirmOrder}
                 disabled={confirming || loading}
-                className="bg-[#6f9d24] hover:bg-[#618a1f] disabled:cursor-not-allowed disabled:opacity-60"
+                className="bg-white px-4 py-2 text-[#6f9d24] hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <CheckCircle2 className="h-4 w-4" />
-                {confirming ? "Confirming..." : "Confirm Order"}
+                {confirming ? "Confirming..." : "Confirm"}
               </ActionButton>
+
               <ActionButton
                 onClick={handleCancelOrder}
                 disabled={cancelling || loading}
-                className="bg-[#f0261e] hover:bg-[#d91d17] disabled:cursor-not-allowed disabled:opacity-60"
+                className="bg-[#f0261e] px-4 py-2 hover:bg-[#d91d17] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <XCircle className="h-4 w-4" />
-                {cancelling ? "Cancelling..." : "Cancel Order"}
+                {cancelling ? "Cancelling..." : "Cancel"}
               </ActionButton>
             </div>
           </div>
-
-          <div className="grid gap-4 px-4 py-6 md:grid-cols-2 md:px-6">
-            <div className="rounded-md border border-dashed border-stone-400 px-3 py-2">
-              <div className="text-sm text-stone-600">Order Number</div>
-              <div className="text-3xl font-medium text-stone-900">
-                {orderHeader?.order_num || orderNumber}
-              </div>
-            </div>
-            <div className="rounded-md border border-dashed border-stone-400 px-3 py-2">
-              <div className="text-sm text-stone-600">Order Date</div>
-              <div className="text-3xl font-medium text-stone-900">
-                {formatDate(orderHeader?.order_date)}
-              </div>
-            </div>
-          </div>
         </div>
 
-        <div className="rounded-3xl border border-stone-200 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.08)]">
-          {loading ? (
-            <div className="py-16 text-center text-stone-500">Loading order details...</div>
-          ) : error ? (
-            <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
-              {error}
-            </div>
-          ) : items.length === 0 ? (
-            <div className="py-16 text-center text-stone-500">No items found for this order.</div>
-          ) : (
-            <div className="space-y-6">
-              <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
-                {items.map((item) => (
-                  <div
-                    key={item.id}
-                    className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm"
-                  >
-                    <div className="flex h-48 items-center justify-center border-b border-stone-100 bg-stone-50 p-6">
-                      <img
-                        src={`${BASEAPI}${item.image || "default.jpg"}`}
-                        alt={item.item_name}
-                        className="max-h-full w-auto object-contain"
-                      />
+        {/* Summary */}
+        <div className="grid gap-3 border-t border-stone-200 bg-[#fcfaf8] p-4 md:grid-cols-3">
+          <div className="rounded-xl border border-stone-200 bg-white p-3">
+            <p className="text-xs text-stone-500">Order Number</p>
+
+            <h3 className="mt-1 text-xl font-semibold text-stone-900">
+              {orderHeader?.order_num || orderNumber}
+            </h3>
+          </div>
+
+          <div className="rounded-xl border border-stone-200 bg-white p-3">
+            <p className="text-xs text-stone-500">Order Date</p>
+
+            <h3 className="mt-1 text-xl font-semibold text-stone-900">
+              {formatDate(orderHeader?.order_date)}
+            </h3>
+          </div>
+
+          
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
+        {loading ? (
+          <div className="py-16 text-center text-sm text-stone-500">
+            Loading order details...
+          </div>
+        ) : error ? (
+          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+            {error}
+          </div>
+        ) : items.length === 0 ? (
+          <div className="py-16 text-center text-sm text-stone-500">
+            No items found for this order.
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {/* Products */}
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {items.map((item) => (
+                <div
+                  key={item.id}
+                  className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                >
+                  {/* Image */}
+                  <div className="flex h-40 items-center justify-center bg-stone-50 p-4">
+                    <img
+                      src={`${BASEAPI}${item.image || "default.jpg"}`}
+                      alt={item.item_name}
+                      className="max-h-full w-auto object-contain"
+                    />
+                  </div>
+
+                  {/* Details */}
+                  <div className="space-y-3 p-4">
+                    <div>
+                      <h3 className="line-clamp-1 text-base font-semibold text-stone-900">
+                        {item.item_name}
+                      </h3>
+
+                      <p className="mt-1 text-sm text-stone-500">
+                        Quantity: {item.quantity}
+                      </p>
                     </div>
 
-                    <div className="space-y-4 p-4">
-                      <div className="text-lg text-stone-900">
-                        <div>Name: {item.item_name}</div>
-                        <div>Quantity: {item.quantity}</div>
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        <button
-                          type="button"
-                          onClick={() => removeItem(item.id)}
-                          className="rounded-md bg-stone-100 p-2 text-stone-900 transition hover:bg-stone-200"
-                          aria-label={`Remove ${item.item_name}`}
-                        >
-                          <Trash2 className="h-5 w-5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => adjustQuantity(item.id, 1)}
-                          className="rounded-md bg-stone-100 p-2 text-stone-900 transition hover:bg-stone-200"
-                          aria-label={`Increase ${item.item_name}`}
-                        >
-                          <Plus className="h-5 w-5" />
-                        </button>
+                    {/* Controls */}
+                    <div className="flex items-center justify-between rounded-xl bg-stone-50 px-3 py-2">
+                      <div className="flex items-center gap-1">
                         <button
                           type="button"
                           onClick={() => adjustQuantity(item.id, -1)}
-                          className="rounded-md bg-stone-100 p-2 text-stone-900 transition hover:bg-stone-200"
-                          aria-label={`Decrease ${item.item_name}`}
+                          className="rounded-md bg-white p-1.5 text-stone-700 shadow-sm transition hover:bg-stone-100"
                         >
-                          <Minus className="h-5 w-5" />
+                          <Minus className="h-4 w-4" />
+                        </button>
+
+                        <span className="min-w-[28px] text-center text-sm font-semibold text-stone-900">
+                          {item.quantity}
+                        </span>
+
+                        <button
+                          type="button"
+                          onClick={() => adjustQuantity(item.id, 1)}
+                          className="rounded-md bg-[#6f9d24] p-1.5 text-white transition hover:bg-[#5f871f]"
+                        >
+                          <Plus className="h-4 w-4" />
                         </button>
                       </div>
+
+                      <button
+                        type="button"
+                        onClick={() => removeItem(item.id)}
+                        className="rounded-md bg-red-50 p-1.5 text-red-600 transition hover:bg-red-100"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
                     </div>
                   </div>
-                ))}
-              </div>
-
-              <div className="flex items-center justify-between rounded-2xl bg-stone-50 px-5 py-4">
-                <div className="inline-flex items-center gap-2 text-stone-700">
-                  <ShoppingCart className="h-5 w-5" />
-                  Total Items: {items.length}
                 </div>
-                <div className="text-lg font-semibold text-stone-900">
-                  Total Amount: {totalAmount.toFixed(2)}
-                </div>
-              </div>
+              ))}
             </div>
-          )}
-        </div>
+
+           
+          </div>
+        )}
       </div>
     </div>
-  );
+  </div>
+);
 }
