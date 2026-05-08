@@ -12,3 +12,4 @@ function getPricingCondition(category) {
 }
 
 module.exports = { getPricingCondition };
+

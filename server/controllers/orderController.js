@@ -88,7 +88,6 @@ exports.fetchOrderDetails = async (req, res) => {
   try {
     const { id } = req.params;
     const data = await getOrderDetails(id);
-console.log("Fetched Order Details:", data);
     res.status(200).json({
       success: true,
       data,
@@ -161,3 +160,5 @@ exports.createOrUpdateNonMember = async (req, res) => {
     });
   }
 };
+
+

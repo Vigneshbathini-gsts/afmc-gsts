@@ -7,6 +7,15 @@ exports.getCancelledOrders = async (req, res) => {
   try {
     const { fromDate, toDate } = req.query;
 
+    const normalizeDate = (date) => {
+      if (!date) return null;
+      const parsed = new Date(date);
+      return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString().slice(0, 10);
+    };
+
+    const from = normalizeDate(fromDate);
+    const to = normalizeDate(toDate);
+
     const query = `
       SELECT 
           oh.ORDER_NUM,
@@ -29,11 +38,16 @@ exports.getCancelledOrders = async (req, res) => {
               END
           )
       )
-      AND STR_TO_DATE(oh.ORDER_DATE, '%m/%d/%Y') BETWEEN ? AND ?
+      AND (
+        CASE
+          WHEN oh.ORDER_DATE LIKE '%/%' THEN STR_TO_DATE(oh.ORDER_DATE, '%m/%d/%Y')
+          ELSE DATE(oh.ORDER_DATE)
+        END
+      ) BETWEEN COALESCE(?, CURDATE()) AND COALESCE(?, CURDATE())
       ORDER BY oh.ORDER_NUM DESC
     `;
 
-    const [rows] = await pool.query(query, [fromDate, toDate]);
+    const [rows] = await pool.query(query, [from, to]);
     // console.log("Cancelled Orders Query Result:", rows);
     return res.status(200).json({
       success: true,
@@ -49,3 +63,5 @@ exports.getCancelledOrders = async (req, res) => {
     });
   }
 };
+
+

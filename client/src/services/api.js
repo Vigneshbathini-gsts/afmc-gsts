@@ -202,6 +202,20 @@ export const inventoryAPI = {
   deleteStock: (id) => api.delete(`/inventory/${id}`),
 };
 
+export const cartAPI = {
+  getByUserId: (userId) => api.get("/cart", { params: { userId } }),
+  addItem: (cartData) => api.post("/cart", cartData),
+  getCocktailDetails: (cartId, params) => api.get(`/cart/cocktail/${cartId}`, { params }),
+  updateCocktailIngredients: (cartId, data) => api.patch(`/cart/cocktail/${cartId}/ingredients`, data),
+  updateQuantity: (cartId, quantity) => api.patch(`/cart/${cartId}`, { quantity }),
+  deleteItem: (cartId) => api.delete(`/cart/${cartId}`),
+  confirmOrder: (data) => api.post("/cart/confirm-order", data),
+  getLovIngredients: (subCategory) => api.get("/cart/lov-ingredients", { params: { subCategory } }),
+  getCustomItemDetails: (itemId) => api.get(`/cart/item/${itemId}/custom-details`),
+  saveCustomItemDetails: (itemId, data) => api.post(`/cart/item/${itemId}/custom-details`, data),
+  clearCustomItemDetails: (itemId) => api.delete(`/cart/item/${itemId}/custom-details`),
+};
+
 // ================================
 // ORDERS API
 // ================================

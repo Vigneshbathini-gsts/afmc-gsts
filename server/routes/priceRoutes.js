@@ -10,3 +10,4 @@ router.get("/barcode/:barcode",authMiddleware, getItemByBarcode);
 router.put("/price-update", authMiddleware, updateItemPrice);
 
 module.exports = router;
+

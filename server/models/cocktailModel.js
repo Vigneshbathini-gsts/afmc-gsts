@@ -312,7 +312,18 @@ const getCocktailDetailRows = async (inventoryItemCode, connection = db) => {
   `;
 
   const [rows] = await connection.execute(query, [inventoryItemCode]);
-  return rows;
+  return rows.map((row) => ({
+    mocId: row.MOC_ID,
+    itemCode: row.ITEM_CODE,
+    itemName: row.ITEM_NAME,
+    price: row.PRICE,
+    pegs: row.PEGS !== null ? Number(row.PEGS) : null,
+    inventoryItemCode: row.INVENTORY_ITEM_CODE,
+    nonMemberPrice: row.NON_MEMBER_PRICE,
+    categoryId: row.CATEGORY_ID,
+    subcategoryId: row.SUBCATEGORY_ID,
+    memberPrice: Number(row.PRICE || row.NON_MEMBER_PRICE || 0),
+  }));
 };
 
 const getCocktailItemById = async (itemId) => {
@@ -660,6 +671,9 @@ module.exports = {
   getCocktailIngredientOptions,
   getCocktailIngredientPricing,
   getCocktailItemById,
+  getCocktailDetailRows,
   createCocktailItem,
   updateCocktailItem,
 };
+
+

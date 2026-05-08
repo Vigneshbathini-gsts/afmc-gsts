@@ -2,7 +2,9 @@
 import { FaTimes } from "react-icons/fa";
 import { ChevronsLeft, ShoppingCart, Heart, Share2, Star, Flame, Leaf, Zap } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { API_BASE_URL, authFetchJson, offersAPI } from "../../services/api";
+import { toast } from "react-toastify";
+import { useAuth } from "../../context/AuthContext";
+import { API_BASE_URL, authFetchJson, cartAPI, offersAPI } from "../../services/api";
 import Pubmenubuyservice from "../../services/Pubmenubuyservice";
 
 const BASEAPI = "https://afmc.globalsparkteksolutions.com/AFMCIMAGES/";
@@ -487,8 +489,52 @@ function MenuGrid({ items, showStockStatus = false, onItemClick }) {
 }
 
 function MenuPopupCompact({ item, loading, onClose, onBuy }) {
+  const { user, setCartCount } = useAuth();
   const [qty, setQty] = useState("1");
   const [remarks, setRemarks] = useState("Din");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const userId = user?.userId;
+
+  const fetchCartCount = async () => {
+    if (!userId) return;
+    try {
+      const response = await cartAPI.getByUserId(userId);
+      const items = response?.data?.data || [];
+      setCartCount?.(items.length);
+    } catch (err) {
+      console.error("Error fetching cart count:", err);
+    }
+  };
+
+  const handleAddToCart = async () => {
+    if (!item) return;
+
+    try {
+      setIsSubmitting(true);
+      const cartData = {
+        item_id: item?.item_id || item?.item_code,
+        item_name: item?.item_name,
+        quantity: parseInt(qty, 10) || 1,
+        unit_price: item?.unit_price,
+        remarks,
+      };
+
+      const response = await cartAPI.addItem(cartData);
+      toast.success("Item added to cart!");
+      if (response?.status === 201) {
+        await fetchCartCount();
+      }
+      setTimeout(() => onClose?.(), 1200);
+    } catch (err) {
+      console.error("Error adding to cart:", err);
+      const errorMessage =
+        err?.response?.data?.message || err?.message || "Failed to add item to cart";
+      toast.error(errorMessage);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   useEffect(() => {
     if (!item && !loading) {
@@ -627,9 +673,11 @@ function MenuPopupCompact({ item, loading, onClose, onBuy }) {
                 <div className="flex flex-wrap gap-3 md:pl-[calc(4rem+140px)]">
                   <button
                     type="button"
+                    onClick={handleAddToCart}
+                    disabled={isSubmitting}
                     className="min-w-[170px] rounded-full border border-[#7BA43A] px-8 py-3 text-sm font-semibold text-[#5F8A22] transition hover:bg-[#7BA43A]/10"
                   >
-                    Add to cart
+                    {isSubmitting ? "Adding..." : "Add to cart"}
                   </button>
                   <button
                     type="button"

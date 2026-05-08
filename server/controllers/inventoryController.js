@@ -1,4 +1,5 @@
 const inventoryModel = require("../models/inventoryModel");
+const cocktailModel = require("../models/cocktailModel");
 const fs = require("fs");
 const path = require("path");
 const upload = require("../utils/uploadMiddleware");
@@ -97,6 +98,32 @@ exports.getBarTypes = async (_req, res) => {
   } catch (error) {
     console.error("Error fetching bar types:", error);
     res.status(500).json({ success: false, message: "Failed to load bar types" });
+  }
+};
+
+exports.getItemById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!id) {
+      return res.status(400).json({ success: false, message: "Item ID is required" });
+    }
+
+    // First try to get as cocktail/mocktail
+    let item = await cocktailModel.getCocktailItemById(id);
+    
+    // If not found as cocktail, try regular inventory item
+    if (!item) {
+      item = await inventoryModel.getItemById(id);
+    }
+
+    if (!item) {
+      return res.status(404).json({ success: false, message: "Item not found" });
+    }
+
+    res.status(200).json({ success: true, data: item });
+  } catch (error) {
+    console.error("Error fetching item:", error);
+    res.status(500).json({ success: false, message: "Failed to load item" });
   }
 };
 
@@ -239,3 +266,5 @@ exports.addStockOut = async (req, res) => {
     res.status(500).json({ success: false, message: "Failed to add stock-out" });
   }
 };
+
+

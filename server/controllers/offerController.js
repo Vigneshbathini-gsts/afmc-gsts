@@ -194,7 +194,7 @@ exports.updateOffer = async (req, res) => {
     const username = req.user?.username || "SYSTEM";
     const { endDate } = req.body;
 
-    console.log("Updating Offer - ID:", id, "EndDate:", endDate);
+    // console.log("Updating Offer - ID:", id, "EndDate:", endDate);
 
     if (!endDate) {
       return res.status(400).json({ message: "End date is required" });
@@ -253,3 +253,4 @@ exports.getAllItemsForOffer = async (req, res) => {
     res.status(500).json({ message: "Internal server error" });
   }
 };
+

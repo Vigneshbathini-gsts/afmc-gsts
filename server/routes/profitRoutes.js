@@ -12,3 +12,4 @@ router.put("/non-member", updateNonMemberPricing);
 router.get("/report", getPricingReport);
 
 module.exports = router;
+

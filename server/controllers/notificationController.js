@@ -68,3 +68,4 @@ exports.markStockOutRead = async (req, res) => {
     });
   }
 };
+
