@@ -653,7 +653,7 @@ function MenuPopupCompact({ item, loading, onClose, onBuy }) {
                         onChange={(e) => setRemarks(e.target.value)}
                         className="h-11 w-full rounded border border-stone-300 bg-white px-3 text-[15px] font-medium text-stone-800 outline-none transition focus:border-afmc-maroon focus:ring-2 focus:ring-afmc-maroon/20"
                       >
-                        <option value="Din">Din</option>
+                        <option value="Din">Dine In</option>
                         <option value="Take Away">Take Away</option>
                       </select>
                     </div>
