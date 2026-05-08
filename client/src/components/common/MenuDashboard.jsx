@@ -1499,7 +1499,7 @@ function SnackNonVegSection({ onItemClick }) {
 
 function MenuDashboard() {
   const navigate = useNavigate();
-   const location = useLocation();
+  const location = useLocation();
   const [mainTab, setMainTab] = useState("drinks");
   const [drinkSection, setDrinkSection] = useState("soft");
   const [snackSection, setSnackSection] = useState("veg");
@@ -1537,6 +1537,12 @@ function MenuDashboard() {
       );
     }
   };
+
+  const baseSegment = location.pathname.startsWith("/user")
+    ? "/user"
+    : location.pathname.startsWith("/attendant")
+      ? "/attendant"
+      : "/user";
 
   const handleItemClick = async (item) => {
     if (!item?.item_code || !item?.item_id) {
@@ -1672,7 +1678,7 @@ function MenuDashboard() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       {/* Note: Layout already provides a sticky navbar; keep this header non-sticky to avoid overlap. */}
-      <MenuHeader onBack={() => navigate(-1)} />
+      <MenuHeader onBack={() => navigate(`${baseSegment}/dashboard`, { replace: true })} />
 
       {/* Main Content */}
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
