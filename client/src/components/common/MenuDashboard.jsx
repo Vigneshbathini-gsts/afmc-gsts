@@ -6,6 +6,7 @@ import { toast } from "react-toastify";
 import { useAuth } from "../../context/AuthContext";
 import { API_BASE_URL, authFetchJson, cartAPI, offersAPI } from "../../services/api";
 import Pubmenubuyservice from "../../services/Pubmenubuyservice";
+import FilterDropdown from "./FilterDropdown";
 
 const BASEAPI = "https://afmc.globalsparkteksolutions.com/AFMCIMAGES/";
 
@@ -1216,24 +1217,26 @@ function EnduserOtherSection({ onItemClick }) {
   return (
     <FilterShell
       leftFilter={
-        <SelectField
+        <FilterDropdown
           label="Category"
           value={selectedCategory}
-          onChange={(event) => {
-            setSelectedCategory(event.target.value);
+          onChange={(next) => {
+            setSelectedCategory(next);
             setSelectedItem("");
           }}
           options={categoryOptions}
           placeholder="All Categories"
+          allLabel="All Categories"
         />
       }
       rightFilter={
-        <SelectField
+        <FilterDropdown
           label="Item Name"
           value={selectedItem}
-          onChange={(event) => setSelectedItem(event.target.value)}
+          onChange={(next) => setSelectedItem(next)}
           options={itemOptions}
           placeholder="Select Item"
+          allLabel="All Items"
         />
       }
     >
@@ -1285,12 +1288,13 @@ function EnduserMocktailSection({ onItemClick }) {
         <div className="hidden md:block" />
       }
       rightFilter={
-        <SelectField
+        <FilterDropdown
           label="Item Name"
           value={selectedItem}
-          onChange={(event) => setSelectedItem(event.target.value)}
+          onChange={(next) => setSelectedItem(next)}
           options={data.map((item) => item.item_name)}
           placeholder="Select Item"
+          allLabel="All Items"
         />
       }
     >
@@ -1356,12 +1360,13 @@ function DrinkHardDrinkSection({ onItemClick }) {
 
       <div className="grid gap-4 md:grid-cols-2">
         <div className="hidden md:block" />
-        <SelectField
+        <FilterDropdown
           label="Item Name"
           value={selectedItem}
-          onChange={(event) => setSelectedItem(event.target.value)}
+          onChange={(next) => setSelectedItem(next)}
           options={data.map((item) => item.item_name)}
           placeholder="Select Item"
+          allLabel="All Items"
         />
       </div>
 
@@ -1412,12 +1417,13 @@ function SnackVegSection({ onItemClick }) {
         <div className="hidden md:block" />
       }
       rightFilter={
-        <SelectField
+        <FilterDropdown
           label="Item Name"
           value={selectedItem}
-          onChange={(event) => setSelectedItem(event.target.value)}
+          onChange={(next) => setSelectedItem(next)}
           options={data.map((item) => item.item_name)}
           placeholder="Select Item"
+          allLabel="All Items"
         />
       }
     >
@@ -1469,12 +1475,13 @@ function SnackNonVegSection({ onItemClick }) {
         <div className="hidden md:block" />
       }
       rightFilter={
-        <SelectField
+        <FilterDropdown
           label="Item Name"
           value={selectedItem}
-          onChange={(event) => setSelectedItem(event.target.value)}
+          onChange={(next) => setSelectedItem(next)}
           options={data.map((item) => item.item_name)}
           placeholder="Select Item"
+          allLabel="All Items"
         />
       }
     >
