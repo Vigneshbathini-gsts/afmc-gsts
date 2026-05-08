@@ -18,8 +18,7 @@ export function AuthProvider({ children }) {
     try {
       const response = await cartAPI.getByUserId(userId);
       const items = response.data?.data || [];
-      const count = items.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
-      setCartCount(count);
+      setCartCount(items.length);
     } catch (error) {
       console.error("Failed to load cart count:", error);
       setCartCount(0);

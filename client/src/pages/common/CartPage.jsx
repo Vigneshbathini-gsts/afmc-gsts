@@ -8,17 +8,31 @@ const BASEAPI = "https://afmc.globalsparkteksolutions.com/AFMCIMAGES/";
 
 // Toast component for notifications
 const Toast = ({ message, type, onClose }) => {
+    const [isVisible, setIsVisible] = useState(true);
+
     useEffect(() => {
-        const timer = setTimeout(onClose, 3000);
+        const timer = setTimeout(() => {
+            setIsVisible(false);
+            setTimeout(onClose, 300); // Wait for fade animation
+        }, 3000);
         return () => clearTimeout(timer);
     }, [onClose]);
 
     return (
-        <div className={`fixed bottom-4 right-4 z-50 rounded-lg shadow-lg p-4 animate-slide-up ${type === 'error' ? 'bg-red-600' : 'bg-green-600'
-            } text-white min-w-[200px]`}>
+        <div 
+            className={`fixed bottom-4 right-4 z-50 rounded-lg shadow-lg p-4 ${type === 'error' ? 'bg-red-600' : 'bg-green-600'
+                } text-white min-w-[200px] transition-all duration-300 ease-in-out pointer-events-auto ${
+                    isVisible 
+                        ? 'opacity-100 translate-y-0' 
+                        : 'opacity-0 translate-y-3 pointer-events-none'
+                }`}
+        >
             <div className="flex items-center justify-between gap-3">
                 <span className="text-sm">{message}</span>
-                <button onClick={onClose} className="hover:opacity-80">
+                <button onClick={() => {
+                    setIsVisible(false);
+                    setTimeout(onClose, 300);
+                }} className="hover:opacity-80">
                     <X size={16} />
                 </button>
             </div>
@@ -81,7 +95,7 @@ export default function CartPage({ isAttendant = false }) {
         try {
             const response = await cartAPI.getByUserId(userId);
             const items = response.data.data || [];
-            console.log(items);
+            // console.log(items);
             setCartItems(items);
             setCartCount(items.length);
         } catch (err) {
@@ -168,7 +182,7 @@ export default function CartPage({ isAttendant = false }) {
 
     return (
         <div className="space-y-4 pb-20 md:pb-4">
-            {/* Toast Notifications */}
+            {/* Toast Notifications - Always rendered, visibility controlled via CSS */}
             {toast && (
                 <Toast
                     message={toast.message}
@@ -292,10 +306,10 @@ export default function CartPage({ isAttendant = false }) {
                                 {item.itemName || "Unnamed Item"}
                             </h2>
 
-                            <p className={`text-xs mt-1 ${item.stockStatus === "Out Of Stock" ? "text-red-600" : "text-green-600"
+                            {/* <p className={`text-xs mt-1 ${item.stockStatus === "Out Of Stock" ? "text-red-600" : "text-green-600"
                                 }`}>
                                 {item.stockStatus || "Checking Stock"}
-                            </p>
+                            </p> */}
                         </div>
 
                         {/* Quantity Controls */}
@@ -332,17 +346,6 @@ export default function CartPage({ isAttendant = false }) {
 
             {/* Add custom CSS for animations */}
             <style jsx>{`
-                @keyframes slide-up {
-                    from {
-                        transform: translateY(100%);
-                        opacity: 0;
-                    }
-                    to {
-                        transform: translateY(0);
-                        opacity: 1;
-                    }
-                }
-                
                 @keyframes scale-in {
                     from {
                         transform: scale(0.95);
@@ -352,10 +355,6 @@ export default function CartPage({ isAttendant = false }) {
                         transform: scale(1);
                         opacity: 1;
                     }
-                }
-                
-                .animate-slide-up {
-                    animation: slide-up 0.3s ease-out;
                 }
                 
                 .animate-scale-in {
