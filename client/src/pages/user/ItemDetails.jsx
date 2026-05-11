@@ -8,6 +8,7 @@ const getDetailItemCode = (detail) => detail?.itemCode ?? detail?.ITEM_CODE;
 const getDetailItemName = (detail) => detail?.itemName ?? detail?.ITEM_NAME;
 const getDetailPegs = (detail) => detail?.pegs ?? detail?.PEGS;
 const getDetailStockQuantity = (detail) => detail?.stockQuantity ?? detail?.STOCK_QUANTITY;
+const getDetailRequiredQuantity = (detail) => detail?.requiredQuantity ?? detail?.REQUIRED_QUANTITY;
 
 export default function ItemDetails() {
     const { id } = useParams();
@@ -105,6 +106,7 @@ export default function ItemDetails() {
                                     unitPrice: ingredient.unitPrice,
                                     stockQuantity: ingredient.stockQuantity,
                                     stockStatus: ingredient.stockStatus,
+                                    requiredQuantity: ingredient.requiredQuantity,
                                 }));
                                 initialQuantities = {};
                                 details.forEach((detail, idx) => {
@@ -417,8 +419,13 @@ export default function ItemDetails() {
                                     const hasQuantity = pegs !== 0 && pegs !== null;
                                     const currentQty = quantities[index] || 1;
                                     const stockQuantity = getDetailStockQuantity(detail);
+                                    const requiredQuantity = getDetailRequiredQuantity(detail);
                                     const stockStatus = stockQuantity != null
-                                        ? (Number(stockQuantity) >= Number(currentQty) ? "In Stock" : "Out Of Stock")
+                                        ? (
+                                            requiredQuantity != null
+                                                ? (Number(stockQuantity) >= Number(requiredQuantity) ? "In Stock" : "Out Of Stock")
+                                                : (Number(stockQuantity) >= Number(currentQty) ? "In Stock" : "Out Of Stock")
+                                          )
                                         : (detail.stockStatus || "Unknown");
 
                                     return (

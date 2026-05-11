@@ -83,9 +83,9 @@ export default function CartPage({ isAttendant = false }) {
 
     const userId = user?.userId;
 
-    const showToast = (message, type = 'success') => {
+    const showToast = useCallback((message, type = 'success') => {
         setToast({ message, type });
-    };
+    }, []);
 
     const fetchCartItems = useCallback(async () => {
         if (!userId) return;
@@ -165,11 +165,31 @@ export default function CartPage({ isAttendant = false }) {
     }, [cartItems.length]);
 
     const handleProceedConfirm = useCallback(() => {
-        const orderNumber = `ORD-${Date.now()}`;
-        setProceedConfirmOpen(false);
-        const basePath = isAttendant ? "/attendant" : "/user";
-        navigate(`${basePath}/confirm-order?orderNumber=${encodeURIComponent(orderNumber)}`);
-    }, [navigate, isAttendant]);
+        const proceed = async () => {
+            try {
+                setLoading(true);
+                setError(null);
+                const response = await cartAPI.proceedToBuy();
+                const orderNumber = response?.data?.data?.orderNumber;
+                if (!orderNumber) {
+                    throw new Error("Order number not returned");
+                }
+
+                setProceedConfirmOpen(false);
+                const basePath = isAttendant ? "/attendant" : "/user";
+                navigate(`${basePath}/confirm-order?orderNumber=${encodeURIComponent(orderNumber)}`);
+            } catch (err) {
+                setProceedConfirmOpen(false);
+                const msg = err?.response?.data?.message || err?.message || "Unable to create order.";
+                setError(msg);
+                showToast(msg, "error");
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        proceed();
+    }, [navigate, isAttendant, showToast]);
 
     const handleGoToMenu = useCallback(() => {
         const basePath = isAttendant ? "/attendant" : "/user";

@@ -9,14 +9,28 @@ const createValidationError = (message) => {
 };
 
 const getStockQuantity = async (conn, itemCode) => {
-  const [rows] = await conn.execute(
+  // Two stock sources exist in this schema:
+  // - `xxafmc_inventory.stock_quantity` (used by inventory listing/transactions)
+  // - `xxafmc_stock_out.stock_quantity` (used for bar/ingredient stock buckets)
+  // Prefer inventory.stock_quantity when present, otherwise fall back to stock_out sum.
+  const [[invRow]] = await conn.execute(
+    `SELECT IFNULL(STOCK_QUANTITY, 0) AS stock FROM xxafmc_inventory WHERE item_code = ? LIMIT 1`,
+    [itemCode]
+  );
+
+  const inventoryStock = Number(invRow?.stock || 0);
+  if (inventoryStock > 0) {
+    return inventoryStock;
+  }
+
+  const [[stockRow]] = await conn.execute(
     `SELECT IFNULL(SUM(STOCK_QUANTITY), 0) AS stock
      FROM xxafmc_stock_out
      WHERE item_code = ?`,
     [itemCode]
   );
 
-  return Number(rows[0]?.stock || 0);
+  return Number(stockRow?.stock || 0);
 };
 
 const getOrderReservedQuantity = async (conn, itemCode) => {
@@ -224,16 +238,33 @@ const getIngredientStockQuantities = async (conn, itemCodes) => {
   if (normalizedCodes.length === 0) return {};
 
   const placeholders = normalizedCodes.map(() => "?").join(",");
-  const [rows] = await conn.execute(
+  // Prefer `xxafmc_inventory.stock_quantity` when available, otherwise fall back to `xxafmc_stock_out` sum.
+  const [invRows] = await conn.execute(
+    `SELECT item_code, IFNULL(stock_quantity, 0) AS stock_quantity
+     FROM xxafmc_inventory
+     WHERE item_code IN (${placeholders})`,
+    normalizedCodes
+  );
+  const inventoryMap = invRows.reduce((map, row) => {
+    map[String(row.item_code)] = Number(row.stock_quantity || 0);
+    return map;
+  }, {});
+
+  const [stockOutRows] = await conn.execute(
     `SELECT item_code, IFNULL(SUM(stock_quantity), 0) AS stock_quantity
      FROM xxafmc_stock_out
      WHERE item_code IN (${placeholders})
      GROUP BY item_code`,
     normalizedCodes
   );
-
-  return rows.reduce((map, row) => {
+  const stockOutMap = stockOutRows.reduce((map, row) => {
     map[String(row.item_code)] = Number(row.stock_quantity || 0);
+    return map;
+  }, {});
+
+  return normalizedCodes.reduce((map, code) => {
+    const key = String(code);
+    map[key] = Math.max(Number(inventoryMap[key] || 0), Number(stockOutMap[key] || 0));
     return map;
   }, {});
 };
@@ -295,10 +326,12 @@ const getCartCustomization = async (cartId, userId) => {
 
   const ingredients = rows.map((row) => {
     const quantity = Number(row.quantity || 0);
+    const cartItemQuantity = Number(row.cart_quantity || 1);
+    const requiredQuantity = quantity * cartItemQuantity;
     const stockQuantity = Number(stockMap[String(row.ingredient_item_code)] || 0);
     const reservedQuantity = Number(reservedMap[String(row.ingredient_item_code)] || 0);
     const availableQuantity = Math.max(0, stockQuantity - reservedQuantity);
-    const stockStatus = availableQuantity >= quantity ? "In Stock" : "Out Of Stock";
+    const stockStatus = availableQuantity >= requiredQuantity ? "In Stock" : "Out Of Stock";
 
     return {
       id: Number(row.id),
@@ -306,6 +339,7 @@ const getCartCustomization = async (cartId, userId) => {
       itemCode: Number(row.ingredient_item_code),
       itemName: row.ingredient_name,
       quantity,
+      requiredQuantity,
       unitPrice: Number(row.unit_price || 0),
       lineTotal: Number(row.line_total || 0),
       stockQuantity: availableQuantity,
@@ -590,6 +624,7 @@ const addCartItem = async (userId, itemData) => {
 };
 
 const getCartItemsByUser = async (userId) => {
+  await ensureCustomizationTable(db);
   const sql = `
     SELECT
       c.cart_id,
@@ -625,6 +660,57 @@ const getCartItemsByUser = async (userId) => {
 
   const [rows] = await db.execute(sql, [userId]);
 
+  const cocktailCartIds = rows
+    .filter((row) => [14, 15].includes(Number(row.inventory_subcategory || 0)) && Number(row.price ?? row.inventory_price ?? 0) !== 0)
+    .map((row) => Number(row.cart_id))
+    .filter((id) => Number.isFinite(id) && id > 0);
+
+  const cocktailStatusMap = new Map();
+  if (cocktailCartIds.length > 0) {
+    const placeholders = [...new Set(cocktailCartIds)].map(() => "?").join(",");
+    const [customRows] = await db.execute(
+      `
+        SELECT
+          cc.cart_id,
+          cc.ingredient_item_code,
+          cc.quantity AS ingredient_quantity,
+          c.quantity AS cart_quantity
+        FROM ${CUSTOMIZATION_TABLE} cc
+        INNER JOIN xxafmc_cart_items c
+          ON c.cart_id = cc.cart_id
+        WHERE cc.cart_id IN (${placeholders})
+      `,
+      [...new Set(cocktailCartIds)]
+    );
+
+    const ingredientCodes = [...new Set(customRows.map((r) => Number(r.ingredient_item_code)).filter((code) => Number.isFinite(code) && code > 0))];
+    const stockMap = await getIngredientStockQuantities(db, ingredientCodes);
+    const reservedMap = await getIngredientReservedQuantities(db, ingredientCodes);
+
+    const byCart = customRows.reduce((acc, row) => {
+      const cartId = Number(row.cart_id);
+      if (!acc.has(cartId)) acc.set(cartId, []);
+      acc.get(cartId).push({
+        itemCode: Number(row.ingredient_item_code),
+        ingredientQuantity: Number(row.ingredient_quantity || 0),
+        cartQuantity: Number(row.cart_quantity || 1),
+      });
+      return acc;
+    }, new Map());
+
+    for (const [cartId, ingredients] of byCart.entries()) {
+      const hasIngredients = ingredients.length > 0;
+      const enoughStock = hasIngredients && ingredients.every((item) => {
+        const stockQuantity = Number(stockMap[String(item.itemCode)] || 0);
+        const reservedQuantity = Number(reservedMap[String(item.itemCode)] || 0);
+        const availableQuantity = Math.max(0, stockQuantity - reservedQuantity);
+        const requiredQuantity = Number(item.ingredientQuantity || 0) * Number(item.cartQuantity || 1);
+        return availableQuantity >= requiredQuantity;
+      });
+      cocktailStatusMap.set(cartId, hasIngredients ? (enoughStock ? "In Stock" : "Out Of Stock") : "Unknown");
+    }
+  }
+
   return rows.map((row) => {
     const quantity = Number(row.quantity || 0);
 
@@ -638,7 +724,11 @@ const getCartItemsByUser = async (userId) => {
     const canEdit = isCocktailItem && !isFreeItem;
 
     const stockQty = Number(row.stock_quantity || 0);
-    const stockStatus = isCocktailItem ? "In Stock" : stockQty === 0 ? "Out Of Stock" : "In Stock";
+    const stockStatus = isCocktailItem
+      ? (cocktailStatusMap.get(Number(row.cart_id)) || "Unknown")
+      : stockQty === 0
+        ? "Out Of Stock"
+        : "In Stock";
 
 
     return {

@@ -45,6 +45,191 @@ const clearCocktailSessionCollections = async (req, parentItemCode = null, order
   }
 };
 
+const getNextOrderLineId = async (connection) => {
+  const [[row]] = await connection.execute(
+    `
+      SELECT COALESCE(MAX(order_line_id), 0) + 1 AS nextId
+      FROM xxafmc_order_details
+    `
+  );
+  return Number(row?.nextId || 1);
+};
+
+const getMCollectionFromSession = async (req, cartItems, orderNumber = "") => {
+  const rows = [];
+  for (const cartItem of cartItems) {
+    if (!isCocktailCartItem(cartItem)) continue;
+    const { collection } = await getCocktailSessionCollection(req, cartItem.item_id, cartItem.quantity, orderNumber);
+    for (const ingredient of collection.ingredients || []) {
+      rows.push({
+        item_code: ingredient.itemCode,
+        item_name: ingredient.itemName,
+        pegs: ingredient.basePegs,
+        inventory_item_code: cartItem.item_id,
+        user_id: req.user?.userId,
+        stock_quantity: ingredient.stockQuantity,
+      });
+    }
+  }
+  return rows;
+};
+
+const validateCartQuantitiesOrThrow = (cartRows) => {
+  const hasZero = (cartRows || []).some((row) => Number(row.quantity || 0) <= 0);
+  if (hasZero) {
+    const error = new Error("Some items have a quantity of 0. Please update the quantity before proceeding.");
+    error.status = 400;
+    throw error;
+  }
+};
+
+const validateCocktailChildStockOrThrow = async (connection, req, cartRows, orderNumber = "") => {
+  // Equivalent to the APEX validation that checks child item stock only when no M_COLLECTION exists.
+  const mCollectionRows = await getMCollectionFromSession(req, cartRows, orderNumber);
+  if (mCollectionRows.length > 0) return;
+
+  const cocktailCartIds = (cartRows || [])
+    .filter((row) => isCocktailCartItem(row))
+    .map((row) => Number(row.cart_id))
+    .filter((id) => Number.isFinite(id) && id > 0);
+  if (cocktailCartIds.length === 0) return;
+
+  // Prefer validating against the cart's actual customization (xxafmc_cart_customization),
+  // since users may change ingredients/pegs after adding the cocktail.
+  const uniqueCartIds = [...new Set(cocktailCartIds)];
+  const placeholders = uniqueCartIds.map(() => "?").join(",");
+  const [customRows] = await connection.execute(
+    `
+      SELECT
+        cc.cart_id,
+        cc.ingredient_item_code,
+        cc.ingredient_name,
+        cc.quantity AS ingredient_quantity,
+        c.quantity AS cart_quantity
+      FROM xxafmc_cart_customization cc
+      INNER JOIN xxafmc_cart_items c
+        ON c.cart_id = cc.cart_id
+      WHERE cc.cart_id IN (${placeholders})
+    `,
+    uniqueCartIds
+  );
+
+  if (customRows.length > 0) {
+    const ingredientCodes = [...new Set(customRows
+      .map((row) => Number(row.ingredient_item_code))
+      .filter((code) => Number.isFinite(code) && code > 0))];
+
+    const stockPlaceholders = ingredientCodes.map(() => "?").join(",");
+    const [stockRows] = await connection.execute(
+      `
+        SELECT item_code, IFNULL(stock_quantity, 0) AS stock_quantity
+        FROM xxafmc_inventory
+        WHERE item_code IN (${stockPlaceholders})
+      `,
+      ingredientCodes
+    );
+    const inventoryStockMap = stockRows.reduce((acc, row) => {
+      acc[String(row.item_code)] = Number(row.stock_quantity || 0);
+      return acc;
+    }, {});
+
+    const [stockOutRows] = await connection.execute(
+      `
+        SELECT item_code, IFNULL(SUM(stock_quantity), 0) AS stock_quantity
+        FROM xxafmc_stock_out
+        WHERE item_code IN (${stockPlaceholders})
+        GROUP BY item_code
+      `,
+      ingredientCodes
+    );
+    const stockOutMap = stockOutRows.reduce((acc, row) => {
+      acc[String(row.item_code)] = Number(row.stock_quantity || 0);
+      return acc;
+    }, {});
+
+    const stockMap = ingredientCodes.reduce((acc, code) => {
+      const key = String(code);
+      acc[key] = Math.max(Number(inventoryStockMap[key] || 0), Number(stockOutMap[key] || 0));
+      return acc;
+    }, {});
+
+    const [reservedRows] = await connection.execute(
+      `
+        SELECT xod.item_id AS item_code, IFNULL(SUM(xod.quantity), 0) AS reserved
+        FROM xxafmc_order_details xod
+        LEFT JOIN xxafmc_order_header xoh ON xod.order_id = xoh.order_num
+        LEFT JOIN xxafmc_invoices xi ON xi.order_num = xod.order_id
+        WHERE xod.item_id IN (${stockPlaceholders})
+          AND xod.order_status IS NULL
+          AND xod.price IS NULL
+          AND xi.order_num IS NULL
+        GROUP BY xod.item_id
+      `,
+      ingredientCodes
+    );
+    const reservedMap = reservedRows.reduce((acc, row) => {
+      acc[String(row.item_code)] = Number(row.reserved || 0);
+      return acc;
+    }, {});
+
+    const byCart = customRows.reduce((acc, row) => {
+      const cartId = Number(row.cart_id);
+      if (!acc.has(cartId)) acc.set(cartId, []);
+      acc.get(cartId).push({
+        itemCode: Number(row.ingredient_item_code),
+        itemName: String(row.ingredient_name || "").trim(),
+        ingredientQuantity: Number(row.ingredient_quantity || 0),
+        cartQuantity: Number(row.cart_quantity || 1),
+      });
+      return acc;
+    }, new Map());
+
+    for (const [cartId, ingredients] of byCart.entries()) {
+      for (const ingredient of ingredients) {
+        const stockQuantity = Number(stockMap[String(ingredient.itemCode)] || 0);
+        const reservedQuantity = Number(reservedMap[String(ingredient.itemCode)] || 0);
+        const availableQuantity = Math.max(0, stockQuantity - reservedQuantity);
+        const requiredQuantity = Number(ingredient.ingredientQuantity || 0) * Number(ingredient.cartQuantity || 1);
+        if (availableQuantity < requiredQuantity) {
+          const error = new Error(`Out of stock for ingredient ${ingredient.itemName || ingredient.itemCode}. Available quantity: ${availableQuantity}`);
+          error.status = 400;
+          throw error;
+        }
+      }
+    }
+
+    return;
+  }
+
+  // Fallback to legacy validation for cocktails without customization rows.
+  const cocktailParentIds = (cartRows || [])
+    .filter((row) => isCocktailCartItem(row))
+    .map((row) => Number(row.item_id))
+    .filter(Boolean);
+  if (cocktailParentIds.length === 0) return;
+
+  const detailPlaceholders = cocktailParentIds.map(() => "?").join(",");
+  const [rows] = await connection.execute(
+    `
+      SELECT
+        xcmd.item_code AS child_item_code,
+        COALESCE(SUM(xso.stock_quantity), 0) AS stock_quantity
+      FROM xxafmc_cocktails_mocktails_details xcmd
+      LEFT JOIN xxafmc_stock_out xso ON xso.item_code = xcmd.item_code
+      WHERE xcmd.inventory_item_code IN (${detailPlaceholders})
+      GROUP BY xcmd.item_code
+    `,
+    cocktailParentIds
+  );
+
+  const hasOutOfStock = rows.some((row) => Number(row.stock_quantity || 0) === 0);
+  if (hasOutOfStock) {
+    const error = new Error("One of the Child item has no stock.");
+    error.status = 400;
+    throw error;
+  }
+};
+
 const getStockQuantities = async (conn, itemCodes) => {
   if (!Array.isArray(itemCodes) || itemCodes.length === 0) {
     return {};
@@ -458,65 +643,7 @@ exports.confirmOrder = async (req, res) => {
       cartRows.map((row) => [String(row.item_id), Number(row.quantity || 0)])
     );
 
-    const [customizationRows] = await connection.execute(
-      `
-        SELECT
-          c.cart_id,
-          c.item_id AS inventory_item_code,
-          c.quantity AS cart_quantity,
-          cc.ingredient_item_code AS item_code,
-          cc.ingredient_name AS item_name,
-          cc.quantity AS pegs
-        FROM xxafmc_cart_items c
-        INNER JOIN xxafmc_cart_customization cc
-          ON cc.cart_id = c.cart_id
-        WHERE c.user_id = ?
-          AND c.price != 0
-        ORDER BY c.cart_id, cc.id
-      `,
-      [userId]
-    );
-
-    let customizationInserted = 0;
-    const customizedParentItemCodes = new Set();
-    for (const row of customizationRows) {
-      customizedParentItemCodes.add(String(row.inventory_item_code));
-      const requiredQuantity = Number(row.pegs || 0) * Number(row.cart_quantity || 1);
-      const stockMap = await getStockQuantities(connection, [row.item_code]);
-      const totalStock = Number(stockMap[String(row.item_code)] || 0);
-      if (totalStock < requiredQuantity) continue;
-
-      await connection.execute(
-        `INSERT INTO xxafmc_custom_cocktails_mocktails_details
-          (item_code, item_name, pegs, inventory_item_code, user_id, quantity, order_number, creation_date)
-        VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
-        [
-          row.item_code,
-          row.item_name,
-          row.pegs,
-          row.inventory_item_code,
-          userId,
-          row.cart_quantity,
-          orderNumber,
-        ]
-      );
-      customizationInserted += 1;
-    }
-
-    const [collectionRows] = await connection.execute(
-      `SELECT
-          seq_id,
-          c001 AS item_code,
-          c002 AS item_name,
-          c003 AS pegs,
-          c005 AS inventory_item_code,
-          c006 AS user_id,
-          c009 AS stock_quantity
-        FROM apex_collections
-        WHERE collection_name = 'M_COLLECTION'
-          AND c006 = ?`,
-      [userId]
-    );
+    const collectionRows = await getMCollectionFromSession(req, cartRows, orderNumber);
 
     let mainInserted = 0;
     for (const row of collectionRows) {
@@ -551,22 +678,18 @@ exports.confirmOrder = async (req, res) => {
           xcmd.item_code
         FROM xxafmc_cocktails_mocktails_details xcmd
         JOIN xxafmc_cart_items xc ON xc.item_id = xcmd.inventory_item_code AND xc.user_id = ?
-        LEFT JOIN xxafmc_cart_customization xcc ON xcc.cart_id = xc.cart_id
-        WHERE NOT EXISTS (
-          SELECT 1
-          FROM apex_collections ac
-          WHERE ac.collection_name = 'M_COLLECTION'
-            AND ac.c006 = ?
-            AND ac.c005 = xcmd.inventory_item_code
-        )
-          AND xcc.cart_id IS NULL
         GROUP BY xcmd.inventory_item_code, xcmd.pegs, xcmd.item_name, xcmd.item_code`,
-      [userId, userId]
+      [userId]
+    );
+
+    const mCollectionInventorySet = new Set(
+      collectionRows.map((row) => String(row.inventory_item_code))
     );
 
     let dummyInserted = 0;
     for (const row of cocktailRows) {
       const inventoryItemCode = String(row.inventory_item_code);
+      if (mCollectionInventorySet.has(inventoryItemCode)) continue;
       const quantity = cartQuantityMap.get(inventoryItemCode);
       if (!quantity) continue;
 
@@ -615,6 +738,200 @@ exports.confirmOrder = async (req, res) => {
   }
 };
 
+exports.proceedToBuy = async (req, res) => {
+  const userId = req.user?.userId;
+  if (!userId) {
+    return res.status(400).json({ success: false, message: "User ID is required" });
+  }
+
+  const { memberId = null, pubmed = null } = req.body || {};
+  const appUser = String(req.user?.username || req.user?.user_name || userId);
+
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    const [cartRows] = await connection.execute(
+      `SELECT
+         c.cart_id,
+         c.item_id,
+         c.quantity,
+         c.total,
+         c.price,
+         c.profit,
+         c.food_pr_charges,
+         c.type_id,
+         COALESCE(xi.sub_category, c.subcategory) AS subcategory,
+         xi.category_id AS category_id,
+         c.parent_code,
+         c.type
+       FROM xxafmc_cart_items c
+       LEFT JOIN xxafmc_inventory xi
+         ON xi.item_code = c.item_id
+       WHERE c.user_id = ?`,
+      [userId]
+    );
+
+    if (!cartRows.length) {
+      const error = new Error("Cart is empty");
+      error.status = 400;
+      throw error;
+    }
+
+    validateCartQuantitiesOrThrow(cartRows);
+    await validateCocktailChildStockOrThrow(connection, req, cartRows, "");
+
+    const [headerResult] = await connection.execute(
+      `
+        INSERT INTO xxafmc_order_header
+          (user_id, order_date, member_id, pubmed, created_by, creation_date)
+        VALUES
+          (?, NOW(), ?, ?, ?, NOW())
+      `,
+      [userId, memberId, pubmed, appUser]
+    );
+    const orderNumber = String(headerResult.insertId);
+
+    for (const item of cartRows) {
+      const isCocktailOrMocktail = [14, 15].includes(Number(item.subcategory));
+      let availableStock = 0;
+      let itemName = "";
+
+      if (isCocktailOrMocktail) {
+        // Cocktail/mocktail parent items do not have direct stock; their availability is driven by ingredient stock.
+        // Ingredient stock is validated in validateCocktailChildStockOrThrow above.
+        availableStock = Number.POSITIVE_INFINITY;
+      } else {
+      // Prefer inventory stock_quantity (used by inventory transactions), fall back to stock_out buckets.
+      try {
+        const [invRows] = await connection.execute(
+          `SELECT item_name, IFNULL(stock_quantity, 0) AS stock_quantity FROM xxafmc_inventory WHERE item_code = ? LIMIT 1`,
+          [item.item_id]
+        );
+        itemName = String(invRows[0]?.item_name || "").trim();
+        availableStock = Number(invRows[0]?.stock_quantity || 0);
+      } catch {
+        availableStock = 0;
+      }
+
+      if (availableStock <= 0) {
+        try {
+          const [stockRows] = await connection.execute(
+            `
+              SELECT item_name, COALESCE(SUM(stock_quantity), 0) AS stock_quantity
+              FROM xxafmc_stock_out
+              WHERE item_code = ?
+              GROUP BY item_code, item_name
+            `,
+            [item.item_id]
+          );
+          itemName = itemName || String(stockRows[0]?.item_name || "").trim();
+          availableStock = Math.max(availableStock, Number(stockRows[0]?.stock_quantity || 0));
+        } catch {
+          // ignore
+        }
+      }
+
+      // Deduct reserved quantities (pending/unbilled) to match cart/add validations.
+      try {
+        const [reservedRows] = await connection.execute(
+          `
+            SELECT IFNULL(SUM(xod.quantity), 0) AS reserved
+            FROM xxafmc_order_details xod
+            LEFT JOIN xxafmc_order_header xoh ON xod.order_id = xoh.order_num
+            LEFT JOIN xxafmc_invoices xi ON xi.order_num = xod.order_id
+            WHERE xod.item_id = ?
+              AND xod.order_status IS NULL
+              AND xod.price IS NULL
+              AND xi.order_num IS NULL
+          `,
+          [item.item_id]
+        );
+        const reservedQty = Number(reservedRows[0]?.reserved || 0);
+        availableStock = Math.max(0, availableStock - reservedQty);
+      } catch {
+        // ignore reserved lookup failures
+      }
+
+      if (!itemName) {
+        try {
+          const [invRows] = await connection.execute(
+            `SELECT item_name FROM xxafmc_inventory WHERE item_code = ? LIMIT 1`,
+            [item.item_id]
+          );
+          itemName = String(invRows[0]?.item_name || "").trim();
+        } catch {
+          // ignore
+        }
+      }
+      }
+
+      const stockInCart = Number(item.quantity || 0);
+      if (stockInCart > availableStock) {
+        const error = new Error(`Out of Stock for item ${itemName || item.item_id}. Available quantity: ${availableStock}`);
+        error.status = 400;
+        throw error;
+      }
+
+      const orderLineId = await getNextOrderLineId(connection);
+      await connection.execute(
+        `
+          INSERT INTO xxafmc_order_details
+            (
+              order_line_id,
+              order_id,
+              item_id,
+              quantity,
+              subtotal,
+              price,
+              total_quantity,
+              profit,
+              food_pr_charges,
+              created_by,
+              creation_date,
+              type_id,
+              subcategory,
+              barcode,
+              type
+            )
+          VALUES
+            (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?)
+        `,
+        [
+          orderLineId,
+          orderNumber,
+          item.item_id,
+          item.quantity,
+          item.total,
+          item.price,
+          item.quantity,
+          item.profit,
+          item.food_pr_charges,
+          appUser,
+          item.type_id,
+          item.subcategory,
+          item.parent_code,
+          item.type,
+        ]
+      );
+    }
+
+    await connection.commit();
+
+    return res.status(201).json({
+      success: true,
+      message: "Order created",
+      data: { orderNumber },
+    });
+  } catch (error) {
+    console.error("Error proceeding to buy:", error);
+    await connection.rollback();
+    const status = error?.status || 500;
+    return res.status(status).json({ success: false, message: error?.message || "Failed to create order" });
+  } finally {
+    connection.release();
+  }
+};
 exports.updateCartItemQuantity = async (req, res) => {
   try {
     const userId = req.user?.userId;
