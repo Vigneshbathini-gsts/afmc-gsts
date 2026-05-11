@@ -1172,6 +1172,7 @@ function EnduserOtherSection({ onItemClick }) {
       try {
         const result = await authFetchJson(`${API_BASE_URL}/menubar`);
         setData(result?.data || []);
+        console.log(result?.data)
       } catch (fetchError) {
         setError(fetchError.message);
       } finally {
@@ -1553,14 +1554,9 @@ function MenuDashboard() {
     setPopupLoading(true);
 
     try {
-      const response = await fetch(
+      const result = await authFetchJson(
         `${API_BASE_URL}/memupopup?itemCode=${item.item_code}&itemId=${item.item_id}`
       );
-      const result = await response.json();
-
-      if (!response.ok || !result?.success) {
-        throw new Error(result?.message || "Failed to fetch popup details");
-      }
 
       setPopupItem(result.data);
     } catch (error) {
