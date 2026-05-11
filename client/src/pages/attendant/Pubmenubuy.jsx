@@ -69,7 +69,7 @@ function ActionButton({ children, className = "", ...props }) {
   );
 }
 
-export default function Pubmenubuy() {
+export default function Pubmenubuy({ backTo = "" }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
@@ -160,7 +160,11 @@ export default function Pubmenubuy() {
       setError("");
       const response = await Pubmenubuyservice.cancelOrder(orderNumber);
       // window.alert(response?.data?.message || "Order cancelled");
-      navigate(location.pathname.replace(/\/buy$/, ""), { replace: true });
+      if (backTo) {
+        navigate(backTo, { replace: true });
+      } else {
+        navigate(location.pathname.replace(/\/buy$/, ""), { replace: true });
+      }
     } catch (cancelError) {
       setError(
         cancelError.response?.data?.message || "Unable to cancel this order."
@@ -205,7 +209,7 @@ export default function Pubmenubuy() {
  
             <div className="flex flex-wrap gap-2">
               <ActionButton
-                onClick={() => navigate(-1)}
+                onClick={() => (backTo ? navigate(backTo) : navigate(-1))}
                 className="bg-white/15 px-4 py-2 hover:bg-white/25"
               >
                 <ChevronLeft className="h-4 w-4" />

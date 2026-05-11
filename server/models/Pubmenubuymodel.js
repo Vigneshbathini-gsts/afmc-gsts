@@ -38,6 +38,30 @@ async function getOrderSummary(orderNumber) {
     throw error;
   }
 
+  const [totalRows] = await db.execute(
+    `
+      SELECT COALESCE(SUM(subtotal), 0) AS order_total
+      FROM xxafmc_order_details
+      WHERE order_id = ?
+    `,
+    [normalizedOrderNumber]
+  );
+
+  const orderTotal = Number(totalRows[0]?.order_total || 0);
+
+  const [foodRows] = await db.execute(
+    `
+      SELECT COALESCE(SUM(food_pr_charges), 0) AS food_pr_charges
+      FROM xxafmc_order_details
+      WHERE order_id = ?
+    `,
+    [normalizedOrderNumber]
+  );
+
+  const foodPrChargesSum = Number(foodRows[0]?.food_pr_charges || 0);
+  const foodPrCharges =
+    foodPrChargesSum === 0 ? "Not Applicable" : Number(foodPrChargesSum.toFixed(2));
+
   const [itemIdRows] = await db.execute(
     `
       SELECT item_id AS item_id
@@ -78,6 +102,8 @@ async function getOrderSummary(orderNumber) {
     header: {
       ...headerRows[0],
       item_id: itemIdRows[0]?.item_id || null,
+      order_total: Number(orderTotal.toFixed(2)),
+      food_pr_charges: foodPrCharges,
     },
     items: itemRows,
   };

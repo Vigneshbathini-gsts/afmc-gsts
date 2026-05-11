@@ -646,6 +646,7 @@ exports.confirmOrder = async (req, res) => {
     const collectionRows = await getMCollectionFromSession(req, cartRows, orderNumber);
 
     let mainInserted = 0;
+    let customizationInserted = 0;
     for (const row of collectionRows) {
       const inventoryItemCode = String(row.inventory_item_code);
       if (customizedParentItemCodes.has(inventoryItemCode)) continue;

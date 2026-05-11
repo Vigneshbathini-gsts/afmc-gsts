@@ -47,6 +47,7 @@ import AttendantInvoice from "../pages/attendant/Invoice";
 import AttendantActiveOrders from "../pages/attendant/ActiveOrders";
 import AttendantOrderStatus from "../pages/attendant/OrderStatus";
 import Pubmenubuy from "../pages/attendant/Pubmenubuy";
+import CartBuy from "../pages/common/CartBuy";
 
 // User Pages
 import UserDashboard from "../pages/user/Dashboard";
@@ -158,6 +159,7 @@ export default function AppRoutes() {
         <Route path="register-member" element={<RegisterMember />} />
         <Route path="item/:id" element={<ItemDetails />} />
         <Route path="cart" element={<AttendantCart />} />
+        <Route path="cart/buy" element={<CartBuy />} />
         <Route path="item/:id" element={<ItemDetails />} />
         <Route path="confirm-order" element={<AttendantConfirmOrder />} />
         <Route path="confirm-order-page" element={<ConfirmOrderpage />} />
@@ -186,6 +188,7 @@ export default function AppRoutes() {
         <Route path="drinks" element={<Drinks />} />
         <Route path="item/:id" element={<ItemDetails />} />
         <Route path="cart" element={<UserCart />} />
+        <Route path="cart/buy" element={<CartBuy />} />
         <Route path="confirm-order" element={<UserConfirmOrder />} />
         <Route path="confirm-order-page" element={<ConfirmOrderpage />} />
         <Route path="payment" element={<UserPayment />} />
