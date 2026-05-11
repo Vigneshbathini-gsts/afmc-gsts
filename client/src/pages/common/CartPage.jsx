@@ -154,9 +154,10 @@ export default function CartPage({ isAttendant = false }) {
         }
     }, [confirmModal, setCartCount]);
 
-    const handleEditItem = useCallback((itemId) => {
-        navigate(`/user/item/${itemId}`);
-    }, [navigate]);
+    const handleEditItem = useCallback((itemId, cartId) => {
+        const basePath = isAttendant ? "/attendant" : "/user";
+        navigate(`${basePath}/item/${itemId}?cartId=${encodeURIComponent(cartId)}`, { state: { cartId } });
+    }, [navigate, isAttendant]);
 
     const handleProceedToBuy = useCallback(() => {
         if (cartItems.length === 0) return;
@@ -274,11 +275,11 @@ export default function CartPage({ isAttendant = false }) {
                                 />
                                 {/* Action Buttons Overlay - Top Right */}
                                 <div className="absolute right-1 top-1 flex gap-1 z-10">
-                                    {/* Edit Button - Only show for items with subcategory 14 or 15 and not attendant */}
-                                    {item.subcategory && [14, 15].includes(Number(item.subcategory)) && !isAttendant && !item.isFreeItem && (
+                                    {/* Edit Button - Only show for items with subcategory 14 or 15 (cocktail/mocktail) */}
+                                    {item.subcategory && [14, 15].includes(Number(item.subcategory)) && !item.isFreeItem && (
                                         <button
                                             type="button"
-                                            onClick={() => handleEditItem(item.itemId)}
+                                            onClick={() => handleEditItem(item.itemId, item.cartId)}
                                             className="rounded-full bg-white/90 p-1.5 text-blue-600 shadow-md transition hover:bg-blue-50"
                                             title="Edit item"
                                         >

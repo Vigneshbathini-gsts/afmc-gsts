@@ -327,16 +327,10 @@ exports.addCartItem = async (req, res) => {
       quantity: Number(quantity) || 1,
       unit_price: Number(unit_price),
       remarks: remarks || "Din",
+      loginType: req.user?.loginType,
     };
 
     const result = await cartModel.addCartItem(userId, itemData);
-
-    if (result?.isCocktailItem) {
-      const cartItem = await cartModel.getCartItemByCode(userId, item_id);
-      if (cartItem) {
-        await getCocktailSessionCollection(req, cartItem.item_id, cartItem.quantity, orderNumber);
-      }
-    }
 
     return res.status(201).json({
       success: true,
@@ -357,7 +351,6 @@ exports.getCocktailDetails = async (req, res) => {
   try {
     const userId = req.user?.userId;
     const { cartId } = req.params;
-    const orderNumber = String(req.query.orderNumber || "").trim();
 
     if (!userId) {
       return res.status(400).json({ success: false, message: "User ID is required" });
@@ -369,12 +362,27 @@ exports.getCocktailDetails = async (req, res) => {
     const cartItem = await cartModel.getCartItemById(Number(cartId), userId);
     validateCocktailItemOrFail(cartItem);
 
-    const { collection } = await getCocktailSessionCollection(
-      req,
-      cartItem.item_id,
-      cartItem.quantity,
-      orderNumber
-    );
+    let collection = await cartModel.getCartCustomization(Number(cartId), userId);
+    if (collection.ingredients.length === 0) {
+      const connection = await db.getConnection();
+      try {
+        await cartModel.ensureCustomizationTable(connection);
+        await connection.beginTransaction();
+        await cartModel.createDefaultCustomizationForCart(connection, {
+          cartId: Number(cartId),
+          parentItemCode: cartItem.item_id,
+          cartQuantity: cartItem.quantity,
+          loginType: req.user?.loginType,
+        });
+        await connection.commit();
+      } catch (error) {
+        await connection.rollback();
+        throw error;
+      } finally {
+        connection.release();
+      }
+      collection = await cartModel.getCartCustomization(Number(cartId), userId);
+    }
 
     return res.status(200).json({ success: true, data: collection });
   } catch (error) {
@@ -388,7 +396,7 @@ exports.updateCocktailIngredients = async (req, res) => {
   try {
     const userId = req.user?.userId;
     const { cartId } = req.params;
-    const { ingredients, orderNumber } = req.body;
+    const { ingredients } = req.body;
 
     if (!userId) {
       return res.status(400).json({ success: false, message: "User ID is required" });
@@ -400,19 +408,7 @@ exports.updateCocktailIngredients = async (req, res) => {
       return res.status(400).json({ success: false, message: "Ingredients must be an array" });
     }
 
-    const cartItem = await cartModel.getCartItemById(Number(cartId), userId);
-    validateCocktailItemOrFail(cartItem);
-
-    const { sessionKey, collection } = await getCocktailSessionCollection(
-      req,
-      cartItem.item_id,
-      cartItem.quantity,
-      String(orderNumber || "").trim()
-    );
-
-    const updatedCollection = applyCocktailIngredientUpdates(collection, ingredients);
-    req.session[sessionKey] = updatedCollection;
-    await saveSession(req);
+    const updatedCollection = await cartModel.updateCartCustomization(Number(cartId), userId, ingredients);
 
     return res.status(200).json({ success: true, data: updatedCollection });
   } catch (error) {
@@ -450,16 +446,62 @@ exports.confirmOrder = async (req, res) => {
 
   const connection = await db.getConnection();
   try {
+    await cartModel.ensureCustomizationTable(connection);
     await connection.beginTransaction();
 
     const [cartRows] = await connection.execute(
-      "SELECT item_id, quantity FROM xxafmc_cart_items WHERE user_id = ?",
+      "SELECT cart_id, item_id, quantity FROM xxafmc_cart_items WHERE user_id = ?",
       [userId]
     );
 
     const cartQuantityMap = new Map(
       cartRows.map((row) => [String(row.item_id), Number(row.quantity || 0)])
     );
+
+    const [customizationRows] = await connection.execute(
+      `
+        SELECT
+          c.cart_id,
+          c.item_id AS inventory_item_code,
+          c.quantity AS cart_quantity,
+          cc.ingredient_item_code AS item_code,
+          cc.ingredient_name AS item_name,
+          cc.quantity AS pegs
+        FROM xxafmc_cart_items c
+        INNER JOIN xxafmc_cart_customization cc
+          ON cc.cart_id = c.cart_id
+        WHERE c.user_id = ?
+          AND c.price != 0
+        ORDER BY c.cart_id, cc.id
+      `,
+      [userId]
+    );
+
+    let customizationInserted = 0;
+    const customizedParentItemCodes = new Set();
+    for (const row of customizationRows) {
+      customizedParentItemCodes.add(String(row.inventory_item_code));
+      const requiredQuantity = Number(row.pegs || 0) * Number(row.cart_quantity || 1);
+      const stockMap = await getStockQuantities(connection, [row.item_code]);
+      const totalStock = Number(stockMap[String(row.item_code)] || 0);
+      if (totalStock < requiredQuantity) continue;
+
+      await connection.execute(
+        `INSERT INTO xxafmc_custom_cocktails_mocktails_details
+          (item_code, item_name, pegs, inventory_item_code, user_id, quantity, order_number, creation_date)
+        VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
+        [
+          row.item_code,
+          row.item_name,
+          row.pegs,
+          row.inventory_item_code,
+          userId,
+          row.cart_quantity,
+          orderNumber,
+        ]
+      );
+      customizationInserted += 1;
+    }
 
     const [collectionRows] = await connection.execute(
       `SELECT
@@ -479,6 +521,7 @@ exports.confirmOrder = async (req, res) => {
     let mainInserted = 0;
     for (const row of collectionRows) {
       const inventoryItemCode = String(row.inventory_item_code);
+      if (customizedParentItemCodes.has(inventoryItemCode)) continue;
       const quantity = cartQuantityMap.get(inventoryItemCode);
       if (!quantity) continue;
 
@@ -508,6 +551,7 @@ exports.confirmOrder = async (req, res) => {
           xcmd.item_code
         FROM xxafmc_cocktails_mocktails_details xcmd
         JOIN xxafmc_cart_items xc ON xc.item_id = xcmd.inventory_item_code AND xc.user_id = ?
+        LEFT JOIN xxafmc_cart_customization xcc ON xcc.cart_id = xc.cart_id
         WHERE NOT EXISTS (
           SELECT 1
           FROM apex_collections ac
@@ -515,6 +559,7 @@ exports.confirmOrder = async (req, res) => {
             AND ac.c006 = ?
             AND ac.c005 = xcmd.inventory_item_code
         )
+          AND xcc.cart_id IS NULL
         GROUP BY xcmd.inventory_item_code, xcmd.pegs, xcmd.item_name, xcmd.item_code`,
       [userId, userId]
     );
@@ -555,7 +600,7 @@ exports.confirmOrder = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: "Order confirmed successfully",
-      data: { orderNumber, mainInserted, dummyInserted },
+      data: { orderNumber, mainInserted, dummyInserted, customizationInserted },
     });
   } catch (error) {
     console.error("Error confirming order:", error);

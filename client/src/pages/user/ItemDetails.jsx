@@ -1,12 +1,20 @@
-import React, { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import React, { useCallback, useEffect, useState } from "react";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { inventoryAPI, cartAPI } from "../../services/api";
 import { FaArrowLeft, FaPlus, FaMinus, FaTrash, FaSearch } from "react-icons/fa";
 import { toast } from "react-toastify";
 
+const getDetailItemCode = (detail) => detail?.itemCode ?? detail?.ITEM_CODE;
+const getDetailItemName = (detail) => detail?.itemName ?? detail?.ITEM_NAME;
+const getDetailPegs = (detail) => detail?.pegs ?? detail?.PEGS;
+const getDetailStockQuantity = (detail) => detail?.stockQuantity ?? detail?.STOCK_QUANTITY;
+
 export default function ItemDetails() {
     const { id } = useParams();
     const navigate = useNavigate();
+    const location = useLocation();
+    const cartId = location.state?.cartId || new URLSearchParams(location.search).get("cartId");
+    const isEditingCartItem = Boolean(cartId);
     const [item, setItem] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -16,6 +24,56 @@ export default function ItemDetails() {
     const [searchTerm, setSearchTerm] = useState("");
     const [lovData, setLovData] = useState([]);
     const [lovLoading, setLovLoading] = useState(false);
+
+    const draftKey = `afmc-custom-item-draft:${id}`;
+
+    const buildCustomizationPayload = useCallback((details, quantitiesState) => {
+        return (details || [])
+            .filter((detail, idx) => quantitiesState[idx] !== undefined)
+            .map((detail, idx) => {
+                const quantity = Number(quantitiesState[idx]);
+                const rawUnitPrice = detail.unitPrice ?? detail.UNIT_PRICE;
+                const rawLinePrice = detail.memberPrice ?? detail.PRICE;
+                const baseQuantity = Number(getDetailPegs(detail) || quantity || 1);
+                const calculatedUnitPrice = rawUnitPrice != null
+                    ? Number(rawUnitPrice)
+                    : Number(rawLinePrice || 0) > 0 && baseQuantity > 0
+                        ? Number(rawLinePrice) / baseQuantity
+                        : undefined;
+
+                return {
+                    itemCode: Number(getDetailItemCode(detail)),
+                    itemName: getDetailItemName(detail),
+                    quantity,
+                    unitPrice: calculatedUnitPrice,
+                };
+            })
+            .filter((ingredient) => Number.isFinite(ingredient.itemCode) && ingredient.itemCode > 0 && ingredient.quantity >= 0);
+    }, []);
+
+    const persistCustomDetails = useCallback(async (details, quantitiesState) => {
+        if (!details) return true;
+
+        if (isEditingCartItem && cartId) {
+            try {
+                await cartAPI.customizeCocktail(cartId, {
+                    ingredients: buildCustomizationPayload(details, quantitiesState),
+                });
+                return true;
+            } catch (err) {
+                console.error("Error saving cart customization:", err);
+                toast.error(err.response?.data?.message || err.message || "Failed to save customization");
+                return false;
+            }
+        }
+
+        try {
+            localStorage.setItem(draftKey, JSON.stringify({ details, quantities: quantitiesState }));
+        } catch (err) {
+            console.warn("Could not save customization draft:", err);
+        }
+        return true;
+    }, [buildCustomizationPayload, cartId, draftKey, isEditingCartItem]);
 
     useEffect(() => {
         const fetchItemDetails = async () => {
@@ -28,23 +86,47 @@ export default function ItemDetails() {
                     let initialQuantities = {};
 
                     details.forEach((detail, idx) => {
-                        if (detail.pegs !== 0 && detail.pegs !== null) {
-                            initialQuantities[idx] = detail.pegs || 1;
+                        const pegs = getDetailPegs(detail);
+                        if (pegs !== 0 && pegs !== null) {
+                            initialQuantities[idx] = pegs || 1;
                         }
                     });
 
-                    try {
-                        const savedResponse = await cartAPI.getCustomItemDetails(fetchedItem.ITEM_ID || fetchedItem.ITEM_CODE);
-                        if (savedResponse.data.success && savedResponse.data.data) {
-                            const saved = savedResponse.data.data;
-                            details = saved.details || details;
-                            initialQuantities = saved.quantities || initialQuantities;
+                    if (isEditingCartItem) {
+                        try {
+                            const savedResponse = await cartAPI.getCocktailDetails(cartId);
+                            const savedIngredients = savedResponse.data?.data?.ingredients || [];
+                            if (savedIngredients.length > 0) {
+                                details = savedIngredients.map((ingredient) => ({
+                                    itemName: ingredient.itemName,
+                                    itemCode: ingredient.itemCode,
+                                    pegs: ingredient.quantity,
+                                    memberPrice: ingredient.lineTotal,
+                                    unitPrice: ingredient.unitPrice,
+                                    stockQuantity: ingredient.stockQuantity,
+                                    stockStatus: ingredient.stockStatus,
+                                }));
+                                initialQuantities = {};
+                                details.forEach((detail, idx) => {
+                                    initialQuantities[idx] = getDetailPegs(detail) || 1;
+                                });
+                            }
+                        } catch (err) {
+                            console.warn("Could not load cart customization:", err);
                         }
-                    } catch (err) {
-                        console.warn("Could not load saved custom item details:", err);
+                    } else {
+                        try {
+                            const draft = JSON.parse(localStorage.getItem(draftKey) || "null");
+                            if (draft?.details?.length) {
+                                details = draft.details;
+                                initialQuantities = draft.quantities || initialQuantities;
+                            }
+                        } catch (err) {
+                            console.warn("Could not load customization draft:", err);
+                        }
                     }
 
-                    setItem({ ...fetchedItem, details });
+                    setItem({ ...fetchedItem, details, cartId: isEditingCartItem ? cartId : undefined });
                     setQuantities(initialQuantities);
                 } else {
                     setError(response.data.message || "Failed to load item");
@@ -60,27 +142,20 @@ export default function ItemDetails() {
         if (id) {
             fetchItemDetails();
         }
-    }, [id]);
+    }, [cartId, draftKey, id, isEditingCartItem]);
 
-    const persistCustomDetails = async (details, quantitiesState) => {
-        if (!item) return;
-        const itemId = item.ITEM_ID || item.ITEM_CODE;
-        if (!itemId) return;
-        try {
-            await cartAPI.saveCustomItemDetails(itemId, { details, quantities: quantitiesState });
-        } catch (err) {
-            console.error("Error saving custom item details:", err);
+    const updateQuantity = async (index, delta) => {
+        const oldQty = quantities[index] || 1;
+        const newVal = oldQty + delta;
+        if (newVal < 1) return;
+
+        const newQuantities = { ...quantities, [index]: newVal };
+        setQuantities(newQuantities);
+
+        const saved = await persistCustomDetails(item?.details || [], newQuantities);
+        if (!saved) {
+            setQuantities((prev) => ({ ...prev, [index]: oldQty }));
         }
-    };
-
-    const updateQuantity = (index, delta) => {
-        setQuantities(prev => {
-            const newVal = (prev[index] || 1) + delta;
-            if (newVal < 1) return prev;
-            const newQuantities = { ...prev, [index]: newVal };
-            persistCustomDetails(item?.details || [], newQuantities);
-            return newQuantities;
-        });
     };
 
     const deleteIngredient = (index) => {
@@ -136,8 +211,8 @@ export default function ItemDetails() {
 
         const alreadySelected = selectedIngredients.some(item => item.d === ingredient.d);
         const alreadyInRecipe = item?.details?.some(
-            (detail) => String(detail.itemName || detail.ITEM_NAME || "").trim().toLowerCase() === String(ingredient.d || "").trim().toLowerCase()
-                || String(detail.itemCode || detail.ITEM_CODE || "").trim() === String(ingredient.r || "").trim()
+            (detail) => String(getDetailItemName(detail) || "").trim().toLowerCase() === String(ingredient.d || "").trim().toLowerCase()
+                || String(getDetailItemCode(detail) || "").trim() === String(ingredient.r || "").trim()
         );
 
         if (alreadySelected || alreadyInRecipe) {
@@ -161,11 +236,14 @@ export default function ItemDetails() {
         // Add selected ingredients to the item details with default quantity 1
         const newDetails = [...(item.details || [])];
         selectedIngredients.forEach(ingredient => {
+            const stockQuantity = Number(ingredient.stockQuantity ?? 0);
             newDetails.push({
                 itemName: ingredient.d,
                 itemCode: ingredient.r, // Assuming r contains the item code
                 pegs: 1, // Default quantity
-                memberPrice: 0 // Default price, can be updated later
+                memberPrice: null,
+                unitPrice: ingredient.unitPrice,
+                stockQuantity,
             });
         });
 
@@ -197,17 +275,15 @@ export default function ItemDetails() {
             return;
         }
 
-        const selectedIngredients = item.details
-            .filter((_, idx) => quantities[idx] !== undefined)
-            .map((detail, idx) => ({
-                name: detail.itemName,
-                quantity: quantities[idx],
-                price: detail.memberPrice,
-            }));
+        const selectedIngredients = buildCustomizationPayload(item.details, quantities);
 
         const ingredientSummary = selectedIngredients
-            .map((detail) => `${detail.name}:${detail.quantity}`)
+            .map((detail) => `${detail.itemName}:${detail.quantity}`)
             .join(", ");
+
+        const basePath = location.pathname.includes("/attendant/")
+            ? "/attendant"
+            : "/user";
 
         const payload = {
             item_id: item.ITEM_ID || item.ITEM_CODE,
@@ -216,21 +292,38 @@ export default function ItemDetails() {
             remarks: ingredientSummary
                 ? `Custom ingredients: ${ingredientSummary}`
                 : "Din",
+            cartId: isEditingCartItem ? Number(cartId) : undefined,
         };
 
         try {
-            const response = await cartAPI.addItem(payload);
+            const response = isEditingCartItem
+                ? await cartAPI.customizeCocktail(cartId, { ingredients: selectedIngredients })
+                : await cartAPI.addNewItem(payload);
+
             if (response?.data?.success) {
+                const newCartId = response.data?.data?.cartId;
+                if (!isEditingCartItem && newCartId) {
+                    await cartAPI.customizeCocktail(newCartId, { ingredients: selectedIngredients });
+                    localStorage.removeItem(draftKey);
+                }
+
                 toast.success(
-                    `Added ${item.ITEM_NAME} to cart with ${selectedIngredients.length} ingredients`
+                    isEditingCartItem
+                        ? `Updated ${item.ITEM_NAME} customization`
+                        : `Added ${item.ITEM_NAME} to cart with ${selectedIngredients.length} ingredients`
                 );
-                navigate("/user/cart");
+
+                navigate(`${basePath}/cart`);
             } else {
                 toast.error(response?.data?.message || "Failed to add item to cart");
             }
         } catch (err) {
             console.error("Error adding item to cart:", err);
-            toast.error(err.response?.data?.message || err.message || "Failed to add item to cart");
+            if (err.response?.status === 401) {
+                toast.error("Your session has expired. Please login again.");
+            } else {
+                toast.error(err.response?.data?.message || err.message || "Failed to add item to cart");
+            }
         }
     };
 
@@ -270,7 +363,7 @@ export default function ItemDetails() {
                     onClick={handleAddToCart}
                     className="bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-8 rounded-xl transition shadow-sm"
                 >
-                    Add to cart
+                    {isEditingCartItem ? "Save Customization" : "Add to cart"}
                 </button>
                 <button
                     onClick={handleAddIngredientsClick}
@@ -320,16 +413,21 @@ export default function ItemDetails() {
                             </thead>
                             <tbody>
                                 {item.details && item.details.map((detail, index) => {
-                                    const hasQuantity = detail.pegs !== 0 && detail.pegs !== null;
+                                    const pegs = getDetailPegs(detail);
+                                    const hasQuantity = pegs !== 0 && pegs !== null;
                                     const currentQty = quantities[index] || 1;
+                                    const stockQuantity = getDetailStockQuantity(detail);
+                                    const stockStatus = stockQuantity != null
+                                        ? (Number(stockQuantity) >= Number(currentQty) ? "In Stock" : "Out Of Stock")
+                                        : (detail.stockStatus || "Unknown");
 
                                     return (
                                         <tr key={index} className="border-b border-gray-50 hover:bg-gray-50 transition">
-                                            <td className="py-3 px-5 text-sm text-gray-600">{detail.itemCode || '728'}</td>
+                                            <td className="py-3 px-5 text-sm text-gray-600">{getDetailItemCode(detail) || '728'}</td>
                                             <td className="py-3 px-5">
-                                                <span className="text-sm font-medium text-gray-800">{detail.itemName}</span>
+                                                <span className="text-sm font-medium text-gray-800">{getDetailItemName(detail)}</span>
                                             </td>
-                                            <td className="py-3 px-5 text-sm text-gray-600">{detail.pegs || 1}</td>
+                                            <td className="py-3 px-5 text-sm text-gray-600">{pegs || 1}</td>
                                             <td className="py-3 px-5">
                                                 {hasQuantity ? (
                                                     <div className="flex items-center gap-2">
@@ -352,7 +450,9 @@ export default function ItemDetails() {
                                                 )}
                                             </td>
                                             <td className="py-3 px-5">
-                                                <span className="text-sm text-green-600">In stock</span>
+                                                <span className={`text-sm ${stockStatus === "Out Of Stock" ? "text-red-600" : stockStatus === "In Stock" ? "text-green-600" : "text-gray-500"}`}>
+                                                    {stockStatus}
+                                                </span>
                                             </td>
                                             <td className="py-3 px-5">
                                                 {hasQuantity && (

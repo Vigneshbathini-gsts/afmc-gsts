@@ -156,7 +156,9 @@ export default function AppRoutes() {
         <Route path="menudash" element={<MenuDashboard />} />
         <Route path="menudash/buy" element={<Pubmenubuy />} />
         <Route path="register-member" element={<RegisterMember />} />
+        <Route path="item/:id" element={<ItemDetails />} />
         <Route path="cart" element={<AttendantCart />} />
+        <Route path="item/:id" element={<ItemDetails />} />
         <Route path="confirm-order" element={<AttendantConfirmOrder />} />
         <Route path="confirm-order-page" element={<ConfirmOrderpage />} />
         <Route path="payment" element={<AttendantPayment />} />
