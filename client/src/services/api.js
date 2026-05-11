@@ -205,6 +205,7 @@ export const inventoryAPI = {
 export const cartAPI = {
   getByUserId: (userId) => api.get("/cart", { params: { userId } }),
   addItem: (cartData) => api.post("/cart", cartData),
+  proceedToBuy: (data = {}) => api.post("/cart/proceed-to-buy", data),
   getCocktailDetails: (cartId, params) => api.get(`/cart/cocktail/${cartId}`, { params }),
   updateCocktailIngredients: (cartId, data) => api.patch(`/cart/cocktail/${cartId}/ingredients`, data),
   updateQuantity: (cartId, quantity) => api.patch(`/cart/${cartId}`, { quantity }),

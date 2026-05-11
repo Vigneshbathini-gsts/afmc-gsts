@@ -45,6 +45,77 @@ const clearCocktailSessionCollections = async (req, parentItemCode = null, order
   }
 };
 
+const getNextOrderLineId = async (connection) => {
+  const [[row]] = await connection.execute(
+    `
+      SELECT COALESCE(MAX(order_line_id), 0) + 1 AS nextId
+      FROM xxafmc_order_details
+    `
+  );
+  return Number(row?.nextId || 1);
+};
+
+const getMCollectionFromSession = async (req, cartItems, orderNumber = "") => {
+  const rows = [];
+  for (const cartItem of cartItems) {
+    if (!isCocktailCartItem(cartItem)) continue;
+    const { collection } = await getCocktailSessionCollection(req, cartItem.item_id, cartItem.quantity, orderNumber);
+    for (const ingredient of collection.ingredients || []) {
+      rows.push({
+        item_code: ingredient.itemCode,
+        item_name: ingredient.itemName,
+        pegs: ingredient.basePegs,
+        inventory_item_code: cartItem.item_id,
+        user_id: req.user?.userId,
+        stock_quantity: ingredient.stockQuantity,
+      });
+    }
+  }
+  return rows;
+};
+
+const validateCartQuantitiesOrThrow = (cartRows) => {
+  const hasZero = (cartRows || []).some((row) => Number(row.quantity || 0) <= 0);
+  if (hasZero) {
+    const error = new Error("Some items have a quantity of 0. Please update the quantity before proceeding.");
+    error.status = 400;
+    throw error;
+  }
+};
+
+const validateCocktailChildStockOrThrow = async (connection, req, cartRows, orderNumber = "") => {
+  // Equivalent to the APEX validation that checks child item stock only when no M_COLLECTION exists.
+  const mCollectionRows = await getMCollectionFromSession(req, cartRows, orderNumber);
+  if (mCollectionRows.length > 0) return;
+
+  const cocktailParentIds = (cartRows || [])
+    .filter((row) => isCocktailCartItem(row))
+    .map((row) => Number(row.item_id))
+    .filter(Boolean);
+  if (cocktailParentIds.length === 0) return;
+
+  const placeholders = cocktailParentIds.map(() => "?").join(",");
+  const [rows] = await connection.execute(
+    `
+      SELECT
+        xcmd.item_code AS child_item_code,
+        COALESCE(SUM(xso.stock_quantity), 0) AS stock_quantity
+      FROM xxafmc_cocktails_mocktails_details xcmd
+      LEFT JOIN xxafmc_stock_out xso ON xso.item_code = xcmd.item_code
+      WHERE xcmd.inventory_item_code IN (${placeholders})
+      GROUP BY xcmd.item_code
+    `,
+    cocktailParentIds
+  );
+
+  const hasOutOfStock = rows.some((row) => Number(row.stock_quantity || 0) === 0);
+  if (hasOutOfStock) {
+    const error = new Error("One of the Child item has no stock.");
+    error.status = 400;
+    throw error;
+  }
+};
+
 const getStockQuantities = async (conn, itemCodes) => {
   if (!Array.isArray(itemCodes) || itemCodes.length === 0) {
     return {};
@@ -461,20 +532,7 @@ exports.confirmOrder = async (req, res) => {
       cartRows.map((row) => [String(row.item_id), Number(row.quantity || 0)])
     );
 
-    const [collectionRows] = await connection.execute(
-      `SELECT
-          seq_id,
-          c001 AS item_code,
-          c002 AS item_name,
-          c003 AS pegs,
-          c005 AS inventory_item_code,
-          c006 AS user_id,
-          c009 AS stock_quantity
-        FROM apex_collections
-        WHERE collection_name = 'M_COLLECTION'
-          AND c006 = ?`,
-      [userId]
-    );
+    const collectionRows = await getMCollectionFromSession(req, cartRows, orderNumber);
 
     let mainInserted = 0;
     for (const row of collectionRows) {
@@ -508,20 +566,18 @@ exports.confirmOrder = async (req, res) => {
           xcmd.item_code
         FROM xxafmc_cocktails_mocktails_details xcmd
         JOIN xxafmc_cart_items xc ON xc.item_id = xcmd.inventory_item_code AND xc.user_id = ?
-        WHERE NOT EXISTS (
-          SELECT 1
-          FROM apex_collections ac
-          WHERE ac.collection_name = 'M_COLLECTION'
-            AND ac.c006 = ?
-            AND ac.c005 = xcmd.inventory_item_code
-        )
         GROUP BY xcmd.inventory_item_code, xcmd.pegs, xcmd.item_name, xcmd.item_code`,
-      [userId, userId]
+      [userId]
+    );
+
+    const mCollectionInventorySet = new Set(
+      collectionRows.map((row) => String(row.inventory_item_code))
     );
 
     let dummyInserted = 0;
     for (const row of cocktailRows) {
       const inventoryItemCode = String(row.inventory_item_code);
+      if (mCollectionInventorySet.has(inventoryItemCode)) continue;
       const quantity = cartQuantityMap.get(inventoryItemCode);
       if (!quantity) continue;
 
@@ -570,6 +626,154 @@ exports.confirmOrder = async (req, res) => {
   }
 };
 
+exports.proceedToBuy = async (req, res) => {
+  const userId = req.user?.userId;
+  if (!userId) {
+    return res.status(400).json({ success: false, message: "User ID is required" });
+  }
+
+  const { memberId = null, pubmed = null } = req.body || {};
+  const appUser = String(req.user?.username || req.user?.user_name || userId);
+
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    const [cartRows] = await connection.execute(
+      `SELECT
+         cart_id,
+         item_id,
+         quantity,
+         total,
+         price,
+         profit,
+         food_pr_charges,
+         type_id,
+         subcategory,
+         parent_code,
+         type
+       FROM xxafmc_cart_items
+       WHERE user_id = ?`,
+      [userId]
+    );
+
+    if (!cartRows.length) {
+      const error = new Error("Cart is empty");
+      error.status = 400;
+      throw error;
+    }
+
+    validateCartQuantitiesOrThrow(cartRows);
+    await validateCocktailChildStockOrThrow(connection, req, cartRows, "");
+
+    const [headerResult] = await connection.execute(
+      `
+        INSERT INTO xxafmc_order_header
+          (user_id, order_date, member_id, pubmed, created_by, creation_date)
+        VALUES
+          (?, NOW(), ?, ?, ?, NOW())
+      `,
+      [userId, memberId, pubmed, appUser]
+    );
+    const orderNumber = String(headerResult.insertId);
+
+    for (const item of cartRows) {
+      let availableStock = 0;
+      let itemName = "";
+      try {
+        const [stockRows] = await connection.execute(
+          `
+            SELECT item_name, COALESCE(SUM(stock_quantity), 0) AS stock_quantity
+            FROM xxafmc_stock_out
+            WHERE item_code = ?
+            GROUP BY item_code, item_name
+          `,
+          [item.item_id]
+        );
+        itemName = String(stockRows[0]?.item_name || "").trim();
+        availableStock = Number(stockRows[0]?.stock_quantity || 0);
+      } catch {
+        availableStock = 0;
+      }
+
+      if (!itemName) {
+        try {
+          const [invRows] = await connection.execute(
+            `SELECT item_name FROM xxafmc_inventory WHERE item_code = ? LIMIT 1`,
+            [item.item_id]
+          );
+          itemName = String(invRows[0]?.item_name || "").trim();
+        } catch {
+          // ignore
+        }
+      }
+
+      const stockInCart = Number(item.quantity || 0);
+      if (stockInCart > availableStock) {
+        const error = new Error(`Out of Stock for item ${itemName || item.item_id}`);
+        error.status = 400;
+        throw error;
+      }
+
+      const orderLineId = await getNextOrderLineId(connection);
+      await connection.execute(
+        `
+          INSERT INTO xxafmc_order_details
+            (
+              order_line_id,
+              order_id,
+              item_id,
+              quantity,
+              subtotal,
+              price,
+              total_quantity,
+              profit,
+              food_pr_charges,
+              created_by,
+              creation_date,
+              type_id,
+              subcategory,
+              barcode,
+              type
+            )
+          VALUES
+            (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?)
+        `,
+        [
+          orderLineId,
+          orderNumber,
+          item.item_id,
+          item.quantity,
+          item.total,
+          item.price,
+          item.quantity,
+          item.profit,
+          item.food_pr_charges,
+          appUser,
+          item.type_id,
+          item.subcategory,
+          item.parent_code,
+          item.type,
+        ]
+      );
+    }
+
+    await connection.commit();
+
+    return res.status(201).json({
+      success: true,
+      message: "Order created",
+      data: { orderNumber },
+    });
+  } catch (error) {
+    console.error("Error proceeding to buy:", error);
+    await connection.rollback();
+    const status = error?.status || 500;
+    return res.status(status).json({ success: false, message: error?.message || "Failed to create order" });
+  } finally {
+    connection.release();
+  }
+};
 exports.updateCartItemQuantity = async (req, res) => {
   try {
     const userId = req.user?.userId;
