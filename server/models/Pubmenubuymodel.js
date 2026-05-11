@@ -1,5 +1,42 @@
 const db = require("../config/db");
 
+const createValidationError = (message) => {
+  const error = new Error(message);
+  error.statusCode = 400;
+  return error;
+};
+
+const getStockQuantity = async (connection, itemCode) => {
+  const [rows] = await connection.execute(
+    `
+      SELECT IFNULL(SUM(STOCK_QUANTITY), 0) AS stock
+      FROM xxafmc_stock_out
+      WHERE item_code = ?
+    `,
+    [itemCode]
+  );
+
+  return Number(rows[0]?.stock || 0);
+};
+
+const getReservedOrderQuantity = async (connection, itemCode) => {
+  const [rows] = await connection.execute(
+    `
+      SELECT IFNULL(SUM(xod.quantity), 0) AS reserved
+      FROM xxafmc_order_details xod
+      LEFT JOIN xxafmc_invoices xi
+        ON xi.order_num = xod.order_id
+      WHERE xod.item_id = ?
+        AND xod.order_status IS NULL
+        AND xod.price IS NULL
+        AND xi.order_num IS NULL
+    `,
+    [itemCode]
+  );
+
+  return Number(rows[0]?.reserved || 0);
+};
+
 async function getNextOrderLineId(connection) {
   const [[row]] = await connection.execute(
     `
@@ -162,9 +199,10 @@ async function cancelOrder(orderNumber) {
 
 async function createOrder(payload = {}, authUser = {}) {
   const itemCode = Number(payload.itemCode);
-  const quantity = Number(payload.quantity || 1);
+  const rawQuantity = payload.quantity;
+  const quantity = Number(rawQuantity || 1);
   const categoryId = Number(payload.categoryId);
-  const remarks = String(payload.remarks || "Din").trim() || "Din";
+  const remarks = String(payload.remarks || "").trim();
   const memberId =
     payload.memberId === undefined || payload.memberId === null || payload.memberId === ""
       ? null
@@ -180,10 +218,16 @@ async function createOrder(payload = {}, authUser = {}) {
     throw error;
   }
 
+  if (!remarks) {
+    throw createValidationError("Remarks is required");
+  }
+
   if (!Number.isFinite(quantity) || quantity <= 0) {
-    const error = new Error("Valid quantity is required");
-    error.statusCode = 400;
-    throw error;
+    throw createValidationError("Valid quantity is required");
+  }
+
+  if (!Number.isInteger(quantity)) {
+    throw createValidationError("Quantity is not in decimals");
   }
 
   const appUser = authUser?.username || authUser?.user_name || "SYSTEM";
@@ -194,7 +238,7 @@ async function createOrder(payload = {}, authUser = {}) {
 
     const [userRows] = await connection.execute(
       `
-        SELECT user_id
+        SELECT user_id, role_id
         FROM xxafmc_users
         WHERE UPPER(user_name) = UPPER(?)
         LIMIT 1
@@ -209,6 +253,7 @@ async function createOrder(payload = {}, authUser = {}) {
     }
 
     const userId = userRows[0].user_id;
+    const roleId = Number(userRows[0].role_id || 0);
 
     const [inventoryRows] = await connection.execute(
       `
@@ -218,6 +263,8 @@ async function createOrder(payload = {}, authUser = {}) {
           ITEM_NAME AS item_name,
           CATEGORY_ID AS category_id,
           SUB_CATEGORY AS sub_category,
+          IFNULL(NON_MEMBER_PROFIT, 0) AS non_member_profit,
+          IFNULL(PR_CHARGES, 0) AS pr_charges,
           IFNULL(PROFIT, 0) AS profit,
           IFNULL(FOOD_PR_CHARGES, 0) AS food_pr_charges,
           IFNULL(\`A/C_UNIT\`, 'Nos') AS ac_unit
@@ -236,9 +283,32 @@ async function createOrder(payload = {}, authUser = {}) {
 
     const inventoryItem = inventoryRows[0];
     const resolvedCategoryId = Number.isFinite(categoryId) ? categoryId : Number(inventoryItem.category_id);
-    const subCategory = inventoryItem.sub_category ?? null;
-    const profit = Number(inventoryItem.profit || 0);
-    const foodPrCharges = Number(inventoryItem.food_pr_charges || 0);
+    const subCategory = Number(inventoryItem.sub_category ?? 0);
+    const isMocktailItem = Number(resolvedCategoryId) === 10 && [14, 15].includes(subCategory);
+    const profit =
+      roleId === 20
+        ? Number(inventoryItem.profit || 0)
+        : Number(inventoryItem.non_member_profit || 0);
+    const foodPrCharges =
+      roleId === 20
+        ? Number(inventoryItem.food_pr_charges || 0)
+        : Number(inventoryItem.pr_charges || 0);
+
+    if (isMocktailItem && quantity > 5) {
+      throw createValidationError("Quantity must be 5 or less");
+    }
+
+    if (!isMocktailItem) {
+      const [stockQty, reservedQty] = await Promise.all([
+        getStockQuantity(connection, itemCode),
+        getReservedOrderQuantity(connection, itemCode),
+      ]);
+
+      if (quantity + reservedQty > stockQty) {
+        const availableQty = Math.max(0, stockQty - reservedQty);
+        throw createValidationError(`Out of stock. Available quantity: ${availableQty}`);
+      }
+    }
 
     let typeId = null;
     if (Number(resolvedCategoryId) === 10) {
@@ -353,6 +423,16 @@ async function createOrder(payload = {}, authUser = {}) {
         const computedFreeQty = Math.floor((quantity / offerQuantity) * freeItemQuantity);
 
         if (computedFreeQty > 0) {
+          const [freeStockQty, freeReservedQty] = await Promise.all([
+            getStockQuantity(connection, offer.free_item_code),
+            getReservedOrderQuantity(connection, offer.free_item_code),
+          ]);
+
+          if (computedFreeQty + freeReservedQty > freeStockQty) {
+            const availableFreeQty = Math.max(0, freeStockQty - freeReservedQty);
+            throw createValidationError(`Out of stock for free item. Available quantity: ${availableFreeQty}`);
+          }
+
           const freeOrderLineId = await getNextOrderLineId(connection);
           await connection.execute(
             `

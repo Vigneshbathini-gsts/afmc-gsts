@@ -8,102 +8,108 @@ const toNumber = (value, fallback = 0) => {
 const roundCurrency = (value) => Number(toNumber(value).toFixed(2));
 
 const getMenuPopupDetails = async ({ itemCode, itemId, authUser }) => {
+  const normalizedItemCode = Number(itemCode);
+  const normalizedItemId = Number(itemId);
   const appUser = String(authUser?.username || authUser?.user_name || "").trim();
 
-  const sql = `
-    SELECT
-      inv.ITEM_ID AS item_id,
-      inv.ITEM_CODE AS item_code,
-      inv.ITEM_NAME AS item_name,
-      inv.DESCRIPTION AS description,
-      IFNULL(inv.UNIT_PRICE, 0) AS inventory_unit_price,
-      COALESCE(NULLIF(inv.\`A/C_UNIT\`, ''), 'Nos') AS ac_unit,
-      inv.CATEGORY_ID AS category_id,
-      inv.SUB_CATEGORY AS sub_category,
-      inv.CREATION_DATE AS creation_date,
-      inv.IMAGE AS image,
-      inv.MIME_TYPE AS mime_type,
-      inv.FILE_NAME AS file_name,
-      IFNULL(inv.PROFIT, 0) AS profit,
-      IFNULL(inv.NON_MEMBER_PROFIT, 0) AS non_member_profit,
-      IFNULL(inv.PR_CHARGES, 0) AS pr_charges,
-      IFNULL(inv.FOOD_PR_CHARGES, 0) AS food_pr_charges,
-      IFNULL(stock_summary.available_quantity, 0) AS quantity,
-      IFNULL(stock_out_price.max_unit_price, 0) AS stock_out_unit_price,
-      IFNULL(stock_out_pegs.pegs, 1) AS pegs,
-      barcode_info.barcode AS barcode,
-      xu.user_id AS user_id,
-      xu.role_id AS role_id
-    FROM xxafmc_inventory inv
-    LEFT JOIN (
+  const [inventoryRows] = await db.execute(
+    `
       SELECT
-        xso.ITEM_CODE,
-        SUM(IFNULL(xso.STOCK_QUANTITY, 0)) AS available_quantity
-      FROM xxafmc_stock_out xso
-      GROUP BY xso.ITEM_CODE
-    ) AS stock_summary
-      ON stock_summary.ITEM_CODE = inv.ITEM_CODE
-    LEFT JOIN (
-      SELECT
-        xso.ITEM_CODE,
-        MAX(xso.UNIT_PRICE) AS max_unit_price
-      FROM xxafmc_stock_out xso
-      WHERE IFNULL(xso.STOCK_QUANTITY, 0) > 0
-      GROUP BY xso.ITEM_CODE
-    ) AS stock_out_price
-      ON stock_out_price.ITEM_CODE = inv.ITEM_CODE
-    LEFT JOIN (
-      SELECT
-        xso.ITEM_CODE,
-        IFNULL(NULLIF(MAX(xso.PEGS), 0), 1) AS pegs
-      FROM xxafmc_stock_out xso
-      GROUP BY xso.ITEM_CODE
-    ) AS stock_out_pegs
-      ON stock_out_pegs.ITEM_CODE = inv.ITEM_CODE
-    LEFT JOIN (
-      SELECT
-        base.ITEM_CODE,
-        (
-          SELECT xso1.BARCODE
-          FROM xxafmc_stock_out xso1
-          WHERE xso1.ITEM_CODE = base.ITEM_CODE
-            AND IFNULL(xso1.STOCK_QUANTITY, 0) > 0
-          ORDER BY xso1.CREATION_DATE ASC
-          LIMIT 1
-        ) AS barcode
-      FROM xxafmc_stock_out base
-      GROUP BY base.ITEM_CODE
-    ) AS barcode_info
-      ON barcode_info.ITEM_CODE = inv.ITEM_CODE
-    LEFT JOIN xxafmc_users xu
-      ON UPPER(xu.user_name) = UPPER(?)
-    WHERE inv.ITEM_CODE = ?
-      AND inv.ITEM_ID = ?
-    LIMIT 1
-  `;
+        inv.ITEM_ID AS item_id,
+        inv.ITEM_CODE AS item_code,
+        inv.ITEM_NAME AS item_name,
+        inv.DESCRIPTION AS description,
+        IFNULL(inv.UNIT_PRICE, 0) AS inventory_unit_price,
+        COALESCE(NULLIF(inv.\`A/C_UNIT\`, ''), 'Nos') AS ac_unit,
+        inv.CATEGORY_ID AS category_id,
+        inv.SUB_CATEGORY AS sub_category,
+        inv.CREATION_DATE AS creation_date,
+        inv.IMAGE AS image,
+        inv.MIME_TYPE AS mime_type,
+        inv.FILE_NAME AS file_name,
+        IFNULL(inv.PROFIT, 0) AS profit,
+        IFNULL(inv.NON_MEMBER_PROFIT, 0) AS non_member_profit,
+        IFNULL(inv.PR_CHARGES, 0) AS pr_charges,
+        IFNULL(inv.FOOD_PR_CHARGES, 0) AS food_pr_charges
+      FROM xxafmc_inventory inv
+      WHERE inv.ITEM_CODE = ?
+        AND inv.ITEM_ID = ?
+      LIMIT 1
+    `,
+    [normalizedItemCode, normalizedItemId]
+  );
 
-  const [rows] = await db.execute(sql, [appUser, Number(itemCode), Number(itemId)]);
-  const row = rows[0];
-
-  if (!row) {
+  const inventory = inventoryRows[0];
+  if (!inventory) {
     return null;
   }
 
-  const roleId = toNumber(row.role_id, null);
+  const [userRows, stockRows, barcodeRows] = await Promise.all([
+    appUser
+      ? db.execute(
+        `
+          SELECT user_id, role_id
+          FROM xxafmc_users
+          WHERE UPPER(user_name) = UPPER(?)
+          LIMIT 1
+        `,
+        [appUser]
+      )
+      : Promise.resolve([[]]),
+    db.execute(
+      `
+        SELECT
+          IFNULL(SUM(IFNULL(xso.STOCK_QUANTITY, 0)), 0) AS quantity,
+          IFNULL(MAX(CASE WHEN IFNULL(xso.STOCK_QUANTITY, 0) > 0 THEN xso.UNIT_PRICE END), 0) AS stock_out_unit_price,
+          IFNULL(
+            NULLIF(
+              MAX(
+                CASE
+                  WHEN xso.PEGS IS NULL OR xso.PEGS = 0 THEN 1
+                  ELSE xso.PEGS
+                END
+              ),
+              0
+            ),
+            1
+          ) AS pegs
+        FROM xxafmc_stock_out xso
+        WHERE xso.ITEM_CODE = ?
+      `,
+      [normalizedItemCode]
+    ),
+    db.execute(
+      `
+        SELECT xso.BARCODE AS barcode
+        FROM xxafmc_stock_out xso
+        WHERE xso.ITEM_CODE = ?
+          AND IFNULL(xso.STOCK_QUANTITY, 0) > 0
+        ORDER BY xso.CREATION_DATE ASC
+        LIMIT 1
+      `,
+      [normalizedItemCode]
+    ),
+  ]);
+
+  const user = userRows[0]?.[0] || null;
+  const stock = stockRows[0]?.[0] || {};
+  const barcode = barcodeRows[0]?.[0]?.barcode || null;
+
+  const roleId = toNumber(user?.role_id, null);
   const isMember = roleId === 20;
-  const categoryId = toNumber(row.category_id);
-  const subCategory = toNumber(row.sub_category, 0);
-  const inventoryBasePrice = toNumber(row.inventory_unit_price);
-  const inventoryUnitPrice = toNumber(row.stock_out_unit_price || row.inventory_unit_price);
-  const pegs = Math.max(toNumber(row.pegs, 1), 1);
-  const memberProfit = toNumber(row.profit);
-  const nonMemberProfit = toNumber(row.non_member_profit);
-  const memberCharges = toNumber(row.food_pr_charges);
-  const nonMemberCharges = toNumber(row.pr_charges);
+  const categoryId = toNumber(inventory.category_id);
+  const subCategory = toNumber(inventory.sub_category, 0);
+  const inventoryBasePrice = toNumber(inventory.inventory_unit_price);
+  const inventoryUnitPrice = toNumber(stock.stock_out_unit_price || inventory.inventory_unit_price);
+  const pegs = Math.max(toNumber(stock.pegs, 1), 1);
+  const memberProfit = toNumber(inventory.profit);
+  const nonMemberProfit = toNumber(inventory.non_member_profit);
+  const memberCharges = toNumber(inventory.food_pr_charges);
+  const nonMemberCharges = toNumber(inventory.pr_charges);
+  const selectedProfit = isMember ? memberProfit : nonMemberProfit;
+  const selectedCharges = isMember ? memberCharges : nonMemberCharges;
 
   let finalPrice = inventoryUnitPrice;
-  let selectedProfit = isMember ? memberProfit : nonMemberProfit;
-  let selectedCharges = isMember ? memberCharges : nonMemberCharges;
 
   if (categoryId === 10 && [14, 15].includes(subCategory)) {
     finalPrice = inventoryBasePrice + selectedCharges;
@@ -117,24 +123,28 @@ const getMenuPopupDetails = async ({ itemCode, itemId, authUser }) => {
   }
 
   return {
-    ...row,
+    ...inventory,
     role_id: roleId,
-    user_id: row.user_id ? toNumber(row.user_id, row.user_id) : null,
+    user_id: user?.user_id ? toNumber(user.user_id, user.user_id) : null,
     sub_category: subCategory,
+    quantity: toNumber(stock.quantity),
     profit: selectedProfit,
     pr_charges: selectedCharges,
     member_profit: memberProfit,
     non_member_profit: nonMemberProfit,
     member_pr_charges: memberCharges,
     non_member_pr_charges: nonMemberCharges,
-    base_unit_price: roundCurrency(categoryId === 10 && [14, 15].includes(subCategory) ? inventoryBasePrice : inventoryUnitPrice),
+    base_unit_price: roundCurrency(
+      categoryId === 10 && [14, 15].includes(subCategory)
+        ? inventoryBasePrice
+        : inventoryUnitPrice
+    ),
     unit_price: roundCurrency(finalPrice),
     pegs,
+    barcode,
   };
 };
 
 module.exports = {
   getMenuPopupDetails,
 };
-
-
