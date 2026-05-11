@@ -27,13 +27,23 @@ function parseCardText(cardText = "") {
 
 function normalizeItem(item, fallbackIndex = 0) {
   const parsed = parseCardText(item.card_text || item.CARD_TEXT);
+  const quantity = Number(item.quantity || item.QUANTITY || parsed.quantity || 1);
+  const subtotal = Number(item.subtotal || item.SUBTOTAL || item.unit_price || item.UNIT_PRICE || 0);
+  const explicitUnitPrice = Number(item.price || item.PRICE || item.unitPrice || item.UNIT_PRICE);
+  const unitPrice =
+    Number.isFinite(explicitUnitPrice) && explicitUnitPrice >= 0
+      ? explicitUnitPrice
+      : quantity > 0
+        ? Number((subtotal / quantity).toFixed(2))
+        : 0;
 
   return {
     id: item.item_id || item.ITEM_ID || item.item_code || item.ITEM_CODE || fallbackIndex,
     item_code: item.item_code || item.ITEM_CODE || "",
     item_name: item.item_name || item.ITEM_NAME || parsed.item_name,
-    quantity: Number(item.quantity || item.QUANTITY || parsed.quantity || 1),
-    subtotal: Number(item.subtotal || item.SUBTOTAL || item.unit_price || item.UNIT_PRICE || 0),
+    quantity,
+    unitPrice,
+    subtotal,
     image: item.image || item.IMAGE || "",
     card_text: item.card_text || item.CARD_TEXT || "",
   };
@@ -69,7 +79,7 @@ function ActionButton({ children, className = "", ...props }) {
   );
 }
 
-export default function Pubmenubuy({ backTo = "" }) {
+export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
@@ -83,6 +93,7 @@ export default function Pubmenubuy({ backTo = "" }) {
   const currentBasePath = location.pathname.startsWith("/attendant")
     ? "/attendant"
     : "/user";
+  const MAX_QTY = 99;
 
   useEffect(() => {
     let ignore = false;
@@ -129,13 +140,35 @@ export default function Pubmenubuy({ backTo = "" }) {
   );
 
   const adjustQuantity = (id, delta) => {
+    let validationMessage = "";
+
     setItems((current) =>
-      current.map((item) =>
-        item.id === id
-          ? { ...item, quantity: Math.max(1, Number(item.quantity || 1) + delta) }
-          : item
-      )
+      current.map((item) => {
+        if (item.id !== id) return item;
+
+        const currentQty = Number(item.quantity || 1);
+        const nextQty = currentQty + delta;
+
+        if (nextQty < 1) {
+          validationMessage = "Quantity cannot be less than 1.";
+          return item;
+        }
+
+        if (nextQty > MAX_QTY) {
+          validationMessage = `Quantity cannot be more than ${MAX_QTY}.`;
+          return item;
+        }
+
+        const unitPrice = Number(
+          item.unitPrice || (currentQty > 0 ? item.subtotal / currentQty : 0) || 0
+        );
+        const nextSubtotal = Number((unitPrice * nextQty).toFixed(2));
+
+        return { ...item, quantity: nextQty, unitPrice, subtotal: nextSubtotal };
+      })
     );
+
+    setError(validationMessage);
   };
 
   const removeItem = (id) => {
@@ -183,7 +216,13 @@ export default function Pubmenubuy({ backTo = "" }) {
       setConfirming(true);
       setError("");
       await ConfirmOrderservice.confirmOrder(orderNumber);
-      navigate(`${currentBasePath}/confirm-order-page?orderNumber=${orderNumber}`);
+      if (afterConfirmTo) {
+        navigate(`${afterConfirmTo}?orderNumber=${encodeURIComponent(orderNumber)}`, {
+          state: { orderNumber },
+        });
+      } else {
+        navigate(`${currentBasePath}/confirm-order-page?orderNumber=${orderNumber}`);
+      }
     } catch (confirmError) {
       setError(
         confirmError.response?.data?.message || "Unable to confirm this order."
@@ -307,24 +346,26 @@ export default function Pubmenubuy({ backTo = "" }) {
                      <div className="flex items-center justify-between rounded-xl bg-stone-50 px-3 py-2">
                        <div className="flex items-center gap-1">
                          <button
-                           type="button"
-                           onClick={() => adjustQuantity(item.id, -1)}
-                           className="rounded-md bg-white p-1.5 text-stone-700 shadow-sm transition hover:bg-stone-100"
-                         >
-                           <Minus className="h-4 w-4" />
-                         </button>
+                            type="button"
+                            onClick={() => adjustQuantity(item.id, -1)}
+                            disabled={item.quantity <= 1}
+                            className="rounded-md bg-white p-1.5 text-stone-700 shadow-sm transition hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            <Minus className="h-4 w-4" />
+                          </button>
 
                         <span className="min-w-[28px] text-center text-sm font-semibold text-stone-900">
                           {item.quantity}
                         </span>
 
-                          <button
-                            type="button"
-                            onClick={() => adjustQuantity(item.id, 1)}
-                            className="rounded-md bg-afmc-maroon p-1.5 text-white transition hover:bg-afmc-maroon2"
-                          >
-                            <Plus className="h-4 w-4" />
-                          </button>
+                           <button
+                             type="button"
+                             onClick={() => adjustQuantity(item.id, 1)}
+                             disabled={item.quantity >= MAX_QTY}
+                             className="rounded-md bg-afmc-maroon p-1.5 text-white transition hover:bg-afmc-maroon2 disabled:cursor-not-allowed disabled:opacity-60"
+                           >
+                             <Plus className="h-4 w-4" />
+                           </button>
                         </div>
 
                       <button

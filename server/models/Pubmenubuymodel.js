@@ -125,6 +125,7 @@ async function cancelOrder(orderNumber) {
     const [[orderRow]] = await connection.execute(
       `
         SELECT order_num
+             , user_id
         FROM xxafmc_order_header
         WHERE order_num = ?
         LIMIT 1
@@ -156,6 +157,24 @@ async function cancelOrder(orderNumber) {
       throw error;
     }
 
+    const userId = orderRow?.user_id || null;
+
+    await connection.execute(
+      `
+        DELETE FROM xxafmc_custom_cocktails_mocktails_details
+        WHERE order_number = ?
+      `,
+      [normalizedOrderNumber]
+    );
+
+    await connection.execute(
+      `
+        DELETE FROM xxafmc_custom_cocktails_mocktails_details_dummy
+        WHERE order_number = ?
+      `,
+      [normalizedOrderNumber]
+    );
+
     await connection.execute(
       `
         DELETE FROM xxafmc_order_details
@@ -171,6 +190,10 @@ async function cancelOrder(orderNumber) {
       `,
       [normalizedOrderNumber]
     );
+
+    if (userId) {
+      await connection.execute(`DELETE FROM xxafmc_cart_items WHERE user_id = ?`, [userId]);
+    }
 
     await connection.commit();
 

@@ -67,6 +67,7 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
           od.barcode,
           od.type_id,
           xi.item_name,
+          xi.description,
           c.category_name
         FROM xxafmc_order_details od
         JOIN xxafmc_inventory xi
@@ -82,6 +83,15 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
     if (!detailRows.length) {
       const error = new Error("No order items found");
       error.statusCode = 404;
+      throw error;
+    }
+
+    const hasZeroQty = detailRows.some((row) => Number(row.quantity || 0) === 0);
+    if (hasZeroQty) {
+      const error = new Error(
+        "Some items have a quantity of 0. Please update the quantity before proceeding."
+      );
+      error.statusCode = 400;
       throw error;
     }
 
@@ -114,6 +124,7 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
               ordernumber,
               user_name,
               item_id,
+              description,
               item_name,
               quantity,
               type_id,
@@ -125,12 +136,13 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
               kitchen_type
             )
           VALUES
-            (?, ?, ?, ?, ?, ?, ?, NOW(), 'N', 'Received', ?, ?)
+            (?, ?, ?, ?, ?, ?, ?, ?, NOW(), 'N', 'Received', ?, ?)
         `,
         [
           normalizedOrderNumber,
           notificationUserId,
           item.item_id,
+          item.description || null,
           item.item_name,
           Number(item.quantity || 0),
           item.type_id || null,
@@ -142,6 +154,11 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
 
       insertedCount += 1;
     }
+
+    // Cart flow: once an order is confirmed, clear the user's cart.
+    await connection.execute(`DELETE FROM xxafmc_cart_items WHERE user_id = ?`, [
+      notificationUserId,
+    ]);
 
     await connection.commit();
 
@@ -175,14 +192,12 @@ async function getConfirmedOrderDetails(orderNumber) {
         oh.order_num,
         oh.order_date,
         COALESCE(MAX(nm.first_name), MAX(u.first_name), '') AS customer_name,
-        COALESCE(MAX(kn.status), 'Received') AS status
+        'Received' AS status
       FROM xxafmc_order_header oh
       LEFT JOIN xxafmc_users u
         ON u.user_id = oh.user_id
       LEFT JOIN xxafmc_non_members nm
         ON nm.id = oh.member_id
-      LEFT JOIN xxafmc_kitchen_notification kn
-        ON kn.ordernumber = oh.order_num
       WHERE oh.order_num = ?
       GROUP BY oh.order_num, oh.order_date
       LIMIT 1
@@ -215,8 +230,35 @@ async function getConfirmedOrderDetails(orderNumber) {
     [normalizedOrderNumber]
   );
 
+  // APEX-style overall status calculation.
+  const totalItems = itemRows.length;
+  const statusCounts = itemRows.reduce(
+    (acc, row) => {
+      const s = String(row.status || "Received").trim();
+      if (s === "Completed") acc.completed += 1;
+      else if (s === "Preparing") acc.preparing += 1;
+      else if (s === "Cancelled") acc.cancelled += 1;
+      else acc.received += 1;
+      return acc;
+    },
+    { completed: 0, preparing: 0, cancelled: 0, received: 0 }
+  );
+
+  const activeItems = totalItems - statusCounts.cancelled;
+  let overallStatus = "Received";
+  if (activeItems > 0 && statusCounts.completed === activeItems) {
+    overallStatus = "Completed";
+  } else if (statusCounts.preparing > 0) {
+    overallStatus = "Preparing";
+  } else if (totalItems > 0 && statusCounts.cancelled === totalItems) {
+    overallStatus = "Cancelled";
+  }
+
   return {
-    header: headerRows[0],
+    header: {
+      ...headerRows[0],
+      status: overallStatus,
+    },
     items: itemRows,
   };
 }
