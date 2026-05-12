@@ -496,6 +496,8 @@ function MenuPopupCompact({ item, loading, onClose, onBuy }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const userId = user?.userId;
+  const isMocktailItem =
+    Number(item?.category_id) === 10 && [14, 15].includes(Number(item?.sub_category));
 
   const fetchCartCount = async () => {
     if (!userId) return;
@@ -535,6 +537,33 @@ function MenuPopupCompact({ item, loading, onClose, onBuy }) {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleBuyNow = () => {
+    const trimmedRemarks = String(remarks || "").trim();
+    const quantityValue = Number(qty);
+
+    if (!trimmedRemarks) {
+      toast.error("Remarks is required");
+      return;
+    }
+
+    if (!Number.isFinite(quantityValue) || quantityValue <= 0) {
+      toast.error("Valid quantity is required");
+      return;
+    }
+
+    if (!Number.isInteger(quantityValue)) {
+      toast.error("Quantity is not in decimals");
+      return;
+    }
+
+    if (isMocktailItem && quantityValue > 5) {
+      toast.error("Quantity must be 5 or less");
+      return;
+    }
+
+    onBuy?.(item, quantityValue, trimmedRemarks);
   };
 
   useEffect(() => {
@@ -682,7 +711,7 @@ function MenuPopupCompact({ item, loading, onClose, onBuy }) {
                   </button>
                   <button
                     type="button"
-                    onClick={() => onBuy?.(item, qty, remarks)}
+                    onClick={handleBuyNow}
                     className="min-w-[90px] rounded-full border border-[#7BA43A] px-8 py-3 text-sm font-semibold text-[#5F8A22] transition hover:bg-[#7BA43A]/10"
                   >
                     Buy
@@ -1172,6 +1201,7 @@ function EnduserOtherSection({ onItemClick }) {
       try {
         const result = await authFetchJson(`${API_BASE_URL}/menubar`);
         setData(result?.data || []);
+        console.log(result?.data)
       } catch (fetchError) {
         setError(fetchError.message);
       } finally {
@@ -1519,6 +1549,12 @@ function MenuDashboard() {
         remarks,
         categoryId: item?.category_id,
         type: item?.ac_unit || "Nos",
+        unitPrice: item?.unit_price,
+        profit: item?.profit,
+        prCharges: item?.pr_charges,
+        userId: item?.user_id,
+        subCategory: item?.sub_category,
+        barcode: item?.barcode,
       });
 
       const orderNumber = response?.data?.data?.orderNumber;
@@ -1549,18 +1585,20 @@ function MenuDashboard() {
       return;
     }
 
+    setPopupItem({
+      ...item,
+      description: item.description || "",
+      unit_price: item.unit_price || 0,
+      ac_unit: item.ac_unit || "Nos",
+      quantity: item.quantity || 0,
+    });
     setPopupOpen(true);
     setPopupLoading(true);
 
     try {
-      const response = await fetch(
+      const result = await authFetchJson(
         `${API_BASE_URL}/memupopup?itemCode=${item.item_code}&itemId=${item.item_id}`
       );
-      const result = await response.json();
-
-      if (!response.ok || !result?.success) {
-        throw new Error(result?.message || "Failed to fetch popup details");
-      }
 
       setPopupItem(result.data);
     } catch (error) {

@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { CheckCircle2, ChevronLeft, Minus, Plus, ShoppingCart, Trash2, XCircle } from "lucide-react";
+import { CheckCircle2, ChevronLeft, Minus, Plus, Trash2, XCircle } from "lucide-react";
 import Pubmenubuyservice from "../../services/Pubmenubuyservice";
 import ConfirmOrderservice from "../../services/ConfirmOrderservice";
 
@@ -27,34 +27,22 @@ function parseCardText(cardText = "") {
 
 function normalizeItem(item, fallbackIndex = 0) {
   const parsed = parseCardText(item.card_text || item.CARD_TEXT);
+  const rawPrice = item.price ?? item.PRICE;
+  const isFreeItem = rawPrice === 0 || String(rawPrice) === "0";
 
   return {
-    id: item.item_id || item.ITEM_ID || item.item_code || item.ITEM_CODE || fallbackIndex,
+    id: item.order_line_id || item.ORDER_LINE_ID || item.item_id || item.ITEM_ID || fallbackIndex,
+    order_line_id: item.order_line_id || item.ORDER_LINE_ID || null,
     item_code: item.item_code || item.ITEM_CODE || "",
     item_name: item.item_name || item.ITEM_NAME || parsed.item_name,
     quantity: Number(item.quantity || item.QUANTITY || parsed.quantity || 1),
     subtotal: Number(item.subtotal || item.SUBTOTAL || item.unit_price || item.UNIT_PRICE || 0),
     image: item.image || item.IMAGE || "",
     card_text: item.card_text || item.CARD_TEXT || "",
+    price: rawPrice,
+    barcode: item.barcode || item.BARCODE || null,
+    isFreeItem,
   };
-}
-
-function fallbackItemFromState(source) {
-  if (!source) {
-    return [];
-  }
-
-  return [
-    {
-      id: source.item_id || source.item_code || "selected-item",
-      item_code: source.item_code || "",
-      item_name: source.item_name || "Item",
-      quantity: Number(source.quantity || 1),
-      subtotal: Number(source.unit_price || source.subtotal || 0),
-      image: source.image || "",
-      card_text: `Name: ${source.item_name || "Item"} Quantity: ${source.quantity || 1}`,
-    },
-  ];
 }
 
 function ActionButton({ children, className = "", ...props }) {
@@ -79,6 +67,7 @@ export default function Pubmenubuy({ backTo = "" }) {
   const [loading, setLoading] = useState(Boolean(orderNumber));
   const [cancelling, setCancelling] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [updatingItemCode, setUpdatingItemCode] = useState(null);
   const [error, setError] = useState("");
   const currentBasePath = location.pathname.startsWith("/attendant")
     ? "/attendant"
@@ -123,23 +112,61 @@ export default function Pubmenubuy({ backTo = "" }) {
     };
   }, [orderNumber]);
 
-  const totalAmount = useMemo(
-    () => items.reduce((sum, item) => sum + Number(item.subtotal || 0), 0),
-    [items]
-  );
-
-  const adjustQuantity = (id, delta) => {
-    setItems((current) =>
-      current.map((item) =>
-        item.id === id
-          ? { ...item, quantity: Math.max(1, Number(item.quantity || 1) + delta) }
-          : item
-      )
-    );
+  const syncFromSummary = (payload) => {
+    const data = payload?.data || payload || {};
+    const rows = Array.isArray(data?.items) ? data.items : [];
+    setOrderHeader(data?.header || null);
+    setItems(rows.map((item, index) => normalizeItem(item, index)));
   };
 
-  const removeItem = (id) => {
-    setItems((current) => current.filter((item) => item.id !== id));
+  const adjustQuantity = async (item, delta) => {
+    if (!orderNumber || !item?.item_code || item?.isFreeItem || updatingItemCode) {
+      return;
+    }
+
+    try {
+      setUpdatingItemCode(String(item.item_code));
+      setError("");
+      const response = await Pubmenubuyservice.updateItemQuantity(orderNumber, item.item_code, delta);
+      syncFromSummary(response?.data);
+    } catch (updateError) {
+      setError(updateError.response?.data?.message || "Unable to update quantity.");
+    } finally {
+      setUpdatingItemCode(null);
+    }
+  };
+
+  const removeItem = async (item) => {
+    if (!orderNumber || !item?.item_code || item?.isFreeItem || updatingItemCode) {
+      return;
+    }
+
+    try {
+      setUpdatingItemCode(String(item.item_code));
+      setError("");
+      await Pubmenubuyservice.deleteItem(orderNumber, item.item_code);
+
+      try {
+        const summaryResponse = await Pubmenubuyservice.getByOrderNumber(orderNumber);
+        syncFromSummary(summaryResponse?.data);
+      } catch (summaryError) {
+        if (summaryError?.response?.status === 404) {
+          navigate(location.pathname.replace(/\/buy$/, ""), { replace: true });
+          return;
+        }
+
+        throw summaryError;
+      }
+    } catch (removeError) {
+      if (removeError?.response?.status === 404) {
+        navigate(location.pathname.replace(/\/buy$/, ""), { replace: true });
+        return;
+      }
+
+      setError(removeError.response?.data?.message || "Unable to remove item.");
+    } finally {
+      setUpdatingItemCode(null);
+    }
   };
 
   const handleCancelOrder = async () => {
@@ -277,67 +304,80 @@ export default function Pubmenubuy({ backTo = "" }) {
           <div className="space-y-4">
             {/* Products */}
              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {items.map((item) => (
-                  <div
-                    key={item.id}
-                    className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-                  >
-                    {/* Image */}
-                   <div className="flex h-40 items-center justify-center bg-stone-50 p-4">
-                      <img
-                        src={`${BASEAPI}${item.image || "default.jpg"}`}
-                        alt={item.item_name}
-                        className="max-h-full w-auto object-contain"
-                      />
-                  </div>
+                {items.map((item) => {
+                  const isBusy = updatingItemCode === String(item.item_code);
+                  const disableItemActions = Boolean(isBusy || item.isFreeItem);
 
-                  {/* Details */}
-                  <div className="space-y-3 p-4">
-                    <div>
-                      <h3 className="line-clamp-1 text-base font-semibold text-stone-900">
-                        {item.item_name}
-                      </h3>
+                  return (
+                    <div
+                      key={item.id}
+                      className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                    >
+                      {/* Image */}
+                      <div className="flex h-40 items-center justify-center bg-stone-50 p-4">
+                        <img
+                          src={`${BASEAPI}${item.image || "default.jpg"}`}
+                          alt={item.item_name}
+                          className="max-h-full w-auto object-contain"
+                        />
+                      </div>
 
-                      <p className="mt-1 text-sm text-stone-500">
-                        Quantity: {item.quantity}
-                      </p>
-                    </div>
+                      {/* Details */}
+                      <div className="space-y-3 p-4">
+                        <div>
+                          <h3 className="line-clamp-1 text-base font-semibold text-stone-900">
+                            {item.item_name}
+                          </h3>
 
-                     {/* Controls */}
-                     <div className="flex items-center justify-between rounded-xl bg-stone-50 px-3 py-2">
-                       <div className="flex items-center gap-1">
-                         <button
-                           type="button"
-                           onClick={() => adjustQuantity(item.id, -1)}
-                           className="rounded-md bg-white p-1.5 text-stone-700 shadow-sm transition hover:bg-stone-100"
-                         >
-                           <Minus className="h-4 w-4" />
-                         </button>
+                          <p className="mt-1 text-sm text-stone-500">
+                            Quantity: {item.quantity}
+                          </p>
+                          {item.isFreeItem ? (
+                            <p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-emerald-600">
+                              Free Item
+                            </p>
+                          ) : null}
+                        </div>
 
-                        <span className="min-w-[28px] text-center text-sm font-semibold text-stone-900">
-                          {item.quantity}
-                        </span>
+                        {/* Controls */}
+                        <div className="flex items-center justify-between rounded-xl bg-stone-50 px-3 py-2">
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => adjustQuantity(item, -1)}
+                              disabled={disableItemActions || Number(item.quantity || 1) <= 1}
+                              className="rounded-md bg-white p-1.5 text-stone-700 shadow-sm transition hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              <Minus className="h-4 w-4" />
+                            </button>
+
+                            <span className="min-w-[28px] text-center text-sm font-semibold text-stone-900">
+                              {item.quantity}
+                            </span>
+
+                            <button
+                              type="button"
+                              onClick={() => adjustQuantity(item, 1)}
+                              disabled={disableItemActions}
+                              className="rounded-md bg-afmc-maroon p-1.5 text-white transition hover:bg-afmc-maroon2 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              <Plus className="h-4 w-4" />
+                            </button>
+                          </div>
 
                           <button
                             type="button"
-                            onClick={() => adjustQuantity(item.id, 1)}
-                            className="rounded-md bg-afmc-maroon p-1.5 text-white transition hover:bg-afmc-maroon2"
+                            onClick={() => removeItem(item)}
+                            disabled={disableItemActions}
+                            className="rounded-md bg-red-50 p-1.5 text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
                           >
-                            <Plus className="h-4 w-4" />
+                            <Trash2 className="h-4 w-4" />
                           </button>
                         </div>
-
-                      <button
-                        type="button"
-                        onClick={() => removeItem(item.id)}
-                        className="rounded-md bg-red-50 p-1.5 text-red-600 transition hover:bg-red-100"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              ))}
+                  );
+                })}
             </div>
 
            

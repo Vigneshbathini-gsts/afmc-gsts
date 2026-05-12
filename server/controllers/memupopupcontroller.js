@@ -22,6 +22,7 @@ const getMenuPopupDetails = async (req, res) => {
     const data = await memuPopupService.getMenuPopupDetails({
       itemCode,
       itemId,
+      authUser: req.user,
     });
 
     if (!data) {
