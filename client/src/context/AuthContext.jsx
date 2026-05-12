@@ -3,6 +3,19 @@ import { cartAPI } from "../services/api";
 
 const AuthContext = createContext(null);
 const AUTH_USER_STORAGE_KEY = "authUser";
+const ORDER_HISTORY_FILTER_PREFIX = "orderHistoryFilters";
+
+const clearOrderHistoryFilters = () => {
+  try {
+    Object.keys(sessionStorage).forEach((key) => {
+      if (key === ORDER_HISTORY_FILTER_PREFIX || key.startsWith(`${ORDER_HISTORY_FILTER_PREFIX}:`)) {
+        sessionStorage.removeItem(key);
+      }
+    });
+  } catch (_) {
+    // Storage can be unavailable in private or restricted browser contexts.
+  }
+};
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
@@ -74,6 +87,7 @@ export function AuthProvider({ children }) {
   };
 
   const clearUser = () => {
+    clearOrderHistoryFilters();
     localStorage.removeItem(AUTH_USER_STORAGE_KEY);
     setUser(null);
     setIsLoading(false);

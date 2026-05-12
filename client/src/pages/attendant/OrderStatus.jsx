@@ -1,3 +1,5 @@
+import OrderHistoryPage from "../common/OrderHistoryPage";
+
 export default function OrderStatus() {
-  return null;
+  return <OrderHistoryPage />;
 }

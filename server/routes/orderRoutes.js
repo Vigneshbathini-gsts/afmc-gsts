@@ -6,6 +6,7 @@ const {
   fetchAdminOrderHistory,
   fetchAttendantOrders,
   fetchOrderDetails,
+  fetchOrderSummary,
   lookupNonMember,
 } = require("../controllers/orderController");
 
@@ -16,6 +17,8 @@ router.get("/attendant", authMiddleware, fetchAttendantOrders);
 router.get("/history", authMiddleware, fetchAdminOrderHistory);
 router.get("/non-member", authMiddleware, lookupNonMember);
 router.post("/non-member", authMiddleware, createOrUpdateNonMember);
+router.get("/:id/summary", authMiddleware, fetchOrderSummary);
+router.get("/:id/details", authMiddleware, fetchOrderDetails);
 router.get("/:id", authMiddleware, fetchOrderDetails);
 
 module.exports = router;

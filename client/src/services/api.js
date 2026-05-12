@@ -1,6 +1,18 @@
 // axios instance goes here
 import axios from "axios";
 
+const clearOrderHistoryFilters = () => {
+  try {
+    Object.keys(sessionStorage).forEach((key) => {
+      if (key === "orderHistoryFilters" || key.startsWith("orderHistoryFilters:")) {
+        sessionStorage.removeItem(key);
+      }
+    });
+  } catch (_) {
+    // Ignore storage access errors.
+  }
+};
+
 const trimTrailingSlash = (value) => value.replace(/\/+$/, "");
 
 const getDefaultApiBase = () => {
@@ -62,6 +74,7 @@ api.interceptors.response.use(
     ) {
       localStorage.removeItem("token");
       localStorage.removeItem("authUser");
+      clearOrderHistoryFilters();
       window.location.href = "/login";
     }
     return Promise.reject(err);
@@ -88,6 +101,7 @@ export async function authFetchJson(input, init = {}) {
   if (res.status === 401 && !window.location.pathname.includes("/login")) {
     localStorage.removeItem("token");
     localStorage.removeItem("authUser");
+    clearOrderHistoryFilters();
     window.location.href = "/login";
     throw new Error("Unauthorized");
   }
@@ -248,6 +262,7 @@ export const orderAPI = {
 
   // Admin
   getOrderHistory: (params) => api.get("/orders/history", { params }),
+  getOrderSummary: (orderNumber) => api.get(`/orders/${orderNumber}/summary`),
 };
 
 // ================================

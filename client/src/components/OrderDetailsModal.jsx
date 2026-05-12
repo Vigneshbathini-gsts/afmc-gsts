@@ -18,10 +18,21 @@ const getStatusClassName = (status) => {
   return "text-gray-500";
 };
 
+const formatCurrency = (value) =>
+  Number(value || 0).toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
 export default function OrderDetailsModal({ isOpen, onClose, orderNumber }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const grandTotal = items.reduce(
+    (total, item) => total + Number(item.subtotal || item.SUBTOTAL || item.total || 0),
+    0
+  );
 
   useEffect(() => {
     if (!isOpen || !orderNumber) return;
@@ -32,7 +43,7 @@ export default function OrderDetailsModal({ isOpen, onClose, orderNumber }) {
         setError("");
 
         const response = await orderAPI.getOrderDetails(orderNumber);
-        console.log("Order Details Response:", response.data);
+        // console.log("Order Details Response:", response.data);
         setItems(response.data?.data || []);
       } catch (err) {
         console.error("Error fetching order details:", err);
@@ -47,7 +58,7 @@ export default function OrderDetailsModal({ isOpen, onClose, orderNumber }) {
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 bg-black/40 z-[100] flex items-center justify-center px-4">
-      <div className="bg-white w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl p-6 relative animate-fadeIn">
+      <div className="bg-white w-full max-w-5xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl p-6 relative animate-fadeIn">
         {/* Close Button */}
         <button
           onClick={onClose}
@@ -88,22 +99,36 @@ export default function OrderDetailsModal({ isOpen, onClose, orderNumber }) {
                   <th className="px-4 py-3 text-left">Status</th>
                   <th className="px-4 py-3 text-left">Quantity</th>
                   <th className="px-4 py-3 text-left">Type</th>
+                  <th className="px-4 py-3 text-right">Price</th>
+                  <th className="px-4 py-3 text-right">Total</th>
                 </tr>
               </thead>
               <tbody>
                 {items.map((item, index) => (
                   <tr key={index} className="border-t hover:bg-gray-50">
-                    <td className="px-4 py-3">{toInitCap(item.item_name)}</td>
+                    <td className="px-4 py-3">{toInitCap(item.item_name || item.ITEM_NAME)}</td>
                     <td className="px-4 py-3">
                       <span className={`font-semibold ${getStatusClassName(item.status)}`}>
                         {toInitCap(item.status || "Received")}
                       </span>
                     </td>
-                    <td className="px-4 py-3">{item.quantity}</td>
-                    <td className="px-4 py-3">{toInitCap(item.type || "Na")}</td>
+                    <td className="px-4 py-3">{item.quantity || item.QUANTITY || 0}</td>
+                    <td className="px-4 py-3">{toInitCap(item.type || item.TYPE || "Na")}</td>
+                    <td className="px-4 py-3 text-right">₹ {formatCurrency(item.price || item.PRICE)}</td>
+                    <td className="px-4 py-3 text-right font-semibold">₹ {formatCurrency(item.subtotal || item.SUBTOTAL || item.total)}</td>
                   </tr>
                 ))}
               </tbody>
+              <tfoot className="bg-gray-50">
+                <tr className="border-t font-bold text-gray-800">
+                  <td colSpan="5" className="px-4 py-3 text-right">
+                    Grand Total
+                  </td>
+                  <td className="px-4 py-3 text-right text-green-700">
+                    ₹ {formatCurrency(grandTotal)}
+                  </td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         )}

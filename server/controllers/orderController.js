@@ -3,6 +3,7 @@ const {
   getAdminOrderHistory,
   getNonMemberByPhone,
   getOrderDetails,
+  getOrderSummary,
   saveNonMember,
 } = require("../models/orderModel");
 
@@ -61,13 +62,15 @@ exports.fetchAttendantOrders = async (req, res) => {
 
 exports.fetchAdminOrderHistory = async (req, res) => {
   try {
-    const { from = null, to = null, username = null, app_user = null } = req.query;
+    const { from = null, to = null, username = null } = req.query;
+    const roleId = Number(req.user?.roleId);
+    const userId = roleId === 10 ? null : req.user?.userId || null;
 
     const data = await getAdminOrderHistory({
       from,
       to,
       username,
-      appUser: app_user,
+      userId,
     });
 
     res.status(200).json({
@@ -86,8 +89,9 @@ exports.fetchAdminOrderHistory = async (req, res) => {
 
 exports.fetchOrderDetails = async (req, res) => {
   try {
-    const { id } = req.params;
-    const data = await getOrderDetails(id);
+    const { id, orderId } = req.params;
+    const orderIdentifier = id || orderId;
+    const data = await getOrderDetails(orderIdentifier);
     res.status(200).json({
       success: true,
       data,
@@ -97,6 +101,32 @@ exports.fetchOrderDetails = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Unable to fetch order details.",
+      error: error.message,
+    });
+  }
+};
+
+exports.fetchOrderSummary = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const data = await getOrderSummary(id);
+
+    if (!data) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found.",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data,
+    });
+  } catch (error) {
+    console.error("Failed to fetch order summary:", error);
+    res.status(500).json({
+      success: false,
+      message: "Unable to fetch order summary.",
       error: error.message,
     });
   }
