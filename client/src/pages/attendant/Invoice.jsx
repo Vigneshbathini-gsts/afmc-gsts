@@ -1,1 +1,3 @@
-export default function Invoice(){ return <div>Invoice</div>; }
+import InvoicePage from "../common/InvoicePage";
+
+export default InvoicePage;

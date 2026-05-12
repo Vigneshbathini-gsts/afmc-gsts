@@ -174,6 +174,7 @@ async function getConfirmedOrderDetails(orderNumber) {
       SELECT
         oh.order_num,
         oh.order_date,
+        ROUND(MAX(IFNULL(oh.order_total, 0)), 2) AS order_total,
         COALESCE(MAX(nm.first_name), MAX(u.first_name), '') AS customer_name,
         CASE
           WHEN COUNT(od.order_line_id) - SUM(CASE WHEN COALESCE(kn.status, '') = 'Cancelled' THEN 1 ELSE 0 END) > 0
@@ -215,6 +216,7 @@ async function getConfirmedOrderDetails(orderNumber) {
         od.item_id,
         xi.item_name,
         od.quantity,
+        ROUND(MAX(IFNULL(od.subtotal, 0)), 2) AS subtotal,
         CASE
           WHEN COUNT(od.order_line_id) - SUM(CASE WHEN COALESCE(kn.status, '') = 'Cancelled' THEN 1 ELSE 0 END) > 0
             AND SUM(CASE WHEN COALESCE(kn.status, '') = 'Completed' THEN 1 ELSE 0 END) =
