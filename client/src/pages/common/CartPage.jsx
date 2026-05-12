@@ -95,9 +95,8 @@ export default function CartPage({ isAttendant = false }) {
         try {
             const response = await cartAPI.getByUserId(userId);
             const items = response.data.data || [];
-            // console.log(items);
             setCartItems(items);
-            setCartCount(items.length);
+            setCartCount(newItems.length);
         } catch (err) {
             setError(err?.response?.data?.message || "Unable to load cart items");
             showToast("Failed to load cart items", 'error');
@@ -108,7 +107,7 @@ export default function CartPage({ isAttendant = false }) {
 
     useEffect(() => {
         fetchCartItems();
-    }, [fetchCartItems]);
+    }, [fetchCartItems, userId]);
 
     const handleQuantityUpdate = useCallback(async (cartId, newQuantity) => {
         if (!cartId || Number.isNaN(Number(cartId))) {

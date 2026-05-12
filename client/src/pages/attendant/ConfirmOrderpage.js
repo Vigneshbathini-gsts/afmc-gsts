@@ -20,6 +20,16 @@ export default function ConfirmOrderpage() {
   const [error, setError] = useState("");
   const [orderData, setOrderData] = useState(null);
 
+  // Auto-clear error warnings after 5 seconds for better UX
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => {
+        setError("");
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [error]);
+
   const currentBasePath = location.pathname.startsWith("/attendant")
     ? "/attendant"
     : "/user";
@@ -60,9 +70,18 @@ export default function ConfirmOrderpage() {
     };
   }, [orderNumber]);
 
-  const items = Array.isArray(orderData?.items) ? orderData.items : [];
+  const items = useMemo(
+    () => (Array.isArray(orderData?.items) ? orderData.items : []),
+    [orderData?.items]
+  );
+
   const totalQuantity = useMemo(
     () => items.reduce((sum, item) => sum + Number(item.quantity || 0), 0),
+    [items]
+  );
+
+  const totalAmount = useMemo(
+    () => items.reduce((sum, item) => sum + Number(item.subtotal || 0), 0),
     [items]
   );
 
@@ -166,6 +185,10 @@ return (
                     </th>
 
                     <th className="px-5 py-3 text-left text-sm font-semibold text-[#6b0f1a]">
+                      Subtotal
+                    </th>
+
+                    <th className="px-5 py-3 text-left text-sm font-semibold text-[#6b0f1a]">
                       Status
                     </th>
                   </tr>
@@ -183,6 +206,10 @@ return (
 
                       <td className="px-5 py-4 text-sm text-stone-700">
                         {item.quantity}
+                      </td>
+
+                      <td className="px-5 py-4 text-sm text-stone-700">
+                        ₹{Number(item.subtotal || 0).toFixed(2)}
                       </td>
 
                       <td className="px-5 py-4">
@@ -210,6 +237,13 @@ return (
                   Quantity :
                   <span className="ml-1 font-semibold text-stone-900">
                     {totalQuantity}
+                  </span>
+                </span>
+
+                <span>
+                  Total Amount :
+                  <span className="ml-1 font-semibold text-stone-900">
+                    ₹{totalAmount.toFixed(2)}
                   </span>
                 </span>
               </div>

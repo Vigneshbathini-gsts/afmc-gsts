@@ -202,7 +202,10 @@ async function getConfirmedOrderDetails(orderNumber) {
         od.item_id,
         xi.item_name,
         od.quantity,
-        COALESCE(kn.status, 'Received') AS status
+        od.price,
+        od.subtotal,
+        COALESCE(kn.status, 'Received') AS status,
+        od.subcategory
       FROM xxafmc_order_details od
       JOIN xxafmc_inventory xi
         ON od.item_id = xi.item_code

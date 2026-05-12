@@ -310,7 +310,7 @@ exports.clearCustomItemDetails = async (req, res) => {
 exports.addCartItem = async (req, res) => {
   try {
     const userId = req.user?.userId;
-    const { item_id, quantity, unit_price, remarks, orderNumber } = req.body;
+    const { item_id, quantity, unit_price, remarks, ingredients } = req.body;
 
     if (!userId) {
       return res.status(400).json({ success: false, message: "User ID is required" });
@@ -328,6 +328,7 @@ exports.addCartItem = async (req, res) => {
       unit_price: Number(unit_price),
       remarks: remarks || "Din",
       loginType: req.user?.loginType,
+      customIngredients: ingredients
     };
 
     const result = await cartModel.addCartItem(userId, itemData);
@@ -435,181 +436,143 @@ exports.getCartItems = async (req, res) => {
 
 exports.confirmOrder = async (req, res) => {
   const userId = req.user?.userId;
-  const { orderNumber } = req.body || {};
+  const { pubmed, memberId, kitchenType } = req.body || {};
 
   if (!userId) {
     return res.status(400).json({ success: false, message: "User ID is required" });
   }
-  if (!orderNumber || typeof orderNumber !== "string") {
-    return res.status(400).json({ success: false, message: "Order number is required" });
-  }
 
   const connection = await db.getConnection();
   try {
-    await cartModel.ensureCustomizationTable(connection);
     await connection.beginTransaction();
 
+    // 1. Fetch Cart Items and join with inventory to get names and categories
     const [cartRows] = await connection.execute(
-      "SELECT cart_id, item_id, quantity FROM xxafmc_cart_items WHERE user_id = ?",
+      `SELECT c.*, xi.category_id, xi.sub_category, xi.item_name 
+       FROM xxafmc_cart_items c 
+       JOIN xxafmc_inventory xi ON c.item_id = xi.item_code 
+       WHERE c.user_id = ?`,
       [userId]
     );
 
-    const cartQuantityMap = new Map(
-      cartRows.map((row) => [String(row.item_id), Number(row.quantity || 0)])
-    );
+    if (cartRows.length === 0) {
+      throw new Error("Cart is empty");
+    }
 
+    // Calculate Order Total
+    const orderTotal = cartRows.reduce((sum, item) => sum + Number(item.total || 0), 0);
+
+    // 1. Create Order Header
+    const [headerResult] = await connection.execute(
+      `INSERT INTO xxafmc_order_header 
+        (user_id, order_date, member_id, pubmed, created_by, creation_date, order_total)
+       VALUES (?, NOW(), ?, ?, ?, NOW(), ?)`,
+      [userId, memberId || null, pubmed || null, req.user?.username || 'SYSTEM', orderTotal]
+    );
+    const orderNumber = headerResult.insertId;
+
+    for (const cartItem of cartRows) {
+      // 2. Validate Stock inside transaction (Production Check)
+      const [stockRows] = await connection.execute(
+        `SELECT IFNULL(SUM(STOCK_QUANTITY), 0) AS stock FROM xxafmc_stock_out WHERE item_code = ?`,
+        [cartItem.item_id]
+      );
+      const available = Number(stockRows[0]?.stock || 0);
+      
+      // Note: We also check reserved quantities from other orders
+      const [reservedRows] = await connection.execute(
+        `SELECT IFNULL(SUM(quantity), 0) AS reserved FROM xxafmc_order_details 
+         WHERE item_id = ? AND order_status IS NULL AND order_id != ?`,
+        [cartItem.item_id, orderNumber]
+      );
+      const reserved = Number(reservedRows[0]?.reserved || 0);
+
+      if (cartItem.quantity + reserved > available) {
+        throw new Error(`Insufficient stock for ${cartItem.item_name}. Only ${available - reserved} left.`);
+      }
+
+      // 3. Insert into Order Details
+       await connection.execute(
+        `INSERT INTO xxafmc_order_details 
+         (order_id, item_id, quantity, price, subtotal, description, created_by, creation_date, subcategory, total_quantity)
+         VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?)`,
+        [
+          orderNumber,
+          cartItem.item_id,
+          cartItem.quantity,
+          cartItem.price,
+          cartItem.total,
+          cartItem.description,
+          userId,
+          cartItem.sub_category,
+          cartItem.quantity
+        ]
+      );
+
+      // 3. Create Kitchen Notification
+      const kType = kitchenType || (Number(cartItem.category_id) === 10 ? 'Bar' : 'Kitchen');
+      await connection.execute(
+        `INSERT INTO xxafmc_kitchen_notification
+          (ordernumber, user_name, item_id, item_name, quantity, created_by, creation_date, msg_read, status, kitchen_type)
+         VALUES (?, ?, ?, ?, ?, ?, NOW(), 'N', 'Received', ?)`,
+        [
+          orderNumber,
+          userId,
+          cartItem.item_id,
+          cartItem.item_name,
+          cartItem.quantity,
+          userId,
+          kType
+        ]
+      );
+    }
+
+    // 4. Migrate Customizations from cart to order
     const [customizationRows] = await connection.execute(
-      `
-        SELECT
-          c.cart_id,
-          c.item_id AS inventory_item_code,
-          c.quantity AS cart_quantity,
-          cc.ingredient_item_code AS item_code,
-          cc.ingredient_name AS item_name,
-          cc.quantity AS pegs
-        FROM xxafmc_cart_items c
-        INNER JOIN xxafmc_cart_customization cc
-          ON cc.cart_id = c.cart_id
-        WHERE c.user_id = ?
-          AND c.price != 0
-        ORDER BY c.cart_id, cc.id
-      `,
+      `SELECT cc.*, c.item_id AS parent_item_code, c.quantity AS cart_qty
+       FROM xxafmc_cart_customization cc
+       JOIN xxafmc_cart_items c ON cc.cart_id = c.cart_id
+       WHERE c.user_id = ?`,
       [userId]
     );
 
-    let customizationInserted = 0;
-    const customizedParentItemCodes = new Set();
     for (const row of customizationRows) {
-      customizedParentItemCodes.add(String(row.inventory_item_code));
-      const requiredQuantity = Number(row.pegs || 0) * Number(row.cart_quantity || 1);
-      const stockMap = await getStockQuantities(connection, [row.item_code]);
-      const totalStock = Number(stockMap[String(row.item_code)] || 0);
-      if (totalStock < requiredQuantity) continue;
-
       await connection.execute(
         `INSERT INTO xxafmc_custom_cocktails_mocktails_details
           (item_code, item_name, pegs, inventory_item_code, user_id, quantity, order_number, creation_date)
         VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
         [
-          row.item_code,
-          row.item_name,
-          row.pegs,
-          row.inventory_item_code,
+          row.ingredient_item_code,
+          row.ingredient_name,
+          row.quantity,
+          row.parent_item_code,
           userId,
-          row.cart_quantity,
-          orderNumber,
+          row.cart_qty,
+          orderNumber
         ]
       );
-      customizationInserted += 1;
     }
 
-    const [collectionRows] = await connection.execute(
-      `SELECT
-          seq_id,
-          c001 AS item_code,
-          c002 AS item_name,
-          c003 AS pegs,
-          c005 AS inventory_item_code,
-          c006 AS user_id,
-          c009 AS stock_quantity
-        FROM apex_collections
-        WHERE collection_name = 'M_COLLECTION'
-          AND c006 = ?`,
+    // 5. Clear Cart
+    await connection.execute(
+      `DELETE FROM xxafmc_cart_customization 
+       WHERE cart_id IN (SELECT cart_id FROM xxafmc_cart_items WHERE user_id = ?)`, 
       [userId]
     );
-
-    let mainInserted = 0;
-    for (const row of collectionRows) {
-      const inventoryItemCode = String(row.inventory_item_code);
-      if (customizedParentItemCodes.has(inventoryItemCode)) continue;
-      const quantity = cartQuantityMap.get(inventoryItemCode);
-      if (!quantity) continue;
-
-      const requiredQuantity = Number(row.pegs || 0) * Number(quantity);
-      if (Number(row.stock_quantity || 0) < requiredQuantity) continue;
-
-      const [existingRows] = await connection.execute(
-        `SELECT 1 FROM xxafmc_custom_cocktails_mocktails_details WHERE inventory_item_code = ? AND order_number = ? LIMIT 1`,
-        [row.inventory_item_code, orderNumber]
-      );
-      if (existingRows.length > 0) continue;
-
-      await connection.execute(
-        `INSERT INTO xxafmc_custom_cocktails_mocktails_details
-          (item_code, item_name, pegs, inventory_item_code, user_id, quantity, order_number, creation_date)
-        VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
-        [row.item_code, row.item_name, row.pegs, row.inventory_item_code, row.user_id, quantity, orderNumber]
-      );
-      mainInserted += 1;
-    }
-
-    const [cocktailRows] = await connection.execute(
-      `SELECT
-          xcmd.inventory_item_code,
-          xcmd.pegs,
-          xcmd.item_name,
-          xcmd.item_code
-        FROM xxafmc_cocktails_mocktails_details xcmd
-        JOIN xxafmc_cart_items xc ON xc.item_id = xcmd.inventory_item_code AND xc.user_id = ?
-        LEFT JOIN xxafmc_cart_customization xcc ON xcc.cart_id = xc.cart_id
-        WHERE NOT EXISTS (
-          SELECT 1
-          FROM apex_collections ac
-          WHERE ac.collection_name = 'M_COLLECTION'
-            AND ac.c006 = ?
-            AND ac.c005 = xcmd.inventory_item_code
-        )
-          AND xcc.cart_id IS NULL
-        GROUP BY xcmd.inventory_item_code, xcmd.pegs, xcmd.item_name, xcmd.item_code`,
-      [userId, userId]
-    );
-
-    let dummyInserted = 0;
-    for (const row of cocktailRows) {
-      const inventoryItemCode = String(row.inventory_item_code);
-      const quantity = cartQuantityMap.get(inventoryItemCode);
-      if (!quantity) continue;
-
-      const [stockRows] = await connection.execute(
-        `SELECT COALESCE(SUM(stock_quantity), 0) AS total_stock FROM xxafmc_stock_out WHERE item_code = ?`,
-        [row.item_code]
-      );
-      const totalStock = Number(stockRows[0]?.total_stock || 0);
-      const requiredQuantity = Number(row.pegs || 0) * Number(quantity);
-      if (totalStock < requiredQuantity) continue;
-
-      const [existingRows] = await connection.execute(
-        `SELECT 1 FROM xxafmc_custom_cocktails_mocktails_details_dummy WHERE inventory_item_code = ? AND order_number = ? LIMIT 1`,
-        [row.inventory_item_code, orderNumber]
-      );
-      if (existingRows.length > 0) continue;
-
-      await connection.execute(
-        `INSERT INTO xxafmc_custom_cocktails_mocktails_details_dummy
-          (item_code, item_name, pegs, inventory_item_code, user_id, quantity, order_number, creation_date)
-        VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
-        [row.item_code, row.item_name, row.pegs, row.inventory_item_code, userId, quantity, orderNumber]
-      );
-      dummyInserted += 1;
-    }
+    await connection.execute("DELETE FROM xxafmc_cart_items WHERE user_id = ?", [userId]);
 
     await connection.commit();
-
     await clearCocktailSessionCollections(req, null, orderNumber);
 
     return res.status(200).json({
       success: true,
       message: "Order confirmed successfully",
-      data: { orderNumber, mainInserted, dummyInserted, customizationInserted },
+      data: { orderNumber },
     });
   } catch (error) {
     console.error("Error confirming order:", error);
     await connection.rollback();
-    const status = error?.status || 500;
-    return res.status(status).json({
-      success: false,
-      message: error?.message || "Failed to confirm order",
-    });
+    return res.status(500).json({ success: false, message: error.message });
   } finally {
     connection.release();
   }
