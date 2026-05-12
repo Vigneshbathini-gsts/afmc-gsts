@@ -797,6 +797,11 @@ exports.proceedToBuy = async (req, res) => {
       const isCocktailOrMocktail = [14, 15].includes(Number(item.subcategory));
       let availableStock = 0;
       let itemName = "";
+      const safeQuantity = Number(item.quantity || 0);
+      const safePrice = Number.isFinite(Number(item.price)) ? Number(item.price) : 0;
+      const safeTotal = Number.isFinite(Number(item.total)) ? Number(item.total) : Number((safePrice * safeQuantity).toFixed(2));
+      const safeProfit = Number.isFinite(Number(item.profit)) ? Number(item.profit) : 0;
+      const safeFoodCharges = Number.isFinite(Number(item.food_pr_charges)) ? Number(item.food_pr_charges) : 0;
 
       if (isCocktailOrMocktail) {
         // Cocktail/mocktail parent items do not have direct stock; their availability is driven by ingredient stock.
@@ -867,7 +872,7 @@ exports.proceedToBuy = async (req, res) => {
       }
       }
 
-      const stockInCart = Number(item.quantity || 0);
+      const stockInCart = safeQuantity;
       if (stockInCart > availableStock) {
         const error = new Error(`Out of Stock for item ${itemName || item.item_id}. Available quantity: ${availableStock}`);
         error.status = 400;
@@ -902,12 +907,12 @@ exports.proceedToBuy = async (req, res) => {
           orderLineId,
           orderNumber,
           item.item_id,
-          item.quantity,
-          item.total,
-          item.price,
-          item.quantity,
-          item.profit,
-          item.food_pr_charges,
+          safeQuantity,
+          safeTotal,
+          safePrice,
+          safeQuantity,
+          safeProfit,
+          safeFoodCharges,
           appUser,
           item.type_id,
           item.subcategory,

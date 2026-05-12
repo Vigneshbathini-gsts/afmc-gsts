@@ -90,6 +90,17 @@ function normalizeItem(item, fallbackIndex = 0) {
     rawAvailableQuantity === undefined || rawAvailableQuantity === null
       ? null
       : Number(rawAvailableQuantity);
+  const rawStockStatus = item.stock_status ?? item.STOCK_STATUS ?? item.stockStatus ?? null;
+  const stockStatus =
+    rawStockStatus === null || rawStockStatus === undefined || rawStockStatus === ""
+      ? null
+      : String(rawStockStatus);
+  const rawStockIssueMessage =
+    item.stock_issue_message ?? item.STOCK_ISSUE_MESSAGE ?? item.stockIssueMessage ?? null;
+  const stockIssueMessage =
+    rawStockIssueMessage === null || rawStockIssueMessage === undefined || rawStockIssueMessage === ""
+      ? null
+      : String(rawStockIssueMessage);
   const unitPrice =
     Number.isFinite(explicitUnitPrice) && explicitUnitPrice >= 0
       ? explicitUnitPrice
@@ -98,6 +109,11 @@ function normalizeItem(item, fallbackIndex = 0) {
         : 0;
 
   const isFreeItem = Number(unitPrice || 0) === 0 && Number(subtotal || 0) === 0;
+  const rawSubcategory = item.subcategory ?? item.SUBCATEGORY ?? item.sub_category ?? item.SUB_CATEGORY ?? null;
+  const subcategory =
+    rawSubcategory === null || rawSubcategory === undefined || rawSubcategory === ""
+      ? null
+      : Number(rawSubcategory);
 
   const rawOrderLineId = item.order_line_id ?? item.ORDER_LINE_ID ?? item.orderLineId ?? item.id ?? 0;
   const orderLineId = Number(rawOrderLineId) || 0;
@@ -120,6 +136,9 @@ function normalizeItem(item, fallbackIndex = 0) {
     isFreeItem,
     offer_quantity: Number.isFinite(offer_quantity) ? offer_quantity : null,
     free_item_quantity: Number.isFinite(free_item_quantity) ? free_item_quantity : null,
+    subcategory: Number.isFinite(subcategory) ? subcategory : null,
+    stockStatus,
+    stockIssueMessage,
   };
 }
 
@@ -170,22 +189,40 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
     ? "/attendant"
     : "/user";
   const MAX_QTY = 99;
+  const isCocktailOrMocktail = (item) => [14, 15].includes(Number(item?.subcategory));
   const stockIssue = useMemo(() => {
     return items.find(
       (item) =>
+        !isCocktailOrMocktail(item) &&
         item.availableQuantity !== null &&
         item.availableQuantity !== undefined &&
         Number(item.quantity || 0) > Number(item.availableQuantity || 0)
     ) || null;
   }, [items]);
 
+  const cocktailStockIssue = useMemo(() => {
+    return (
+      items.find(
+        (item) =>
+          isCocktailOrMocktail(item) &&
+          String(item.stockStatus || "").toLowerCase() === "out of stock"
+      ) || null
+    );
+  }, [items]);
+
   const stockIssueMessage = useMemo(() => {
-    if (!stockIssue) return "";
+    if (!stockIssue && !cocktailStockIssue) return "";
+    if (cocktailStockIssue) {
+      return (
+        cocktailStockIssue.stockIssueMessage ||
+        "Out of stock for cocktail/mocktail ingredients. Please reduce quantity or update selection."
+      );
+    }
     const available = Number(stockIssue.availableQuantity || 0);
     return stockIssue.isFreeItem
       ? `Out of stock for free item. Available quantity: ${available}`
       : `Out of stock. Available quantity: ${available}`;
-  }, [stockIssue]);
+  }, [stockIssue, cocktailStockIssue]);
 
   const showToast = (message, type = "success") => {
     setToast({ message, type });
@@ -348,6 +385,7 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
 
       const availableQty = targetItem.availableQuantity;
       if (
+        !isCocktailOrMocktail(targetItem) &&
         availableQty !== null &&
         availableQty !== undefined &&
         nextQtyCandidate > Number(availableQty)
@@ -475,8 +513,34 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
     }
 
     const nextQtyCandidate = currentQty + delta;
+
+    // Cocktail/mocktail stock validation (mirrors CartPage behavior)
+    if (delta > 0) {
+      const stockMessage = String(liveItem?.stockIssueMessage || "").trim();
+
+      // Backend may return ingredient-level stock issues via message only (often for cocktail/mocktail),
+      // without reliable subcategory/stockStatus in this screen's payload.
+      if (stockMessage) {
+        showToast(stockMessage, "error");
+        return;
+      }
+
+      // Fallback: cocktail/mocktail sometimes marks overall status as out-of-stock.
+      if (
+        isCocktailOrMocktail(liveItem) &&
+        String(liveItem?.stockStatus || "").toLowerCase() === "out of stock"
+      ) {
+        showToast(
+          "Out of stock for cocktail/mocktail ingredients. Please reduce quantity or update selection.",
+          "error"
+        );
+        return;
+      }
+    }
+
     const availableQty = liveItem?.availableQuantity;
     if (
+      !isCocktailOrMocktail(liveItem) &&
       availableQty !== null &&
       availableQty !== undefined &&
       Number.isFinite(Number(availableQty)) &&
@@ -568,7 +632,7 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
   };
 
   const handleConfirmOrder = async () => {
-    if (!orderNumber || confirming || loading || stockIssue) {
+    if (!orderNumber || confirming || loading || stockIssue || cocktailStockIssue) {
       return;
     }
 
@@ -609,7 +673,7 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
  
             <div className="flex flex-wrap gap-2">
               <ActionButton
-                onClick={() => (backTo ? navigate(backTo) : navigate(-1))}
+                onClick={() => (backTo ? navigate(backTo, { replace: true }) : navigate(-1))}
                 className="bg-white/15 px-4 py-2 hover:bg-white/25"
               >
                 <ChevronLeft className="h-4 w-4" />
@@ -705,6 +769,16 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
                       <p className="mt-1 text-sm text-stone-500">
                         Quantity: {item.quantity}{item.isFreeItem ? " (Free)" : ""}
                       </p>
+                      {isCocktailOrMocktail(item) && item.stockStatus && (
+                        <p className={`mt-1 text-xs font-semibold ${String(item.stockStatus).toLowerCase() === "out of stock" ? "text-red-600" : "text-green-700"}`}>
+                          {item.stockStatus}
+                        </p>
+                      )}
+                      {isCocktailOrMocktail(item) && item.stockIssueMessage && (
+                        <p className="mt-1 text-xs font-semibold text-red-600">
+                          {item.stockIssueMessage}
+                        </p>
+                      )}
                       {item.availableQuantity !== null && item.availableQuantity !== undefined && (
                         <p className="mt-1 text-xs text-stone-400">
                           Available: {item.availableQuantity}
@@ -723,16 +797,17 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
                      {!item.isFreeItem ? (
                      <div className="flex items-center justify-between rounded-xl bg-stone-50 px-3 py-2">
                        <div className="flex items-center gap-1">
-                          <button
-                             type="button"
-                             onClick={() => handleQtyClick(item, -1)}
-                             aria-disabled={updatingLineId === Number(item.orderLineId ?? item.id) || item.quantity <= 1}
-                             className={`rounded-md bg-white p-1.5 text-stone-700 shadow-sm transition hover:bg-stone-100 ${
-                               updatingLineId === Number(item.orderLineId ?? item.id) || item.quantity <= 1
-                                 ? "opacity-50"
-                                 : ""
-                             }`}
-                           >
+                           <button
+                              type="button"
+                              onClick={() => handleQtyClick(item, -1)}
+                              aria-disabled={updatingLineId === Number(item.orderLineId ?? item.id) || item.quantity <= 1}
+                              disabled={updatingLineId === Number(item.orderLineId ?? item.id) || item.quantity <= 1}
+                              className={`rounded-md bg-white p-1.5 text-stone-700 shadow-sm transition hover:bg-stone-100 ${
+                                updatingLineId === Number(item.orderLineId ?? item.id) || item.quantity <= 1
+                                  ? "opacity-50"
+                                  : ""
+                              }`}
+                            >
                              <Minus className="h-4 w-4" />
                            </button>
 
@@ -740,20 +815,33 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
                           {item.quantity}
                         </span>
 
-                            <button
-                              type="button"
-                              onClick={() => handleQtyClick(item, 1)}
-                              aria-disabled={
-                                updatingLineId === Number(item.orderLineId ?? item.id) ||
-                                item.quantity >= MAX_QTY
-                              }
-                              className={`rounded-md bg-afmc-maroon p-1.5 text-white transition hover:bg-afmc-maroon2 ${
-                                updatingLineId === Number(item.orderLineId ?? item.id) ||
-                                item.quantity >= MAX_QTY
-                                  ? "opacity-60"
-                                  : ""
-                              }`}
-                            >
+                             <button
+                               type="button"
+                               onClick={() => handleQtyClick(item, 1)}
+                               aria-disabled={
+                                 updatingLineId === Number(item.orderLineId ?? item.id) ||
+                                 String(item.stockIssueMessage || "").trim().length > 0 ||
+                                 (isCocktailOrMocktail(item) &&
+                                   String(item.stockStatus || "").toLowerCase() === "out of stock") ||
+                                 item.quantity >= MAX_QTY
+                               }
+                               disabled={
+                                 updatingLineId === Number(item.orderLineId ?? item.id) ||
+                                 String(item.stockIssueMessage || "").trim().length > 0 ||
+                                 (isCocktailOrMocktail(item) &&
+                                   String(item.stockStatus || "").toLowerCase() === "out of stock") ||
+                                 item.quantity >= MAX_QTY
+                               }
+                                className={`rounded-md bg-afmc-maroon p-1.5 text-white transition hover:bg-afmc-maroon2 ${
+                                  updatingLineId === Number(item.orderLineId ?? item.id) ||
+                                 String(item.stockIssueMessage || "").trim().length > 0 ||
+                                 (isCocktailOrMocktail(item) &&
+                                   String(item.stockStatus || "").toLowerCase() === "out of stock") ||
+                                  item.quantity >= MAX_QTY
+                                    ? "opacity-60"
+                                    : ""
+                                }`}
+                              >
                               <Plus className="h-4 w-4" />
                             </button>
                         </div>

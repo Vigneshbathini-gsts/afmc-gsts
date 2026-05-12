@@ -45,6 +45,223 @@ async function getReservedQuantitiesExcludingOrder(connection, itemCodes, orderN
   }, new Map());
 }
 
+async function getIngredientStockQuantities(connection, ingredientCodes) {
+  const normalizedCodes = [...new Set((Array.isArray(ingredientCodes) ? ingredientCodes : [])
+    .map((code) => Number(code))
+    .filter((code) => Number.isFinite(code) && code > 0))];
+
+  if (normalizedCodes.length === 0) return {};
+
+  const placeholders = normalizedCodes.map(() => "?").join(",");
+  const [rows] = await connection.execute(
+    `
+      SELECT item_code, IFNULL(stock_quantity, 0) AS stock_quantity
+      FROM xxafmc_inventory
+      WHERE item_code IN (${placeholders})
+    `,
+    normalizedCodes
+  );
+
+  return rows.reduce((acc, row) => {
+    acc[String(row.item_code)] = Number(row.stock_quantity || 0);
+    return acc;
+  }, {});
+}
+
+async function getIngredientReservedQuantities(connection, ingredientCodes) {
+  const normalizedCodes = [...new Set((Array.isArray(ingredientCodes) ? ingredientCodes : [])
+    .map((code) => Number(code))
+    .filter((code) => Number.isFinite(code) && code > 0))];
+
+  if (normalizedCodes.length === 0) return {};
+
+  const placeholders = normalizedCodes.map(() => "?").join(",");
+  const [rows] = await connection.execute(
+    `
+      SELECT xod.item_id AS item_code, IFNULL(SUM(xod.quantity), 0) AS reserved_quantity
+      FROM xxafmc_order_details xod
+      LEFT JOIN xxafmc_order_header xoh ON xod.order_id = xoh.order_num
+      LEFT JOIN xxafmc_invoices xi ON xi.order_num = xod.order_id
+      WHERE xod.item_id IN (${placeholders})
+        AND xod.order_status IS NULL
+        AND xod.price IS NULL
+        AND xi.order_num IS NULL
+      GROUP BY xod.item_id
+    `,
+    normalizedCodes
+  );
+
+  return rows.reduce((acc, row) => {
+    acc[String(row.item_code)] = Number(row.reserved_quantity || 0);
+    return acc;
+  }, {});
+}
+
+async function getCocktailStockStatusMap(connection, orderNumber, cocktailItemIds, parentQuantityMap = new Map()) {
+  const normalizedOrderNumber = Number(orderNumber);
+  const normalizedItems = [...new Set((Array.isArray(cocktailItemIds) ? cocktailItemIds : [])
+    .map((code) => Number(code))
+    .filter((code) => Number.isFinite(code) && code > 0))];
+
+  if (!Number.isFinite(normalizedOrderNumber) || normalizedOrderNumber <= 0 || normalizedItems.length === 0) {
+    return new Map();
+  }
+
+  const placeholders = normalizedItems.map(() => "?").join(",");
+  const [rows] = await connection.execute(
+    `
+      SELECT
+        x.inventory_item_code AS parent_item_id,
+        x.item_code AS ingredient_item_code,
+        x.item_name AS ingredient_name,
+        x.pegs AS ingredient_pegs,
+        x.quantity AS parent_quantity
+      FROM (
+        SELECT inventory_item_code, item_code, item_name, pegs, quantity
+        FROM xxafmc_custom_cocktails_mocktails_details
+        WHERE order_number = ?
+        UNION ALL
+        SELECT inventory_item_code, item_code, item_name, pegs, quantity
+        FROM xxafmc_custom_cocktails_mocktails_details_dummy
+        WHERE order_number = ?
+      ) x
+      WHERE x.inventory_item_code IN (${placeholders})
+    `,
+    [normalizedOrderNumber, normalizedOrderNumber, ...normalizedItems]
+  );
+
+  const byParent = rows.reduce((acc, row) => {
+    const parentId = Number(row.parent_item_id);
+    if (!Number.isFinite(parentId) || parentId <= 0) return acc;
+    if (!acc.has(parentId)) acc.set(parentId, []);
+    acc.get(parentId).push({
+      itemCode: Number(row.ingredient_item_code),
+      itemName: String(row.ingredient_name || "").trim(),
+      pegs: Number(row.ingredient_pegs || 0),
+      parentQuantity: Number(row.parent_quantity || 0),
+    });
+    return acc;
+  }, new Map());
+
+  const ingredientCodes = [...new Set(rows
+    .map((row) => Number(row.ingredient_item_code))
+    .filter((code) => Number.isFinite(code) && code > 0))];
+
+  const stockMap = await getIngredientStockQuantities(connection, ingredientCodes);
+  const reservedMap = await getIngredientReservedQuantities(connection, ingredientCodes);
+
+  const statusMap = new Map();
+
+  for (const parentId of normalizedItems) {
+    const ingredients = byParent.get(parentId) || [];
+    if (ingredients.length === 0) continue;
+
+    let failing = null;
+    for (const ingredient of ingredients) {
+      const stockQuantity = Number(stockMap[String(ingredient.itemCode)] || 0);
+      const reservedQuantity = Number(reservedMap[String(ingredient.itemCode)] || 0);
+      const availableQuantity = Math.max(0, stockQuantity - reservedQuantity);
+      const requiredQuantity = Number(ingredient.pegs || 0) * Number(ingredient.parentQuantity || 0);
+
+      if (requiredQuantity > availableQuantity) {
+        failing = {
+          itemName: ingredient.itemName || String(ingredient.itemCode),
+          availableQuantity,
+        };
+        break;
+      }
+    }
+
+    if (failing) {
+      statusMap.set(parentId, {
+        status: "Out Of Stock",
+        message: `Out of stock for ingredient ${failing.itemName}. Available quantity: ${failing.availableQuantity}`,
+      });
+    } else {
+      statusMap.set(parentId, { status: "In Stock", message: null });
+    }
+  }
+
+  // Fallback to legacy ingredient mapping when customization rows don't exist yet
+  // (mirrors cart validation behavior).
+  const missingParentIds = normalizedItems.filter((parentId) => !statusMap.has(parentId));
+  if (missingParentIds.length > 0) {
+    const missingPlaceholders = missingParentIds.map(() => "?").join(",");
+    const [legacyRows] = await connection.execute(
+      `
+        SELECT
+          inventory_item_code AS parent_item_id,
+          item_code AS ingredient_item_code,
+          item_name AS ingredient_name,
+          pegs AS ingredient_pegs
+        FROM xxafmc_cocktails_mocktails_details
+        WHERE inventory_item_code IN (${missingPlaceholders})
+      `,
+      missingParentIds
+    );
+
+    const legacyByParent = legacyRows.reduce((acc, row) => {
+      const parentId = Number(row.parent_item_id);
+      if (!Number.isFinite(parentId) || parentId <= 0) return acc;
+      if (!acc.has(parentId)) acc.set(parentId, []);
+      acc.get(parentId).push({
+        itemCode: Number(row.ingredient_item_code),
+        itemName: String(row.ingredient_name || "").trim(),
+        pegs: Number(row.ingredient_pegs || 0),
+      });
+      return acc;
+    }, new Map());
+
+    const legacyIngredientCodes = [...new Set(legacyRows
+      .map((row) => Number(row.ingredient_item_code))
+      .filter((code) => Number.isFinite(code) && code > 0))];
+
+    const legacyStockMap = await getIngredientStockQuantities(connection, legacyIngredientCodes);
+    const legacyReservedMap = await getIngredientReservedQuantities(connection, legacyIngredientCodes);
+
+    for (const parentId of missingParentIds) {
+      const ingredients = legacyByParent.get(parentId) || [];
+      if (ingredients.length === 0) {
+        statusMap.set(parentId, { status: "Unknown", message: null });
+        continue;
+      }
+
+      const parentQuantity = Number(parentQuantityMap.get(parentId) || 0);
+      if (!Number.isFinite(parentQuantity) || parentQuantity <= 0) {
+        statusMap.set(parentId, { status: "Unknown", message: null });
+        continue;
+      }
+
+      let failing = null;
+      for (const ingredient of ingredients) {
+        const stockQuantity = Number(legacyStockMap[String(ingredient.itemCode)] || 0);
+        const reservedQuantity = Number(legacyReservedMap[String(ingredient.itemCode)] || 0);
+        const availableQuantity = Math.max(0, stockQuantity - reservedQuantity);
+        const requiredQuantity = Number(ingredient.pegs || 0) * parentQuantity;
+
+        if (requiredQuantity > availableQuantity) {
+          failing = {
+            itemName: ingredient.itemName || String(ingredient.itemCode),
+            availableQuantity,
+          };
+          break;
+        }
+      }
+
+      if (failing) {
+        statusMap.set(parentId, {
+          status: "Out Of Stock",
+          message: `Out of stock for ingredient ${failing.itemName}. Available quantity: ${failing.availableQuantity}`,
+        });
+      } else {
+        statusMap.set(parentId, { status: "In Stock", message: null });
+      }
+    }
+  }
+
+  return statusMap;
+}
+
 async function getOrderSummary(orderNumber) {
   const normalizedOrderNumber = Number(orderNumber);
   if (!Number.isFinite(normalizedOrderNumber) || normalizedOrderNumber <= 0) {
@@ -115,6 +332,7 @@ async function getOrderSummary(orderNumber) {
         xxod.QUANTITY AS quantity,
         xxod.PRICE AS price,
         xxod.BARCODE AS barcode,
+        XXINV.SUB_CATEGORY AS subcategory,
         CONCAT(
           'Name: ', XXINV.ITEM_NAME,
           ' Quantity: ', xxod.QUANTITY
@@ -123,15 +341,18 @@ async function getOrderSummary(orderNumber) {
         XXINV.IMAGE AS image,
         LENGTH(XXINV.IMAGE) AS card_title,
         XXINV.ITEM_CODE AS item_code,
-        COALESCE(
-          NULLIF(XXINV.STOCK_QUANTITY, 0),
-          (
-            SELECT IFNULL(SUM(stock_quantity), 0)
-            FROM xxafmc_stock_out so
-            WHERE so.item_code = XXINV.ITEM_CODE
-          ),
-          0
-        ) AS stock_quantity,
+        CASE
+          WHEN XXINV.SUB_CATEGORY IN (14, 15) THEN NULL
+          ELSE COALESCE(
+            NULLIF(XXINV.STOCK_QUANTITY, 0),
+            (
+              SELECT IFNULL(SUM(stock_quantity), 0)
+              FROM xxafmc_stock_out so
+              WHERE so.item_code = XXINV.ITEM_CODE
+            ),
+            0
+          )
+        END AS stock_quantity,
         '#' AS card_link,
         CASE
           WHEN xxod.PRICE = 0 THEN NULL
@@ -149,6 +370,27 @@ async function getOrderSummary(orderNumber) {
     .map((row) => Number(row.item_code))
     .filter((code) => Number.isFinite(code) && code > 0);
   const reservedMap = await getReservedQuantitiesExcludingOrder(db, itemCodes, normalizedOrderNumber);
+
+  const cocktailParents = itemRows
+    .filter((row) => [14, 15].includes(Number(row.subcategory)))
+    .map((row) => ({
+      itemId: Number(row.item_id),
+      quantity: Number(row.quantity || 0),
+    }))
+    .filter((row) => Number.isFinite(row.itemId) && row.itemId > 0);
+
+  const cocktailItemIds = cocktailParents.map((row) => row.itemId);
+  const cocktailParentQuantityMap = cocktailParents.reduce((map, row) => {
+    map.set(row.itemId, row.quantity);
+    return map;
+  }, new Map());
+
+  const cocktailStatusMap = await getCocktailStockStatusMap(
+    db,
+    normalizedOrderNumber,
+    cocktailItemIds,
+    cocktailParentQuantityMap
+  );
 
   // Get offer details for items
   const [offerRows] = await db.execute(
@@ -178,14 +420,30 @@ async function getOrderSummary(orderNumber) {
   });
 
   const enrichedItems = itemRows.map((row) => {
-    const stockQuantity = Number(row.stock_quantity || 0);
+    const subcategory = Number(row.subcategory || 0);
+    const isCocktailItem = [14, 15].includes(subcategory);
+
     const reservedQuantity = Number(reservedMap.get(String(row.item_code)) || 0);
-    const availableQuantity = Math.max(0, stockQuantity - reservedQuantity);
+    const stockQuantity = row.stock_quantity == null ? null : Number(row.stock_quantity || 0);
+    const availableQuantity = stockQuantity == null ? null : Math.max(0, stockQuantity - reservedQuantity);
+
+    const stockStatus = isCocktailItem
+      ? (cocktailStatusMap.get(Number(row.item_id))?.status || "Unknown")
+      : availableQuantity === 0
+        ? "Out Of Stock"
+        : "In Stock";
+
+    const stockIssueMessage = isCocktailItem
+      ? (cocktailStatusMap.get(Number(row.item_id))?.message || null)
+      : null;
+
     const offer = offerMap.get(Number(row.item_code));
     return {
       ...row,
       RESERVED_QUANTITY: reservedQuantity,
       AVAILABLE_QUANTITY: availableQuantity,
+      stock_status: stockStatus,
+      stock_issue_message: stockIssueMessage,
       offer_quantity: offer?.offer_quantity || null,
       free_item_quantity: offer?.free_item_quantity || null,
       free_item_code: offer?.free_item_code || null,
