@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useLocation, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import ConfirmOrderservice from "../../services/ConfirmOrderservice";
 
 function statusColor(status = "") {
@@ -12,11 +12,13 @@ function statusColor(status = "") {
 
 export default function InvoicePage() {
   const location = useLocation();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const orderNumber = searchParams.get("orderNumber") || location.state?.orderNumber || "";
   const [loading, setLoading] = useState(Boolean(orderNumber));
   const [error, setError] = useState("");
   const [data, setData] = useState(null);
+  const basePath = location.pathname.startsWith("/attendant") ? "/attendant" : "/user";
 
   useEffect(() => {
     let ignore = false;
@@ -123,6 +125,23 @@ export default function InvoicePage() {
                 <div>
                   <span className="font-semibold">Total Qty:</span> {totalQty}
                 </div>
+              </div>
+
+              <div className="mt-4 flex flex-wrap justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => navigate(`${basePath}/menudash`, { replace: true })}
+                  className="rounded-full bg-red-700 px-5 py-2 text-sm font-semibold text-white transition hover:bg-red-800"
+                >
+                  Back to Menu
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate(`${basePath}/active-orders`)}
+                  className="rounded-full border border-stone-300 bg-white px-5 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-50"
+                >
+                  View Orders
+                </button>
               </div>
             </div>
           )}

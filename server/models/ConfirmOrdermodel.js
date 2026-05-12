@@ -64,12 +64,22 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
         SELECT
           od.item_id,
           od.quantity,
+          od.price,
+          od.subtotal,
           od.barcode,
           od.type_id,
           xi.item_name,
           xi.description,
           c.category_name,
-          IFNULL(xi.stock_quantity, 0) AS stock_quantity
+          COALESCE(
+            NULLIF(xi.stock_quantity, 0),
+            (
+              SELECT IFNULL(SUM(stock_quantity), 0)
+              FROM xxafmc_stock_out so
+              WHERE so.item_code = xi.item_code
+            ),
+            0
+          ) AS stock_quantity
         FROM xxafmc_order_details od
         JOIN xxafmc_inventory xi
           ON od.item_id = xi.item_code
@@ -131,8 +141,11 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
         const stockQuantity = Number(outOfStockItem.stock_quantity || 0);
         const reservedQuantity = Number(reservedMap[String(outOfStockItem.item_id)] || 0);
         const availableQuantity = Math.max(0, stockQuantity - reservedQuantity);
+        const isFreeItem = Number(outOfStockItem.price || 0) === 0 && Number(outOfStockItem.subtotal || 0) === 0;
         const error = new Error(
-          `Out of stock for ${outOfStockItem.item_name || outOfStockItem.item_id}. Available quantity: ${availableQuantity}`
+          isFreeItem
+            ? `Out of stock for free item. Available quantity: ${availableQuantity}`
+            : `Out of stock for ${outOfStockItem.item_name || outOfStockItem.item_id}. Available quantity: ${availableQuantity}`
         );
         error.statusCode = 400;
         throw error;
