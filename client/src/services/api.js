@@ -361,6 +361,10 @@ export const invoiceAPI = {
   savePayment: (orderNumber, data) => api.post(`/invoice/${orderNumber}/payment`, data),
 };
 
+export const invoiceReportAPI = {
+  getByOrderNumber: (orderNumber) => api.get(`/invoice-report/${orderNumber}`),
+};
+
 export const cancelledOrdersAPI = {
   getCancelledOrders: (params) => api.get("/cancelled-orders", { params }),
 };

@@ -187,12 +187,12 @@ export default function InvoicePage() {
 
               <span className="hidden text-stone-300 md:block">|</span>
 
-              <span className="text-stone-500">
+              {/* <span className="text-stone-500">
                 Amount :
                 <span className="ml-1 font-semibold text-stone-900">
                   {formatMoney(computedAmount)}
                 </span>
-              </span>
+              </span> */}
             </div>
           </div>
         </div>

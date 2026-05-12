@@ -1,6 +1,7 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { ChevronsLeft, CheckCircle2 } from "lucide-react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import InvoiceReportservice from "../../services/InvoiceReportservice";
 
 function formatDate(value) {
   const date = value ? new Date(value) : new Date();
@@ -19,18 +20,63 @@ export default function InvoiceReport() {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
+  const [loading, setLoading] = useState(Boolean(searchParams.get("orderNumber") || location.state?.orderNumber));
+  const [error, setError] = useState("");
+  const [reportData, setReportData] = useState(location.state?.invoiceData || null);
   const currentBasePath = location.pathname.startsWith("/attendant")
     ? "/attendant"
     : "/user";
-
   const orderNumber = searchParams.get("orderNumber") || location.state?.orderNumber || "";
-  const amount = Number(searchParams.get("amount") || location.state?.amount || 0);
-  const invoiceData = location.state?.invoiceData || null;
-  const items = Array.isArray(invoiceData?.items) ? invoiceData.items : [];
+  const amountFromQuery = Number(searchParams.get("amount") || location.state?.amount || 0);
+  const items = Array.isArray(reportData?.items) ? reportData.items : [];
   const totalQuantity = useMemo(
     () => items.reduce((sum, item) => sum + Number(item.quantity || 0), 0),
     [items]
   );
+  const resolvedAmount = Number(
+    reportData?.summary?.total_amount ||
+      reportData?.header?.invoice_amount ||
+      reportData?.header?.order_total ||
+      amountFromQuery ||
+      0
+  );
+
+  useEffect(() => {
+    let ignore = false;
+
+    const fetchInvoiceReport = async () => {
+      if (!orderNumber) {
+        setLoading(false);
+        setError("Order number is missing.");
+        return;
+      }
+
+      try {
+        setLoading(true);
+        setError("");
+        const response = await InvoiceReportservice.getByOrderNumber(orderNumber);
+        if (!ignore) {
+          setReportData(response?.data?.data || null);
+        }
+      } catch (fetchError) {
+        if (!ignore) {
+          setError(
+            fetchError.response?.data?.message || "Unable to load invoice report."
+          );
+        }
+      } finally {
+        if (!ignore) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchInvoiceReport();
+
+    return () => {
+      ignore = true;
+    };
+  }, [orderNumber]);
 
   return (
     <div className="min-h-screen bg-[#f5f1ec] px-4 py-5 md:px-8">
@@ -76,7 +122,7 @@ export default function InvoiceReport() {
               <div className="flex justify-between text-sm text-stone-600">
                 <span>Invoice ID :</span>
                 <span className="font-semibold text-stone-900">
-                  {invoiceData?.invoice?.invoice_id || "-"}
+                  {reportData?.header?.invoice_id || "-"}
                 </span>
               </div>
 
@@ -88,14 +134,14 @@ export default function InvoiceReport() {
               <div className="flex justify-between text-sm text-stone-600">
                 <span>Invoice Date :</span>
                 <span className="font-semibold text-stone-900">
-                  {formatDate(invoiceData?.invoice?.invoice_date || invoiceData?.header?.order_date)}
+                  {formatDate(reportData?.header?.invoice_date || reportData?.header?.order_date)}
                 </span>
               </div>
 
               <div className="flex justify-between text-sm text-stone-600">
                 <span>Amount :</span>
                 <span className="font-semibold text-stone-900">
-                  {formatMoney(amount)}
+                  {formatMoney(resolvedAmount)}
                 </span>
               </div>
             </div>
@@ -120,20 +166,48 @@ export default function InvoiceReport() {
                 </thead>
 
                 <tbody className="divide-y divide-stone-200 bg-white">
-                  {items.map((item, index) => (
-                    <tr key={`${item.item_id}-${index}`}>
-                      <td className="px-5 py-4 text-sm text-stone-800">{item.item_name}</td>
-                      <td className="px-5 py-4 text-sm text-stone-700">{item.quantity}</td>
-                      <td className="px-5 py-4 text-sm text-stone-900">{formatMoney(item.price)}</td>
-                      <td className="px-5 py-4 text-sm text-stone-900">{formatMoney(item.total)}</td>
+                  {loading ? (
+                    <tr>
+                      <td
+                        colSpan={4}
+                        className="px-5 py-8 text-center text-sm text-stone-500"
+                      >
+                        Loading invoice report...
+                      </td>
                     </tr>
-                  ))}
-                  <tr className="bg-[#fffdf9]">
-                    <td className="px-5 py-4 text-sm text-stone-800" />
-                    <td className="px-5 py-4 text-sm text-stone-700">{totalQuantity}</td>
-                    <td className="px-5 py-4 text-sm font-semibold text-[#d11616]">Total</td>
-                    <td className="px-5 py-4 text-sm font-semibold text-[#d11616]">{formatMoney(amount)}</td>
-                  </tr>
+                  ) : error ? (
+                    <tr>
+                      <td
+                        colSpan={4}
+                        className="px-5 py-8 text-center text-sm text-red-600"
+                      >
+                        {error}
+                      </td>
+                    </tr>
+                  ) : (
+                    <>
+                      {items.map((item, index) => (
+                        <tr key={`${item.item_id}-${index}`}>
+                          <td className="px-5 py-4 text-sm text-stone-800">{item.item_name}</td>
+                          <td className="px-5 py-4 text-sm text-stone-700">{item.quantity}</td>
+                          <td className="px-5 py-4 text-sm text-stone-900">{formatMoney(item.price)}</td>
+                          <td className="px-5 py-4 text-sm text-stone-900">{formatMoney(item.subtotal)}</td>
+                        </tr>
+                      ))}
+                      <tr className="bg-[#fffdf9]">
+                        <td className="px-5 py-4 text-sm text-stone-800" />
+                        <td className="px-5 py-4 text-sm text-stone-700">
+                          {reportData?.summary?.total_quantity ?? totalQuantity}
+                        </td>
+                        <td className="px-5 py-4 text-sm font-semibold text-[#d11616]">
+                          {reportData?.summary?.total_label || "Total"}
+                        </td>
+                        <td className="px-5 py-4 text-sm font-semibold text-[#d11616]">
+                          {formatMoney(resolvedAmount)}
+                        </td>
+                      </tr>
+                    </>
+                  )}
                 </tbody>
               </table>
             </div>
