@@ -96,7 +96,7 @@ export default function CartPage({ isAttendant = false }) {
             const response = await cartAPI.getByUserId(userId);
             const items = response.data.data || [];
             setCartItems(items);
-            setCartCount(newItems.length);
+            setCartCount(items.length);
         } catch (err) {
             setError(err?.response?.data?.message || "Unable to load cart items");
             showToast("Failed to load cart items", 'error');

@@ -51,13 +51,14 @@ const updateInvoicePayment = async ({
   paymentMode,
   paymentReference,
   paymentStatus,
+  createdBy = "SYSTEM",
 }) => {
   const connection = await db.getConnection();
 
   try {
     await connection.beginTransaction();
 
-    await connection.execute(
+    const [updateResult] = await connection.execute(
       `
       UPDATE xxafmc_invoices
       SET payment_method = ?,
@@ -72,6 +73,56 @@ const updateInvoicePayment = async ({
         orderNumber,
       ]
     );
+
+    if (updateResult.affectedRows === 0) {
+      const [orderRows] = await connection.execute(
+        `
+        SELECT
+          order_num,
+          order_total,
+          COALESCE(
+            STR_TO_DATE(order_date, '%m/%d/%Y'),
+            DATE(order_date),
+            CURDATE()
+          ) AS invoice_date
+        FROM xxafmc_order_header
+        WHERE order_num = ?
+        LIMIT 1
+        `,
+        [orderNumber]
+      );
+
+      if (!orderRows.length) {
+        const error = new Error("Order not found for invoice creation");
+        error.statusCode = 404;
+        throw error;
+      }
+
+      await connection.execute(
+        `
+        INSERT INTO xxafmc_invoices (
+          order_num,
+          payment_method,
+          payment_reference,
+          payment_status,
+          invoice_date,
+          amount,
+          creation_by,
+          creation_date
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
+        `,
+        [
+          orderNumber,
+          paymentMode,
+          paymentReference,
+          paymentStatus,
+          orderRows[0].invoice_date,
+          orderRows[0].order_total || 0,
+          createdBy,
+        ]
+      );
+    }
 
     await connection.execute(
       `

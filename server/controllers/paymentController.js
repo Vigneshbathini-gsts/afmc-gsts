@@ -22,7 +22,10 @@ const getPaymentModes = async (req, res) => {
 
 const updatePayment = async (req, res) => {
   try {
-    const paymentData = req.body;
+    const paymentData = {
+      ...req.body,
+      createdBy: req.user?.username || req.user?.userName || "SYSTEM",
+    };
 
     const response = await paymentService.processPayment(paymentData);
 

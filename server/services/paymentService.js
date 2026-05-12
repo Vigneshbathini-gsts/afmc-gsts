@@ -18,6 +18,7 @@ const processPayment = async ({
   orderNumber,
   paymentMode,
   paymentReference,
+  createdBy,
 }) => {
   const paymentStatus =
     paymentMode === "CREDIT"
@@ -29,6 +30,7 @@ const processPayment = async ({
     paymentMode,
     paymentReference,
     paymentStatus,
+    createdBy,
   });
 
   return {
