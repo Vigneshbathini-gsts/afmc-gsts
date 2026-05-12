@@ -55,8 +55,11 @@ export default function ConfirmOrderpage() {
     };
 
     fetchConfirmedOrder();
+    const intervalId = window.setInterval(fetchConfirmedOrder, 10000);
+
     return () => {
       ignore = true;
+      window.clearInterval(intervalId);
     };
   }, [orderNumber]);
 
