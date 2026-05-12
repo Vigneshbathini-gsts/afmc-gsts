@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { CheckCircle2, ChevronLeft, Minus, Plus, ShoppingCart, Trash2, XCircle } from "lucide-react";
 import Pubmenubuyservice from "../../services/Pubmenubuyservice";
 import ConfirmOrderservice from "../../services/ConfirmOrderservice";
+import { getMaxAllowedQuantity, isCocktailOrMocktail, isOutOfStock, validateNextQuantity } from "../../utils/stockValidation";
 
 const BASEAPI = "https://afmc.globalsparkteksolutions.com/AFMCIMAGES/";
 
@@ -115,6 +116,16 @@ function normalizeItem(item, fallbackIndex = 0) {
       ? null
       : Number(rawSubcategory);
 
+  // Some order-details payloads may send `available_quantity: 0` for cocktails/mocktails while
+  // ingredient-based availability is still being computed server-side. Treat that as "unknown"
+  // unless an explicit out-of-stock status/message is present, to avoid showing false OOS.
+  const isCocktail = [14, 15].includes(Number(subcategory));
+  const normalizedStockStatus = String(stockStatus || "").trim().toLowerCase();
+  const hasExplicitStockIssue =
+    String(stockIssueMessage || "").trim().length > 0 || normalizedStockStatus === "out of stock";
+  const normalizedAvailableQuantity =
+    isCocktail && Number(availableQuantity) === 0 && !hasExplicitStockIssue ? null : availableQuantity;
+
   const rawOrderLineId = item.order_line_id ?? item.ORDER_LINE_ID ?? item.orderLineId ?? item.id ?? 0;
   const orderLineId = Number(rawOrderLineId) || 0;
   const fallbackId = orderLineId > 0
@@ -131,7 +142,7 @@ function normalizeItem(item, fallbackIndex = 0) {
     subtotal,
     image: item.image || item.IMAGE || "",
     card_text: item.card_text || item.CARD_TEXT || "",
-    availableQuantity: Number.isFinite(availableQuantity) ? availableQuantity : null,
+    availableQuantity: Number.isFinite(normalizedAvailableQuantity) ? normalizedAvailableQuantity : null,
     parentCode,
     isFreeItem,
     offer_quantity: Number.isFinite(offer_quantity) ? offer_quantity : null,
@@ -189,14 +200,17 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
     ? "/attendant"
     : "/user";
   const MAX_QTY = 99;
-  const isCocktailOrMocktail = (item) => [14, 15].includes(Number(item?.subcategory));
   const stockIssue = useMemo(() => {
     return items.find(
       (item) =>
-        !isCocktailOrMocktail(item) &&
-        item.availableQuantity !== null &&
-        item.availableQuantity !== undefined &&
-        Number(item.quantity || 0) > Number(item.availableQuantity || 0)
+        (() => {
+          const maxAllowed = getMaxAllowedQuantity(item);
+          return (
+            maxAllowed !== null &&
+            maxAllowed !== undefined &&
+            Number(item.quantity || 0) > Number(maxAllowed || 0)
+          );
+        })()
     ) || null;
   }, [items]);
 
@@ -204,8 +218,7 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
     return (
       items.find(
         (item) =>
-          isCocktailOrMocktail(item) &&
-          String(item.stockStatus || "").toLowerCase() === "out of stock"
+          isCocktailOrMocktail(item) && isOutOfStock(item)
       ) || null
     );
   }, [items]);
@@ -218,7 +231,7 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
         "Out of stock for cocktail/mocktail ingredients. Please reduce quantity or update selection."
       );
     }
-    const available = Number(stockIssue.availableQuantity || 0);
+    const available = Number(getMaxAllowedQuantity(stockIssue) ?? stockIssue.availableQuantity ?? 0);
     return stockIssue.isFreeItem
       ? `Out of stock for free item. Available quantity: ${available}`
       : `Out of stock. Available quantity: ${available}`;
@@ -384,13 +397,18 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
       }
 
       const availableQty = targetItem.availableQuantity;
-      if (
-        !isCocktailOrMocktail(targetItem) &&
-        availableQty !== null &&
-        availableQty !== undefined &&
-        nextQtyCandidate > Number(availableQty)
-      ) {
-        validationMessage = `Out of stock. Available quantity: ${availableQty}`;
+      if (delta > 0 && String(targetItem.stockIssueMessage || "").trim().length > 0) {
+        validationMessage = String(targetItem.stockIssueMessage || "").trim();
+        return current;
+      }
+
+      const stockValidation = validateNextQuantity(targetItem, nextQtyCandidate);
+      if (!stockValidation.ok) {
+        validationMessage =
+          stockValidation.message ||
+          (availableQty !== null && availableQty !== undefined
+            ? `Out of stock. Available quantity: ${availableQty}`
+            : "Out of stock.");
         return current;
       }
 
@@ -733,14 +751,14 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
           <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
             {error}
           </div>
-        ) : stockIssue ? (
-          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {stockIssueMessage || "Out of stock. Reduce quantity to proceed."}
-          </div>
-        ) : items.length === 0 ? (
-          <div className="py-16 text-center text-sm text-stone-500">
-            No items found for this order.
-          </div>
+         ) : stockIssueMessage ? (
+           <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+             {stockIssueMessage}
+           </div>
+         ) : items.length === 0 ? (
+           <div className="py-16 text-center text-sm text-stone-500">
+             No items found for this order.
+           </div>
         ) : (
           <div className="space-y-4">
             {/* Products */}
@@ -821,22 +839,43 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
                                aria-disabled={
                                  updatingLineId === Number(item.orderLineId ?? item.id) ||
                                  String(item.stockIssueMessage || "").trim().length > 0 ||
-                                 (isCocktailOrMocktail(item) &&
-                                   String(item.stockStatus || "").toLowerCase() === "out of stock") ||
+                                 isOutOfStock(item) ||
+                                 (() => {
+                                   const maxAllowed = getMaxAllowedQuantity(item);
+                                   return (
+                                     Number.isFinite(Number(maxAllowed)) &&
+                                     Number(maxAllowed) >= 0 &&
+                                     Number(item.quantity || 0) >= Number(maxAllowed)
+                                   );
+                                 })() ||
                                  item.quantity >= MAX_QTY
                                }
                                disabled={
                                  updatingLineId === Number(item.orderLineId ?? item.id) ||
                                  String(item.stockIssueMessage || "").trim().length > 0 ||
-                                 (isCocktailOrMocktail(item) &&
-                                   String(item.stockStatus || "").toLowerCase() === "out of stock") ||
+                                 isOutOfStock(item) ||
+                                 (() => {
+                                   const maxAllowed = getMaxAllowedQuantity(item);
+                                   return (
+                                     Number.isFinite(Number(maxAllowed)) &&
+                                     Number(maxAllowed) >= 0 &&
+                                     Number(item.quantity || 0) >= Number(maxAllowed)
+                                   );
+                                 })() ||
                                  item.quantity >= MAX_QTY
                                }
                                 className={`rounded-md bg-afmc-maroon p-1.5 text-white transition hover:bg-afmc-maroon2 ${
                                   updatingLineId === Number(item.orderLineId ?? item.id) ||
                                  String(item.stockIssueMessage || "").trim().length > 0 ||
-                                 (isCocktailOrMocktail(item) &&
-                                   String(item.stockStatus || "").toLowerCase() === "out of stock") ||
+                                 isOutOfStock(item) ||
+                                 (() => {
+                                   const maxAllowed = getMaxAllowedQuantity(item);
+                                   return (
+                                     Number.isFinite(Number(maxAllowed)) &&
+                                     Number(maxAllowed) >= 0 &&
+                                     Number(item.quantity || 0) >= Number(maxAllowed)
+                                   );
+                                 })() ||
                                   item.quantity >= MAX_QTY
                                     ? "opacity-60"
                                     : ""

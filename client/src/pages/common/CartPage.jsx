@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { cartAPI } from "../../services/api";
 import { Trash2, Minus, Plus, X, Pencil } from "lucide-react";
+import { getMaxAllowedQuantity, isOutOfStock } from "../../utils/stockValidation";
 
 const BASEAPI = "https://afmc.globalsparkteksolutions.com/AFMCIMAGES/";
 
@@ -358,10 +359,15 @@ export default function CartPage({ isAttendant = false }) {
                                         className="rounded-full bg-white px-2 text-xs font-semibold text-gray-700 shadow-sm hover:bg-gray-100 disabled:opacity-50"
                                         disabled={
                                             updatingItemId === item.cartId ||
-                                            item.stockStatus === "Out Of Stock" ||
-                                            (Number.isFinite(Number(item.stockQuantity)) &&
-                                                Number(item.stockQuantity) > 0 &&
-                                                Number(item.quantity || 0) >= Number(item.stockQuantity))
+                                            isOutOfStock(item) ||
+                                            (() => {
+                                                const maxAllowed = getMaxAllowedQuantity(item);
+                                                return (
+                                                    Number.isFinite(Number(maxAllowed)) &&
+                                                    Number(maxAllowed) > 0 &&
+                                                    Number(item.quantity || 0) >= Number(maxAllowed)
+                                                );
+                                            })()
                                         }
                                     >
                                         <Plus size={12} />

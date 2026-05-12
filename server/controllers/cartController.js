@@ -922,6 +922,103 @@ exports.proceedToBuy = async (req, res) => {
       );
     }
 
+    // --------------------------------------------------------------------
+    // Persist cocktail/mocktail ingredient selections for this order
+    // so that the order-details screen validates using the same recipe
+    // as the cart (cart customization table).
+    // --------------------------------------------------------------------
+    const cocktailCartItems = cartRows
+      .filter((row) => [14, 15].includes(Number(row.subcategory)))
+      .map((row) => ({
+        cartId: Number(row.cart_id),
+        parentItemCode: Number(row.item_id),
+        parentQuantity: Number(row.quantity || 0),
+      }))
+      .filter((row) => Number.isFinite(row.cartId) && row.cartId > 0 && Number.isFinite(row.parentItemCode) && row.parentItemCode > 0);
+
+    if (cocktailCartItems.length > 0) {
+      const cartIds = [...new Set(cocktailCartItems.map((row) => row.cartId))];
+      const cartMetaById = cocktailCartItems.reduce((map, row) => {
+        map.set(row.cartId, row);
+        return map;
+      }, new Map());
+
+      const placeholders = cartIds.map(() => "?").join(",");
+      const [customizationRows] = await connection.execute(
+        `
+          SELECT cart_id, ingredient_item_code, ingredient_name, quantity
+          FROM xxafmc_cart_customization
+          WHERE cart_id IN (${placeholders})
+        `,
+        cartIds
+      );
+
+      if (customizationRows.length > 0) {
+        for (const row of customizationRows) {
+          const cartId = Number(row.cart_id);
+          const meta = cartMetaById.get(cartId);
+          if (!meta) continue;
+
+          const ingredientCode = Number(row.ingredient_item_code);
+          if (!Number.isFinite(ingredientCode) || ingredientCode <= 0) continue;
+
+          await connection.execute(
+            `
+              INSERT INTO xxafmc_custom_cocktails_mocktails_details
+                (item_code, item_name, pegs, inventory_item_code, user_id, quantity, order_number, creation_date)
+              VALUES
+                (?, ?, ?, ?, ?, ?, ?, NOW())
+            `,
+            [
+              ingredientCode,
+              String(row.ingredient_name || "").trim(),
+              Number(row.quantity || 0),
+              meta.parentItemCode,
+              userId,
+              meta.parentQuantity,
+              Number(orderNumber),
+            ]
+          );
+        }
+      } else {
+        // Fallback: if cart customization rows are missing for any reason,
+        // snapshot the base recipe as the order's ingredient list.
+        for (const meta of cocktailCartItems) {
+          const [detailRows] = await connection.execute(
+            `
+              SELECT item_code, item_name, pegs
+              FROM xxafmc_cocktails_mocktails_details
+              WHERE inventory_item_code = ?
+            `,
+            [meta.parentItemCode]
+          );
+
+          for (const detail of detailRows) {
+            const ingredientCode = Number(detail.item_code);
+            if (!Number.isFinite(ingredientCode) || ingredientCode <= 0) continue;
+
+            await connection.execute(
+              `
+                INSERT INTO xxafmc_custom_cocktails_mocktails_details
+                  (item_code, item_name, pegs, inventory_item_code, user_id, quantity, order_number, creation_date)
+                VALUES
+                  (?, ?, ?, ?, ?, ?, ?, NOW())
+              `,
+              [
+                ingredientCode,
+                String(detail.item_name || "").trim(),
+                Number(detail.pegs || 0),
+                meta.parentItemCode,
+                userId,
+                meta.parentQuantity,
+                Number(orderNumber),
+              ]
+            );
+          }
+        }
+      }
+    }
+
     await connection.commit();
 
     return res.status(201).json({
