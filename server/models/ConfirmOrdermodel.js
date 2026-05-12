@@ -68,7 +68,8 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
           od.type_id,
           xi.item_name,
           xi.description,
-          c.category_name
+          c.category_name,
+          IFNULL(xi.stock_quantity, 0) AS stock_quantity
         FROM xxafmc_order_details od
         JOIN xxafmc_inventory xi
           ON od.item_id = xi.item_code
@@ -93,6 +94,49 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
       );
       error.statusCode = 400;
       throw error;
+    }
+
+    const itemCodes = [...new Set(detailRows.map((row) => Number(row.item_id)).filter((code) => Number.isFinite(code) && code > 0))];
+    if (itemCodes.length > 0) {
+      const placeholders = itemCodes.map(() => "?").join(",");
+      const [reservedRows] = await connection.execute(
+        `
+          SELECT xod.item_id AS item_code, IFNULL(SUM(xod.quantity), 0) AS reserved
+          FROM xxafmc_order_details xod
+          LEFT JOIN xxafmc_order_header xoh ON xod.order_id = xoh.order_num
+          LEFT JOIN xxafmc_invoices xi ON xi.order_num = xod.order_id
+          WHERE xod.item_id IN (${placeholders})
+            AND xod.order_status IS NULL
+            AND xod.price IS NULL
+            AND xi.order_num IS NULL
+            AND xod.order_id != ?
+          GROUP BY xod.item_id
+        `,
+        [...itemCodes, normalizedOrderNumber]
+      );
+
+      const reservedMap = reservedRows.reduce((map, row) => {
+        map[String(row.item_code)] = Number(row.reserved || 0);
+        return map;
+      }, {});
+
+      const outOfStockItem = detailRows.find((row) => {
+        const stockQuantity = Number(row.stock_quantity || 0);
+        const reservedQuantity = Number(reservedMap[String(row.item_id)] || 0);
+        const availableQuantity = Math.max(0, stockQuantity - reservedQuantity);
+        return Number(row.quantity || 0) > availableQuantity;
+      });
+
+      if (outOfStockItem) {
+        const stockQuantity = Number(outOfStockItem.stock_quantity || 0);
+        const reservedQuantity = Number(reservedMap[String(outOfStockItem.item_id)] || 0);
+        const availableQuantity = Math.max(0, stockQuantity - reservedQuantity);
+        const error = new Error(
+          `Out of stock for ${outOfStockItem.item_name || outOfStockItem.item_id}. Available quantity: ${availableQuantity}`
+        );
+        error.statusCode = 400;
+        throw error;
+      }
     }
 
     let insertedCount = 0;

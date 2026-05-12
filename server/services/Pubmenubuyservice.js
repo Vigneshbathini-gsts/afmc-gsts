@@ -12,8 +12,13 @@ const cancelOrder = async (orderNumber) => {
   return Pubmenubuymodel.cancelOrder(orderNumber);
 };
 
+const updateOrderLineQuantity = async (orderNumber, orderLineId, userId, quantity) => {
+  return Pubmenubuymodel.updateOrderLineQuantity(orderNumber, orderLineId, userId, quantity);
+};
+
 module.exports = {
   createOrder,
   getOrderSummary,
   cancelOrder,
+  updateOrderLineQuantity,
 };

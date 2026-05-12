@@ -11,6 +11,40 @@ async function getNextOrderLineId(connection) {
   return Number(row?.nextId || 1);
 }
 
+async function getReservedQuantitiesExcludingOrder(connection, itemCodes, orderNumber) {
+  const normalizedCodes = [...new Set((Array.isArray(itemCodes) ? itemCodes : [])
+    .map((code) => Number(code))
+    .filter((code) => Number.isFinite(code) && code > 0))];
+
+  if (normalizedCodes.length === 0) return new Map();
+
+  const normalizedOrderNumber = Number(orderNumber);
+  const placeholders = normalizedCodes.map(() => "?").join(",");
+
+  const [rows] = await connection.execute(
+    `
+      SELECT
+        xod.item_id AS item_code,
+        IFNULL(SUM(xod.quantity), 0) AS reserved
+      FROM xxafmc_order_details xod
+      LEFT JOIN xxafmc_order_header xoh ON xod.order_id = xoh.order_num
+      LEFT JOIN xxafmc_invoices xi ON xi.order_num = xod.order_id
+      WHERE xod.item_id IN (${placeholders})
+        AND xod.order_status IS NULL
+        AND xod.price IS NULL
+        AND xi.order_num IS NULL
+        AND xod.order_id != ?
+      GROUP BY xod.item_id
+    `,
+    [...normalizedCodes, normalizedOrderNumber]
+  );
+
+  return rows.reduce((map, row) => {
+    map.set(String(row.item_code), Number(row.reserved || 0));
+    return map;
+  }, new Map());
+}
+
 async function getOrderSummary(orderNumber) {
   const normalizedOrderNumber = Number(orderNumber);
   if (!Number.isFinite(normalizedOrderNumber) || normalizedOrderNumber <= 0) {
@@ -76,20 +110,32 @@ async function getOrderSummary(orderNumber) {
   const [itemRows] = await db.execute(
     `
       SELECT
-        xxod.ITEM_ID,
+        xxod.ORDER_LINE_ID AS order_line_id,
+        xxod.ITEM_ID AS item_id,
+        xxod.QUANTITY AS quantity,
+        xxod.PRICE AS price,
         CONCAT(
           'Name: ', XXINV.ITEM_NAME,
           ' Quantity: ', xxod.QUANTITY
-        ) AS CARD_TEXT,
-        xxod.SUBTOTAL,
-        XXINV.IMAGE,
-        LENGTH(XXINV.IMAGE) AS CARD_TITLE,
-        XXINV.ITEM_CODE,
-        '#' AS CARD_LINK,
+        ) AS card_text,
+        xxod.SUBTOTAL AS subtotal,
+        XXINV.IMAGE AS image,
+        LENGTH(XXINV.IMAGE) AS card_title,
+        XXINV.ITEM_CODE AS item_code,
+        COALESCE(
+          NULLIF(XXINV.STOCK_QUANTITY, 0),
+          (
+            SELECT IFNULL(SUM(stock_quantity), 0)
+            FROM xxafmc_stock_out so
+            WHERE so.item_code = XXINV.ITEM_CODE
+          ),
+          0
+        ) AS stock_quantity,
+        '#' AS card_link,
         CASE
           WHEN xxod.PRICE = 0 THEN NULL
           ELSE NULL
-        END AS CARD_SUBTEXT
+        END AS card_subtext
       FROM xxafmc_order_details xxod
       JOIN xxafmc_inventory XXINV
         ON xxod.item_id = XXINV.item_code
@@ -98,6 +144,21 @@ async function getOrderSummary(orderNumber) {
     [normalizedOrderNumber]
   );
 
+  const itemCodes = itemRows
+    .map((row) => Number(row.item_code))
+    .filter((code) => Number.isFinite(code) && code > 0);
+  const reservedMap = await getReservedQuantitiesExcludingOrder(db, itemCodes, normalizedOrderNumber);
+  const enrichedItems = itemRows.map((row) => {
+    const stockQuantity = Number(row.stock_quantity || 0);
+    const reservedQuantity = Number(reservedMap.get(String(row.item_code)) || 0);
+    const availableQuantity = Math.max(0, stockQuantity - reservedQuantity);
+    return {
+      ...row,
+      RESERVED_QUANTITY: reservedQuantity,
+      AVAILABLE_QUANTITY: availableQuantity,
+    };
+  });
+
   return {
     header: {
       ...headerRows[0],
@@ -105,7 +166,7 @@ async function getOrderSummary(orderNumber) {
       order_total: Number(orderTotal.toFixed(2)),
       food_pr_charges: foodPrCharges,
     },
-    items: itemRows,
+    items: enrichedItems,
   };
 }
 
@@ -452,8 +513,138 @@ async function createOrder(payload = {}, authUser = {}) {
   }
 }
 
+async function updateOrderLineQuantity(orderNumber, orderLineId, userId, quantity) {
+  const normalizedOrderNumber = Number(orderNumber);
+  const normalizedOrderLineId = Number(orderLineId);
+  const normalizedUserId = Number(userId);
+  const normalizedQuantity = Number(quantity);
+
+  if (!Number.isFinite(normalizedOrderNumber) || normalizedOrderNumber <= 0) {
+    const error = new Error("Valid order number is required");
+    error.statusCode = 400;
+    throw error;
+  }
+  if (!Number.isFinite(normalizedOrderLineId) || normalizedOrderLineId <= 0) {
+    const error = new Error("Valid order line id is required");
+    error.statusCode = 400;
+    throw error;
+  }
+  if (!Number.isFinite(normalizedUserId) || normalizedUserId <= 0) {
+    const error = new Error("Valid user id is required");
+    error.statusCode = 400;
+    throw error;
+  }
+  if (!Number.isFinite(normalizedQuantity) || normalizedQuantity < 1) {
+    const error = new Error("Valid quantity is required");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const connection = await db.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    const [[headerRow]] = await connection.execute(
+      `SELECT order_num, user_id FROM xxafmc_order_header WHERE order_num = ? LIMIT 1`,
+      [normalizedOrderNumber]
+    );
+
+    if (!headerRow) {
+      const error = new Error("Order not found");
+      error.statusCode = 404;
+      throw error;
+    }
+
+    if (Number(headerRow.user_id) !== normalizedUserId) {
+      const error = new Error("You are not allowed to modify this order");
+      error.statusCode = 403;
+      throw error;
+    }
+
+    const [[detailRow]] = await connection.execute(
+      `
+        SELECT od.order_line_id, od.item_id, od.price, od.quantity, od.subtotal
+        FROM xxafmc_order_details od
+        WHERE od.order_id = ?
+          AND od.order_line_id = ?
+        LIMIT 1
+      `,
+      [normalizedOrderNumber, normalizedOrderLineId]
+    );
+
+    if (!detailRow) {
+      const error = new Error("Order item not found");
+      error.statusCode = 404;
+      throw error;
+    }
+
+    const itemId = Number(detailRow.item_id);
+    const storedPrice = detailRow.price;
+    const hasStoredPrice = storedPrice !== null && storedPrice !== undefined && storedPrice !== "";
+    const price = hasStoredPrice ? Number(storedPrice) : Number.NaN;
+    const currentQty = Number(detailRow.quantity || 0);
+    const currentSubtotal = Number(detailRow.subtotal || 0);
+    const unitPrice =
+      Number.isFinite(price) && price >= 0
+        ? price
+        : currentQty > 0
+          ? Number((currentSubtotal / currentQty).toFixed(2))
+          : 0;
+
+    const [[invRow]] = await connection.execute(
+      `
+        SELECT
+          COALESCE(
+            NULLIF(xi.stock_quantity, 0),
+            (
+              SELECT IFNULL(SUM(stock_quantity), 0)
+              FROM xxafmc_stock_out so
+              WHERE so.item_code = xi.item_code
+            ),
+            0
+          ) AS stock_quantity
+        FROM xxafmc_inventory xi
+        WHERE xi.item_code = ?
+        LIMIT 1
+      `,
+      [itemId]
+    );
+
+    const stockQuantity = Number(invRow?.stock_quantity || 0);
+    const reservedMap = await getReservedQuantitiesExcludingOrder(connection, [itemId], normalizedOrderNumber);
+    const reservedQuantity = Number(reservedMap.get(String(itemId)) || 0);
+    const availableQuantity = Math.max(0, stockQuantity - reservedQuantity);
+
+    if (normalizedQuantity > availableQuantity) {
+      const error = new Error(`Out of stock. Available quantity: ${availableQuantity}`);
+      error.statusCode = 400;
+      throw error;
+    }
+
+    await connection.execute(
+      `UPDATE xxafmc_order_details SET quantity = ?, subtotal = ? WHERE order_id = ? AND order_line_id = ?`,
+      [
+        normalizedQuantity,
+        Number((normalizedQuantity * unitPrice).toFixed(2)),
+        normalizedOrderNumber,
+        normalizedOrderLineId,
+      ]
+    );
+
+    await connection.commit();
+    return getOrderSummary(normalizedOrderNumber);
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
 module.exports = {
   createOrder,
   getOrderSummary,
   cancelOrder,
+  updateOrderLineQuantity,
 };

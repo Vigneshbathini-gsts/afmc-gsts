@@ -6,5 +6,10 @@ const PubmenubuyController = require("../controllers/PubmenubuyController");
 router.post("/Pubmenubuy/create", authMiddleware, PubmenubuyController.createPubMenuOrder);
 router.get("/Pubmenubuy/:ORDER_NUMBER", authMiddleware, PubmenubuyController.getPubMenuOrderSummary);
 router.delete("/Pubmenubuy/:ORDER_NUMBER", authMiddleware, PubmenubuyController.cancelPubMenuOrder);
+router.put(
+  "/Pubmenubuy/:ORDER_NUMBER/line/:ORDER_LINE_ID/quantity",
+  authMiddleware,
+  PubmenubuyController.updatePubMenuOrderLineQuantity
+);
 
 module.exports = router;

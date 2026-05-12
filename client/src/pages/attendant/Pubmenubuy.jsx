@@ -30,6 +30,12 @@ function normalizeItem(item, fallbackIndex = 0) {
   const quantity = Number(item.quantity || item.QUANTITY || parsed.quantity || 1);
   const subtotal = Number(item.subtotal || item.SUBTOTAL || item.unit_price || item.UNIT_PRICE || 0);
   const explicitUnitPrice = Number(item.price || item.PRICE || item.unitPrice || item.UNIT_PRICE);
+  const rawAvailableQuantity =
+    item.available_quantity ?? item.AVAILABLE_QUANTITY ?? item.stock_quantity ?? item.STOCK_QUANTITY;
+  const availableQuantity =
+    rawAvailableQuantity === undefined || rawAvailableQuantity === null
+      ? null
+      : Number(rawAvailableQuantity);
   const unitPrice =
     Number.isFinite(explicitUnitPrice) && explicitUnitPrice >= 0
       ? explicitUnitPrice
@@ -37,8 +43,15 @@ function normalizeItem(item, fallbackIndex = 0) {
         ? Number((subtotal / quantity).toFixed(2))
         : 0;
 
+  const rawOrderLineId = item.order_line_id ?? item.ORDER_LINE_ID ?? item.orderLineId ?? item.id ?? 0;
+  const orderLineId = Number(rawOrderLineId) || 0;
+  const fallbackId = orderLineId > 0
+    ? orderLineId
+    : Number(item.item_id || item.ITEM_ID || item.item_code || item.ITEM_CODE || fallbackIndex) || fallbackIndex;
+
   return {
-    id: item.item_id || item.ITEM_ID || item.item_code || item.ITEM_CODE || fallbackIndex,
+    id: fallbackId,
+    orderLineId: orderLineId > 0 ? orderLineId : fallbackId,
     item_code: item.item_code || item.ITEM_CODE || "",
     item_name: item.item_name || item.ITEM_NAME || parsed.item_name,
     quantity,
@@ -46,6 +59,7 @@ function normalizeItem(item, fallbackIndex = 0) {
     subtotal,
     image: item.image || item.IMAGE || "",
     card_text: item.card_text || item.CARD_TEXT || "",
+    availableQuantity: Number.isFinite(availableQuantity) ? availableQuantity : null,
   };
 }
 
@@ -139,36 +153,83 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
     [items]
   );
 
-  const adjustQuantity = (id, delta) => {
-    let validationMessage = "";
+  const adjustQuantity = async (orderLineId, delta) => {
+    if (!orderNumber) return;
+    const numericOrderLineId = Number(orderLineId);
+    if (!Number.isFinite(numericOrderLineId) || numericOrderLineId <= 0) {
+      const invalidMessage = "Unable to identify order item for quantity update.";
+      setError(invalidMessage);
+      window.alert(invalidMessage);
+      return;
+    }
 
-    setItems((current) =>
-      current.map((item) => {
-        if (item.id !== id) return item;
+    let validationMessage = "";
+    let nextQuantity = null;
+
+    setItems((current) => {
+      const nextState = current.map((item) => {
+        if (item.orderLineId !== numericOrderLineId) return item;
 
         const currentQty = Number(item.quantity || 1);
-        const nextQty = currentQty + delta;
+        const nextQtyCandidate = currentQty + delta;
 
-        if (nextQty < 1) {
+        if (nextQtyCandidate < 1) {
           validationMessage = "Quantity cannot be less than 1.";
           return item;
         }
 
-        if (nextQty > MAX_QTY) {
+        if (nextQtyCandidate > MAX_QTY) {
           validationMessage = `Quantity cannot be more than ${MAX_QTY}.`;
           return item;
         }
 
+        const availableQty = item.availableQuantity;
+        if (availableQty !== null && availableQty !== undefined && nextQtyCandidate > Number(availableQty)) {
+          validationMessage = `Out of stock. Available quantity: ${availableQty}`;
+          return item;
+        }
+
+        nextQuantity = nextQtyCandidate;
+
         const unitPrice = Number(
           item.unitPrice || (currentQty > 0 ? item.subtotal / currentQty : 0) || 0
         );
-        const nextSubtotal = Number((unitPrice * nextQty).toFixed(2));
+        const nextSubtotal = Number((unitPrice * nextQtyCandidate).toFixed(2));
 
-        return { ...item, quantity: nextQty, unitPrice, subtotal: nextSubtotal };
-      })
-    );
+        return { ...item, quantity: nextQtyCandidate, unitPrice, subtotal: nextSubtotal };
+      });
+
+      return nextState;
+    });
 
     setError(validationMessage);
+    if (validationMessage) {
+      window.alert(validationMessage);
+      return;
+    }
+
+    if (nextQuantity === null) return;
+
+    try {
+      const response = await Pubmenubuyservice.updateLineQuantity(orderNumber, numericOrderLineId, nextQuantity);
+      const data = response?.data?.data || {};
+      const rows = Array.isArray(data?.items) ? data.items : [];
+      setOrderHeader(data?.header || null);
+      setItems(rows.map((item, index) => normalizeItem(item, index)));
+    } catch (updateError) {
+      const message = updateError?.response?.data?.message || "Unable to update quantity.";
+      setError(message);
+      window.alert(message);
+      try {
+        const response = await Pubmenubuyservice.getByOrderNumber(orderNumber);
+        const data = response?.data?.data || {};
+        const rows = Array.isArray(data?.items) ? data.items : [];
+        setOrderHeader(data?.header || null);
+        setItems(rows.map((item, index) => normalizeItem(item, index)));
+      } catch {
+        // ignore refresh failure
+      }
+    }
   };
 
   const removeItem = (id) => {
@@ -318,7 +379,7 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {items.map((item) => (
                   <div
-                    key={item.id}
+                    key={item.orderLineId ?? item.id}
                     className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
                   >
                     {/* Image */}
@@ -340,6 +401,11 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
                       <p className="mt-1 text-sm text-stone-500">
                         Quantity: {item.quantity}
                       </p>
+                      {item.availableQuantity !== null && item.availableQuantity !== undefined && (
+                        <p className="mt-1 text-xs text-stone-400">
+                          Available: {item.availableQuantity}
+                        </p>
+                      )}
                     </div>
 
                      {/* Controls */}
@@ -347,7 +413,7 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
                        <div className="flex items-center gap-1">
                          <button
                             type="button"
-                            onClick={() => adjustQuantity(item.id, -1)}
+                            onClick={() => adjustQuantity(Number(item.orderLineId ?? item.id), -1)}
                             disabled={item.quantity <= 1}
                             className="rounded-md bg-white p-1.5 text-stone-700 shadow-sm transition hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-50"
                           >
@@ -360,8 +426,13 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
 
                            <button
                              type="button"
-                             onClick={() => adjustQuantity(item.id, 1)}
-                             disabled={item.quantity >= MAX_QTY}
+                             onClick={() => adjustQuantity(Number(item.orderLineId ?? item.id), 1)}
+                             disabled={
+                               item.quantity >= MAX_QTY ||
+                               (item.availableQuantity !== null &&
+                                 item.availableQuantity !== undefined &&
+                                 Number(item.quantity) >= Number(item.availableQuantity))
+                             }
                              className="rounded-md bg-afmc-maroon p-1.5 text-white transition hover:bg-afmc-maroon2 disabled:cursor-not-allowed disabled:opacity-60"
                            >
                              <Plus className="h-4 w-4" />

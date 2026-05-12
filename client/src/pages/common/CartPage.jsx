@@ -329,10 +329,14 @@ export default function CartPage({ isAttendant = false }) {
                                 {item.itemName || "Unnamed Item"}
                             </h2>
 
-                            {/* <p className={`text-xs mt-1 ${item.stockStatus === "Out Of Stock" ? "text-red-600" : "text-green-600"
-                                }`}>
+                            <p
+                                className={`text-xs mt-1 ${item.stockStatus === "Out Of Stock"
+                                    ? "text-red-600"
+                                    : "text-green-600"
+                                    }`}
+                            >
                                 {item.stockStatus || "Checking Stock"}
-                            </p> */}
+                            </p>
                         </div>
 
                         {/* Quantity Controls */}
@@ -352,7 +356,13 @@ export default function CartPage({ isAttendant = false }) {
                                     <button
                                         onClick={() => handleQuantityUpdate(item.cartId, (item.quantity || 1) + 1)}
                                         className="rounded-full bg-white px-2 text-xs font-semibold text-gray-700 shadow-sm hover:bg-gray-100 disabled:opacity-50"
-                                        disabled={updatingItemId === item.cartId}
+                                        disabled={
+                                            updatingItemId === item.cartId ||
+                                            item.stockStatus === "Out Of Stock" ||
+                                            (Number.isFinite(Number(item.stockQuantity)) &&
+                                                Number(item.stockQuantity) > 0 &&
+                                                Number(item.quantity || 0) >= Number(item.stockQuantity))
+                                        }
                                     >
                                         <Plus size={12} />
                                     </button>
