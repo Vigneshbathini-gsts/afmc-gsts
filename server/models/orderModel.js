@@ -83,7 +83,11 @@ async function getAdminOrderHistory({
           '%c/%e/%Y'
         ) AS order_date,
         1 AS ord,
-        ROUND(xxoh.order_total, 2) AS subtotal
+        ROUND(COALESCE(xxoh.order_total, (
+          SELECT SUM(xxod2.subtotal)
+          FROM xxafmc_order_details xxod2
+          WHERE xxod2.order_id = xxoh.order_num
+        ), 0), 2) AS subtotal
       FROM xxafmc_order_header xxoh
       JOIN xxafmc_order_details xxod
         ON xxoh.order_num = xxod.order_id
@@ -127,7 +131,7 @@ async function getAdminOrderHistory({
           )
         ) = UPPER(?)
       )
-      GROUP BY xxoh.order_num, xxoh.order_total, xxoh.order_date
+      GROUP BY xxoh.order_num, xxoh.order_date
 
       UNION ALL
 
@@ -141,7 +145,11 @@ async function getAdminOrderHistory({
         2 AS ord,
         ROUND(IFNULL(SUM(subtotal), 0), 2) AS subtotal
       FROM (
-        SELECT xxoh.order_num, xxoh.order_total AS subtotal
+        SELECT xxoh.order_num, COALESCE(xxoh.order_total, (
+          SELECT SUM(xxod2.subtotal)
+          FROM xxafmc_order_details xxod2
+          WHERE xxod2.order_id = xxoh.order_num
+        ), 0) AS subtotal
         FROM xxafmc_order_header xxoh
         JOIN xxafmc_order_details xxod
           ON xxoh.order_num = xxod.order_id
@@ -316,13 +324,14 @@ async function getOrderDetails(orderNumber) {
   od.quantity,
   od.price,
   od.subtotal,
-  COALESCE(NULLIF(od.type, ''), 'NA') AS type,
+  COALESCE(NULLIF(xi.type, ''), NULLIF(od.type, ''), 'NA') AS type,
   COALESCE(NULLIF(od.order_status, ''), 'Pending') AS status
 FROM xxafmc_order_details od
 LEFT JOIN (
     SELECT 
       item_code,
-      MAX(item_name) AS item_name
+      MAX(item_name) AS item_name,
+      MAX(type) AS type
     FROM xxafmc_inventory
     GROUP BY item_code
 ) xi
@@ -339,7 +348,11 @@ async function getOrderSummary(orderNumber) {
   const query = `
     SELECT
       xxoh.order_num,
-      ROUND(xxoh.order_total, 2) AS totalAmount,
+      ROUND(COALESCE(xxoh.order_total, (
+        SELECT SUM(od.subtotal)
+        FROM xxafmc_order_details od
+        WHERE od.order_id = xxoh.order_num
+      ), 0), 2) AS totalAmount,
       DATE_FORMAT(STR_TO_DATE(xxoh.order_date, '%m/%d/%Y'), '%c/%e/%Y') AS orderDate,
       IFNULL(MAX(inv.payment_method), '') AS paymentMethod,
       IFNULL(MAX(inv.payment_status), 'Un Paid') AS paymentStatus

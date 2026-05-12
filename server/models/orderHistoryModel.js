@@ -46,7 +46,7 @@ const getOrderDetails = async (orderId) => {
       od.price,
       od.subtotal,
       i.item_name,
-      COALESCE(NULLIF(od.type, ''), 'NA') AS type,
+      COALESCE(NULLIF(i.type, ''), 'NA') AS type,
       kn.status
     FROM xxafmc_order_details od
     LEFT JOIN xxafmc_inventory i

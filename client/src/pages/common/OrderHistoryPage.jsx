@@ -183,7 +183,7 @@ const OrderHistoryPage = () => {
                 order.status ?? "",
                 showPaymentMethod ? order.payment_method ?? "" : null,
                 order.payment_status ?? order.payment_status1 ?? "",
-                Number(order.order_total ?? order.subtotal ?? 0).toFixed(2),
+                Number(order.subtotal ?? order.order_total ?? 0).toFixed(2),
             ].filter((value) => value !== null)),
         });
     };

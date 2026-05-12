@@ -70,7 +70,7 @@ const OrderTable = ({
                         </tr>
                     ) : (
                         orders.map((order) => {
-                            const amount = order.order_total ?? order.subtotal ?? 0;
+                            const amount = order.subtotal ?? order.order_total ?? 0;
                             const paymentStatus = order.payment_status ?? order.payment_status1 ?? "-";
                             const isPaid = String(paymentStatus).trim().toLowerCase() === "paid";
 
