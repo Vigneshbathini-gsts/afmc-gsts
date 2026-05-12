@@ -44,6 +44,7 @@ import AttendantConfirmOrder from "../pages/attendant/ConfirmOrder";
 import ConfirmOrderpage from "../pages/attendant/ConfirmOrderpage";
 import AttendantPayment from "../pages/attendant/Payment";
 import AttendantInvoice from "../pages/attendant/Invoice";
+import AttendantInvoiceReport from "../pages/attendant/InvoiceReport";
 import AttendantActiveOrders from "../pages/attendant/ActiveOrders";
 import AttendantOrderStatus from "../pages/attendant/OrderStatus";
 import Pubmenubuy from "../pages/attendant/Pubmenubuy";
@@ -57,6 +58,7 @@ import UserCart from "../pages/user/Cart";
 import UserConfirmOrder from "../pages/user/ConfirmOrder";
 import UserPayment from "../pages/user/Payment";
 import UserInvoice from "../pages/user/Invoice";
+import UserInvoiceReport from "../pages/user/InvoiceReport";
 import ActiveOrders from "../pages/user/ActiveOrders";
 import UserOrderStatus from "../pages/user/OrderStatus";
 import MenuDashboard from "../components/common/MenuDashboard";
@@ -161,6 +163,7 @@ export default function AppRoutes() {
         <Route path="confirm-order-page" element={<ConfirmOrderpage />} />
         <Route path="payment" element={<AttendantPayment />} />
         <Route path="invoice" element={<AttendantInvoice />} />
+        <Route path="invoice-report" element={<AttendantInvoiceReport />} />
         <Route path="active-orders" element={<AttendantActiveOrders />} />
         <Route path="order-status" element={<AttendantOrderStatus />} />
 
@@ -188,6 +191,7 @@ export default function AppRoutes() {
         <Route path="confirm-order-page" element={<ConfirmOrderpage />} />
         <Route path="payment" element={<UserPayment />} />
         <Route path="invoice" element={<UserInvoice />} />
+        <Route path="invoice-report" element={<UserInvoiceReport />} />
         <Route path="active-orders" element={<ActiveOrders />} />
         <Route path="order-status" element={<UserOrderStatus />} />
 
