@@ -195,7 +195,7 @@ const replaceCartCustomization = async (conn, cartId, ingredients) => {
 
 const createDefaultCustomizationForCart = async (conn, { cartId, parentItemCode, cartQuantity, loginType }) => {
   const ingredients = await getDefaultCocktailIngredientRows(conn, parentItemCode, loginType);
-  // await validateCustomizationStock(conn, ingredients, cartQuantity);
+  await validateCustomizationStock(conn, ingredients, cartQuantity);
   await replaceCartCustomization(conn, cartId, ingredients);
   return ingredients;
 };
@@ -418,7 +418,7 @@ const updateCartCustomization = async (cartId, userId, updates) => {
 };
 
 const addCartItem = async (userId, itemData) => {
-  const { item_id, quantity = 1, unit_price = 0, remarks, loginType } = itemData;
+  const { item_id, quantity = 1, unit_price = 0, remarks, loginType, customIngredients } = itemData;
 
   const conn = await db.getConnection();
 
@@ -450,8 +450,14 @@ const addCartItem = async (userId, itemData) => {
       stockQty = await getStockQuantity(conn, item_id);
     }
 
+    // If cocktail, we must have ingredients
+    const ingredientsToUse = customIngredients && customIngredients.length > 0 
+      ? customIngredients 
+      : await getDefaultCocktailIngredientRows(conn, item_id, loginType);
 
-
+    if (isCocktailOrMocktail) {
+      await validateCustomizationStock(conn, ingredientsToUse, quantity);
+    }
 
     if (!isCocktailOrMocktail && existingCartQty + quantity + orderReservedQty > stockQty) {
       const availableQty = Math.max(0, stockQty - orderReservedQty - existingCartQty);
@@ -496,16 +502,13 @@ const addCartItem = async (userId, itemData) => {
       );
       insertId = insertResult.insertId;
       if (isCocktailOrMocktail) {
-        const customizationIngredients = await createDefaultCustomizationForCart(conn, {
-          cartId: insertId,
-          parentItemCode: item_id,
-          cartQuantity: quantity,
-          loginType,
-        });
+        const normalized = await normalizeCustomizationUpdates(conn, ingredientsToUse);
+        await replaceCartCustomization(conn, insertId, normalized);
 
         const customizedUnitPrice = Number(
-          customizationIngredients.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0).toFixed(2)
+          normalized.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0).toFixed(2)
         ) || Number(unit_price || 0);
+        
         await conn.execute(
           `UPDATE xxafmc_cart_items SET price = ?, total = ? * quantity WHERE cart_id = ?`,
           [customizedUnitPrice, customizedUnitPrice, insertId]
@@ -644,7 +647,7 @@ const getCartItemsByUser = async (userId) => {
       c.last_updated_date,
       c.parent_code,
       c.subcategory,
-      xi.sub_category AS inventory_subcategory,  -- ✅ FIX
+      xi.sub_category AS inventory_subcategory,
       COALESCE(
         (SELECT SUM(stock_quantity)
          FROM xxafmc_stock_out
@@ -729,7 +732,6 @@ const getCartItemsByUser = async (userId) => {
       : stockQty === 0
         ? "Out Of Stock"
         : "In Stock";
-
 
     return {
       cartId: Number(row.cart_id),
@@ -1069,5 +1071,3 @@ module.exports = {
   ensureCustomizationTable,
   getLovIngredients,
 };
-
-

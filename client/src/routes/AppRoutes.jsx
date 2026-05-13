@@ -68,6 +68,10 @@ import EnduserMocktail from "../components/common/ENDUSERFLOW/EnduserMocktail";
 import Snackveg from "../components/common/ENDUSERFLOW/Snackveg";
 import Snacknonveg from "../components/common/ENDUSERFLOW/Snacknonveg";
 import Drinkharddrink from "../components/common/ENDUSERFLOW/Drinkharddrink";
+import InvoicePage from "../pages/common/InvoicePage";
+import OrderHistoryPage from "../pages/common/OrderHistoryPage";
+import Payment from "../pages/user/Payment";
+
 
 // Kitchen Pages
 
@@ -106,7 +110,7 @@ export default function AppRoutes() {
       <Route
         path="/admin"
         element={
-          <ProtectedRoute allowedRoles={[10,80]}>
+          <ProtectedRoute allowedRoles={[10, 80]}>
             <AdminLayout />
           </ProtectedRoute>
         }
@@ -170,7 +174,8 @@ export default function AppRoutes() {
         <Route path="invoice-report" element={<AttendantInvoiceReport />} />
         <Route path="active-orders" element={<AttendantActiveOrders />} />
         <Route path="order-status" element={<AttendantOrderStatus />} />
-
+        <Route path="invoice/:id" element={<InvoicePage />} />
+        <Route path="payment/:id" element={<Payment />} />
 
       </Route>
 
@@ -206,42 +211,45 @@ export default function AppRoutes() {
         <Route path="Snackveg" element={<Snackveg />} />
         <Route path="Snacknonveg" element={<Snacknonveg />} />
         <Route path="Drinkharddrink" element={<Drinkharddrink />} />
+        <Route path="invoice/:id" element={<InvoicePage />} />
+        <Route path="payment/:id" element={<Payment />} />
+        <Route path="order-history" element={<OrderHistoryPage />} />
 
-       
+
 
 
 
       </Route>
 
-     {/* ================= OUTLETS ================= */}
-<Route
-  path="/kitchen"
-  element={
-    <ProtectedRoute allowedRoles={[40]} allowedOutletTypes={["KITCHEN"]}>
-      <KitchenLayout />
-    </ProtectedRoute>
-  }
->
-  <Route path="dashboard" element={<OutletDashboard />} />
-  <Route path="order-details" element={<OutletOrderDetails />} />
-  {/* Add these missing routes */}
-  <Route path="cancelled-orders" element={<KitchenCancelledOrder />} />
-  <Route path="order-history" element={<KitchenOrderHistory />} />
-</Route>
+      {/* ================= OUTLETS ================= */}
+      <Route
+        path="/kitchen"
+        element={
+          <ProtectedRoute allowedRoles={[40]} allowedOutletTypes={["KITCHEN"]}>
+            <KitchenLayout />
+          </ProtectedRoute>
+        }
+      >
+        <Route path="dashboard" element={<OutletDashboard />} />
+        <Route path="order-details" element={<OutletOrderDetails />} />
+        {/* Add these missing routes */}
+        <Route path="cancelled-orders" element={<KitchenCancelledOrder />} />
+        <Route path="order-history" element={<KitchenOrderHistory />} />
+      </Route>
 
-<Route
-  path="/bar"
-  element={
-    <ProtectedRoute allowedRoles={[40]} allowedOutletTypes={["BAR"]}>
-      <KitchenLayout />
-    </ProtectedRoute>
-  }
->
-  <Route path="dashboard" element={<OutletDashboard />} />
-  <Route path="order-details" element={<OutletOrderDetails />} />
-  <Route path="cancelled-orders" element={<KitchenCancelledOrder />} />
-  <Route path="order-history" element={<KitchenOrderHistory />} />
-</Route>
+      <Route
+        path="/bar"
+        element={
+          <ProtectedRoute allowedRoles={[40]} allowedOutletTypes={["BAR"]}>
+            <KitchenLayout />
+          </ProtectedRoute>
+        }
+      >
+        <Route path="dashboard" element={<OutletDashboard />} />
+        <Route path="order-details" element={<OutletOrderDetails />} />
+        <Route path="cancelled-orders" element={<KitchenCancelledOrder />} />
+        <Route path="order-history" element={<KitchenOrderHistory />} />
+      </Route>
 
       {/* ================= STOREKEEPER ================= */}
       <Route

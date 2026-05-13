@@ -33,7 +33,7 @@ async function getAdminOrderHistory({
   from = null,
   to = null,
   username = null,
-  appUser = null,
+  userId = null,
 }) {
   const query = `
     SELECT
@@ -48,24 +48,6 @@ async function getAdminOrderHistory({
     FROM (
       SELECT
         xxoh.order_num,
-        ROUND(xxoh.order_total, 2) AS subtotal,
-        CASE
-          WHEN SUM(CASE WHEN xxkn.status = 'Completed' THEN 1 ELSE 0 END) > 0
-          THEN 'Completed'
-          ELSE 'Pending'
-        END AS status,
-        DATE_FORMAT(
-          STR_TO_DATE(xxoh.order_date, '%m/%d/%Y'),
-          '%c/%e/%Y'
-        ) AS order_date,
-        IFNULL(
-          CONCAT(
-            UCASE(LEFT(MAX(inv.payment_method), 1)),
-            LCASE(SUBSTRING(MAX(inv.payment_method), 2))
-          ),
-          ''
-        ) AS payment_method,
-        1 AS ord,
         MAX(
           IFNULL(
             (
@@ -80,7 +62,32 @@ async function getAdminOrderHistory({
             )
           )
         ) AS first_name,
-        IFNULL(MAX(inv.payment_status), 'Un Paid') AS payment_status1
+        CASE
+          WHEN SUM(CASE WHEN xxkn.status = 'Completed' THEN 1 ELSE 0 END) > 0
+          THEN 'Completed'
+          ELSE 'Pending'
+        END AS status,
+        IFNULL(
+          CONCAT(
+            UCASE(LEFT(MAX(inv.payment_method), 1)),
+            LCASE(SUBSTRING(MAX(inv.payment_method), 2))
+          ),
+          ''
+        ) AS payment_method,
+        IFNULL(MAX(inv.payment_status), 'Un Paid') AS payment_status1,
+        DATE_FORMAT(
+          COALESCE(
+            STR_TO_DATE(xxoh.order_date, '%m/%d/%Y'),
+            DATE(xxoh.order_date)
+          ),
+          '%c/%e/%Y'
+        ) AS order_date,
+        1 AS ord,
+        ROUND(COALESCE(xxoh.order_total, (
+          SELECT SUM(xxod2.subtotal)
+          FROM xxafmc_order_details xxod2
+          WHERE xxod2.order_id = xxoh.order_num
+        ), 0), 2) AS subtotal
       FROM xxafmc_order_header xxoh
       JOIN xxafmc_order_details xxod
         ON xxoh.order_num = xxod.order_id
@@ -98,18 +105,14 @@ async function getAdminOrderHistory({
       )
       AND (
         ? IS NULL
-        OR ? = ''
-        OR EXISTS (
-          SELECT 1
-          FROM xxafmc_users
-          WHERE UPPER(user_name) = UPPER(?)
-            AND role_id = 10
-        )
-        OR UPPER(xu.user_name) = UPPER(?)
+        OR xxoh.user_id = ?
       )
-      AND STR_TO_DATE(xxoh.order_date, '%m/%d/%Y') BETWEEN
-        COALESCE(?, STR_TO_DATE(xxoh.order_date, '%m/%d/%Y'))
-        AND COALESCE(?, STR_TO_DATE(xxoh.order_date, '%m/%d/%Y'))
+      AND COALESCE(
+        STR_TO_DATE(xxoh.order_date, '%m/%d/%Y'),
+        DATE(xxoh.order_date)
+      ) BETWEEN
+        COALESCE(?, COALESCE(STR_TO_DATE(xxoh.order_date, '%m/%d/%Y'), DATE(xxoh.order_date)))
+        AND COALESCE(?, COALESCE(STR_TO_DATE(xxoh.order_date, '%m/%d/%Y'), DATE(xxoh.order_date)))
       AND (
         ? IS NULL
         OR ? = ''
@@ -128,7 +131,7 @@ async function getAdminOrderHistory({
           )
         ) = UPPER(?)
       )
-      GROUP BY xxoh.order_num, xxoh.order_total, xxoh.order_date
+      GROUP BY xxoh.order_num, xxoh.order_date
 
       UNION ALL
 
@@ -140,9 +143,13 @@ async function getAdminOrderHistory({
         'Total' AS payment_status1,
         NULL AS order_date,
         2 AS ord,
-        ROUND(IFNULL(SUM(subtotal), 2), 2) AS subtotal
+        ROUND(IFNULL(SUM(subtotal), 0), 2) AS subtotal
       FROM (
-        SELECT xxoh.order_num, xxoh.order_total AS subtotal
+        SELECT xxoh.order_num, COALESCE(xxoh.order_total, (
+          SELECT SUM(xxod2.subtotal)
+          FROM xxafmc_order_details xxod2
+          WHERE xxod2.order_id = xxoh.order_num
+        ), 0) AS subtotal
         FROM xxafmc_order_header xxoh
         JOIN xxafmc_order_details xxod
           ON xxoh.order_num = xxod.order_id
@@ -161,18 +168,14 @@ async function getAdminOrderHistory({
           )
           AND (
             ? IS NULL
-            OR ? = ''
-            OR EXISTS (
-              SELECT 1
-              FROM xxafmc_users
-              WHERE UPPER(user_name) = UPPER(?)
-                AND role_id = 10
-            )
-            OR UPPER(xu.user_name) = UPPER(?)
+            OR xxoh.user_id = ?
           )
-          AND STR_TO_DATE(xxoh.order_date, '%m/%d/%Y') BETWEEN
-            COALESCE(?, STR_TO_DATE(xxoh.order_date, '%m/%d/%Y'))
-            AND COALESCE(?, STR_TO_DATE(xxoh.order_date, '%m/%d/%Y'))
+          AND COALESCE(
+            STR_TO_DATE(xxoh.order_date, '%m/%d/%Y'),
+            DATE(xxoh.order_date)
+          ) BETWEEN
+            COALESCE(?, COALESCE(STR_TO_DATE(xxoh.order_date, '%m/%d/%Y'), DATE(xxoh.order_date)))
+            AND COALESCE(?, COALESCE(STR_TO_DATE(xxoh.order_date, '%m/%d/%Y'), DATE(xxoh.order_date)))
           AND (
             ? IS NULL
             OR ? = ''
@@ -193,6 +196,7 @@ async function getAdminOrderHistory({
           )
         GROUP BY xxoh.order_num, xxoh.order_total
       ) t
+      HAVING COUNT(*) > 0
     ) final_data
     ORDER BY ord DESC, order_num DESC
   `;
@@ -200,22 +204,18 @@ async function getAdminOrderHistory({
   const fromDate = normalizeDate(from);
   const toDate = normalizeDate(to);
   const requestedUser = username?.trim() || null;
-  const activeUser = appUser?.trim() || null;
+  const activeUserId = userId || null;
 
   const params = [
-    activeUser,
-    activeUser,
-    activeUser,
-    activeUser,
+    activeUserId,
+    activeUserId,
     fromDate,
     toDate,
     requestedUser,
     requestedUser,
     requestedUser,
-    activeUser,
-    activeUser,
-    activeUser,
-    activeUser,
+    activeUserId,
+    activeUserId,
     fromDate,
     toDate,
     requestedUser,
@@ -322,14 +322,16 @@ async function getOrderDetails(orderNumber) {
   od.item_id,
   COALESCE(xi.item_name, od.item_id) AS item_name,
   od.quantity,
-  COALESCE(NULLIF(xi.type, ''), 'NA') AS type,
+  od.price,
+  od.subtotal,
+  COALESCE(NULLIF(xi.type, ''), NULLIF(od.type, ''), 'NA') AS type,
   COALESCE(NULLIF(od.order_status, ''), 'Pending') AS status
 FROM xxafmc_order_details od
 LEFT JOIN (
     SELECT 
       item_code,
       MAX(item_name) AS item_name,
-      MAX(COALESCE(NULLIF(type, ''), 'NA')) AS type
+      MAX(type) AS type
     FROM xxafmc_inventory
     GROUP BY item_code
 ) xi
@@ -340,6 +342,29 @@ ORDER BY od.order_line_id ASC;
 
   const [rows] = await db.execute(query, [orderNumber]);
   return rows;
+}
+
+async function getOrderSummary(orderNumber) {
+  const query = `
+    SELECT
+      xxoh.order_num,
+      ROUND(COALESCE(xxoh.order_total, (
+        SELECT SUM(od.subtotal)
+        FROM xxafmc_order_details od
+        WHERE od.order_id = xxoh.order_num
+      ), 0), 2) AS totalAmount,
+      DATE_FORMAT(STR_TO_DATE(xxoh.order_date, '%m/%d/%Y'), '%c/%e/%Y') AS orderDate,
+      IFNULL(MAX(inv.payment_method), '') AS paymentMethod,
+      IFNULL(MAX(inv.payment_status), 'Un Paid') AS paymentStatus
+    FROM xxafmc_order_header xxoh
+    LEFT JOIN xxafmc_invoices inv
+      ON inv.order_num = xxoh.order_num
+    WHERE xxoh.order_num = ?
+    GROUP BY xxoh.order_num, xxoh.order_total, xxoh.order_date
+  `;
+
+  const [rows] = await db.execute(query, [orderNumber]);
+  return rows[0] || null;
 }
 
 async function getNonMemberByPhone(phoneNumber) {
@@ -437,6 +462,7 @@ module.exports = {
   getAdminOrderHistory,
   getNonMemberByPhone,
   getOrderDetails,
+  getOrderSummary,
   saveNonMember,
 };
 

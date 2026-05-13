@@ -76,6 +76,14 @@ export default function ItemDetails() {
         return true;
     }, [buildCustomizationPayload, cartId, draftKey, isEditingCartItem]);
 
+    // Auto-clear validation errors after 5 seconds
+    useEffect(() => {
+        if (error) {
+            const timer = setTimeout(() => setError(null), 5000);
+            return () => clearTimeout(timer);
+        }
+    }, [error]);
+
     useEffect(() => {
         const fetchItemDetails = async () => {
             try {

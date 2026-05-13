@@ -96,7 +96,6 @@ export default function CartPage({ isAttendant = false }) {
         try {
             const response = await cartAPI.getByUserId(userId);
             const items = response.data.data || [];
-            // console.log(items);
             setCartItems(items);
             setCartCount(items.length);
         } catch (err) {
@@ -109,7 +108,7 @@ export default function CartPage({ isAttendant = false }) {
 
     useEffect(() => {
         fetchCartItems();
-    }, [fetchCartItems]);
+    }, [fetchCartItems, userId]);
 
     const handleQuantityUpdate = useCallback(async (cartId, newQuantity) => {
         if (!cartId || Number.isNaN(Number(cartId))) {

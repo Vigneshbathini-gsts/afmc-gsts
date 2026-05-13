@@ -1,1 +1,5 @@
-export default function Payment(){ return <div>Payment</div>; }
+import PaymentPage from "../common/PaymentPage";
+
+export default function Payment() {
+  return <PaymentPage />;
+}
