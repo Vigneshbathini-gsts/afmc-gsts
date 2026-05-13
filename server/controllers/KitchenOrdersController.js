@@ -201,8 +201,19 @@ exports.updateBarOrderStatus = async (req, res) => {
       if (scannedItems.length > 0) {
         const placeholders = scannedItems.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?)").join(", ");
         const values = [];
+        const orderPriceMap = new Map();
 
         for (const item of scannedItems) {
+          const targetItemCode = String(item.parentItem || item.itemCode || "").trim();
+          const numericItemPrice = Number(item.itemPrice || 0);
+
+          if (targetItemCode) {
+            const existing = orderPriceMap.get(targetItemCode);
+            if (!existing || numericItemPrice > 0 || existing === 0) {
+              orderPriceMap.set(targetItemCode, numericItemPrice);
+            }
+          }
+
           values.push(
             "S_COLLECTION",
             ORDERNUMBER,
@@ -234,6 +245,20 @@ exports.updateBarOrderStatus = async (req, res) => {
           `,
           values
         );
+
+        for (const [targetItemCode, itemPrice] of orderPriceMap.entries()) {
+          await connection.query(
+            `
+            UPDATE xxafmc_order_details
+            SET price = ?,
+                subtotal = ROUND(? * quantity, 2)
+            WHERE order_id = ?
+              AND item_id = ?
+              AND (order_status IS NULL OR order_status = '')
+            `,
+            [itemPrice, itemPrice, ORDERNUMBER, targetItemCode]
+          );
+        }
       }
 
       // Then update the order status

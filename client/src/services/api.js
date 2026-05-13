@@ -359,6 +359,15 @@ export const notificationAPI = {
     api.put(`/notifications/stock-out/read/${itemCode}`),
 };
 
+export const invoiceAPI = {
+  getByOrderNumber: (orderNumber) => api.get(`/invoice/${orderNumber}`),
+  savePayment: (orderNumber, data) => api.post(`/invoice/${orderNumber}/payment`, data),
+};
+
+export const invoiceReportAPI = {
+  getByOrderNumber: (orderNumber) => api.get(`/invoice-report/${orderNumber}`),
+};
+
 export const cancelledOrdersAPI = {
   getCancelledOrders: (params) => api.get("/cancelled-orders", { params }),
 };

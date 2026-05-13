@@ -69,6 +69,7 @@ export default function Pubmenubuy({ backTo = "" }) {
   const [confirming, setConfirming] = useState(false);
   const [updatingItemCode, setUpdatingItemCode] = useState(null);
   const [error, setError] = useState("");
+  const [itemError, setItemError] = useState({ itemCode: null, message: "" });
   const currentBasePath = location.pathname.startsWith("/attendant")
     ? "/attendant"
     : "/user";
@@ -90,6 +91,7 @@ export default function Pubmenubuy({ backTo = "" }) {
         const data = response?.data?.data || {};
         const rows = Array.isArray(data?.items) ? data.items : [];
         if (!ignore) {
+          setItemError({ itemCode: null, message: "" });
           setOrderHeader(data?.header || null);
           setItems(rows.map((item, index) => normalizeItem(item, index)));
         }
@@ -115,6 +117,7 @@ export default function Pubmenubuy({ backTo = "" }) {
   const syncFromSummary = (payload) => {
     const data = payload?.data || payload || {};
     const rows = Array.isArray(data?.items) ? data.items : [];
+    setItemError({ itemCode: null, message: "" });
     setOrderHeader(data?.header || null);
     setItems(rows.map((item, index) => normalizeItem(item, index)));
   };
@@ -127,10 +130,16 @@ export default function Pubmenubuy({ backTo = "" }) {
     try {
       setUpdatingItemCode(String(item.item_code));
       setError("");
+      setItemError({ itemCode: null, message: "" });
       const response = await Pubmenubuyservice.updateItemQuantity(orderNumber, item.item_code, delta);
       syncFromSummary(response?.data);
     } catch (updateError) {
-      setError(updateError.response?.data?.message || "Unable to update quantity.");
+      const message = updateError.response?.data?.message || "Unable to update quantity.";
+      if (message.toLowerCase().includes("out of stock")) {
+        setItemError({ itemCode: String(item.item_code), message });
+      } else {
+        setError(message);
+      }
     } finally {
       setUpdatingItemCode(null);
     }
@@ -144,6 +153,7 @@ export default function Pubmenubuy({ backTo = "" }) {
     try {
       setUpdatingItemCode(String(item.item_code));
       setError("");
+      setItemError({ itemCode: null, message: "" });
       await Pubmenubuyservice.deleteItem(orderNumber, item.item_code);
 
       try {
@@ -307,6 +317,8 @@ export default function Pubmenubuy({ backTo = "" }) {
                 {items.map((item) => {
                   const isBusy = updatingItemCode === String(item.item_code);
                   const disableItemActions = Boolean(isBusy || item.isFreeItem);
+                  const showItemError =
+                    itemError.itemCode === String(item.item_code) && itemError.message;
 
                   return (
                     <div
@@ -314,12 +326,19 @@ export default function Pubmenubuy({ backTo = "" }) {
                       className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
                     >
                       {/* Image */}
-                      <div className="flex h-40 items-center justify-center bg-stone-50 p-4">
+                      <div className="relative flex h-40 items-center justify-center bg-stone-50 p-4">
                         <img
                           src={`${BASEAPI}${item.image || "default.jpg"}`}
                           alt={item.item_name}
                           className="max-h-full w-auto object-contain"
                         />
+                        {showItemError ? (
+                          <div className="pointer-events-none absolute inset-0 flex items-start justify-center bg-red-950/10 p-3">
+                            <div className="rounded-lg bg-red-600/95 px-3 py-2 text-center text-xs font-semibold text-white shadow-lg">
+                              {itemError.message}
+                            </div>
+                          </div>
+                        ) : null}
                       </div>
 
                       {/* Details */}

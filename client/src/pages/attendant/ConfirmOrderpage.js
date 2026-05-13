@@ -55,12 +55,18 @@ export default function ConfirmOrderpage() {
     };
 
     fetchConfirmedOrder();
+    const intervalId = window.setInterval(fetchConfirmedOrder, 10000);
+
     return () => {
       ignore = true;
+      window.clearInterval(intervalId);
     };
   }, [orderNumber]);
 
   const items = Array.isArray(orderData?.items) ? orderData.items : [];
+  const orderStatus = String(orderData?.header?.status || "Received");
+  const orderAmount = Number(orderData?.header?.order_total || 0);
+  const canProceedToPayment = orderStatus === "Completed";
   const totalQuantity = useMemo(
     () => items.reduce((sum, item) => sum + Number(item.quantity || 0), 0),
     [items]
@@ -72,7 +78,27 @@ return (
       {/* Success Banner */}
       <div className="overflow-hidden rounded-[26px] border border-stone-200 bg-white shadow-[0_10px_30px_rgba(15,23,42,0.08)]">
         {/* Top Action */}
-        <div className="flex justify-end px-4 pt-4">
+        <div className="flex justify-end gap-3 px-4 pt-4">
+          {canProceedToPayment ? (
+            <button
+              type="button"
+              onClick={() =>
+                navigate(
+                  `${currentBasePath}/invoice?orderNumber=${encodeURIComponent(orderData?.header?.order_num || orderNumber)}&amount=${encodeURIComponent(orderAmount.toFixed(2))}`,
+                  {
+                    state: {
+                      orderNumber: orderData?.header?.order_num || orderNumber,
+                      amount: orderAmount,
+                    },
+                  }
+                )
+              }
+              className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-5 py-2 text-sm font-medium text-white transition hover:bg-emerald-700"
+            >
+              Payment
+            </button>
+          ) : null}
+
           <button
             type="button"
             onClick={() => navigate(`${currentBasePath}/menudash`)}
@@ -120,8 +146,17 @@ return (
 
             <span className="hidden text-stone-300 md:block">|</span>
 
+            {/* <span className="text-stone-500">
+              Amount :
+              <span className="ml-1 font-semibold text-stone-900">
+                {orderAmount.toFixed(2)}
+              </span>
+            </span> */}
+
+            <span className="hidden text-stone-300 md:block">|</span>
+
             <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700">
-              {orderData?.header?.status || "Received"}
+              {orderStatus}
             </span>
           </div>
         </div>
