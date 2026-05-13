@@ -215,6 +215,8 @@ async function syncFreeItemForOrderItem(connection, { orderNumber, itemCode, qua
       itemCode,
     ]
   );
+}
+
 async function getReservedQuantitiesExcludingOrder(connection, itemCodes, orderNumber) {
   const normalizedCodes = [...new Set((Array.isArray(itemCodes) ? itemCodes : [])
     .map((code) => Number(code))
