@@ -567,7 +567,8 @@ async function getConfirmedOrderDetails(orderNumber) {
           WHEN SUM(CASE WHEN COALESCE(kn.status, '') = 'Cancelled' THEN 1 ELSE 0 END) = COUNT(od.order_line_id)
             THEN 'Cancelled'
           ELSE 'Received'
-        END AS status
+        END AS status,
+        COALESCE(MAX(inv.payment_status), 'Not Paid') AS payment_status
       FROM xxafmc_order_header oh
       JOIN xxafmc_order_details od
         ON od.order_id = oh.order_num
@@ -578,6 +579,8 @@ async function getConfirmedOrderDetails(orderNumber) {
       LEFT JOIN xxafmc_kitchen_notification kn
         ON kn.ordernumber = od.order_id
         AND kn.item_id = od.item_id
+      LEFT JOIN xxafmc_invoices inv
+        ON inv.order_num = oh.order_num
       WHERE oh.order_num = ?
       GROUP BY oh.order_num, oh.order_date
       LIMIT 1

@@ -170,7 +170,7 @@ const PaymentPage = () => {
                         </p>
 
                         <p className="font-semibold text-lg">
-                            ₹ {order?.totalAmount}
+                            ₹ {Number(order?.totalAmount || 0).toFixed(2)}
                         </p>
                     </div>
                 </div>

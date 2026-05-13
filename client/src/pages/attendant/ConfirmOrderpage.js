@@ -79,8 +79,9 @@ export default function ConfirmOrderpage() {
   );
 
   const orderStatus = String(orderData?.header?.status || "Received");
-  const orderAmount = Number(orderData?.header?.order_total || 0);
-  const canProceedToPayment = orderStatus === "Completed";
+  const paymentStatus = String(orderData?.header?.payment_status || "Not Paid");
+  const canProceedToPayment = orderStatus === "Completed" && paymentStatus !== "Paid";
+  const isPaymentDone = paymentStatus === "Paid";
 
   const totalQuantity = useMemo(
     () => items.reduce((sum, item) => sum + Number(item.quantity || 0), 0),
@@ -146,7 +147,11 @@ return (
           </p>
 
           <div className="mt-4 rounded-2xl border border-stone-200 bg-[#fff4f0] px-4 py-4 text-left text-sm text-stone-700">
-            {orderStatus === "Completed" ? (
+            {orderStatus === "Completed" && paymentStatus === "Paid" ? (
+              <p>
+                Payment has been completed. Here is your invoice.
+              </p>
+            ) : orderStatus === "Completed" ? (
               <p>
                 Kitchen has completed all items. You can now proceed to payment.
               </p>
@@ -235,9 +240,11 @@ return (
                       Quantity
                     </th>
 
-                    <th className="px-5 py-3 text-left text-sm font-semibold text-[#6b0f1a]">
-                      Subtotal
-                    </th>
+                    {isPaymentDone && (
+                      <th className="px-5 py-3 text-left text-sm font-semibold text-[#6b0f1a]">
+                        Subtotal
+                      </th>
+                    )}
 
                     <th className="px-5 py-3 text-left text-sm font-semibold text-[#6b0f1a]">
                       Status
@@ -259,9 +266,11 @@ return (
                         {item.quantity}
                       </td>
 
-                      <td className="px-5 py-4 text-sm text-stone-700">
-                        ₹{Number(item.subtotal || 0).toFixed(2)}
-                      </td>
+                      {isPaymentDone && (
+                        <td className="px-5 py-4 text-sm text-stone-700">
+                          ₹{Number(item.subtotal || 0).toFixed(2)}
+                        </td>
+                      )}
 
                       <td className="px-5 py-4">
                         <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700">
@@ -291,12 +300,14 @@ return (
                   </span>
                 </span>
 
-                <span>
-                  Total Amount :
-                  <span className="ml-1 font-semibold text-stone-900">
-                    ₹{totalAmount.toFixed(2)}
+                {isPaymentDone && (
+                  <span>
+                    Total Amount :
+                    <span className="ml-1 font-semibold text-stone-900">
+                      ₹{totalAmount.toFixed(2)}
+                    </span>
                   </span>
-                </span>
+                )}
               </div>
 
               <button

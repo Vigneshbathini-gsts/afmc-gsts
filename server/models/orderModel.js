@@ -348,11 +348,17 @@ async function getOrderSummary(orderNumber) {
   const query = `
     SELECT
       xxoh.order_num,
-      ROUND(COALESCE(xxoh.order_total, (
-        SELECT SUM(od.subtotal)
-        FROM xxafmc_order_details od
-        WHERE od.order_id = xxoh.order_num
-      ), 0), 2) AS totalAmount,
+      ROUND(
+        CASE 
+          WHEN COALESCE(xxoh.order_total, 0) > 0 THEN xxoh.order_total
+          ELSE COALESCE((
+            SELECT SUM(COALESCE(od.subtotal, 0))
+            FROM xxafmc_order_details od
+            WHERE od.order_id = xxoh.order_num
+          ), 0)
+        END,
+        2
+      ) AS totalAmount,
       DATE_FORMAT(STR_TO_DATE(xxoh.order_date, '%m/%d/%Y'), '%c/%e/%Y') AS orderDate,
       IFNULL(MAX(inv.payment_method), '') AS paymentMethod,
       IFNULL(MAX(inv.payment_status), 'Un Paid') AS paymentStatus
