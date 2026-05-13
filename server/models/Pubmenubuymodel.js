@@ -575,6 +575,7 @@ async function createOrder(payload = {}, authUser = {}) {
   const quantity = Number(rawQuantity || 1);
   const categoryId = Number(payload.categoryId);
   const remarks = String(payload.remarks || "").trim();
+  const normalizedType = String(payload.type || "").trim() || null;
   const memberId =
     payload.memberId === undefined || payload.memberId === null || payload.memberId === ""
       ? null
@@ -663,7 +664,7 @@ async function createOrder(payload = {}, authUser = {}) {
     }
 
     let typeId = null;
-    if (Number(resolvedCategoryId) === 10) {
+    if (Number(resolvedCategoryId) === 10 && normalizedType) {
       const [typeRows] = await connection.execute(
         `
           SELECT type_id
@@ -671,7 +672,7 @@ async function createOrder(payload = {}, authUser = {}) {
           WHERE UPPER(type) = UPPER(?)
           LIMIT 1
         `,
-        [String(payload.type || inventoryItem.ac_unit || "Nos")]
+        [normalizedType]
       );
       typeId = typeRows[0]?.type_id || null;
     }
@@ -716,7 +717,7 @@ async function createOrder(payload = {}, authUser = {}) {
           itemCode,
           typeId,
           quantity,
-          remarks,
+          normalizedType,
           quantity,
           appUser,
           subCategory,

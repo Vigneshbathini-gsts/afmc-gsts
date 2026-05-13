@@ -493,6 +493,7 @@ function MenuPopupCompact({ item, loading, onClose, onBuy }) {
   const { user, setCartCount } = useAuth();
   const [qty, setQty] = useState("1");
   const [remarks, setRemarks] = useState("Din");
+  const [pegType, setPegType] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const userId = user?.userId;
@@ -543,6 +544,11 @@ function MenuPopupCompact({ item, loading, onClose, onBuy }) {
     const trimmedRemarks = String(remarks || "").trim();
     const quantityValue = Number(qty);
 
+    if (isPegsUnit && !pegType) {
+      toast.error("Select the type");
+      return;
+    }
+
     if (!trimmedRemarks) {
       toast.error("Remarks is required");
       return;
@@ -563,7 +569,7 @@ function MenuPopupCompact({ item, loading, onClose, onBuy }) {
       return;
     }
 
-    onBuy?.(item, quantityValue, trimmedRemarks);
+    onBuy?.(item, quantityValue, trimmedRemarks, isPegsUnit ? pegType || null : null);
   };
 
   useEffect(() => {
@@ -587,12 +593,17 @@ function MenuPopupCompact({ item, loading, onClose, onBuy }) {
     };
   }, [item, loading, onClose]);
 
+  useEffect(() => {
+    setPegType("");
+  }, [item?.item_id, item?.item_code]);
+
   if (!item && !loading) {
     return null;
   }
 
   const imageSrc = `${BASEAPI}${item?.image || "default.jpg"}`;
   const acUnit = item?.ac_unit || item?.["A/C_UNIT"] || "Nos";
+  const isPegsUnit = String(acUnit).trim().toLowerCase() === "pegs";
 
   return (
     <div
@@ -674,6 +685,23 @@ function MenuPopupCompact({ item, loading, onClose, onBuy }) {
                         inputMode="numeric"
                       />
                     </div>
+
+                    {isPegsUnit ? (
+                      <>
+                        <div className="text-[14px] font-semibold leading-5 text-stone-600">Type</div>
+                        <div>
+                          <select
+                            value={pegType}
+                            onChange={(e) => setPegType(e.target.value)}
+                            className="h-11 w-full rounded border border-stone-300 bg-white px-3 text-[15px] font-medium text-stone-800 outline-none transition focus:border-afmc-maroon focus:ring-2 focus:ring-afmc-maroon/20"
+                          >
+                            <option value="">Select type</option>
+                            <option value="Small">Small</option>
+                            <option value="Large">Large</option>
+                          </select>
+                        </div>
+                      </>
+                    ) : null}
 
                     <div className="text-[14px] font-semibold leading-5 text-stone-600">Remarks</div>
                     <div>
@@ -1540,15 +1568,17 @@ function MenuDashboard() {
   const [offers, setOffers] = useState([]);
   const [offersLoading, setOffersLoading] = useState(false);
 
-  const handleBuy = async (item, qty, remarks) => {
+  const handleBuy = async (item, qty, remarks, selectedType) => {
     try {
+      const typeForBackend = selectedType || null;
+
       const response = await Pubmenubuyservice.createOrder({
         itemCode: item?.item_code,
         itemId: item?.item_id,
         quantity: Number(qty) || 1,
         remarks,
         categoryId: item?.category_id,
-        type: item?.ac_unit || "Nos",
+        type: typeForBackend,
         unitPrice: item?.unit_price,
         profit: item?.profit,
         prCharges: item?.pr_charges,

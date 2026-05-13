@@ -275,7 +275,7 @@ export default function InvoicePage() {
               ) : null}
 
               <div className="flex flex-wrap justify-end gap-3 pt-2">
-                <button
+                {/* <button
                   type="button"
                   onClick={handleSaveInvoice}
                   disabled={saving || loading}
@@ -283,7 +283,7 @@ export default function InvoicePage() {
                 >
                   <CreditCard className="h-4 w-4" />
                   {saving ? "Saving..." : "Save"}
-                </button>
+                </button> */}
 
                 <button
                   type="button"
@@ -375,9 +375,9 @@ export default function InvoicePage() {
                     </span>
                   </div>
 
-                  <div className="rounded-full bg-[#edf7ef] px-5 py-2 text-sm font-semibold text-emerald-700">
+                  {/* <div className="rounded-full bg-[#edf7ef] px-5 py-2 text-sm font-semibold text-emerald-700">
                     Payable Amount : {formatMoney(computedAmount)}
-                  </div>
+                  </div> */}
                 </div>
               </div>
             )}
