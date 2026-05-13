@@ -111,7 +111,19 @@ const PaymentPage = () => {
             const basePath = location.pathname.startsWith("/attendant")
                 ? "/attendant"
                 : "/user";
-            navigate(`${basePath}/invoice?orderNumber=${encodeURIComponent(orderNumber)}`);
+            const amount = Number(order?.totalAmount || order?.order_total || 0);
+
+            navigate(
+                `${basePath}/invoice-report?orderNumber=${encodeURIComponent(orderNumber)}&amount=${encodeURIComponent(
+                    amount.toFixed(2)
+                )}`,
+                {
+                    state: {
+                        orderNumber,
+                        amount,
+                    },
+                }
+            );
         } catch (payError) {
             console.log(payError);
             alert("Payment failed. Please try again.");

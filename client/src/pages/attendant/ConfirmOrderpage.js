@@ -145,6 +145,22 @@ return (
             Your order has been received successfully.
           </p>
 
+          <div className="mt-4 rounded-2xl border border-stone-200 bg-[#fff4f0] px-4 py-4 text-left text-sm text-stone-700">
+            {orderStatus === "Completed" ? (
+              <p>
+                Kitchen has completed all items. You can now proceed to payment.
+              </p>
+            ) : orderStatus === "Cancelled" ? (
+              <p>
+                The order has been cancelled by the kitchen. Please contact support for details.
+              </p>
+            ) : (
+              <p>
+                Kitchen status is currently <strong>{orderStatus}</strong>. Payment will be available once all items are completed.
+              </p>
+            )}
+          </div>
+
           {/* Compact Order Details */}
           <div className="mt-6 inline-flex flex-wrap items-center justify-center gap-3 rounded-full border border-[#d4af37]/30 bg-[#fff8eb] px-5 py-3 text-sm">
             <span className="text-stone-500">
