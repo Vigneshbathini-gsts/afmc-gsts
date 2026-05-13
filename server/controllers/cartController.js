@@ -797,6 +797,11 @@ exports.proceedToBuy = async (req, res) => {
       const isCocktailOrMocktail = [14, 15].includes(Number(item.subcategory));
       let availableStock = 0;
       let itemName = "";
+      const safeQuantity = Number(item.quantity || 0);
+      const safePrice = Number.isFinite(Number(item.price)) ? Number(item.price) : 0;
+      const safeTotal = Number.isFinite(Number(item.total)) ? Number(item.total) : Number((safePrice * safeQuantity).toFixed(2));
+      const safeProfit = Number.isFinite(Number(item.profit)) ? Number(item.profit) : 0;
+      const safeFoodCharges = Number.isFinite(Number(item.food_pr_charges)) ? Number(item.food_pr_charges) : 0;
 
       if (isCocktailOrMocktail) {
         // Cocktail/mocktail parent items do not have direct stock; their availability is driven by ingredient stock.
@@ -867,7 +872,7 @@ exports.proceedToBuy = async (req, res) => {
       }
       }
 
-      const stockInCart = Number(item.quantity || 0);
+      const stockInCart = safeQuantity;
       if (stockInCart > availableStock) {
         const error = new Error(`Out of Stock for item ${itemName || item.item_id}. Available quantity: ${availableStock}`);
         error.status = 400;
@@ -902,12 +907,12 @@ exports.proceedToBuy = async (req, res) => {
           orderLineId,
           orderNumber,
           item.item_id,
-          item.quantity,
-          item.total,
-          item.price,
-          item.quantity,
-          item.profit,
-          item.food_pr_charges,
+          safeQuantity,
+          safeTotal,
+          safePrice,
+          safeQuantity,
+          safeProfit,
+          safeFoodCharges,
           appUser,
           item.type_id,
           item.subcategory,
@@ -915,6 +920,103 @@ exports.proceedToBuy = async (req, res) => {
           item.type,
         ]
       );
+    }
+
+    // --------------------------------------------------------------------
+    // Persist cocktail/mocktail ingredient selections for this order
+    // so that the order-details screen validates using the same recipe
+    // as the cart (cart customization table).
+    // --------------------------------------------------------------------
+    const cocktailCartItems = cartRows
+      .filter((row) => [14, 15].includes(Number(row.subcategory)))
+      .map((row) => ({
+        cartId: Number(row.cart_id),
+        parentItemCode: Number(row.item_id),
+        parentQuantity: Number(row.quantity || 0),
+      }))
+      .filter((row) => Number.isFinite(row.cartId) && row.cartId > 0 && Number.isFinite(row.parentItemCode) && row.parentItemCode > 0);
+
+    if (cocktailCartItems.length > 0) {
+      const cartIds = [...new Set(cocktailCartItems.map((row) => row.cartId))];
+      const cartMetaById = cocktailCartItems.reduce((map, row) => {
+        map.set(row.cartId, row);
+        return map;
+      }, new Map());
+
+      const placeholders = cartIds.map(() => "?").join(",");
+      const [customizationRows] = await connection.execute(
+        `
+          SELECT cart_id, ingredient_item_code, ingredient_name, quantity
+          FROM xxafmc_cart_customization
+          WHERE cart_id IN (${placeholders})
+        `,
+        cartIds
+      );
+
+      if (customizationRows.length > 0) {
+        for (const row of customizationRows) {
+          const cartId = Number(row.cart_id);
+          const meta = cartMetaById.get(cartId);
+          if (!meta) continue;
+
+          const ingredientCode = Number(row.ingredient_item_code);
+          if (!Number.isFinite(ingredientCode) || ingredientCode <= 0) continue;
+
+          await connection.execute(
+            `
+              INSERT INTO xxafmc_custom_cocktails_mocktails_details
+                (item_code, item_name, pegs, inventory_item_code, user_id, quantity, order_number, creation_date)
+              VALUES
+                (?, ?, ?, ?, ?, ?, ?, NOW())
+            `,
+            [
+              ingredientCode,
+              String(row.ingredient_name || "").trim(),
+              Number(row.quantity || 0),
+              meta.parentItemCode,
+              userId,
+              meta.parentQuantity,
+              Number(orderNumber),
+            ]
+          );
+        }
+      } else {
+        // Fallback: if cart customization rows are missing for any reason,
+        // snapshot the base recipe as the order's ingredient list.
+        for (const meta of cocktailCartItems) {
+          const [detailRows] = await connection.execute(
+            `
+              SELECT item_code, item_name, pegs
+              FROM xxafmc_cocktails_mocktails_details
+              WHERE inventory_item_code = ?
+            `,
+            [meta.parentItemCode]
+          );
+
+          for (const detail of detailRows) {
+            const ingredientCode = Number(detail.item_code);
+            if (!Number.isFinite(ingredientCode) || ingredientCode <= 0) continue;
+
+            await connection.execute(
+              `
+                INSERT INTO xxafmc_custom_cocktails_mocktails_details
+                  (item_code, item_name, pegs, inventory_item_code, user_id, quantity, order_number, creation_date)
+                VALUES
+                  (?, ?, ?, ?, ?, ?, ?, NOW())
+              `,
+              [
+                ingredientCode,
+                String(detail.item_name || "").trim(),
+                Number(detail.pegs || 0),
+                meta.parentItemCode,
+                userId,
+                meta.parentQuantity,
+                Number(orderNumber),
+              ]
+            );
+          }
+        }
+      }
     }
 
     await connection.commit();

@@ -797,7 +797,7 @@ const updateCartItemQuantity = async (cartId, userId, quantity) => {
 
       if (quantity + orderReservedQty > stockQty) {
         const availableQty = Math.max(0, stockQty - orderReservedQty);
-        throw new Error(`Available stock is : ${availableQty}`);
+        throw createValidationError(`Out of stock. Available quantity: ${availableQty}`);
       }
     }
     if (isCocktailOrMocktail) {

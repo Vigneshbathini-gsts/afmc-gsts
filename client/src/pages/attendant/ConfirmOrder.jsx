@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { cartAPI } from "../../services/api";
 
 export default function ConfirmOrder() {
+  const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [status, setStatus] = useState("loading");
   const [message, setMessage] = useState("Confirming the attendant order...");
   const orderNumber = searchParams.get("orderNumber") || `ORD-${Date.now()}`;
+  const basePath = location.pathname.startsWith("/attendant") ? "/attendant" : "/user";
 
   useEffect(() => {
     const confirmOrder = async () => {
@@ -42,14 +44,14 @@ export default function ConfirmOrder() {
 
         <div className="mt-6 flex flex-col gap-3 sm:flex-row">
           <button
-            onClick={() => navigate(`/attendant/payment?orderNumber=${encodeURIComponent(orderNumber)}`)}
+            onClick={() => navigate(`${basePath}/payment?orderNumber=${encodeURIComponent(orderNumber)}`)}
             className="rounded-full bg-red-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-red-800"
             disabled={status !== "success"}
           >
             Go to Payment
           </button>
           <button
-            onClick={() => navigate("/attendant/cart")}
+            onClick={() => navigate(`${basePath}/cart`)}
             className="rounded-full border border-gray-300 bg-white px-5 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
           >
             Back to Cart

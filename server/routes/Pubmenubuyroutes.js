@@ -8,5 +8,10 @@ router.get("/Pubmenubuy/:ORDER_NUMBER", authMiddleware, PubmenubuyController.get
 router.patch("/Pubmenubuy/:ORDER_NUMBER/item/:ITEM_CODE", authMiddleware, PubmenubuyController.updatePubMenuOrderItemQuantity);
 router.delete("/Pubmenubuy/:ORDER_NUMBER/item/:ITEM_CODE", authMiddleware, PubmenubuyController.deletePubMenuOrderItem);
 router.delete("/Pubmenubuy/:ORDER_NUMBER", authMiddleware, PubmenubuyController.cancelPubMenuOrder);
+router.put(
+  "/Pubmenubuy/:ORDER_NUMBER/line/:ORDER_LINE_ID/quantity",
+  authMiddleware,
+  PubmenubuyController.updatePubMenuOrderLineQuantity
+);
 
 module.exports = router;

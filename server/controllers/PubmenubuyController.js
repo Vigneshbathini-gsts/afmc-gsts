@@ -126,3 +126,46 @@ exports.deletePubMenuOrderItem = async (req, res) => {
     });
   }
 };
+
+exports.updatePubMenuOrderLineQuantity = async (req, res) => {
+  try {
+    const { ORDER_NUMBER, ORDER_LINE_ID } = req.params;
+    const userId = req.user?.userId || req.user?.user_id;
+    const { quantity } = req.body || {};
+
+    if (!userId) {
+      return res.status(400).json({ success: false, message: "User ID is required" });
+    }
+
+    if (!ORDER_NUMBER) {
+      return res.status(400).json({ success: false, message: "ORDER_NUMBER is required" });
+    }
+
+    if (!ORDER_LINE_ID) {
+      return res.status(400).json({ success: false, message: "ORDER_LINE_ID is required" });
+    }
+
+    if (quantity === undefined || quantity === null || Number.isNaN(Number(quantity))) {
+      return res.status(400).json({ success: false, message: "Valid quantity is required" });
+    }
+
+    const data = await Pubmenubuyservice.updateOrderLineQuantity(
+      ORDER_NUMBER,
+      ORDER_LINE_ID,
+      userId,
+      Number(quantity)
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Quantity updated",
+      data,
+    });
+  } catch (error) {
+    console.error("Update pub menu order line quantity error:", error);
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || "Server error while updating quantity",
+    });
+  }
+};

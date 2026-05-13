@@ -13,6 +13,157 @@ function deriveKitchenTypeFromCategory(categoryName) {
   return normalized === "LIQUOR" ? "Bar" : "Kitchen";
 }
 
+async function getIngredientStockQuantities(connection, ingredientCodes) {
+  const normalizedCodes = [...new Set((Array.isArray(ingredientCodes) ? ingredientCodes : [])
+    .map((code) => Number(code))
+    .filter((code) => Number.isFinite(code) && code > 0))];
+
+  if (normalizedCodes.length === 0) return {};
+
+  const placeholders = normalizedCodes.map(() => "?").join(",");
+  const [invRows] = await connection.execute(
+    `
+      SELECT item_code, IFNULL(stock_quantity, 0) AS stock_quantity
+      FROM xxafmc_inventory
+      WHERE item_code IN (${placeholders})
+    `,
+    normalizedCodes
+  );
+
+  const inventoryMap = invRows.reduce((acc, row) => {
+    acc[String(row.item_code)] = Number(row.stock_quantity || 0);
+    return acc;
+  }, {});
+
+  const [stockOutRows] = await connection.execute(
+    `
+      SELECT item_code, IFNULL(SUM(stock_quantity), 0) AS stock_quantity
+      FROM xxafmc_stock_out
+      WHERE item_code IN (${placeholders})
+      GROUP BY item_code
+    `,
+    normalizedCodes
+  );
+
+  const stockOutMap = stockOutRows.reduce((acc, row) => {
+    acc[String(row.item_code)] = Number(row.stock_quantity || 0);
+    return acc;
+  }, {});
+
+  return normalizedCodes.reduce((acc, code) => {
+    const key = String(code);
+    acc[key] = Math.max(Number(inventoryMap[key] || 0), Number(stockOutMap[key] || 0));
+    return acc;
+  }, {});
+}
+
+async function getIngredientReservedQuantitiesExcludingOrder(connection, ingredientCodes, orderNumber) {
+  const normalizedCodes = [...new Set((Array.isArray(ingredientCodes) ? ingredientCodes : [])
+    .map((code) => Number(code))
+    .filter((code) => Number.isFinite(code) && code > 0))];
+
+  const normalizedOrderNumber = Number(orderNumber);
+  if (normalizedCodes.length === 0) return {};
+
+  const placeholders = normalizedCodes.map(() => "?").join(",");
+  const [rows] = await connection.execute(
+    `
+      SELECT xod.item_id AS item_code, IFNULL(SUM(xod.quantity), 0) AS reserved_quantity
+      FROM xxafmc_order_details xod
+      LEFT JOIN xxafmc_order_header xoh ON xod.order_id = xoh.order_num
+      LEFT JOIN xxafmc_invoices xi ON xi.order_num = xod.order_id
+      WHERE xod.item_id IN (${placeholders})
+        AND xod.order_status IS NULL
+        AND xod.price IS NULL
+        AND xi.order_num IS NULL
+        AND xod.order_id != ?
+      GROUP BY xod.item_id
+    `,
+    [...normalizedCodes, normalizedOrderNumber]
+  );
+
+  return rows.reduce((acc, row) => {
+    acc[String(row.item_code)] = Number(row.reserved_quantity || 0);
+    return acc;
+  }, {});
+}
+
+async function getCocktailMaxQuantityMap(connection, orderNumber, parentItemIds) {
+  const normalizedOrderNumber = Number(orderNumber);
+  const normalizedParents = [...new Set((Array.isArray(parentItemIds) ? parentItemIds : [])
+    .map((code) => Number(code))
+    .filter((code) => Number.isFinite(code) && code > 0))];
+
+  if (!Number.isFinite(normalizedOrderNumber) || normalizedOrderNumber <= 0 || normalizedParents.length === 0) {
+    return new Map();
+  }
+
+  const placeholders = normalizedParents.map(() => "?").join(",");
+  const [rows] = await connection.execute(
+    `
+      SELECT
+        x.inventory_item_code AS parent_item_id,
+        x.item_code AS ingredient_item_code,
+        x.item_name AS ingredient_name,
+        x.pegs AS ingredient_pegs
+      FROM (
+        SELECT inventory_item_code, item_code, item_name, pegs
+        FROM xxafmc_custom_cocktails_mocktails_details
+        WHERE order_number = ?
+        UNION ALL
+        SELECT inventory_item_code, item_code, item_name, pegs
+        FROM xxafmc_custom_cocktails_mocktails_details_dummy
+        WHERE order_number = ?
+      ) x
+      WHERE x.inventory_item_code IN (${placeholders})
+    `,
+    [normalizedOrderNumber, normalizedOrderNumber, ...normalizedParents]
+  );
+
+  const byParent = rows.reduce((acc, row) => {
+    const parentId = Number(row.parent_item_id);
+    if (!Number.isFinite(parentId) || parentId <= 0) return acc;
+    if (!acc.has(parentId)) acc.set(parentId, []);
+    acc.get(parentId).push({
+      itemCode: Number(row.ingredient_item_code),
+      itemName: String(row.ingredient_name || "").trim(),
+      pegs: Number(row.ingredient_pegs || 0),
+    });
+    return acc;
+  }, new Map());
+
+  const ingredientCodes = [...new Set(rows
+    .map((row) => Number(row.ingredient_item_code))
+    .filter((code) => Number.isFinite(code) && code > 0))];
+
+  const stockMap = await getIngredientStockQuantities(connection, ingredientCodes);
+  const reservedMap = await getIngredientReservedQuantitiesExcludingOrder(connection, ingredientCodes, normalizedOrderNumber);
+
+  const maxMap = new Map();
+
+  for (const parentId of normalizedParents) {
+    const ingredients = byParent.get(parentId) || [];
+    if (ingredients.length === 0) {
+      maxMap.set(parentId, null);
+      continue;
+    }
+
+    let maxPossibleQty = Infinity;
+    for (const ingredient of ingredients) {
+      const perCocktailPegs = Number(ingredient.pegs || 0);
+      if (perCocktailPegs <= 0) continue;
+      const stockQuantity = Number(stockMap[String(ingredient.itemCode)] || 0);
+      const reservedQuantity = Number(reservedMap[String(ingredient.itemCode)] || 0);
+      const availableQuantity = Math.max(0, stockQuantity - reservedQuantity);
+      maxPossibleQty = Math.min(maxPossibleQty, Math.floor(availableQuantity / perCocktailPegs));
+    }
+
+    maxMap.set(parentId, Number.isFinite(maxPossibleQty) ? Math.max(0, maxPossibleQty) : null);
+  }
+
+  return maxMap;
+}
+
 async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
   const normalizedOrderNumber = Number(orderNumber);
   if (!Number.isFinite(normalizedOrderNumber) || normalizedOrderNumber <= 0) {
@@ -64,10 +215,23 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
         SELECT
           od.item_id,
           od.quantity,
+          od.price,
+          od.subtotal,
           od.barcode,
           od.type_id,
           xi.item_name,
-          c.category_name
+          xi.description,
+          xi.sub_category,
+          c.category_name,
+          COALESCE(
+            NULLIF(xi.stock_quantity, 0),
+            (
+              SELECT IFNULL(SUM(stock_quantity), 0)
+              FROM xxafmc_stock_out so
+              WHERE so.item_code = xi.item_code
+            ),
+            0
+          ) AS stock_quantity
         FROM xxafmc_order_details od
         JOIN xxafmc_inventory xi
           ON od.item_id = xi.item_code
@@ -83,6 +247,79 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
       const error = new Error("No order items found");
       error.statusCode = 404;
       throw error;
+    }
+
+    const hasZeroQty = detailRows.some((row) => Number(row.quantity || 0) === 0);
+    if (hasZeroQty) {
+      const error = new Error(
+        "Some items have a quantity of 0. Please update the quantity before proceeding."
+      );
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const itemCodes = [...new Set(detailRows.map((row) => Number(row.item_id)).filter((code) => Number.isFinite(code) && code > 0))];
+    const cocktailItemIds = [...new Set(detailRows
+      .filter((row) => [14, 15].includes(Number(row.sub_category)))
+      .map((row) => Number(row.item_id))
+      .filter((code) => Number.isFinite(code) && code > 0))];
+
+    const cocktailMaxMap = await getCocktailMaxQuantityMap(connection, normalizedOrderNumber, cocktailItemIds);
+
+    if (itemCodes.length > 0) {
+      const placeholders = itemCodes.map(() => "?").join(",");
+      const [reservedRows] = await connection.execute(
+        `
+          SELECT xod.item_id AS item_code, IFNULL(SUM(xod.quantity), 0) AS reserved
+          FROM xxafmc_order_details xod
+          LEFT JOIN xxafmc_order_header xoh ON xod.order_id = xoh.order_num
+          LEFT JOIN xxafmc_invoices xi ON xi.order_num = xod.order_id
+          WHERE xod.item_id IN (${placeholders})
+            AND xod.order_status IS NULL
+            AND xod.price IS NULL
+            AND xi.order_num IS NULL
+            AND xod.order_id != ?
+          GROUP BY xod.item_id
+        `,
+        [...itemCodes, normalizedOrderNumber]
+      );
+
+      const reservedMap = reservedRows.reduce((map, row) => {
+        map[String(row.item_code)] = Number(row.reserved || 0);
+        return map;
+      }, {});
+
+      const outOfStockItem = detailRows.find((row) => {
+        const isCocktailOrMocktail = [14, 15].includes(Number(row.sub_category));
+        if (isCocktailOrMocktail) {
+          const maxQty = cocktailMaxMap.get(Number(row.item_id));
+          if (maxQty === null || maxQty === undefined) return false;
+          return Number(row.quantity || 0) > Number(maxQty);
+        }
+        const stockQuantity = Number(row.stock_quantity || 0);
+        const reservedQuantity = Number(reservedMap[String(row.item_id)] || 0);
+        const availableQuantity = Math.max(0, stockQuantity - reservedQuantity);
+        return Number(row.quantity || 0) > availableQuantity;
+      });
+
+      if (outOfStockItem) {
+        const isCocktailOrMocktail = [14, 15].includes(Number(outOfStockItem.sub_category));
+        const availableQuantity = isCocktailOrMocktail
+          ? Number(cocktailMaxMap.get(Number(outOfStockItem.item_id)) ?? 0)
+          : (() => {
+              const stockQuantity = Number(outOfStockItem.stock_quantity || 0);
+              const reservedQuantity = Number(reservedMap[String(outOfStockItem.item_id)] || 0);
+              return Math.max(0, stockQuantity - reservedQuantity);
+            })();
+        const isFreeItem = Number(outOfStockItem.price || 0) === 0 && Number(outOfStockItem.subtotal || 0) === 0;
+        const error = new Error(
+          isFreeItem
+            ? `Out of stock for free item. Available quantity: ${availableQuantity}`
+            : `Out of stock for ${outOfStockItem.item_name || outOfStockItem.item_id}. Available quantity: ${availableQuantity}`
+        );
+        error.statusCode = 400;
+        throw error;
+      }
     }
 
     let insertedCount = 0;
@@ -114,6 +351,7 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
               ordernumber,
               user_name,
               item_id,
+              description,
               item_name,
               quantity,
               type_id,
@@ -125,12 +363,13 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
               kitchen_type
             )
           VALUES
-            (?, ?, ?, ?, ?, ?, ?, NOW(), 'N', 'Received', ?, ?)
+            (?, ?, ?, ?, ?, ?, ?, ?, NOW(), 'N', 'Received', ?, ?)
         `,
         [
           normalizedOrderNumber,
           notificationUserId,
           item.item_id,
+          item.description || null,
           item.item_name,
           Number(item.quantity || 0),
           item.type_id || null,
@@ -142,6 +381,11 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
 
       insertedCount += 1;
     }
+
+    // Cart flow: once an order is confirmed, clear the user's cart.
+    await connection.execute(`DELETE FROM xxafmc_cart_items WHERE user_id = ?`, [
+      notificationUserId,
+    ]);
 
     await connection.commit();
 
@@ -241,8 +485,35 @@ async function getConfirmedOrderDetails(orderNumber) {
     [normalizedOrderNumber]
   );
 
+  // APEX-style overall status calculation.
+  const totalItems = itemRows.length;
+  const statusCounts = itemRows.reduce(
+    (acc, row) => {
+      const s = String(row.status || "Received").trim();
+      if (s === "Completed") acc.completed += 1;
+      else if (s === "Preparing") acc.preparing += 1;
+      else if (s === "Cancelled") acc.cancelled += 1;
+      else acc.received += 1;
+      return acc;
+    },
+    { completed: 0, preparing: 0, cancelled: 0, received: 0 }
+  );
+
+  const activeItems = totalItems - statusCounts.cancelled;
+  let overallStatus = "Received";
+  if (activeItems > 0 && statusCounts.completed === activeItems) {
+    overallStatus = "Completed";
+  } else if (statusCounts.preparing > 0) {
+    overallStatus = "Preparing";
+  } else if (totalItems > 0 && statusCounts.cancelled === totalItems) {
+    overallStatus = "Cancelled";
+  }
+
   return {
-    header: headerRows[0],
+    header: {
+      ...headerRows[0],
+      status: overallStatus,
+    },
     items: itemRows,
   };
 }
