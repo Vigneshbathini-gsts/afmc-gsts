@@ -434,6 +434,33 @@ exports.getCartItems = async (req, res) => {
   }
 };
 
+exports.proceedToBuy = async (req, res) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(400).json({ success: false, message: "User ID is required" });
+    }
+
+    const items = await cartModel.getCartItemsByUser(userId);
+    if (!items || items.length === 0) {
+      return res.status(400).json({ success: false, message: "Cart is empty" });
+    }
+
+    // `client/src/pages/common/CartBuy.jsx` currently routes into the Pub menu flow and
+    // does not persist/consume this orderNumber. It only needs a stable token to navigate.
+    const orderNumber = Date.now();
+
+    return res.status(200).json({
+      success: true,
+      message: "Proceed to buy initialized",
+      data: { orderNumber },
+    });
+  } catch (error) {
+    console.error("Error in proceedToBuy:", error);
+    return res.status(500).json({ success: false, message: "Failed to proceed to buy" });
+  }
+};
+
 exports.confirmOrder = async (req, res) => {
   const userId = req.user?.userId;
   const { pubmed, memberId, kitchenType } = req.body || {};
@@ -446,9 +473,105 @@ exports.confirmOrder = async (req, res) => {
   try {
     await connection.beginTransaction();
 
+    const getStockQuantity = async (itemCode) => {
+      const [[row]] = await connection.execute(
+        `
+          SELECT COALESCE(
+            NULLIF(xi.stock_quantity, 0),
+            (
+              SELECT IFNULL(SUM(so.stock_quantity), 0)
+              FROM xxafmc_stock_out so
+              WHERE so.item_code = xi.item_code
+            ),
+            0
+          ) AS stock_quantity
+          FROM xxafmc_inventory xi
+          WHERE xi.item_code = ?
+          LIMIT 1
+        `,
+        [itemCode]
+      );
+
+      return Number(row?.stock_quantity || 0);
+    };
+
+    const getReservedOrderQuantity = async (itemCode, excludingOrderNumber) => {
+      const [[row]] = await connection.execute(
+        `
+          SELECT IFNULL(SUM(xod.quantity), 0) AS reserved
+          FROM xxafmc_order_details xod
+          LEFT JOIN xxafmc_invoices xi
+            ON xi.order_num = xod.order_id
+          WHERE xod.item_id = ?
+            AND xod.order_status IS NULL
+            AND xod.price IS NULL
+            AND xi.order_num IS NULL
+            AND xod.order_id != ?
+        `,
+        [itemCode, excludingOrderNumber]
+      );
+
+      return Number(row?.reserved || 0);
+    };
+
+    const validateCocktailIngredientsStock = async (cartId, cartQuantity, excludingOrderNumber) => {
+      const normalizedCartId = Number(cartId);
+      if (!Number.isFinite(normalizedCartId) || normalizedCartId <= 0) {
+        const error = new Error("Invalid cart item selected");
+        error.statusCode = 400;
+        throw error;
+      }
+
+      const [rows] = await connection.execute(
+        `
+          SELECT ingredient_item_code, ingredient_name, quantity
+          FROM xxafmc_cart_customization
+          WHERE cart_id = ?
+        `,
+        [normalizedCartId]
+      );
+
+      if (!rows.length) {
+        // Cocktail/mocktail must have ingredients; if missing, block checkout.
+        const error = new Error("Cocktail/mocktail ingredients are missing");
+        error.statusCode = 400;
+        throw error;
+      }
+
+      for (const row of rows) {
+        const ingredientCode = Number(row.ingredient_item_code || 0);
+        const perUnitQty = Number(row.quantity || 0);
+        const requiredQty = perUnitQty * Number(cartQuantity || 1);
+        if (!ingredientCode || requiredQty <= 0) continue;
+
+        const [stockQty, reservedQty] = await Promise.all([
+          getStockQuantity(ingredientCode),
+          getReservedOrderQuantity(ingredientCode, excludingOrderNumber),
+        ]);
+
+        if (requiredQty + reservedQty > stockQty) {
+          const availableQty = Math.max(0, stockQty - reservedQty);
+          const error = new Error(
+            `Out of stock for cocktail/mocktail ingredients (${row.ingredient_name || ingredientCode}). Available quantity: ${availableQty}`
+          );
+          error.statusCode = 400;
+          throw error;
+        }
+      }
+    };
+
     // 1. Fetch Cart Items and join with inventory to get names and categories
     const [cartRows] = await connection.execute(
-      `SELECT c.*, xi.category_id, xi.sub_category, xi.item_name 
+      `SELECT
+        c.*,
+        xi.category_id,
+        xi.sub_category,
+        xi.item_name,
+        IFNULL(xi.profit, 0) AS profit,
+        IFNULL(xi.non_member_profit, 0) AS non_member_profit,
+        IFNULL(xi.pr_charges, 0) AS pr_charges,
+        IFNULL(xi.food_pr_charges, 0) AS food_pr_charges,
+        IFNULL(xi.\`A/C_UNIT\`, 'Nos') AS ac_unit
        FROM xxafmc_cart_items c 
        JOIN xxafmc_inventory xi ON c.item_id = xi.item_code 
        WHERE c.user_id = ?`,
@@ -471,46 +594,107 @@ exports.confirmOrder = async (req, res) => {
     );
     const orderNumber = headerResult.insertId;
 
-    for (const cartItem of cartRows) {
-      // 2. Validate Stock inside transaction (Production Check)
-      const [stockRows] = await connection.execute(
-        `SELECT IFNULL(SUM(STOCK_QUANTITY), 0) AS stock FROM xxafmc_stock_out WHERE item_code = ?`,
-        [cartItem.item_id]
+    const getNextOrderLineId = async () => {
+      const [[row]] = await connection.execute(
+        `SELECT COALESCE(MAX(order_line_id), 0) + 1 AS nextId FROM xxafmc_order_details`
       );
-      const available = Number(stockRows[0]?.stock || 0);
-      
-      // Note: We also check reserved quantities from other orders
-      const [reservedRows] = await connection.execute(
-        `SELECT IFNULL(SUM(quantity), 0) AS reserved FROM xxafmc_order_details 
-         WHERE item_id = ? AND order_status IS NULL AND order_id != ?`,
-        [cartItem.item_id, orderNumber]
-      );
-      const reserved = Number(reservedRows[0]?.reserved || 0);
+      return Number(row?.nextId || 1);
+    };
 
-      if (cartItem.quantity + reserved > available) {
-        throw new Error(`Insufficient stock for ${cartItem.item_name}. Only ${available - reserved} left.`);
+    for (const cartItem of cartRows) {
+      const itemId = cartItem?.item_id ?? cartItem?.ITEM_ID ?? cartItem?.itemId ?? null;
+      if (itemId === null || itemId === undefined) {
+        throw new Error("Cart item is missing item_id");
       }
 
-      // 3. Insert into Order Details
-       await connection.execute(
-        `INSERT INTO xxafmc_order_details 
-         (order_id, item_id, quantity, price, subtotal, description, created_by, creation_date, subcategory, total_quantity)
-         VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?)`,
-        [
-          orderNumber,
-          cartItem.item_id,
-          cartItem.quantity,
-          cartItem.price,
-          cartItem.total,
-          cartItem.description,
-          userId,
-          cartItem.sub_category,
-          cartItem.quantity
-        ]
-      );
+      // Cart rows come from MySQL; column keys can be uppercase (e.g. QUANTITY/PRICE/TOTAL).
+      const cartQtyRaw = cartItem?.quantity ?? cartItem?.QUANTITY ?? null;
+      const cartPriceRaw = cartItem?.price ?? cartItem?.PRICE ?? null;
+      const cartTotalRaw = cartItem?.total ?? cartItem?.TOTAL ?? null;
+      const cartDescriptionRaw = cartItem?.description ?? cartItem?.DESCRIPTION ?? null;
+      const cartSubcategoryRaw =
+        cartItem?.sub_category ?? cartItem?.SUB_CATEGORY ?? cartItem?.subCategory ?? cartItem?.SUBCATEGORY ?? null;
+      const cartCategoryIdRaw = cartItem?.category_id ?? cartItem?.CATEGORY_ID ?? null;
+      const cartItemName = cartItem?.item_name ?? cartItem?.ITEM_NAME ?? null;
+      const stockCheckQty = Number(cartQtyRaw || 0);
+
+      const isCocktailOrMocktail = [14, 15].includes(Number(cartSubcategoryRaw || 0));
+      if (isCocktailOrMocktail) {
+        const cartId = cartItem?.cart_id ?? cartItem?.CART_ID ?? null;
+        await validateCocktailIngredientsStock(cartId, stockCheckQty, orderNumber);
+      } else {
+        // 2. Validate stock for non-cocktail items
+        const [stockQty, reservedQty] = await Promise.all([
+          getStockQuantity(itemId),
+          getReservedOrderQuantity(itemId, orderNumber),
+        ]);
+        const availableQty = Math.max(0, stockQty - reservedQty);
+        if (stockCheckQty > availableQty) {
+          throw new Error(`Insufficient stock for ${cartItemName || itemId}. Only ${availableQty} left.`);
+        }
+      }
+
+      // 3. Insert into Order Details (aligned to existing schema; no `description` column)
+      const orderLineId = await getNextOrderLineId();
+      const quantity = Number(cartQtyRaw ?? 0);
+      const unitPrice = cartPriceRaw ?? null;
+      const lineSubtotal = cartTotalRaw ?? null;
+      const subCategory = cartSubcategoryRaw ?? null;
+      const roleId = Number(req.user?.roleId || 0);
+      const profit = roleId === 20 ? Number(cartItem.profit || 0) : Number(cartItem.non_member_profit || 0);
+      const foodPrCharges = roleId === 20 ? Number(cartItem.food_pr_charges || 0) : Number(cartItem.pr_charges || 0);
+
+      if (Number(cartCategoryIdRaw) === 10) {
+        const typeName = String(cartDescriptionRaw ?? cartItem.ac_unit ?? "Nos").trim() || "Nos";
+        const [typeRows] = await connection.execute(
+          `SELECT type_id FROM xxafmc_bar WHERE UPPER(type) = UPPER(?) LIMIT 1`,
+          [typeName]
+        );
+        const typeId = typeRows?.[0]?.type_id ?? null;
+
+        await connection.execute(
+          `INSERT INTO xxafmc_order_details
+            (order_line_id, order_id, item_id, type_id, quantity, type, price, subtotal, total_quantity, created_by, creation_date, subcategory, profit, food_pr_charges)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?)`,
+          [
+            orderLineId,
+            orderNumber,
+            itemId,
+            typeId,
+            quantity,
+            typeName,
+            unitPrice,
+            lineSubtotal,
+            quantity,
+            req.user?.username || "SYSTEM",
+            subCategory,
+            profit,
+            foodPrCharges,
+          ]
+        );
+      } else {
+        await connection.execute(
+          `INSERT INTO xxafmc_order_details
+            (order_line_id, order_id, item_id, quantity, price, subtotal, total_quantity, created_by, creation_date, subcategory, profit, food_pr_charges)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?)`,
+          [
+            orderLineId,
+            orderNumber,
+            itemId,
+            quantity,
+            unitPrice,
+            lineSubtotal,
+            quantity,
+            req.user?.username || "SYSTEM",
+            subCategory,
+            profit,
+            foodPrCharges,
+          ]
+        );
+      }
 
       // 3. Create Kitchen Notification
-      const kType = kitchenType || (Number(cartItem.category_id) === 10 ? 'Bar' : 'Kitchen');
+      const kType = kitchenType || (Number(cartItem.category_id) === 10 ? "Bar" : "Kitchen");
       await connection.execute(
         `INSERT INTO xxafmc_kitchen_notification
           (ordernumber, user_name, item_id, item_name, quantity, created_by, creation_date, msg_read, status, kitchen_type)
@@ -518,11 +702,11 @@ exports.confirmOrder = async (req, res) => {
         [
           orderNumber,
           userId,
-          cartItem.item_id,
-          cartItem.item_name,
-          cartItem.quantity,
+          itemId,
+          cartItem.item_name ?? null,
+          Number(cartItem.quantity ?? 0),
           userId,
-          kType
+          kType ?? "Kitchen",
         ]
       );
     }

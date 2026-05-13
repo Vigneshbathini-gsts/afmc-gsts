@@ -35,4 +35,22 @@ const getInvoiceByOrder = async (req, res) => {
 module.exports = {
   createInvoice,
   getInvoiceByOrder,
+  saveInvoicePayment: async (req, res) => {
+    try {
+      const { orderNumber } = req.params;
+      const { paymentMode, paymentReference, paymentStatus } = req.body || {};
+
+      const result = await invoiceService.saveInvoicePayment({
+        orderNumber,
+        paymentMode,
+        paymentReference,
+        paymentStatus,
+        createdBy: req.user?.username || req.user?.userName || "SYSTEM",
+      });
+
+      return successResponse(res, "Payment saved", result);
+    } catch (error) {
+      return errorResponse(res, error.message);
+    }
+  },
 };

@@ -104,18 +104,17 @@ return (
               type="button"
               onClick={() =>
                 navigate(
-                  `${currentBasePath}/invoice?orderNumber=${encodeURIComponent(orderData?.header?.order_num || orderNumber)}&amount=${encodeURIComponent(orderAmount.toFixed(2))}`,
+                  `${currentBasePath}/payment?orderNumber=${encodeURIComponent(orderData?.header?.order_num || orderNumber)}`,
                   {
                     state: {
                       orderNumber: orderData?.header?.order_num || orderNumber,
-                      amount: orderAmount,
                     },
                   }
                 )
               }
               className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-5 py-2 text-sm font-medium text-white transition hover:bg-emerald-700"
             >
-              Payment
+              Go to Payment
             </button>
           ) : null}
 

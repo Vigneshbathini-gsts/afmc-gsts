@@ -57,6 +57,7 @@ async function getInventoryItem(connection, itemCode) {
         ITEM_NAME AS item_name,
         CATEGORY_ID AS category_id,
         SUB_CATEGORY AS sub_category,
+        IFNULL(UNIT_PRICE, 0) AS unit_price,
         IFNULL(NON_MEMBER_PROFIT, 0) AS non_member_profit,
         IFNULL(PR_CHARGES, 0) AS pr_charges,
         IFNULL(PROFIT, 0) AS profit,
@@ -1133,6 +1134,9 @@ async function createOrder(payload = {}, authUser = {}) {
         ? Number(inventoryItem.food_pr_charges || 0)
         : Number(inventoryItem.pr_charges || 0);
 
+    const unitPrice = Number(inventoryItem.unit_price || 0);
+    const subtotal = Number((unitPrice * quantity).toFixed(2));
+
     if (isMocktailItem && quantity > 5) {
       throw createValidationError("Quantity must be 5 or less");
     }
@@ -1187,6 +1191,8 @@ async function createOrder(payload = {}, authUser = {}) {
               type_id,
               quantity,
               type,
+              price,
+              subtotal,
               total_quantity,
               created_by,
               creation_date,
@@ -1195,7 +1201,7 @@ async function createOrder(payload = {}, authUser = {}) {
               food_pr_charges
             )
           VALUES
-            (?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?)
+            (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?)
         `,
         [
           orderLineId,
@@ -1204,6 +1210,8 @@ async function createOrder(payload = {}, authUser = {}) {
           typeId,
           quantity,
           remarks,
+          unitPrice,
+          subtotal,
           quantity,
           appUser,
           subCategory,
@@ -1220,6 +1228,8 @@ async function createOrder(payload = {}, authUser = {}) {
               order_id,
               item_id,
               quantity,
+              price,
+              subtotal,
               total_quantity,
               created_by,
               creation_date,
@@ -1228,9 +1238,9 @@ async function createOrder(payload = {}, authUser = {}) {
               food_pr_charges
             )
           VALUES
-            (?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?)
+            (?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?)
         `,
-        [orderLineId, orderNumber, itemCode, quantity, quantity, appUser, subCategory, profit, foodPrCharges]
+        [orderLineId, orderNumber, itemCode, quantity, unitPrice, subtotal, quantity, appUser, subCategory, profit, foodPrCharges]
       );
     }
 

@@ -168,9 +168,44 @@ const findInvoiceWithItemsByOrder = async (orderNumber) => {
   return rows;
 };
 
+const findOrderWithItemsByOrder = async (orderNumber) => {
+  const query = `
+    SELECT
+      oh.order_num AS orderNumber,
+      '' AS paymentMethod,
+      '' AS paymentStatus,
+      DATE_FORMAT(
+        COALESCE(
+          STR_TO_DATE(oh.order_date, '%m/%d/%Y'),
+          DATE(oh.order_date),
+          CURDATE()
+        ),
+        '%c/%e/%Y'
+      ) AS invoiceDate,
+      oh.order_total AS totalAmount,
+      '' AS paymentReference,
+      od.item_id,
+      od.quantity,
+      od.price,
+      od.subtotal,
+      COALESCE(i.item_name, od.item_id) AS item_name
+    FROM xxafmc_order_header oh
+    LEFT JOIN xxafmc_order_details od
+      ON od.order_id = oh.order_num
+    LEFT JOIN xxafmc_inventory i
+      ON i.item_code = od.item_id
+    WHERE oh.order_num = ?
+    ORDER BY od.order_line_id ASC
+  `;
+
+  const [rows] = await db.execute(query, [orderNumber]);
+  return rows;
+};
+
 module.exports = {
   findInvoiceByOrder,
   createInvoice,
   updateInvoicePayment,
   findInvoiceWithItemsByOrder,
+  findOrderWithItemsByOrder,
 };
