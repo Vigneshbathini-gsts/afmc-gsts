@@ -301,6 +301,20 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
     return Math.floor(paid / 2);
   };
 
+  const refreshOrderSummary = async () => {
+    if (!orderNumber) return;
+
+    try {
+      const refreshed = await Pubmenubuyservice.getByOrderNumber(orderNumber);
+      const refreshedData = refreshed?.data?.data || {};
+      const refreshedRows = Array.isArray(refreshedData?.items) ? refreshedData.items : [];
+      setOrderHeader(refreshedData?.header || null);
+      setItems(refreshedRows.map((item, index) => normalizeItem(item, index)));
+    } catch {
+      // Ignore refresh failures here; the existing order state is still valid.
+    }
+  };
+
   const syncFreeItemQuantities = async (nextItems) => {
     if (!orderNumber) return;
 
@@ -336,25 +350,7 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
 
     if (updates.length === 0) return;
 
-    try {
-      await Promise.all(
-        updates.map((update) =>
-          Pubmenubuyservice.updateLineQuantity(orderNumber, update.orderLineId, update.quantity)
-        )
-      );
-
-      const refreshed = await Pubmenubuyservice.getByOrderNumber(orderNumber);
-      const refreshedData = refreshed?.data?.data || {};
-      const refreshedRows = Array.isArray(refreshedData?.items) ? refreshedData.items : [];
-      setOrderHeader(refreshedData?.header || null);
-      setItems(refreshedRows.map((item, index) => normalizeItem(item, index)));
-    } catch (syncError) {
-      // If backend disallows free-line updates, don't block the user flow.
-      // Order confirmation will still validate stock/quantities server-side.
-      const message =
-        syncError?.response?.data?.message || "Unable to sync free item quantities.";
-      showToast(message, "error");
-    }
+    await refreshOrderSummary();
   };
 
   const adjustQuantity = async (orderLineId, delta) => {
@@ -481,6 +477,8 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
       setItems(normalized);
       setError("");
       showToast("Quantity updated successfully", "success");
+      // The backend response already returns an updated order summary (including offer-linked free items).
+      // Avoid an immediate refetch here; it can briefly reintroduce stale quantities in slow networks.
       await syncFreeItemQuantities(normalized);
     } catch (updateError) {
       const message = updateError?.response?.data?.message || "Unable to update quantity.";

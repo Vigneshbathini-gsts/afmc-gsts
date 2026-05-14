@@ -601,6 +601,25 @@ exports.confirmOrder = async (req, res) => {
       return Number(row?.nextId || 1);
     };
 
+    // Map paid item_id -> quantity (used to link free lines during migration)
+    const paidQtyByItemId = new Map();
+    for (const row of cartRows) {
+      const itemId = row?.item_id ?? row?.ITEM_ID ?? null;
+      const qtyRaw = row?.quantity ?? row?.QUANTITY ?? null;
+      const priceRaw = row?.price ?? row?.PRICE ?? null;
+      const totalRaw = row?.total ?? row?.TOTAL ?? null;
+
+      const quantity = Number(qtyRaw ?? 0);
+      const unitPrice = Number(priceRaw ?? 0);
+      const subtotal = Number(totalRaw ?? 0);
+      const isFreeRow = unitPrice === 0 && subtotal === 0;
+      if (isFreeRow) continue;
+
+      if (itemId !== null && itemId !== undefined && Number.isFinite(Number(itemId)) && Number(itemId) > 0) {
+        paidQtyByItemId.set(Number(itemId), quantity);
+      }
+    }
+
     for (const cartItem of cartRows) {
       const itemId = cartItem?.item_id ?? cartItem?.ITEM_ID ?? cartItem?.itemId ?? null;
       if (itemId === null || itemId === undefined) {
@@ -643,6 +662,15 @@ exports.confirmOrder = async (req, res) => {
       const roleId = Number(req.user?.roleId || 0);
       const profit = roleId === 20 ? Number(cartItem.profit || 0) : Number(cartItem.non_member_profit || 0);
       const foodPrCharges = roleId === 20 ? Number(cartItem.food_pr_charges || 0) : Number(cartItem.pr_charges || 0);
+      const parentCodeRaw = cartItem?.parent_code ?? cartItem?.PARENT_CODE ?? null;
+      const parentCode = parentCodeRaw === null || parentCodeRaw === undefined || parentCodeRaw === "" ? null : String(parentCodeRaw);
+
+      const isFreeRow = Number(unitPrice || 0) === 0 && Number(lineSubtotal || 0) === 0;
+      const parentItemIdForFree = parentCode ? Number(parentCode) : Number.NaN;
+      const parentQtyForFree =
+        Number.isFinite(parentItemIdForFree) && paidQtyByItemId.has(parentItemIdForFree)
+          ? Number(paidQtyByItemId.get(parentItemIdForFree) || 0)
+          : quantity;
 
       if (Number(cartCategoryIdRaw) === 10) {
         const typeName = String(cartDescriptionRaw ?? cartItem.ac_unit ?? "Nos").trim() || "Nos";
@@ -654,8 +682,8 @@ exports.confirmOrder = async (req, res) => {
 
         await connection.execute(
           `INSERT INTO xxafmc_order_details
-            (order_line_id, order_id, item_id, type_id, quantity, type, price, subtotal, total_quantity, created_by, creation_date, subcategory, profit, food_pr_charges)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?)`,
+            (order_line_id, order_id, item_id, type_id, quantity, type, price, subtotal, total_quantity, created_by, creation_date, subcategory, profit, food_pr_charges, barcode)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?)`,
           [
             orderLineId,
             orderNumber,
@@ -665,18 +693,19 @@ exports.confirmOrder = async (req, res) => {
             typeName,
             unitPrice,
             lineSubtotal,
-            quantity,
+            isFreeRow ? parentQtyForFree : quantity,
             req.user?.username || "SYSTEM",
             subCategory,
             profit,
             foodPrCharges,
+            isFreeRow ? parentCode : null,
           ]
         );
       } else {
         await connection.execute(
           `INSERT INTO xxafmc_order_details
-            (order_line_id, order_id, item_id, quantity, price, subtotal, total_quantity, created_by, creation_date, subcategory, profit, food_pr_charges)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?)`,
+            (order_line_id, order_id, item_id, quantity, price, subtotal, total_quantity, created_by, creation_date, subcategory, profit, food_pr_charges, barcode)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?)`,
           [
             orderLineId,
             orderNumber,
@@ -684,16 +713,20 @@ exports.confirmOrder = async (req, res) => {
             quantity,
             unitPrice,
             lineSubtotal,
-            quantity,
+            isFreeRow ? parentQtyForFree : quantity,
             req.user?.username || "SYSTEM",
             subCategory,
             profit,
             foodPrCharges,
+            isFreeRow ? parentCode : null,
           ]
         );
       }
 
-      // 3. Create Kitchen Notification
+      // 3. Create Kitchen Notification (skip free offer lines)
+      if (isFreeRow) {
+        continue;
+      }
       const kType = kitchenType || (Number(cartItem.category_id) === 10 ? "Bar" : "Kitchen");
       await connection.execute(
         `INSERT INTO xxafmc_kitchen_notification

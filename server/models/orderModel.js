@@ -325,7 +325,10 @@ async function getOrderDetails(orderNumber) {
   od.price,
   od.subtotal,
   COALESCE(NULLIF(xi.type, ''), NULLIF(od.type, ''), 'NA') AS type,
-  COALESCE(NULLIF(od.order_status, ''), 'Pending') AS status
+  COALESCE(NULLIF(od.order_status, ''), 'Pending') AS status,
+  od.barcode AS barcode,
+  od.FREE_ITEM_CODE AS free_item_code,
+  od.FREE_ITEM_QUANTITY AS free_item_quantity
 FROM xxafmc_order_details od
 LEFT JOIN (
     SELECT 
