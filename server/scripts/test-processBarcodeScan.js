@@ -102,16 +102,14 @@ async function runSuccessScenario() {
         reply: () => [[{ ROLE_ID: 20 }]],
       },
       {
-        match: "SELECT PROFIT, NON_MEMBER_PROFIT",
-        reply: () => [[{ PROFIT: 20, NON_MEMBER_PROFIT: 30 }]],
-      },
-      {
-        match: "SELECT PR_CHARGES, FOOD_PR_CHARGES",
-        reply: () => [[{ PR_CHARGES: 5, FOOD_PR_CHARGES: 7 }]],
-      },
-      {
-        match: "SELECT subcategory\n  FROM xxafmc_order_details",
-        reply: () => [[{ subcategory: 14 }]],
+        match: "xu.login_type AS customer_login_type",
+        reply: () => [[{
+          subcategory: 14,
+          profit: 20,
+          food_pr_charges: 7,
+          customer_login_type: "Member",
+          customer_role_id: 20,
+        }]],
       },
       {
         match: "SELECT item_id, price",
@@ -209,8 +207,14 @@ async function runStandardRecipeCapScenario() {
         reply: () => [[{ total_quantity: 2 }]], // required total scans for Sprite in this order
       },
       {
-        match: "SELECT subcategory\n  FROM xxafmc_order_details",
-        reply: () => [[{ subcategory: 10 }]],
+        match: "xu.login_type AS customer_login_type",
+        reply: () => [[{
+          subcategory: 10,
+          profit: 0,
+          food_pr_charges: 0,
+          customer_login_type: "Member",
+          customer_role_id: 20,
+        }]],
       },
       {
         match: "SELECT item_id, price",

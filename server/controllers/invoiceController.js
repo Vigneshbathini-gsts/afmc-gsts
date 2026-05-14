@@ -1,38 +1,33 @@
-const invoiceService = require("../services/invoiceService");
-const {
-  successResponse,
-  errorResponse,
-} = require("../utils/responseHandler");
+const invoiceModel = require("../models/invoiceModel");
 
-const createInvoice = async (req, res) => {
-  try {
-    const result = await invoiceService.createInvoice(req.body);
-
-    return successResponse(res, "Invoice created", result);
-  } catch (error) {
-    return errorResponse(res, error.message);
-  }
-};
-
-const getInvoiceByOrder = async (req, res) => {
+exports.getInvoiceDetails = async (req, res) => {
   try {
     const { orderNumber } = req.params;
-    const data = await invoiceService.fetchInvoiceByOrder(orderNumber);
-
-    if (!data) {
-      return res.status(404).json({
-        success: false,
-        message: "Invoice not found.",
-      });
-    }
-
-    return successResponse(res, "Invoice fetched", data);
+    const data = await invoiceModel.getInvoiceDetails(orderNumber);
+    return res.status(200).json({ success: true, data });
   } catch (error) {
-    return errorResponse(res, error.message);
+    console.error("Fetch invoice details error:", error);
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || "Failed to fetch invoice details",
+    });
   }
 };
 
-module.exports = {
-  createInvoice,
-  getInvoiceByOrder,
+exports.saveInvoicePayment = async (req, res) => {
+  try {
+    const { orderNumber } = req.params;
+    const data = await invoiceModel.saveInvoicePayment(orderNumber, req.body, req.user || {});
+    return res.status(200).json({
+      success: true,
+      message: "Invoice updated successfully",
+      data,
+    });
+  } catch (error) {
+    console.error("Save invoice payment error:", error);
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || "Failed to save invoice payment",
+    });
+  }
 };

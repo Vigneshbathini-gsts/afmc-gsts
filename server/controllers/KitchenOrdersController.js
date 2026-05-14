@@ -201,8 +201,19 @@ exports.updateBarOrderStatus = async (req, res) => {
       if (scannedItems.length > 0) {
         const placeholders = scannedItems.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?)").join(", ");
         const values = [];
+        const orderPriceMap = new Map();
 
         for (const item of scannedItems) {
+          const targetItemCode = String(item.parentItem || item.itemCode || "").trim();
+          const numericItemPrice = Number(item.itemPrice || 0);
+
+          if (targetItemCode) {
+            const existing = orderPriceMap.get(targetItemCode);
+            if (!existing || numericItemPrice > 0 || existing === 0) {
+              orderPriceMap.set(targetItemCode, numericItemPrice);
+            }
+          }
+
           values.push(
             "S_COLLECTION",
             ORDERNUMBER,
@@ -234,6 +245,20 @@ exports.updateBarOrderStatus = async (req, res) => {
           `,
           values
         );
+
+        for (const [targetItemCode, itemPrice] of orderPriceMap.entries()) {
+          await connection.query(
+            `
+            UPDATE xxafmc_order_details
+            SET price = ?,
+                subtotal = ROUND(? * quantity, 2)
+            WHERE order_id = ?
+              AND item_id = ?
+              AND (order_status IS NULL OR order_status = '')
+            `,
+            [itemPrice, itemPrice, ORDERNUMBER, targetItemCode]
+          );
+        }
       }
 
       // Then update the order status
@@ -596,20 +621,35 @@ exports.processBarcodeScan = async (req, res) => {
 
     // ================= PRICE CALCULATION (FINAL - ORACLE MATCH) =================
 
-    // STEP A: Get sub_category from order_details (important)
-    let subCategory = null;
-    const [subCategoryRows] = await connection.query(
+    // STEP A: Get the pricing already chosen for this order line.
+    // The kitchen user is staff, so req.user.loginType is not the customer's
+    // member type at completion time.
+    const targetOrderItemCode = String(parentItem || scanItemCode).trim();
+    const [orderPricingRows] = await connection.query(
       `
-  SELECT subcategory
-  FROM xxafmc_order_details
-  WHERE item_id = ? AND order_id = ?
-  LIMIT 1
-  `,
-      [scanItemCode, ORDERNUMBER]
+      SELECT
+        od.subcategory,
+        od.profit,
+        od.food_pr_charges,
+        xu.login_type AS customer_login_type,
+        xu.role_id AS customer_role_id
+      FROM xxafmc_order_details od
+      LEFT JOIN xxafmc_order_header oh
+        ON oh.order_num = od.order_id
+      LEFT JOIN xxafmc_users xu
+        ON xu.user_id = oh.user_id
+      WHERE od.item_id = ?
+        AND od.order_id = ?
+        AND (od.order_status IS NULL OR od.order_status = '')
+      ORDER BY od.order_line_id ASC
+      LIMIT 1
+      `,
+      [targetOrderItemCode || scanItemCode, ORDERNUMBER]
     );
 
-    subCategory = subCategoryRows.length > 0
-      ? Number(subCategoryRows[0].subcategory)
+    const orderPricing = orderPricingRows[0] || {};
+    const subCategory = orderPricingRows.length > 0
+      ? Number(orderPricing.subcategory)
       : null;
 
 
@@ -632,10 +672,23 @@ exports.processBarcodeScan = async (req, res) => {
 
     // STEP C: Base values
     const unitPrice = Number(item.UNIT_PRICE) || 0;
-    const profitPercent = Number(item.PROFIT) || 0;
-    const nonMemberProfit = Number(item.NON_MEMBER_PROFIT) || 0;
-    const prCharges = Number(item.PR_CHARGES) || 0;
-    const foodPrCharges = Number(item.FOOD_PR_CHARGES) || 0;
+    const hasOrderProfit =
+      orderPricing.profit !== null &&
+      orderPricing.profit !== undefined &&
+      orderPricing.profit !== "";
+    const hasOrderCharges =
+      orderPricing.food_pr_charges !== null &&
+      orderPricing.food_pr_charges !== undefined &&
+      orderPricing.food_pr_charges !== "";
+    const orderProfit = Number(orderPricing.profit);
+    const orderCharges = Number(orderPricing.food_pr_charges);
+    const isOrderNonMember =
+      String(orderPricing.customer_login_type || "").trim().toUpperCase() === "NON MEMBER" ||
+      (orderPricing.customer_role_id != null && Number(orderPricing.customer_role_id) !== 20);
+    const fallbackProfit = isOrderNonMember ? Number(item.NON_MEMBER_PROFIT) : Number(item.PROFIT);
+    const fallbackCharges = isOrderNonMember ? Number(item.PR_CHARGES) : Number(item.FOOD_PR_CHARGES);
+    const profitPercent = hasOrderProfit && Number.isFinite(orderProfit) ? orderProfit : fallbackProfit || 0;
+    const prCharges = hasOrderCharges && Number.isFinite(orderCharges) ? orderCharges : fallbackCharges || 0;
     const pegsFromStock = Number(item.PEGS) || 1;
 
 
@@ -666,26 +719,12 @@ exports.processBarcodeScan = async (req, res) => {
         ? unitPrice / pegsFromStock
         : unitPrice;
 
-      //   SAME logic for both (you had duplicate branches → simplified)
-      const normalizedLoginType = String(req.user?.loginType || "").trim().toUpperCase();
-      const isNonMember = normalizedLoginType === "NON MEMBER";
+      const profit =
+        pricePerPeg +
+        (pricePerPeg * profitPercent / 100) +
+        prCharges;
 
-      if (!isNonMember) {
-        const profit =
-          pricePerPeg +
-          (pricePerPeg * profitPercent / 100) +
-          foodPrCharges;
-
-        calculatedPrice = Number(profit).toFixed(2);
-
-      } else {
-        const profit =
-          pricePerPeg +
-          (pricePerPeg * nonMemberProfit / 100) +
-          prCharges;
-
-        calculatedPrice = Number(profit).toFixed(2);
-      }
+      calculatedPrice = Number(profit).toFixed(2);
     }
 
     const [componentRows] = await connection.query(`

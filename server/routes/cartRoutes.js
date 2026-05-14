@@ -6,6 +6,7 @@ const router = express.Router();
 
 router.post("/", authMiddleware, cartController.addCartItem);
 router.post("/add", authMiddleware, cartController.addCartItem);
+router.post("/proceed-to-buy", authMiddleware, cartController.proceedToBuy);
 router.post("/confirm-order", authMiddleware, cartController.confirmOrder);
 router.get("/", authMiddleware, cartController.getCartItems);
 router.get("/cocktail/:cartId", authMiddleware, cartController.getCocktailDetails);

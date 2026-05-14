@@ -220,6 +220,7 @@ export const cartAPI = {
   getByUserId: (userId) => api.get("/cart", { params: { userId } }),
   addItem: (cartData) => api.post("/cart", cartData),
   addNewItem: (cartData) => api.post("/cart/add", cartData),
+  proceedToBuy: (data = {}) => api.post("/cart/proceed-to-buy", data),
   getCocktailDetails: (cartId, params) => api.get(`/cart/cocktail/${cartId}`, { params }),
   updateCocktailIngredients: (cartId, data) => api.patch(`/cart/cocktail/${cartId}/ingredients`, data),
   customizeCocktail: (cartId, data) => api.put(`/cart/customize/${cartId}`, data),
@@ -371,6 +372,15 @@ export const notificationAPI = {
   getStockOutNotifications: () => api.get("/notifications/stock-out"),
   markStockOutRead: (itemCode) =>
     api.put(`/notifications/stock-out/read/${itemCode}`),
+};
+
+export const invoiceAPI = {
+  getByOrderNumber: (orderNumber) => api.get(`/invoice/${orderNumber}`),
+  savePayment: (orderNumber, data) => api.post(`/invoice/${orderNumber}/payment`, data),
+};
+
+export const invoiceReportAPI = {
+  getByOrderNumber: (orderNumber) => api.get(`/invoice-report/${orderNumber}`),
 };
 
 export const cancelledOrdersAPI = {

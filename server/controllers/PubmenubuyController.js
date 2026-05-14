@@ -66,3 +66,63 @@ exports.cancelPubMenuOrder = async (req, res) => {
     });
   }
 };
+
+exports.updatePubMenuOrderItemQuantity = async (req, res) => {
+  try {
+    const { ORDER_NUMBER, ITEM_CODE } = req.params;
+    const { delta } = req.body || {};
+
+    if (!ORDER_NUMBER || !ITEM_CODE) {
+      return res.status(400).json({
+        success: false,
+        message: "ORDER_NUMBER and ITEM_CODE are required",
+      });
+    }
+
+    const data = await Pubmenubuyservice.updateOrderItemQuantity(
+      ORDER_NUMBER,
+      ITEM_CODE,
+      delta,
+      req.user
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Order item quantity updated",
+      data,
+    });
+  } catch (error) {
+    console.error("Update pub menu order item quantity error:", error);
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || "Server error while updating order item quantity",
+    });
+  }
+};
+
+exports.deletePubMenuOrderItem = async (req, res) => {
+  try {
+    const { ORDER_NUMBER, ITEM_CODE } = req.params;
+
+    if (!ORDER_NUMBER || !ITEM_CODE) {
+      return res.status(400).json({
+        success: false,
+        message: "ORDER_NUMBER and ITEM_CODE are required",
+      });
+    }
+
+    const data = await Pubmenubuyservice.deleteOrderItem(ORDER_NUMBER, ITEM_CODE);
+
+    return res.status(200).json({
+      success: true,
+      message: "Order item deleted",
+      data,
+    });
+  } catch (error) {
+    console.error("Delete pub menu order item error:", error);
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || "Server error while deleting order item",
+    });
+  }
+};

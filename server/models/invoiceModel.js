@@ -1,176 +1,199 @@
 const db = require("../config/db");
 
-const findInvoiceByOrder = async (orderNumber) => {
-  const query = `
-    SELECT * FROM xxafmc_invoices
-    WHERE order_num = ?
-  `;
-
-  const [rows] = await db.execute(query, [orderNumber]);
-  return rows[0] || null;
+const createValidationError = (message) => {
+  const error = new Error(message);
+  error.statusCode = 400;
+  return error;
 };
 
-const createInvoice = async ({
-  orderNumber,
-  paymentMode,
-  paymentReference,
-  paymentStatus,
-  orderDate,
-  amount,
-  createdBy,
-}) => {
-  const query = `
-    INSERT INTO xxafmc_invoices (
-      order_num,
-      payment_method,
-      payment_reference,
-      payment_status,
-      invoice_date,
-      amount,
-      creation_by,
-      creation_date
-    )
-    VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
-  `;
+async function getInvoiceDetails(orderNumber) {
+  const normalizedOrderNumber = Number(orderNumber);
+  if (!Number.isFinite(normalizedOrderNumber) || normalizedOrderNumber <= 0) {
+    throw createValidationError("Valid order number is required");
+  }
 
-  const [result] = await db.execute(query, [
-    orderNumber,
-    paymentMode,
-    paymentReference,
-    paymentStatus,
-    orderDate,
-    amount,
-    createdBy,
-  ]);
+  const [headerRows] = await db.execute(
+    `
+      SELECT
+        oh.order_num,
+        oh.user_id,
+        oh.order_date,
+        ROUND(IFNULL(oh.order_total, 0), 2) AS order_total,
+        od.item_id,
+        inv.invoice_id,
+        inv.payment_method,
+        inv.payment_reference,
+        inv.payment_status,
+        inv.invoice_date,
+        ROUND(IFNULL(inv.amount, 0), 2) AS amount
+      FROM xxafmc_order_header oh
+      LEFT JOIN xxafmc_order_details od
+        ON od.order_id = oh.order_num
+      LEFT JOIN xxafmc_invoices inv
+        ON inv.order_num = oh.order_num
+      WHERE oh.order_num = ?
+      ORDER BY od.order_line_id ASC
+      LIMIT 1
+    `,
+    [normalizedOrderNumber]
+  );
 
-  return result;
-};
+  if (!headerRows.length) {
+    const error = new Error("Invoice order not found");
+    error.statusCode = 404;
+    throw error;
+  }
 
-const updateInvoicePayment = async ({
-  orderNumber,
-  paymentMode,
-  paymentReference,
-  paymentStatus,
-  createdBy = "SYSTEM",
-}) => {
+  const [itemRows] = await db.execute(
+    `
+      SELECT
+        od.item_id,
+        COALESCE(xi.item_name, od.item_id) AS item_name,
+        od.quantity,
+        ROUND(IFNULL(od.price, 0), 2) AS price,
+        ROUND(IFNULL(od.subtotal, 0), 2) AS total
+      FROM xxafmc_order_details od
+      LEFT JOIN xxafmc_inventory xi
+        ON xi.item_code = od.item_id
+      WHERE od.order_id = ?
+        AND od.order_status IS NULL
+      ORDER BY od.order_line_id ASC
+    `,
+    [normalizedOrderNumber]
+  );
+
+  const header = headerRows[0];
+
+  return {
+    header: {
+      order_num: header.order_num,
+      user_id: header.user_id,
+      order_date: header.order_date,
+      order_total: header.order_total,
+      item_id: header.item_id || null,
+    },
+    invoice: {
+      invoice_id: header.invoice_id || null,
+      payment_method: header.payment_method || "Credit",
+      payment_reference: header.payment_reference || "",
+      payment_status: header.payment_status || "Un Paid",
+      invoice_date: header.invoice_date || header.order_date,
+      amount: Number(header.amount || header.order_total || 0),
+    },
+    items: itemRows,
+  };
+}
+
+async function saveInvoicePayment(orderNumber, payload = {}, authUser = {}) {
+  const normalizedOrderNumber = Number(orderNumber);
+  if (!Number.isFinite(normalizedOrderNumber) || normalizedOrderNumber <= 0) {
+    throw createValidationError("Valid order number is required");
+  }
+
+  const paymentMode = String(payload.paymentMode || "").trim();
+  const paymentReference = String(payload.paymentReference || "").trim();
+  const normalizedPaymentMode = paymentMode ? paymentMode.toUpperCase() : "";
+
+  if (!paymentMode) {
+    throw createValidationError("Payment mode is required");
+  }
+
+  if (normalizedPaymentMode === "IMMEDIATE" && !paymentReference) {
+    throw createValidationError("Payment reference is required for immediate payment");
+  }
+
   const connection = await db.getConnection();
 
   try {
     await connection.beginTransaction();
 
-    const [updateResult] = await connection.execute(
+    const [[orderHeader]] = await connection.execute(
       `
-      UPDATE xxafmc_invoices
-      SET payment_method = ?,
-          payment_reference = ?,
-          payment_status = ?
-      WHERE order_num = ?
-      `,
-      [
-        paymentMode,
-        paymentReference,
-        paymentStatus,
-        orderNumber,
-      ]
-    );
-
-    if (updateResult.affectedRows === 0) {
-      const [orderRows] = await connection.execute(
-        `
-        SELECT
-          order_num,
-          order_total,
-          COALESCE(
-            STR_TO_DATE(order_date, '%m/%d/%Y'),
-            DATE(order_date),
-            CURDATE()
-          ) AS invoice_date
+        SELECT order_num, order_date, ROUND(IFNULL(order_total, 0), 2) AS order_total
         FROM xxafmc_order_header
         WHERE order_num = ?
         LIMIT 1
-        `,
-        [orderNumber]
-      );
+      `,
+      [normalizedOrderNumber]
+    );
 
-      if (!orderRows.length) {
-        const error = new Error("Order not found for invoice creation");
-        error.statusCode = 404;
-        throw error;
-      }
+    if (!orderHeader) {
+      const error = new Error("Invoice order not found");
+      error.statusCode = 404;
+      throw error;
+    }
 
+    const [[invoiceRow]] = await connection.execute(
+      `
+        SELECT invoice_id
+        FROM xxafmc_invoices
+        WHERE order_num = ?
+        LIMIT 1
+      `,
+      [normalizedOrderNumber]
+    );
+
+    const appUser = authUser?.username || authUser?.user_name || "SYSTEM";
+    const resolvedStatus = normalizedPaymentMode === "CREDIT" ? "Un Paid" : "Paid";
+
+    if (!invoiceRow) {
       await connection.execute(
         `
-        INSERT INTO xxafmc_invoices (
-          order_num,
-          payment_method,
-          payment_reference,
-          payment_status,
-          invoice_date,
-          amount,
-          creation_by,
-          creation_date
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
+          INSERT INTO xxafmc_invoices (
+            order_num,
+            payment_method,
+            payment_reference,
+            payment_status,
+            invoice_date,
+            amount,
+            creation_by,
+            creation_date
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
         `,
         [
-          orderNumber,
+          normalizedOrderNumber,
           paymentMode,
-          paymentReference,
-          paymentStatus,
-          orderRows[0].invoice_date,
-          orderRows[0].order_total || 0,
-          createdBy,
+          paymentReference || null,
+          resolvedStatus,
+          orderHeader.order_date,
+          Number(orderHeader.order_total || 0),
+          appUser,
         ]
+      );
+    } else {
+      await connection.execute(
+        `
+          UPDATE xxafmc_invoices
+          SET payment_status = ?,
+              payment_method = ?,
+              payment_reference = ?
+          WHERE order_num = ?
+        `,
+        [resolvedStatus, paymentMode, paymentReference || null, normalizedOrderNumber]
       );
     }
 
     await connection.execute(
       `
-      UPDATE xxafmc_order_details
-      SET payment_status = ?
-      WHERE order_id = ?
+        UPDATE xxafmc_order_details
+        SET payment_status = ?
+        WHERE order_id = ?
       `,
-      [paymentStatus, orderNumber]
+      [resolvedStatus, normalizedOrderNumber]
     );
 
     await connection.commit();
+    return getInvoiceDetails(normalizedOrderNumber);
   } catch (error) {
     await connection.rollback();
     throw error;
   } finally {
     connection.release();
   }
-};
-
-const findInvoiceWithItemsByOrder = async (orderNumber) => {
-  const query = `
-    SELECT
-      inv.order_num AS orderNumber,
-      inv.payment_method AS paymentMethod,
-      inv.payment_status AS paymentStatus,
-      DATE_FORMAT(inv.invoice_date, '%c/%e/%Y') AS invoiceDate,
-      inv.amount AS totalAmount,
-      inv.payment_reference AS paymentReference,
-      od.item_id,
-      od.quantity,
-      od.price,
-      od.subtotal,
-      COALESCE(i.item_name, od.item_id) AS item_name
-    FROM xxafmc_invoices inv
-    LEFT JOIN xxafmc_order_details od
-      ON od.order_id = inv.order_num
-    LEFT JOIN xxafmc_inventory i
-      ON i.item_code = od.item_id
-    WHERE inv.order_num = ?
-  `;
-
-  const [rows] = await db.execute(query, [orderNumber]);
-  return rows;
-};
+}
 
 module.exports = {
-  findInvoiceByOrder,
-  createInvoice,
-  updateInvoicePayment,
-  findInvoiceWithItemsByOrder,
+  getInvoiceDetails,
+  saveInvoicePayment,
 };

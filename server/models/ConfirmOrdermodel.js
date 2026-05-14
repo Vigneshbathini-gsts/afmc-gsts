@@ -174,15 +174,29 @@ async function getConfirmedOrderDetails(orderNumber) {
       SELECT
         oh.order_num,
         oh.order_date,
+        ROUND(MAX(IFNULL(oh.order_total, 0)), 2) AS order_total,
         COALESCE(MAX(nm.first_name), MAX(u.first_name), '') AS customer_name,
-        COALESCE(MAX(kn.status), 'Received') AS status
+        CASE
+          WHEN COUNT(od.order_line_id) - SUM(CASE WHEN COALESCE(kn.status, '') = 'Cancelled' THEN 1 ELSE 0 END) > 0
+            AND SUM(CASE WHEN COALESCE(kn.status, '') = 'Completed' THEN 1 ELSE 0 END) =
+                COUNT(od.order_line_id) - SUM(CASE WHEN COALESCE(kn.status, '') = 'Cancelled' THEN 1 ELSE 0 END)
+            THEN 'Completed'
+          WHEN SUM(CASE WHEN COALESCE(kn.status, '') = 'Preparing' THEN 1 ELSE 0 END) > 0
+            THEN 'Preparing'
+          WHEN SUM(CASE WHEN COALESCE(kn.status, '') = 'Cancelled' THEN 1 ELSE 0 END) = COUNT(od.order_line_id)
+            THEN 'Cancelled'
+          ELSE 'Received'
+        END AS status
       FROM xxafmc_order_header oh
+      JOIN xxafmc_order_details od
+        ON od.order_id = oh.order_num
       LEFT JOIN xxafmc_users u
         ON u.user_id = oh.user_id
       LEFT JOIN xxafmc_non_members nm
         ON nm.id = oh.member_id
       LEFT JOIN xxafmc_kitchen_notification kn
-        ON kn.ordernumber = oh.order_num
+        ON kn.ordernumber = od.order_id
+        AND kn.item_id = od.item_id
       WHERE oh.order_num = ?
       GROUP BY oh.order_num, oh.order_date
       LIMIT 1
@@ -202,10 +216,18 @@ async function getConfirmedOrderDetails(orderNumber) {
         od.item_id,
         xi.item_name,
         od.quantity,
-        od.price,
-        od.subtotal,
-        COALESCE(kn.status, 'Received') AS status,
-        od.subcategory
+        ROUND(MAX(IFNULL(od.subtotal, 0)), 2) AS subtotal,
+        CASE
+          WHEN COUNT(od.order_line_id) - SUM(CASE WHEN COALESCE(kn.status, '') = 'Cancelled' THEN 1 ELSE 0 END) > 0
+            AND SUM(CASE WHEN COALESCE(kn.status, '') = 'Completed' THEN 1 ELSE 0 END) =
+                COUNT(od.order_line_id) - SUM(CASE WHEN COALESCE(kn.status, '') = 'Cancelled' THEN 1 ELSE 0 END)
+            THEN 'Completed'
+          WHEN SUM(CASE WHEN COALESCE(kn.status, '') = 'Preparing' THEN 1 ELSE 0 END) > 0
+            THEN 'Preparing'
+          WHEN SUM(CASE WHEN COALESCE(kn.status, '') = 'Cancelled' THEN 1 ELSE 0 END) = COUNT(od.order_line_id)
+            THEN 'Cancelled'
+          ELSE 'Received'
+        END AS status
       FROM xxafmc_order_details od
       JOIN xxafmc_inventory xi
         ON od.item_id = xi.item_code
@@ -213,6 +235,7 @@ async function getConfirmedOrderDetails(orderNumber) {
         ON kn.ordernumber = od.order_id
         AND kn.item_id = od.item_id
       WHERE od.order_id = ?
+      GROUP BY od.order_line_id, od.item_id, xi.item_name, od.quantity
       ORDER BY od.order_line_id ASC
     `,
     [normalizedOrderNumber]
