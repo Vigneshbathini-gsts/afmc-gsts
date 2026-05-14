@@ -84,8 +84,8 @@ async function getActiveOffer(connection, itemCode, quantity) {
       FROM xxafmc_offers
       WHERE item_code = ?
         AND offer_quantity <= ?
-        AND DATE(offer_date) = CURDATE()
-        AND UPPER(status) = UPPER('Active')
+        AND CURDATE() >= DATE(offer_date)
+        AND (end_date IS NULL OR CURDATE() <= DATE(end_date))
       ORDER BY offer_id DESC
       LIMIT 1
     `,
