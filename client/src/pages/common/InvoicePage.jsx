@@ -123,7 +123,7 @@ export default function InvoicePage() {
 
   const handleComplete = () => {
     navigate(
-      `${currentBasePath}/invoice-report?orderNumber=${encodeURIComponent(orderNumber)}&amount=${encodeURIComponent(formatMoney(computedAmount))}`,
+      `${currentBasePath}/Buyflowinvoicereport?orderNumber=${encodeURIComponent(orderNumber)}&amount=${encodeURIComponent(formatMoney(computedAmount))}`,
       {
         state: {
           orderNumber,

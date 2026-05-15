@@ -16,7 +16,7 @@ function formatMoney(value) {
   return amount.toFixed(2);
 }
 
-export default function InvoiceReport() {
+export default function Buyflowinvoicereport() {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();

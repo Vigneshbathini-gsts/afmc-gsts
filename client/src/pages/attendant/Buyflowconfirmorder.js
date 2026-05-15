@@ -11,7 +11,7 @@ function formatDate(value) {
   return date.toLocaleDateString("en-IN");
 }
 
-export default function ConfirmOrderpage() {
+export default function Buyflowconfirmorder() {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();

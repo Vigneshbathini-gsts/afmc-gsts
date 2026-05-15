@@ -220,7 +220,7 @@ export default function Pubmenubuy({ backTo = "" }) {
       setConfirming(true);
       setError("");
       await ConfirmOrderservice.confirmOrder(orderNumber);
-      navigate(`${currentBasePath}/confirm-order-page?orderNumber=${orderNumber}`);
+      navigate(`${currentBasePath}/Buyflowconfirmorder?orderNumber=${orderNumber}`);
     } catch (confirmError) {
       setError(
         confirmError.response?.data?.message || "Unable to confirm this order."
