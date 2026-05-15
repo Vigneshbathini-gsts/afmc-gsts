@@ -72,6 +72,9 @@ function normalizeItem(item, fallbackIndex = 0) {
   const explicitUnitPrice = Number(item.price || item.PRICE || item.unitPrice || item.UNIT_PRICE);
   const rawOfferQuantity = item.offer_quantity ?? item.OFFER_QUANTITY ?? item.offerQuantity ?? null;
   const rawFreeItemQuantity = item.free_item_quantity ?? item.FREE_ITEM_QUANTITY ?? item.freeItemQuantity ?? null;
+  const rawFreeItemCode = item.free_item_code ?? item.FREE_ITEM_CODE ?? item.freeItemCode ?? null;
+  const rawComputedFreeItemQuantity =
+    item.computed_free_item_quantity ?? item.COMPUTED_FREE_ITEM_QUANTITY ?? item.computedFreeItemQuantity ?? null;
   const offer_quantity =
     rawOfferQuantity === null || rawOfferQuantity === undefined || rawOfferQuantity === ""
       ? null
@@ -80,6 +83,16 @@ function normalizeItem(item, fallbackIndex = 0) {
     rawFreeItemQuantity === null || rawFreeItemQuantity === undefined || rawFreeItemQuantity === ""
       ? null
       : Number(rawFreeItemQuantity);
+  const free_item_code =
+    rawFreeItemCode === null || rawFreeItemCode === undefined || rawFreeItemCode === ""
+      ? null
+      : Number(rawFreeItemCode);
+  const computed_free_item_quantity =
+    rawComputedFreeItemQuantity === null ||
+    rawComputedFreeItemQuantity === undefined ||
+    rawComputedFreeItemQuantity === ""
+      ? null
+      : Number(rawComputedFreeItemQuantity);
   const parentCodeRaw = item.barcode ?? item.BARCODE ?? item.parent_code ?? item.PARENT_CODE ?? null;
   const parentCode =
     parentCodeRaw === null || parentCodeRaw === undefined || parentCodeRaw === ""
@@ -147,6 +160,8 @@ function normalizeItem(item, fallbackIndex = 0) {
     isFreeItem,
     offer_quantity: Number.isFinite(offer_quantity) ? offer_quantity : null,
     free_item_quantity: Number.isFinite(free_item_quantity) ? free_item_quantity : null,
+    free_item_code: Number.isFinite(free_item_code) ? free_item_code : null,
+    computed_free_item_quantity: Number.isFinite(computed_free_item_quantity) ? computed_free_item_quantity : null,
     subcategory: Number.isFinite(subcategory) ? subcategory : null,
     stockStatus,
     stockIssueMessage,
@@ -259,7 +274,8 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
         const rows = Array.isArray(data?.items) ? data.items : [];
         if (!ignore) {
           setOrderHeader(data?.header || null);
-          setItems(rows.map((item, index) => normalizeItem(item, index)));
+          const normalized = rows.map((item, index) => normalizeItem(item, index));
+          setItems(ensureOfferFreeRows(normalized));
         }
       } catch (fetchError) {
         if (!ignore) {
@@ -285,6 +301,72 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
     [items]
   );
 
+  const ensureOfferFreeRows = (nextItems) => {
+    if (!Array.isArray(nextItems) || nextItems.length === 0) return nextItems;
+
+    const parents = nextItems.filter((row) => !row?.isFreeItem);
+    const children = nextItems.filter((row) => row?.isFreeItem);
+    const hasChildForParent = new Set(
+      children.map((row) => String(row?.parentCode || "").trim()).filter(Boolean)
+    );
+
+    const insertionsByAfterId = new Map();
+
+    for (const parent of parents) {
+      const parentCode = String(parent?.item_code || "").trim();
+      if (!parentCode) continue;
+      if (hasChildForParent.has(parentCode)) continue;
+
+      const expected =
+        Number(parent?.computed_free_item_quantity) > 0
+          ? Number(parent.computed_free_item_quantity)
+          : calculateFreeQuantity(parent?.quantity, parent?.offer_quantity, parent?.free_item_quantity);
+
+      const freeItemCode = Number(parent?.free_item_code || 0);
+      if (!Number.isFinite(expected) || expected <= 0) continue;
+      if (!Number.isFinite(freeItemCode) || freeItemCode <= 0) continue;
+
+      const afterId = Number(parent?.orderLineId ?? parent?.id) || 0;
+      const placeholderId = -Number(`${Date.now()}${Math.floor(Math.random() * 1000)}`);
+
+      const placeholder = {
+        id: placeholderId,
+        orderLineId: placeholderId,
+        item_code: String(freeItemCode),
+        item_name: "Free item",
+        quantity: expected,
+        unitPrice: 0,
+        subtotal: 0,
+        image: "",
+        card_text: `Name: Free item Quantity: ${expected}`,
+        availableQuantity: null,
+        parentCode,
+        isFreeItem: true,
+        offer_quantity: null,
+        free_item_quantity: null,
+        free_item_code: null,
+        computed_free_item_quantity: null,
+        subcategory: null,
+        stockStatus: null,
+        stockIssueMessage: null,
+      };
+
+      if (!insertionsByAfterId.has(afterId)) insertionsByAfterId.set(afterId, []);
+      insertionsByAfterId.get(afterId).push(placeholder);
+    }
+
+    if (insertionsByAfterId.size === 0) return nextItems;
+
+    const merged = [];
+    for (const row of nextItems) {
+      merged.push(row);
+      const key = Number(row?.orderLineId ?? row?.id) || 0;
+      const toAdd = insertionsByAfterId.get(key);
+      if (toAdd?.length) merged.push(...toAdd);
+    }
+    return merged;
+  };
+
   const calculateFreeQuantity = (paidQuantity, offerQuantity, freeItemQuantity) => {
     const paid = Number(paidQuantity || 0);
     if (!Number.isFinite(paid) || paid <= 0) return 0;
@@ -309,7 +391,8 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
       const refreshedData = refreshed?.data?.data || {};
       const refreshedRows = Array.isArray(refreshedData?.items) ? refreshedData.items : [];
       setOrderHeader(refreshedData?.header || null);
-      setItems(refreshedRows.map((item, index) => normalizeItem(item, index)));
+      const normalized = refreshedRows.map((item, index) => normalizeItem(item, index));
+      setItems(ensureOfferFreeRows(normalized));
     } catch {
       // Ignore refresh failures here; the existing order state is still valid.
     }
@@ -435,7 +518,7 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
 
       nextQuantity = nextQtyCandidate;
 
-      return current.map((item) => {
+      const nextItems = current.map((item) => {
         if (item.orderLineId === numericOrderLineId) {
           const unitPrice = Number(
             item.unitPrice || (currentQty > 0 ? item.subtotal / currentQty : 0) || 0
@@ -454,6 +537,50 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
 
         return item;
       });
+
+      // If the parent crosses the offer threshold, the linked free line may not exist yet.
+      // Optimistically create a placeholder free row so the UI updates immediately; it will be
+      // replaced by the backend response after `updateLineQuantity`.
+      const freeItemCode = Number(targetItem.free_item_code || 0);
+      if (
+        expectedFreeQty > 0 &&
+        linkedFreeItems.length === 0 &&
+        Number.isFinite(freeItemCode) &&
+        freeItemCode > 0 &&
+        targetCode
+      ) {
+        const placeholderId = -Date.now();
+        const placeholder = {
+          id: placeholderId,
+          orderLineId: placeholderId,
+          item_code: String(freeItemCode),
+          item_name: "Free item",
+          quantity: expectedFreeQty,
+          unitPrice: 0,
+          subtotal: 0,
+          image: "",
+          card_text: `Name: Free item Quantity: ${expectedFreeQty}`,
+          availableQuantity: null,
+          parentCode: targetCode,
+          isFreeItem: true,
+          offer_quantity: null,
+          free_item_quantity: null,
+          subcategory: null,
+          stockStatus: null,
+          stockIssueMessage: null,
+        };
+
+        const merged = [];
+        for (const row of nextItems) {
+          merged.push(row);
+          if (row.orderLineId === numericOrderLineId) {
+            merged.push(placeholder);
+          }
+        }
+        return merged;
+      }
+
+      return nextItems;
     });
 
     setError(validationMessage);

@@ -144,7 +144,7 @@ async function getActiveOffer(connection, itemCode, quantity) {
           (END_DATE IS NULL AND CURDATE() >= DATE(OFFER_DATE))
           OR (CURDATE() BETWEEN DATE(OFFER_DATE) AND END_DATE)
         )
-        AND UPPER(status) = UPPER('Active')
+        AND (status IS NULL OR UPPER(status) = UPPER('Active'))
       ORDER BY offer_id DESC
     `,
     [itemCode, quantity]
@@ -789,7 +789,7 @@ async function getOrderSummary(orderNumber) {
               (END_DATE IS NULL AND CURDATE() >= DATE(OFFER_DATE))
               OR (CURDATE() BETWEEN DATE(OFFER_DATE) AND END_DATE)
             )
-            AND UPPER(status) = UPPER('Active')
+            AND (status IS NULL OR UPPER(status) = UPPER('Active'))
           ORDER BY item_code, offer_quantity DESC
         `,
         itemCodes
@@ -1867,7 +1867,7 @@ async function updateOrderLineQuantity(orderNumber, orderLineId, userId, quantit
             OR
             (CURDATE() BETWEEN DATE(OFFER_DATE) AND END_DATE)
           )
-          AND UPPER(status) = UPPER('Active')
+          AND (status IS NULL OR UPPER(status) = UPPER('Active'))
         ORDER BY offer_id DESC
       `,
       [itemId, normalizedQuantity]
