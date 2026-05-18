@@ -42,7 +42,7 @@ import RegisterMember from "../pages/attendant/RegisterMember";
 import AttendantCart from "../pages/attendant/Cart";
 import AttendantConfirmOrder from "../pages/attendant/ConfirmOrder";
 import ConfirmOrderpage from "../pages/attendant/ConfirmOrderpage";
-import AttendantPayment from "../pages/attendant/Payment";
+// import AttendantPayment from "../pages/attendant/Payment";
 import AttendantInvoice from "../pages/attendant/Invoice";
 import AttendantInvoiceReport from "../pages/attendant/InvoiceReport";
 import AttendantActiveOrders from "../pages/attendant/ActiveOrders";
@@ -161,12 +161,12 @@ export default function AppRoutes() {
         <Route index element={<Navigate to="register-member" replace />} />
         <Route path="dashboard" element={<AttendantDashboard />} />
         <Route path="menudash" element={<MenuDashboard />} />
-        <Route
+        {/* <Route
           path="menudash/buy"
           element={
             <Pubmenubuy backTo="/attendant/menudash" afterConfirmTo="/attendant/confirm-order-page" />
           }
-        />
+        /> */}
         <Route path="register-member" element={<RegisterMember />} />
         <Route path="item/:id" element={<ItemDetails />} />
         <Route path="cart" element={<AttendantCart />} />
@@ -174,7 +174,7 @@ export default function AppRoutes() {
         <Route path="item/:id" element={<ItemDetails />} />
         <Route path="confirm-order" element={<AttendantConfirmOrder />} />
         <Route path="confirm-order-page" element={<ConfirmOrderpage />} />
-        <Route path="payment" element={<AttendantPayment />} />
+        {/* <Route path="payment" element={<AttendantPayment />} /> */}
         <Route path="invoice" element={<AttendantInvoice />} />
         <Route path="invoice-report" element={<AttendantInvoiceReport />} />
         <Route path="active-orders" element={<AttendantActiveOrders />} />
@@ -196,10 +196,10 @@ export default function AppRoutes() {
         <Route path="dashboard" element={<UserDashboard />} />
         <Route path="dashboard-Page" element={<UserDashboard />} />
         <Route path="menudash" element={<MenuDashboard />} />
-        <Route
+        {/* <Route
           path="menudash/buy"
           element={<Pubmenubuy backTo="/user/menudash" afterConfirmTo="/user/confirm-order-page" />}
-        />
+        /> */}
         <Route path="snacks" element={<Snacks />} />
         <Route path="drinks" element={<Drinks />} />
         <Route path="item/:id" element={<ItemDetails />} />
