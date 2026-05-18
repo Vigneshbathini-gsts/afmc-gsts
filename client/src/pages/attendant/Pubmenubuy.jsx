@@ -89,6 +89,7 @@ export default function Pubmenubuy({ backTo = "" }) {
       try {
         const response = await Pubmenubuyservice.getByOrderNumber(orderNumber);
         const data = response?.data?.data || {};
+        console.log("Fetched order details:", data);
         const rows = Array.isArray(data?.items) ? data.items : [];
         if (!ignore) {
           setItemError({ itemCode: null, message: "" });
