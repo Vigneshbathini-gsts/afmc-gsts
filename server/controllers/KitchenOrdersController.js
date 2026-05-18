@@ -246,17 +246,43 @@ exports.updateBarOrderStatus = async (req, res) => {
           values
         );
 
-        for (const [targetItemCode, itemPrice] of orderPriceMap.entries()) {
+        // Update stock in xxafmc_stock_out and xxafmc_inventory
+        for (const item of scannedItems) {
+          const qty = Number(item.scanQuantity || 0);
+          const physicalItemCode = String(item.itemCode || "").trim();
+
+          if (qty > 0) {
+            // Decrement the specific barcode's stock
+            await connection.query(
+              `UPDATE xxafmc_stock_out SET STOCK_QUANTITY = GREATEST(0, STOCK_QUANTITY - ?) WHERE BARCODE = ?`,
+              [qty, item.barcode]
+            );
+
+            // Decrement the master inventory total for this item
+            if (physicalItemCode) {
+              await connection.query(
+                `UPDATE xxafmc_inventory SET STOCK_QUANTITY = GREATEST(0, STOCK_QUANTITY - ?) WHERE ITEM_CODE = ?`,
+                [qty, physicalItemCode]
+              );
+            }
+          }
+        }
+
+        // Update prices specifically by order_line_id for standard items
+        const linePrices = new Map();
+        scannedItems.forEach(si => {
+          if (si.orderLineId) {
+            const current = linePrices.get(si.orderLineId) || 0;
+            if (Number(si.itemPrice) > 0 || current === 0) {
+              linePrices.set(si.orderLineId, Number(si.itemPrice));
+            }
+          }
+        });
+
+        for (const [lineId, price] of linePrices.entries()) {
           await connection.query(
-            `
-            UPDATE xxafmc_order_details
-            SET price = ?,
-                subtotal = ROUND(? * quantity, 2)
-            WHERE order_id = ?
-              AND item_id = ?
-              AND (order_status IS NULL OR order_status = '')
-            `,
-            [itemPrice, itemPrice, ORDERNUMBER, targetItemCode]
+            `UPDATE xxafmc_order_details SET price = ?, subtotal = ROUND(? * quantity, 2), ORDER_STATUS = 'COMPLETED' WHERE ORDER_LINE_ID = ?`,
+            [price, price, lineId]
           );
         }
       }
@@ -336,14 +362,25 @@ exports.getOrderItems = async (req, res) => {
 
     const query = `
   SELECT 
-    xod.ORDER_LINE_ID,
+    MIN(xod.ORDER_LINE_ID) AS ORDER_LINE_ID,
     xod.ITEM_ID,
-    xod.QUANTITY,
-    xi.ITEM_NAME,
+    SUM(xod.quantity) AS PARENT_QTY,
+    SUM(CASE WHEN xod.price > 0 OR xod.price IS NULL THEN xod.quantity ELSE 0 END) AS PAID_QTY,
+    SUM(CASE WHEN xod.price = 0 THEN xod.quantity ELSE 0 END) AS FREE_QTY,
+    COALESCE( /* Calculate total barcode scans required for this row */
+      (SELECT SUM(COALESCE(xccd.pegs, 1) * COALESCE(xccd.quantity, 0)) FROM xxafmc_custom_cocktails_mocktails_details xccd WHERE xccd.order_number = xod.ORDER_ID AND xccd.inventory_item_code = xod.ITEM_ID),
+      (SELECT SUM(COALESCE(xccdd.pegs, 1) * COALESCE(xccdd.quantity, 0)) FROM xxafmc_custom_cocktails_mocktails_details_dummy xccdd WHERE xccdd.order_number = xod.ORDER_ID AND xccdd.inventory_item_code = xod.ITEM_ID),
+      (SELECT SUM(COALESCE(xcmd.pegs, 1) * (SELECT SUM(xod_inner.quantity) FROM xxafmc_order_details xod_inner WHERE xod_inner.order_id = xod.ORDER_ID AND xod_inner.item_id = xod.ITEM_ID AND xod_inner.type = xod.TYPE))
+       FROM xxafmc_cocktails_mocktails_details xcmd
+       WHERE xcmd.inventory_item_code = xod.ITEM_ID
+       GROUP BY xcmd.inventory_item_code), /* Group by inventory_item_code to make SUM(xod_inner.quantity) valid in this context */
+      SUM(xod.quantity) /* For regular items, just sum the order quantity */
+    ) AS TOTAL_INGREDIENTS,
+    MAX(xi.ITEM_NAME) AS ITEM_NAME,
     COALESCE(xod.TYPE, 'NA') AS TYPE,
 
     CASE 
-      WHEN xi.SUB_CATEGORY IN (14, 15) THEN 'Y'
+      WHEN MAX(xi.SUB_CATEGORY) IN (14, 15) THEN 'Y'
       ELSE 'N'
     END AS LINK_ENABLED,
 
@@ -358,7 +395,8 @@ exports.getOrderItems = async (req, res) => {
     AND (xod.ORDER_STATUS IS NULL OR xod.ORDER_STATUS = '')
     AND xi.CATEGORY_ID = ?
 
-  ORDER BY xod.ORDER_LINE_ID ASC;
+  GROUP BY xod.ITEM_ID, xod.TYPE
+  ORDER BY ORDER_LINE_ID ASC;
 `;
 
     const [rows] = await pool.query(query, [ORDERNUMBER, categoryId]);
@@ -366,7 +404,13 @@ exports.getOrderItems = async (req, res) => {
     const formattedData = rows.map((row) => ({
       ORDER_LINE_ID: row.ORDER_LINE_ID,
       ITEM_ID: row.ITEM_ID,
-      quantity: Number(row.QUANTITY) || 0,
+      quantity: Number(row.PARENT_QTY) || 0,
+      paidQty: Number(row.PAID_QTY) || 0,
+      freeQty: Number(row.FREE_QTY) || 0,
+      ingredientsPerUnit: Math.max(
+        1,
+        Math.round((Number(row.TOTAL_INGREDIENTS) || 0) / (Number(row.PARENT_QTY) || 1))
+      ),
       ITEM_NAME: (row.ITEM_NAME || '').trim(),
       TYPE: row.TYPE,
       LINK_ENABLED: row.LINK_ENABLED,
@@ -550,7 +594,7 @@ exports.processBarcodeScan = async (req, res) => {
         UNION ALL
         SELECT (CASE WHEN xo.type = 'Large' THEN 2 ELSE 1 END * COALESCE(xo.quantity, 0)) AS quantity 
         FROM xxafmc_order_details xo 
-        WHERE xo.order_id = ? AND xo.item_id = ?
+        WHERE xo.order_id = ? AND xo.item_id = ? AND (xo.order_status IS NULL OR xo.order_status = '')
       ) a`,
       [
         ORDERNUMBER,
@@ -690,58 +734,35 @@ exports.processBarcodeScan = async (req, res) => {
     const profitPercent = hasOrderProfit && Number.isFinite(orderProfit) ? orderProfit : fallbackProfit || 0;
     const prCharges = hasOrderCharges && Number.isFinite(orderCharges) ? orderCharges : fallbackCharges || 0;
     const pegsFromStock = Number(item.PEGS) || 1;
-
-
-    // STEP D: Calculate price
-    let calculatedPrice = unitPrice;
-    let isFree = false;
-
-    if (isFreeItem && Number(scanItemCode) === Number(freeItemRows[0].item_id)) {
-
-      //   FREE ITEM
-      calculatedPrice = 0;
-      isFree = true;
-
-      await connection.query(
-        `
-    UPDATE xxafmc_order_details
-    SET free_item_quantity = '1'
-    WHERE order_id = ? 
-      AND item_id = ? 
-      AND barcode IS NOT NULL
-    `,
-        [ORDERNUMBER, scanItemCode]
-      );
-
-    } else {
-
-      const pricePerPeg = pegsFromStock > 0
-        ? unitPrice / pegsFromStock
-        : unitPrice;
-
-      const profit =
-        pricePerPeg +
-        (pricePerPeg * profitPercent / 100) +
-        prCharges;
-
-      calculatedPrice = Number(profit).toFixed(2);
-    }
+    const calculatedPaidPrice = Number(
+      (pegsFromStock > 0 ? unitPrice / pegsFromStock : unitPrice) * (1 + profitPercent / 100) + prCharges
+    ).toFixed(2);
 
     const [componentRows] = await connection.query(`
-      SELECT item_code, item_name, quantity AS total_quantity, inventory_item_code, Mix
+      SELECT 
+        item_code, 
+        item_name, 
+        quantity AS total_quantity, 
+        inventory_item_code, 
+        Mix, 
+        price, 
+        order_line_id,
+        free_item_quantity
       FROM (
         SELECT DISTINCT x.item_code, x.item_name, (x.pegs*x.quantity) AS quantity, x.inventory_item_code, 'MO' AS Mix
+             , NULL AS price, NULL AS order_line_id, NULL AS free_item_quantity
         FROM xxafmc_custom_cocktails_mocktails_details x JOIN xxafmc_order_details xo ON x.inventory_item_code = xo.item_id
         WHERE x.order_number = ? AND x.item_code = ?
           AND (? = '' OR x.inventory_item_code = ?)
         UNION ALL
         SELECT DISTINCT x.item_code, x.item_name, (x.pegs*x.quantity) AS quantity, x.inventory_item_code, 'MO' AS Mix
+             , NULL AS price, NULL AS order_line_id, NULL AS free_item_quantity
         FROM xxafmc_custom_cocktails_mocktails_details_dummy x JOIN xxafmc_order_details xo ON x.inventory_item_code = xo.item_id
         WHERE x.order_number = ? AND x.item_code = ?
           AND (? = '' OR x.inventory_item_code = ?)
         UNION ALL
         SELECT DISTINCT xcmd.item_code, xcmd.item_name, (xcmd.pegs * xcmd.quantity) AS quantity,
-               xcmd.inventory_item_code, 'MO' AS Mix
+               xcmd.inventory_item_code, 'MO' AS Mix, NULL AS price, NULL AS order_line_id, NULL AS free_item_quantity
         FROM xxafmc_cocktails_mocktails_details xcmd
         WHERE (
             (? <> '' AND xcmd.inventory_item_code = ?)
@@ -759,7 +780,7 @@ exports.processBarcodeScan = async (req, res) => {
           )
         UNION ALL
         SELECT COALESCE(xi.item_code, xo.ITEM_ID) AS item_code, COALESCE(xi.item_name, 'Unknown') AS item_name, (CASE WHEN xo.type='Large' THEN 2 ELSE 1 END * xo.quantity) AS quantity,
-               CAST(xo.ITEM_ID AS CHAR) AS inventory_item_code, 'I' AS Mix
+               CAST(xo.ITEM_ID AS CHAR) AS inventory_item_code, 'I' AS Mix, xo.price, xo.order_line_id, xo.free_item_quantity
         FROM xxafmc_order_details xo LEFT JOIN (${inventorySummarySql}) xi ON xi.item_code = xo.ITEM_ID
         WHERE xo.order_id = ? AND xo.item_id = ?
       ) A`,
@@ -785,14 +806,22 @@ exports.processBarcodeScan = async (req, res) => {
 
     let componentsWithRemaining = componentRows
       .map(comp => {
-        const already = currentScanned
-          .filter(s => sameCode(s.itemCode, comp.item_code) &&
-            sameCode(s.parentItem || s.itemCode, comp.inventory_item_code))
-          .reduce((sum, s) => sum + Number(s.scanQuantity || 0), 0);
+        // Fix: Subtract scans allocated ONLY to this specific line
+        const already = currentScanned.filter(s => {
+          if (comp.Mix === 'I' && comp.order_line_id) {
+            return s.orderLineId === comp.order_line_id;
+          }
+          return sameCode(s.itemCode, comp.item_code) && sameCode(s.parentItem, comp.inventory_item_code);
+        }).reduce((sum, s) => sum + Number(s.scanQuantity || 0), 0);
+
         return { ...comp, coll_qty: Math.max(0, Number(comp.total_quantity) - already) };
       })
       .filter(comp => comp.coll_qty > 0)
-      .sort((a, b) => a.Mix.localeCompare(b.Mix));
+      .sort((a, b) => {
+        // Priority: Cocktail ingredients -> Paid Standard items -> Free Standard items
+        if (a.Mix !== b.Mix) return a.Mix.localeCompare(b.Mix);
+        return Number(b.price || 0) - Number(a.price || 0);
+      });
 
     // CRITICAL: If nothing left to add → show exact Oracle error
     if (componentsWithRemaining.length === 0) {
@@ -810,14 +839,30 @@ exports.processBarcodeScan = async (req, res) => {
     for (const comp of componentsWithRemaining) {
       if (reqQtyLeft <= 0) break;
       const qtyToAdd = Math.min(reqQtyLeft, comp.coll_qty);
+      
+      let finalPrice = calculatedPaidPrice;
+      let isFree = false;
+
+      // Determine if this specific component is a free line
+      if (comp.Mix === 'I' && Number(comp.price || 1) === 0) {
+        finalPrice = 0;
+        isFree = true;
+        if (!comp.free_item_quantity) {
+           await connection.query(
+             `UPDATE xxafmc_order_details SET free_item_quantity = '1' WHERE order_line_id = ?`,
+             [comp.order_line_id]
+           );
+        }
+      }
 
       const newEntry = {
         id: Date.now() + addedThisScan.length,
         itemCode: comp.item_code,
         itemName: comp.item_name,
         scanQuantity: qtyToAdd,
-        itemPrice: calculatedPrice,
+        itemPrice: finalPrice,
         barcode: BARCODE,
+        orderLineId: comp.order_line_id,
         scannedAt: new Date().toISOString(),
         parentItem: comp.inventory_item_code,
         categoryId,
@@ -847,7 +892,7 @@ exports.processBarcodeScan = async (req, res) => {
       data: {
         itemCode: scanItemCode,
         itemName: item.ITEM_NAME,
-        calculatedPrice,
+        calculatedPrice: addedThisScan[0]?.itemPrice,
         barcode: BARCODE,
         isCocktailIngredient: addedThisScan.some((entry) => entry.isCocktailIngredient),
         addedThisScan
@@ -1510,5 +1555,3 @@ exports.getOrderDetailsByOrderNumber = async (req, res) => {
     }
   }
 };
-
-
