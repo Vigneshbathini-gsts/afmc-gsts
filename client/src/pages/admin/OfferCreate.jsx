@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FaArrowLeft,
@@ -9,6 +9,7 @@ import {
   FaCalendarAlt,
   FaCommentDots,
   FaSortAmountUp,
+  FaSearch,
   FaChevronDown,
 } from "react-icons/fa";
 import { offersAPI } from "../../services/api";
@@ -56,6 +57,8 @@ export default function OfferCreate() {
   const [items, setItems] = useState([]);
   const [showItemDropdown, setShowItemDropdown] = useState(false);
   const [showFreeItemDropdown, setShowFreeItemDropdown] = useState(false);
+  const [itemSearch, setItemSearch] = useState("");
+  const [freeItemSearch, setFreeItemSearch] = useState("");
   const [loadingItems, setLoadingItems] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -113,6 +116,20 @@ export default function OfferCreate() {
     };
   }, []);
 
+  const filteredItems = useMemo(() => {
+    return items.filter((item) =>
+      item.item_name.toLowerCase().includes(itemSearch.toLowerCase()) ||
+      item.item_code.toString().includes(itemSearch)
+    );
+  }, [items, itemSearch]);
+
+  const filteredFreeItems = useMemo(() => {
+    return items.filter((item) =>
+      item.item_name.toLowerCase().includes(freeItemSearch.toLowerCase()) ||
+      item.item_code.toString().includes(freeItemSearch)
+    );
+  }, [items, freeItemSearch]);
+
   // Handle Input Change
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -132,6 +149,7 @@ export default function OfferCreate() {
       itemName: item.item_name, //   
     }));
     setShowItemDropdown(false);
+    setItemSearch("");
   };
 
   // Select Free Item from Dropdown
@@ -142,6 +160,7 @@ export default function OfferCreate() {
       freeItemName: item.item_name, //   
     }));
     setShowFreeItemDropdown(false);
+    setFreeItemSearch("");
   };
 
   // Save Offer
@@ -287,12 +306,25 @@ return (
 
               {showItemDropdown && (
                 <div className="absolute z-20 mt-2 w-full bg-white border border-gray-200 rounded-2xl shadow-xl max-h-64 overflow-y-auto">
+                  <div className="p-2 sticky top-0 bg-white border-b border-gray-100 z-10">
+                    <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-xl border border-gray-200 focus-within:ring-2 focus-within:ring-afmc-maroon/20">
+                      <FaSearch className="text-gray-400 text-sm" />
+                      <input
+                        type="text"
+                        placeholder="Search items..."
+                        className="w-full bg-transparent outline-none text-sm text-gray-700"
+                        value={itemSearch}
+                        onChange={(e) => setItemSearch(e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </div>
+                  </div>
                   {loadingItems ? (
                     <div className="px-4 py-3 text-sm text-gray-500">Loading items...</div>
-                  ) : items.length === 0 ? (
+                  ) : filteredItems.length === 0 ? (
                     <div className="px-4 py-3 text-sm text-gray-500">No items found</div>
                   ) : (
-                    items.map((item) => (
+                    filteredItems.map((item) => (
                       <button
                         key={item.item_code}
                         type="button"
@@ -351,12 +383,25 @@ return (
 
             {showFreeItemDropdown && (
               <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg max-h-56 overflow-y-auto">
+                <div className="p-2 sticky top-0 bg-white border-b border-gray-100 z-10">
+                  <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-xl border border-gray-200 focus-within:ring-2 focus-within:ring-afmc-maroon/20">
+                    <FaSearch className="text-gray-400 text-sm" />
+                    <input
+                      type="text"
+                      placeholder="Search items..."
+                      className="w-full bg-transparent outline-none text-sm text-gray-700"
+                      value={freeItemSearch}
+                      onChange={(e) => setFreeItemSearch(e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  </div>
+                </div>
                 {loadingItems ? (
                   <div className="px-3 py-2 text-xs text-gray-500">Loading items...</div>
-                ) : items.length === 0 ? (
+                ) : filteredFreeItems.length === 0 ? (
                   <div className="px-3 py-2 text-xs text-gray-500">No items found</div>
                 ) : (
-                  items.map((item) => (
+                  filteredFreeItems.map((item) => (
                     <button
                       key={item.item_code}
                       type="button"

@@ -159,7 +159,7 @@ export default function FilterDropdown({
         </div>
       </div>
 
-      <div className="max-h-72 overflow-y-auto py-2">
+      <div className="max-h-60 overflow-y-auto py-2">
         <button
           type="button"
           onClick={() => {

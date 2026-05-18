@@ -840,6 +840,35 @@ const getStockOutReport = async ({ fromDate, toDate }) => {
   return rows;
 };
 
+const getTodayStockOutDetails = async () => {
+  const sql = `
+    SELECT
+      ITEM_ID,
+      ROUND(STOCK_QUANTITY) AS stock_quantity,
+      ITEM_NAME,
+      UNIT_PRICE,
+      CREATION_DATE,
+      CREATED_BY,
+      LAST_UPDATE_DATE,
+      LAST_UPDATED_BY,
+      ITEM_CODE,
+      \`A/C_UNIT\` AS ac_unit,
+      PEGS,
+      BOTTLES,
+      TOTAL_VALUE,
+      volume,
+      batch_name,
+      type,
+      BARCODE
+    FROM xxafmc_stock_out
+    WHERE DATE(CREATION_DATE) = CURDATE()
+      AND ITEM_CODE IS NOT NULL
+    ORDER BY CREATION_DATE DESC
+  `;
+  const [rows] = await db.execute(sql);
+  return rows;
+};
+
 module.exports = {
   getInventoryList,
   getCategories,
@@ -857,6 +886,7 @@ module.exports = {
   updateItemImage,
   getStockInReport,
   getStockOutReport,
+  getTodayStockOutDetails,
 };
 
 

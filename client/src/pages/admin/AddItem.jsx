@@ -177,6 +177,8 @@ export default function AddItem() {
       setRows([]);
       setBarcode("");
       setSuccessMessage("Stock-out transaction completed successfully.");
+      // Navigate to today's stock out details page
+      navigate("/admin/today-stock-out-details");
     } catch (requestError) {
       console.error("Failed to save stock-out transaction:", requestError);
       setError(

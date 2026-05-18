@@ -81,18 +81,18 @@ export default function OutletOrderDetails() {
 
     try {
       setLoading(true);
-      
+
       // Fetch order items
       const itemsRes = await barOrdersAPI.getOrderItems({
         ORDERNUMBER: orderData.ORDERNUMBER,
         KITCHEN: department,
       });
       const itemsData = itemsRes.data?.data || itemsRes.data || [];
-      
+
       // Fetch scanned items from session
       const scannedRes = await barOrdersAPI.getScannedItems(orderData.ORDERNUMBER);
       const scannedData = scannedRes.data?.data || [];
-      
+
       if (isMountedRef.current) {
         setItems(itemsData);
         setScannedItems(scannedData);
@@ -154,15 +154,17 @@ export default function OutletOrderDetails() {
     fetchOrderItems,
   ]);
 
-  // NOTE: Do not auto-clear scanned-items on `pagehide` / refresh.
-  // `pagehide` fires on browser-level refresh as well, which would wipe the history the user expects to see.
 
-  // Helper function to get scanned quantity for an item
-  const getScannedQuantityByItemCode = useCallback((itemCode) => {
-    const normalizedItemCode = String(itemCode ?? "").trim();
-    return scannedItems
-      .filter(item => String(item.itemCode ?? "").trim() === normalizedItemCode)
-      .reduce((sum, item) => sum + Number(item.scanQuantity || 0), 0);
+  const getScannedQuantityByItemCode = useCallback((item) => {
+    const normalizedItemCode = String(item.ITEM_ID ?? "").trim();
+    const unitFactor = Number(item.ingredientsPerUnit || 1);
+
+    const rawIngredientScans = scannedItems
+      .filter(si => String(si.parentItem ?? si.itemCode ?? "").trim() === normalizedItemCode)
+      .reduce((sum, si) => sum + Number(si.scanQuantity || 0), 0);
+
+    // Only return completed "whole" parent units
+    return Math.floor(rawIngredientScans / unitFactor);
   }, [scannedItems]);
 
   const handleBarcodeBlur = async () => {
@@ -193,89 +195,73 @@ export default function OutletOrderDetails() {
     }
   };
 
- const autoProcessScan = useCallback(async (scannedBarcode) => {
-  if (!scannedBarcode || processingScanRef.current) return;
-  processingScanRef.current = true;
+  const autoProcessScan = useCallback(async (scannedBarcode) => {
+    if (!scannedBarcode || processingScanRef.current) return;
+    processingScanRef.current = true;
 
-  setProcessingScan(true);
-  setScanError("");
-  setScanMessage("");
+    setProcessingScan(true);
+    setScanError("");
+    setScanMessage("");
 
-  try {
-    const res = await barOrdersAPI.processScan({
-      ORDERNUMBER: orderData?.ORDERNUMBER,
-      BARCODE: scannedBarcode,
-      QUANTITY: qty || 1,
-      KITCHEN: department,
-      PARENT_ITEM: activeRecipeParentItem || "",
-    });
+    try {
+      const res = await barOrdersAPI.processScan({
+        ORDERNUMBER: orderData?.ORDERNUMBER,
+        BARCODE: scannedBarcode,
+        QUANTITY: qty || 1,
+        KITCHEN: department,
+        PARENT_ITEM: activeRecipeParentItem || "",
+      });
 
-    const scanData = res.data?.data || {};
+      const scanData = res.data?.data || {};
 
-    // SUCCESS path
-    if (res.data?.success === true) {
-      // Refetch scanned items
-      const scannedRes = await barOrdersAPI.getScannedItems(orderData.ORDERNUMBER);
-      const scannedData = scannedRes.data?.data || [];
-      setScannedItems(scannedData);
+      // SUCCESS path
+      if (res.data?.success === true) {
+        // Refetch scanned items
+        const scannedRes = await barOrdersAPI.getScannedItems(orderData.ORDERNUMBER);
+        const scannedData = scannedRes.data?.data || [];
+        setScannedItems(scannedData);
 
-      setScanMessage(`✓ ${scanData.itemName || 'Item'} scanned successfully.`);
-      setItemCode(scanData.itemCode || "");
-      setItemName(scanData.itemName || "");
-      setPrice(scanData.calculatedPrice || "");
+        setScanMessage(`✓ ${scanData.itemName || 'Item'} scanned successfully.`);
+        setItemCode(scanData.itemCode || "");
+        setItemName(scanData.itemName || "");
+        setPrice(scanData.calculatedPrice || "");
 
-      // Cocktail modal
-      if (scanData.isCocktailIngredient && Array.isArray(scanData.addedThisScan) && scanData.addedThisScan.length > 0) {
-        const parent = String(scanData.addedThisScan?.[0]?.parentItem || "").trim();
-        if (parent) setActiveRecipeParentItem(parent);
-        setScannedCocktailData({
-          name: scanData.itemName || "Cocktail",
-          ingredients: scanData.addedThisScan.map(ing => ({
-            item_code: ing.itemCode,
-            item_name: ing.itemName,
-            pegs: ing.pegs || 1,
-            quantity: ing.scanQuantity,
-          })),
-        });
-        setShowCocktailModal(true);
+        setTimeout(() => {
+          if (isMountedRef.current) {
+            setBarcode("");
+            setQty("");
+          }
+        }, 800);
+      }
+      // Backend returned error (400, etc.)
+      else {
+        const message = scanData.message || res.data?.message || "Scan failed";
+        setScanError(message);
+        if (
+          typeof message === "string" &&
+          (message.toLowerCase().includes("morethan order quantity") ||
+            message.toLowerCase().includes("duplicate bottle scan") ||
+            message.toLowerCase().includes("morethen stock"))
+        ) {
+          window.alert(message);
+        }
       }
 
+    } catch (error) {
+      const errMsg = error.response?.data?.error || error.response?.data?.message || error.message || "Failed to process scan.";
+      setScanError(errMsg);
+      console.error("Process Scan Error:", error);
+    } finally {
+      setProcessingScan(false);
+      processingScanRef.current = false;
       setTimeout(() => {
         if (isMountedRef.current) {
-          setBarcode("");
-          setQty("");
+          setScanMessage("");
+          setScanError("");
         }
-      }, 800);
-    } 
-    // Backend returned error (400, etc.)
-    else {
-      const message = scanData.message || res.data?.message || "Scan failed";
-      setScanError(message);
-      if (
-        typeof message === "string" &&
-        (message.toLowerCase().includes("morethan order quantity") ||
-          message.toLowerCase().includes("duplicate bottle scan") ||
-          message.toLowerCase().includes("morethen stock"))
-      ) {
-        window.alert(message);
-      }
+      }, 4000);
     }
-
-  } catch (error) {
-    const errMsg = error.response?.data?.error || error.response?.data?.message || error.message || "Failed to process scan.";
-    setScanError(errMsg);
-    console.error("Process Scan Error:", error);
-  } finally {
-    setProcessingScan(false);
-    processingScanRef.current = false;
-    setTimeout(() => {
-      if (isMountedRef.current) {
-        setScanMessage("");
-        setScanError("");
-      }
-    }, 4000);
-  }
-}, [orderData, department, qty, activeRecipeParentItem]);
+  }, [orderData, department, qty, activeRecipeParentItem]);
 
   const startScanner = async () => {
     try {
@@ -374,36 +360,36 @@ export default function OutletOrderDetails() {
     initScanner();
   }, [scanning, autoProcessScan, processingScan]);
 
- const handleItemClick = async (item) => {
-  if (!item.LINK_ENABLED || item.LINK_ENABLED !== "Y") return;
-  try {
-    // Pass both item ID and order number
-    const res = await barOrdersAPI.getCocktailDetailsById(item.ITEM_ID, orderData?.ORDERNUMBER);
-    const cocktail = res.data?.data;
-    const ingredients = Array.isArray(cocktail?.details)
-      ? cocktail.details.map((detail) => ({
+  const handleItemClick = async (item) => {
+    if (!item.LINK_ENABLED || item.LINK_ENABLED !== "Y") return;
+    try {
+      // Pass both item ID and order number
+      const res = await barOrdersAPI.getCocktailDetailsById(item.ITEM_ID, orderData?.ORDERNUMBER);
+      const cocktail = res.data?.data;
+      const ingredients = Array.isArray(cocktail?.details)
+        ? cocktail.details.map((detail) => ({
           item_code: detail.ITEM_CODE,
           item_name: detail.ITEM_NAME,
           pegs: detail.PEGS,
           quantity: detail.QUANTITY || 1,
         }))
-      : [];
+        : [];
 
-    if (!ingredients.length) {
-      alert("No recipe details found for this item.");
-      return;
+      if (!ingredients.length) {
+        alert("No recipe details found for this item.");
+        return;
+      }
+      setScannedCocktailData({
+        name: cocktail?.ITEM_NAME || item.ITEM_NAME,
+        ingredients,
+      });
+      setActiveRecipeParentItem(String(item.ITEM_ID || "").trim());
+      setShowCocktailModal(true);
+    } catch (error) {
+      console.error("Error fetching cocktail details:", error);
+      alert("Failed to load cocktail details.");
     }
-    setScannedCocktailData({
-      name: cocktail?.ITEM_NAME || item.ITEM_NAME,
-      ingredients,
-    });
-    setActiveRecipeParentItem(String(item.ITEM_ID || "").trim());
-    setShowCocktailModal(true);
-  } catch (error) {
-    console.error("Error fetching cocktail details:", error);
-    alert("Failed to load cocktail details.");
-  }
-};
+  };
 
   const handleCancelItem = async (item) => {
     if (item.CAN_CANCEL !== "Y") {
@@ -528,303 +514,309 @@ export default function OutletOrderDetails() {
           </button>
         </div>
 
-      {/* Header Card with Order Summary */}
-      <div className="bg-white/80 border border-white/60 rounded-3xl shadow-xl backdrop-blur-sm p-5">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div>
-            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider">Order Number</label>
-            <div className="text-lg font-semibold text-gray-900">{orderData.ORDERNUMBER}</div>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider">Name</label>
-            <div className="text-gray-800">{orderedBy || orderData.FIRST_NAME || "Naveen Member"}</div>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</label>
-            <div className="text-gray-800">
-              {totalOrderedQty} {totalScannedQty > 0 && `(Scanned: ${totalScannedQty})`}
+        {/* Header Card with Order Summary */}
+        <div className="bg-white/80 border border-white/60 rounded-3xl shadow-xl backdrop-blur-sm p-5">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider">Order Number</label>
+              <div className="text-lg font-semibold text-gray-900">{orderData.ORDERNUMBER}</div>
             </div>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider">Status</label>
-            <div className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${isComplete ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>
-              {isComplete ? "Ready to Complete" : `${totalOrderedQty - totalScannedQty} item(s) remaining`}
+            <div>
+              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider">Name</label>
+              <div className="text-gray-800">{orderedBy || orderData.FIRST_NAME || "Naveen Member"}</div>
             </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Two Column Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Order Items Table */}
-          <div className="bg-white/80 border border-white/60 rounded-3xl shadow-xl backdrop-blur-sm overflow-hidden">
-            <div className="border-b border-gray-100 px-6 py-4">
-              <h2 className="text-base font-semibold text-gray-800">Order Items</h2>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="min-w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item Name</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ordered</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Scanned</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Remaining</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Cancel</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {loading ? (
-                    <tr><td colSpan="6" className="px-6 py-12 text-center text-gray-500">Loading...</td></tr>
-                  ) : items.length === 0 ? (
-                    <tr><td colSpan="6" className="px-6 py-12 text-center text-gray-500">No pending items found.</td></tr>
-                  ) : (
-                    items.map((item, idx) => {
-                      const scannedQty = getScannedQuantityByItemCode(item.ITEM_ID);
-                      const remainingQty = item.quantity - scannedQty;
-                      return (
-                        <tr key={item.ORDER_LINE_ID || idx} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 text-sm text-gray-800">
-                            {item.LINK_ENABLED === "Y" ? (
-                              <button onClick={() => handleItemClick(item)} className="text-pink-600 hover:underline">
-                                {toInitCap(item.ITEM_NAME || "")}
-                              </button>
-                            ) : (
-                              toInitCap(item.ITEM_NAME || "")
-                            )}
-                          </td>
-                          <td className="px-6 py-4 text-sm font-medium">{item.quantity}</td>
-                          <td className="px-6 py-4 text-sm text-green-600 font-medium">{scannedQty}</td>
-                          <td className="px-6 py-4 text-sm text-orange-600 font-medium">{remainingQty}</td>
-                          <td className="px-6 py-4 text-sm text-gray-600">{item.TYPE || "NA"}</td>
-                          <td className="px-6 py-4 text-center">
-                            <button
-                              onClick={() => handleCancelItem(item)}
-                              disabled={item.CAN_CANCEL !== "Y"}
-                              className={`text-lg ${item.CAN_CANCEL === "Y" ? "text-red-400 hover:text-red-600" : "text-gray-300 cursor-not-allowed"}`}
-                            >
-                              <FaTimesCircle />
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Barcode Scanner Section */}
-          <div className="bg-white/80 border border-white/60 rounded-3xl shadow-xl backdrop-blur-sm overflow-hidden">
-            <div className="border-b border-gray-100 px-6 py-4">
-              <h2 className="text-base font-semibold text-gray-800">Scan Barcode</h2>
-            </div>
-            <div className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">Barcode</label>
-                    <input
-                      type="text"
-                      value={barcode}
-                      onChange={(e) => handleBarcodeChange(e.target.value)}
-                      onKeyPress={handleBarcodeKeyPress}
-                      onBlur={handleBarcodeBlur}
-                      placeholder="Scan or enter barcode"
-                      className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:ring-1 focus:ring-pink-500"
-                      disabled={processingScan}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">Quantity</label>
-                    <input
-                      type="number"
-                      value={qty}
-                      onChange={(e) => setQty(e.target.value)}
-                      placeholder="1"
-                      className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm"
-                      disabled={processingScan}
-                    />
-                  </div>
-                  <button
-                    onClick={scanning ? stopScanner : startScanner}
-                    disabled={processingScan}
-                    className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg transition text-white font-medium disabled:opacity-50 ${
-                      scanning
-                        ? "bg-gray-700 hover:bg-gray-800"
-                        : "bg-afmc-maroon hover:bg-afmc-maroon2"
-                    }`}
-                  >
-                    <FaCamera /> {scanning ? "Stop Camera" : "Start Camera"}
-                  </button>
-                  {cameraError && <div className="text-sm text-red-600">{cameraError}</div>}
-                  {processingScan && (
-                    <div className="flex items-center gap-2 text-sm text-blue-600">
-                      <FaSpinner className="animate-spin" /> Processing scan...
-                    </div>
-                  )}
-                  {scanMessage && (
-                    <div className="flex items-center gap-2 text-sm text-green-600 bg-green-50 p-3 rounded-lg">
-                      <FaCheckCircle /> {scanMessage}
-                    </div>
-                  )}
-                  {scanError && (
-                    <div className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">{scanError}</div>
-                  )}
-                </div>
-                <div>
-                  <div className="rounded-lg border border-gray-200 bg-black p-0 overflow-hidden">
-                    <div className="relative w-full aspect-video min-h-[240px]">
-                      <div id="qr-reader" className="absolute inset-0 w-full h-full" />
-                      {!scanSuccess && scanning && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-white text-sm rounded-lg">
-                          Position barcode in frame
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</label>
+              <div className="text-gray-800">
+                {totalOrderedQty} {totalScannedQty > 0 && `(Scanned: ${totalScannedQty})`}
               </div>
             </div>
-          </div>
-
-          {/* Complete/Cancel Buttons and Scanned Items History */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-            <div className="border-b border-gray-100 px-6 py-4 flex gap-3">
-              <button
-                onClick={handleCompleteOrder}
-                disabled={completing || !isComplete}
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium transition shadow-sm ${isComplete && !completing ? "bg-green-600 text-white hover:bg-green-700" : "bg-gray-300 text-gray-500 cursor-not-allowed"}`}
-              >
-                {completing ? <FaSpinner className="animate-spin" /> : <FaCheck />}
-                Complete Order
-              </button>
-              <button
-                onClick={handleCancelOrder}
-                disabled={cancelling}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium bg-red-600 text-white hover:bg-red-700 transition shadow-sm"
-              >
-                {cancelling ? <FaSpinner className="animate-spin" /> : <FaBan />}
-                Cancel Order
-              </button>
-            </div>
-
-            <div className="border-b border-gray-100 px-6 py-4 flex items-center justify-between bg-gray-50">
-              <div className="flex items-center gap-2">
-                <FaHistory className="text-gray-400" />
-                <h2 className="text-base font-semibold text-gray-800">Scanned Items History</h2>
-                <span className="text-xs text-gray-500">({scannedItems.length} items scanned)</span>
-              </div>
-              {scannedItems.length > 0 && (
-                <button
-                  onClick={handleClearScannedItems}
-                  className="flex items-center gap-1 px-3 py-1.5 text-xs text-red-600 hover:text-red-700 border border-red-200 rounded-lg hover:bg-red-50 transition"
-                >
-                  <FaTrash className="text-xs" />
-                  Clear All
-                </button>
-              )}
-            </div>
-            <div className="overflow-x-auto">
-              <table className="min-w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item Code</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item Name</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Qty</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Price</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Barcode</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {scannedItems.length === 0 ? (
-                    <tr><td colSpan="6" className="px-4 py-8 text-center text-gray-500">No items scanned yet.</td></tr>
-                  ) : (
-                    scannedItems.map((item) => (
-                      <tr key={item.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 text-sm font-mono text-gray-600">{item.itemCode}</td>
-                        <td className="px-4 py-3 text-sm text-gray-800">{toInitCap(item.itemName || "")}</td>
-                        <td className="px-4 py-3 text-sm text-center font-medium">{item.scanQuantity}</td>
-                        <td className="px-4 py-3 text-sm text-gray-500">
-                          {new Date(item.scannedAt).toLocaleTimeString()}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-right font-semibold">Rs {item.itemPrice || "0"}</td>
-                        <td className="px-4 py-3 text-sm font-mono text-gray-500">{item.barcode}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
-        {/* Right Column - Scanned Item Details */}
-        <div className="space-y-6">
-          <div className="bg-white/80 border border-white/60 rounded-3xl shadow-xl backdrop-blur-sm overflow-hidden">
-            <div className="border-b border-gray-100 px-6 py-4">
-              <h2 className="text-base font-semibold text-gray-800">Current Scanned Item</h2>
-            </div>
-            <div className="p-6 space-y-4">
-              <div className="bg-gray-50 rounded-lg p-4">
-                <p className="text-xs text-gray-400 uppercase tracking-wider">Item Code</p>
-                <p className="mt-1 font-mono text-lg font-semibold text-gray-800">{itemCode || "-"}</p>
-              </div>
-              <div className="bg-gray-50 rounded-lg p-4">
-                <p className="text-xs text-gray-400 uppercase tracking-wider">Item Name</p>
-                <p className="mt-1 font-medium text-gray-800">{itemName ? toInitCap(itemName) : "-"}</p>
-              </div>
-              <div className="bg-gray-50 rounded-lg p-4">
-                <p className="text-xs text-gray-400 uppercase tracking-wider">Price</p>
-                <p className="mt-1 font-semibold text-gray-800">{price ? `Rs ${price}` : "-"}</p>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider">Status</label>
+              <div className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${isComplete ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>
+                {isComplete ? "Ready to Complete" : `${totalOrderedQty - totalScannedQty} item(s) remaining`}
               </div>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Cocktail Recipe Modal */}
-      {showCocktailModal && scannedCocktailData && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[85vh] overflow-hidden">
-            <div className="border-b px-6 py-4 flex justify-between items-center">
-              <h2 className="text-xl font-semibold">{scannedCocktailData.name}</h2>
-              <button onClick={() => setShowCocktailModal(false)} className="text-2xl">&times;</button>
-            </div>
-            <div className="p-6 overflow-y-auto">
-              <table className="min-w-full text-sm">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-2 text-left">Item Code</th>
-                    <th className="px-4 py-2 text-left">Item Name</th>
-                    <th className="px-4 py-2 text-center">Pegs</th>
-                    <th className="px-4 py-2 text-center">Qty</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {scannedCocktailData.ingredients?.map((ing, idx) => (
-                    <tr key={idx}>
-                      <td className="px-4 py-2">{ing.item_code}</td>
-                      <td className="px-4 py-2">{toInitCap(ing.item_name || "")}</td>
-                      <td className="px-4 py-2 text-center">{ing.pegs || 0}</td>
-                      <td className="px-4 py-2 text-center">{ing.quantity || 1}</td>
+        {/* Two Column Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left Column */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Order Items Table */}
+            <div className="bg-white/80 border border-white/60 rounded-3xl shadow-xl backdrop-blur-sm overflow-hidden">
+              <div className="border-b border-gray-100 px-6 py-4">
+                <h2 className="text-base font-semibold text-gray-800">Order Items</h2>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item Name</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ordered (Paid + Free)</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Scanned</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Remaining</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Cancel</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-              <div className="mt-6 flex gap-3">
-                <button onClick={() => setShowCocktailModal(false)} className="flex-1 px-4 py-2 bg-afmc-maroon hover:bg-afmc-maroon2 transition text-white rounded-lg">
-                  Confirm Scan
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {loading ? (
+                      <tr><td colSpan="6" className="px-6 py-12 text-center text-gray-500">Loading...</td></tr>
+                    ) : items.length === 0 ? (
+                      <tr><td colSpan="6" className="px-6 py-12 text-center text-gray-500">No pending items found.</td></tr>
+                    ) : (
+                      items.map((item, idx) => {
+                        const scannedQty = getScannedQuantityByItemCode(item);
+                        const remainingQty = item.quantity - scannedQty;
+                        return (
+                          <tr key={item.ORDER_LINE_ID || idx} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 text-sm text-gray-800">
+                              {item.LINK_ENABLED === "Y" ? (
+                                <button onClick={() => handleItemClick(item)} className="text-pink-600 hover:underline">
+                                  {toInitCap(item.ITEM_NAME || "")}
+                                </button>
+                              ) : (
+                                toInitCap(item.ITEM_NAME || "")
+                              )}
+                            </td>
+                            <td className="px-6 py-4 text-sm font-medium">
+                              {item.quantity}
+                              {item.freeQty > 0 && (
+                                <span className="text-xs text-gray-500 ml-1">
+                                  ({item.paidQty}P + {item.freeQty}F)
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-green-600 font-medium">{scannedQty}</td>
+                            <td className="px-6 py-4 text-sm text-orange-600 font-medium">{remainingQty}</td>
+                            <td className="px-6 py-4 text-sm text-gray-600">{item.TYPE || "NA"}</td>
+                            <td className="px-6 py-4 text-center">
+                              <button
+                                onClick={() => handleCancelItem(item)}
+                                disabled={item.CAN_CANCEL !== "Y"}
+                                className={`text-lg ${item.CAN_CANCEL === "Y" ? "text-red-400 hover:text-red-600" : "text-gray-300 cursor-not-allowed"}`}
+                              >
+                                <FaTimesCircle />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Barcode Scanner Section */}
+            <div className="bg-white/80 border border-white/60 rounded-3xl shadow-xl backdrop-blur-sm overflow-hidden">
+              <div className="border-b border-gray-100 px-6 py-4">
+                <h2 className="text-base font-semibold text-gray-800">Scan Barcode</h2>
+              </div>
+              <div className="p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Barcode</label>
+                      <input
+                        type="text"
+                        value={barcode}
+                        onChange={(e) => handleBarcodeChange(e.target.value)}
+                        onKeyPress={handleBarcodeKeyPress}
+                        onBlur={handleBarcodeBlur}
+                        placeholder="Scan or enter barcode"
+                        className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:ring-1 focus:ring-pink-500"
+                        disabled={processingScan}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Quantity</label>
+                      <input
+                        type="number"
+                        value={qty}
+                        onChange={(e) => setQty(e.target.value)}
+                        placeholder="1"
+                        className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm"
+                        disabled={processingScan}
+                      />
+                    </div>
+                    <button
+                      onClick={scanning ? stopScanner : startScanner}
+                      disabled={processingScan}
+                      className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg transition text-white font-medium disabled:opacity-50 ${scanning
+                          ? "bg-gray-700 hover:bg-gray-800"
+                          : "bg-afmc-maroon hover:bg-afmc-maroon2"
+                        }`}
+                    >
+                      <FaCamera /> {scanning ? "Stop Camera" : "Start Camera"}
+                    </button>
+                    {cameraError && <div className="text-sm text-red-600">{cameraError}</div>}
+                    {processingScan && (
+                      <div className="flex items-center gap-2 text-sm text-blue-600">
+                        <FaSpinner className="animate-spin" /> Processing scan...
+                      </div>
+                    )}
+                    {scanMessage && (
+                      <div className="flex items-center gap-2 text-sm text-green-600 bg-green-50 p-3 rounded-lg">
+                        <FaCheckCircle /> {scanMessage}
+                      </div>
+                    )}
+                    {scanError && (
+                      <div className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">{scanError}</div>
+                    )}
+                  </div>
+                  <div>
+                    <div className="rounded-lg border border-gray-200 bg-black p-0 overflow-hidden">
+                      <div className="relative w-full aspect-video min-h-[240px]">
+                        <div id="qr-reader" className="absolute inset-0 w-full h-full" />
+                        {!scanSuccess && scanning && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-white text-sm rounded-lg">
+                            Position barcode in frame
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Complete/Cancel Buttons and Scanned Items History */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+              <div className="border-b border-gray-100 px-6 py-4 flex gap-3">
+                <button
+                  onClick={handleCompleteOrder}
+                  disabled={completing || !isComplete}
+                  className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium transition shadow-sm ${isComplete && !completing ? "bg-green-600 text-white hover:bg-green-700" : "bg-gray-300 text-gray-500 cursor-not-allowed"}`}
+                >
+                  {completing ? <FaSpinner className="animate-spin" /> : <FaCheck />}
+                  Complete Order
                 </button>
+                <button
+                  onClick={handleCancelOrder}
+                  disabled={cancelling}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium bg-red-600 text-white hover:bg-red-700 transition shadow-sm"
+                >
+                  {cancelling ? <FaSpinner className="animate-spin" /> : <FaBan />}
+                  Cancel Order
+                </button>
+              </div>
+
+              <div className="border-b border-gray-100 px-6 py-4 flex items-center justify-between bg-gray-50">
+                <div className="flex items-center gap-2">
+                  <FaHistory className="text-gray-400" />
+                  <h2 className="text-base font-semibold text-gray-800">Scanned Items History</h2>
+                  <span className="text-xs text-gray-500">({scannedItems.length} items scanned)</span>
+                </div>
+                {scannedItems.length > 0 && (
+                  <button
+                    onClick={handleClearScannedItems}
+                    className="flex items-center gap-1 px-3 py-1.5 text-xs text-red-600 hover:text-red-700 border border-red-200 rounded-lg hover:bg-red-50 transition"
+                  >
+                    <FaTrash className="text-xs" />
+                    Clear All
+                  </button>
+                )}
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item Code</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item Name</th>
+                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Qty</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Price</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Barcode</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {scannedItems.length === 0 ? (
+                      <tr><td colSpan="6" className="px-4 py-8 text-center text-gray-500">No items scanned yet.</td></tr>
+                    ) : (
+                      scannedItems.map((item) => (
+                        <tr key={item.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-3 text-sm font-mono text-gray-600">{item.itemCode}</td>
+                          <td className="px-4 py-3 text-sm text-gray-800">{toInitCap(item.itemName || "")}</td>
+                          <td className="px-4 py-3 text-sm text-center font-medium">{item.scanQuantity}</td>
+                          <td className="px-4 py-3 text-sm text-gray-500">
+                            {new Date(item.scannedAt).toLocaleTimeString()}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-right font-semibold">Rs {item.itemPrice || "0"}</td>
+                          <td className="px-4 py-3 text-sm font-mono text-gray-500">{item.barcode}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column - Scanned Item Details */}
+          <div className="space-y-6">
+            <div className="bg-white/80 border border-white/60 rounded-3xl shadow-xl backdrop-blur-sm overflow-hidden">
+              <div className="border-b border-gray-100 px-6 py-4">
+                <h2 className="text-base font-semibold text-gray-800">Current Scanned Item</h2>
+              </div>
+              <div className="p-6 space-y-4">
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <p className="text-xs text-gray-400 uppercase tracking-wider">Item Code</p>
+                  <p className="mt-1 font-mono text-lg font-semibold text-gray-800">{itemCode || "-"}</p>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <p className="text-xs text-gray-400 uppercase tracking-wider">Item Name</p>
+                  <p className="mt-1 font-medium text-gray-800">{itemName ? toInitCap(itemName) : "-"}</p>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <p className="text-xs text-gray-400 uppercase tracking-wider">Price</p>
+                  <p className="mt-1 font-semibold text-gray-800">{price ? `Rs ${price}` : "-"}</p>
+                </div>
               </div>
             </div>
           </div>
         </div>
-      )}
+
+        {/* Cocktail Recipe Modal */}
+        {showCocktailModal && scannedCocktailData && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[85vh] overflow-hidden">
+              <div className="border-b px-6 py-4 flex justify-between items-center">
+                <h2 className="text-xl font-semibold">{scannedCocktailData.name}</h2>
+                <button onClick={() => setShowCocktailModal(false)} className="text-2xl">&times;</button>
+              </div>
+              <div className="p-6 overflow-y-auto">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-2 text-left">Item Code</th>
+                      <th className="px-4 py-2 text-left">Item Name</th>
+                      <th className="px-4 py-2 text-center">Pegs</th>
+                      <th className="px-4 py-2 text-center">Qty</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {scannedCocktailData.ingredients?.map((ing, idx) => (
+                      <tr key={idx}>
+                        <td className="px-4 py-2">{ing.item_code}</td>
+                        <td className="px-4 py-2">{toInitCap(ing.item_name || "")}</td>
+                        <td className="px-4 py-2 text-center">{ing.pegs || 0}</td>
+                        <td className="px-4 py-2 text-center">{ing.quantity || 1}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div className="mt-6 flex gap-3">
+                  <button onClick={() => setShowCocktailModal(false)} className="flex-1 px-4 py-2 bg-afmc-maroon hover:bg-afmc-maroon2 transition text-white rounded-lg">
+                    Confirm Scan
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

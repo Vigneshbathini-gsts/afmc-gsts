@@ -1,7 +1,19 @@
+<<<<<<< HEAD
 // import React, { useEffect, useMemo, useState } from "react";
 // import { FaArrowLeft, FaSearch, FaTimes } from "react-icons/fa";
 // import { useNavigate } from "react-router-dom";
 // import { API_BASE_URL } from "../../services/api";
+=======
+import React, { useEffect, useMemo, useState } from "react";
+import { FaTimes } from "react-icons/fa";
+import { ChevronsLeft, ShoppingCart, Heart, Share2, Star, Flame, Leaf, Zap } from "lucide-react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
+import { useAuth } from "../../context/AuthContext";
+import { API_BASE_URL, authFetchJson, cartAPI, offersAPI } from "../../services/api";
+import Pubmenubuyservice from "../../services/Pubmenubuyservice";
+import FilterDropdown from "./FilterDropdown";
+>>>>>>> 25ebf029afe25b6a580876fbe2cf83ba2cf41934
 
 // const BASEAPI = "https://afmc.globalsparkteksolutions.com/AFMCIMAGES/";
 
@@ -471,7 +483,11 @@
 //   const [selectedItemDetails, setSelectedItemDetails] = useState(null);
 
 //   const handleBuy = (item, qty, remarks) => {
+<<<<<<< HEAD
 //     navigate("/attendant/menudash/buy", {
+=======
+//     navigate("/attendant/", {
+>>>>>>> 25ebf029afe25b6a580876fbe2cf83ba2cf41934
 //       state: {
 //         item: {
 //           ...item,

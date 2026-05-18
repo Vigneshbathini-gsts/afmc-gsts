@@ -244,6 +244,16 @@ exports.getStockOutReport = async (req, res) => {
   }
 };
 
+exports.getTodayStockOutDetails = async (req, res) => {
+  try {
+    const rows = await inventoryModel.getTodayStockOutDetails();
+    res.status(200).json({ success: true, data: rows });
+  } catch (error) {
+    console.error("Error fetching today's stock-out details:", error);
+    res.status(500).json({ success: false, message: "Failed to load today's stock-out details" });
+  }
+};
+
 exports.addStockOut = async (req, res) => {
   try {
     const payload = req.body?.items ? req.body.items : req.body;

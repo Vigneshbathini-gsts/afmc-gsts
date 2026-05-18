@@ -106,6 +106,8 @@ export default function Inventory() {
   const [imagePreviewUrl, setImagePreviewUrl] = useState("");
   const [imageCacheBusters, setImageCacheBusters] = useState({});
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [imageForm, setImageForm] = useState({
     itemCode: "",
     itemName: "",
@@ -355,6 +357,14 @@ export default function Inventory() {
 
   const allAcUnitOptions = useMemo(() => ["Nos", "Pegs", "Glass", "Mug", "Can"], []);
 
+  const PAGE_SIZE_OPTIONS = useMemo(() => [5, 10, 25, 50], []);
+
+  const totalPages = useMemo(() => Math.max(1, Math.ceil(inventory.length / pageSize)), [inventory.length, pageSize]);
+  const pageStartIndex = useMemo(() => (page - 1) * pageSize, [page, pageSize]);
+  const paginatedInventory = useMemo(() => inventory.slice(pageStartIndex, pageStartIndex + pageSize), [inventory, pageStartIndex, pageSize]);
+  const showingFrom = useMemo(() => (inventory.length === 0 ? 0 : pageStartIndex + 1), [inventory.length, pageStartIndex]);
+  const showingTo = useMemo(() => Math.min(pageStartIndex + pageSize, inventory.length), [pageStartIndex, pageSize, inventory.length]);
+
   const acUnitOptions = useMemo(() => {
     const allowed = getAllowedAcUnits(formValues.categoryId, formValues.subCategory);
     if (allowed.length === 0) return allAcUnitOptions;
@@ -373,6 +383,10 @@ export default function Inventory() {
       setFormValues((prev) => ({ ...prev, acUnit: allowed[0] }));
     }
   }, [formValues.categoryId, formValues.subCategory, formValues.acUnit]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [categoryId, itemCode, search, inventory]);
 
   const formatDate = (date) => {
     const d = date instanceof Date ? date : new Date(date);
@@ -1037,7 +1051,7 @@ export default function Inventory() {
                       </td>
                     </tr>
                   ) : (
-                    inventory.map((row) => (
+                    paginatedInventory.map((row) => (
                       <tr
                         key={row.item_id}
                         className="border-t border-gray-100 hover:bg-afmc-gold/10 transition-colors"
@@ -1072,6 +1086,48 @@ export default function Inventory() {
                   )}
                 </tbody>
               </table>
+            </div>
+
+            <div className="mt-4 flex flex-col gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                Showing {showingFrom} to {showingTo} of {inventory.length} items
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <select
+                  value={pageSize}
+                  onChange={(event) => setPageSize(Number(event.target.value))}
+                  className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
+                >
+                  {PAGE_SIZE_OPTIONS.map((size) => (
+                    <option key={size} value={size}>
+                      {size} / page
+                    </option>
+                  ))}
+                </select>
+
+                <button
+                  type="button"
+                  onClick={() => setPage((current) => Math.max(1, current - 1))}
+                  disabled={page === 1}
+                  className="rounded-lg border border-gray-300 px-4 py-2 font-medium text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Previous
+                </button>
+
+                <span className="font-medium text-gray-700">
+                  Page {page} of {totalPages}
+                </span>
+
+                <button
+                  type="button"
+                  onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+                  disabled={page === totalPages}
+                  className="rounded-lg border border-gray-300 px-4 py-2 font-medium text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </div>
             </div>
           </div>
         </div>

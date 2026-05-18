@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Search,
@@ -70,6 +70,8 @@ export default function OrderHistory() {
   const [detailsByOrder, setDetailsByOrder] = useState({});
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [detailsError, setDetailsError] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   const appUser = useMemo(() => {
     try {
@@ -160,6 +162,14 @@ export default function OrderHistory() {
     return [...new Set(names)].sort((a, b) => a.localeCompare(b));
   }, [rows]);
 
+  const PAGE_SIZE_OPTIONS = useMemo(() => [5, 10, 25, 50], []);
+
+  const totalPages = useMemo(() => Math.max(1, Math.ceil(visibleRows.length / pageSize)), [visibleRows.length, pageSize]);
+  const pageStartIndex = useMemo(() => (page - 1) * pageSize, [page, pageSize]);
+  const paginatedRows = useMemo(() => visibleRows.slice(pageStartIndex, pageStartIndex + pageSize), [visibleRows, pageStartIndex, pageSize]);
+  const showingFrom = useMemo(() => (visibleRows.length === 0 ? 0 : pageStartIndex + 1), [visibleRows.length, pageStartIndex]);
+  const showingTo = useMemo(() => Math.min(pageStartIndex + pageSize, visibleRows.length), [pageStartIndex, pageSize, visibleRows.length]);
+
   const handleFilterChange = (event) => {
     const { name, value } = event.target;
     setError("");
@@ -168,6 +178,10 @@ export default function OrderHistory() {
       [name]: value,
     }));
   };
+
+  useEffect(() => {
+    setPage(1);
+  }, [quickSearch, hasSearched]);
 
   const handleSearch = () => {
     if (!filters.from || !filters.to) {
@@ -416,7 +430,7 @@ export default function OrderHistory() {
                     </td>
                   </tr>
                 ) : visibleRows.length ? (
-                  visibleRows.map((row, index) => {
+                  paginatedRows.map((row, index) => {
                     const isTotalRow =
                       row?.payment_status1 === "Total" || row?.payment_method === "Total" || "";
 
@@ -478,6 +492,48 @@ export default function OrderHistory() {
                 )}
               </tbody>
               </table>
+            </div>
+
+            <div className="mt-4 flex flex-col gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                Showing {showingFrom} to {showingTo} of {visibleRows.length} orders
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <select
+                  value={pageSize}
+                  onChange={(event) => setPageSize(Number(event.target.value))}
+                  className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
+                >
+                  {PAGE_SIZE_OPTIONS.map((size) => (
+                    <option key={size} value={size}>
+                      {size} / page
+                    </option>
+                  ))}
+                </select>
+
+                <button
+                  type="button"
+                  onClick={() => setPage((current) => Math.max(1, current - 1))}
+                  disabled={page === 1}
+                  className="rounded-lg border border-gray-300 px-4 py-2 font-medium text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Previous
+                </button>
+
+                <span className="font-medium text-gray-700">
+                  Page {page} of {totalPages}
+                </span>
+
+                <button
+                  type="button"
+                  onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+                  disabled={page === totalPages}
+                  className="rounded-lg border border-gray-300 px-4 py-2 font-medium text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </div>
             </div>
           </div>
         </div>

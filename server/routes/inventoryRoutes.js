@@ -12,6 +12,7 @@ router.get("/barcode/:barcode/exists", inventoryController.checkBarcodeExists);
 router.get("/stock-out/barcode/:barcode", inventoryController.getStockOutItemByBarcode);
 router.get("/stock-in-report", inventoryController.getStockInReport);
 router.get("/stock-out-report", inventoryController.getStockOutReport);
+router.get("/today-stock-out-details", inventoryController.getTodayStockOutDetails);
 router.get("/:id", inventoryController.getItemById);
 router.post("/", upload.single("image"), inventoryController.createItem);
 router.put("/:itemCode/image", upload.single("image"), inventoryController.updateItemImage);
