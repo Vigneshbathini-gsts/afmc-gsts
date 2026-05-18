@@ -161,12 +161,6 @@ export default function AppRoutes() {
         <Route index element={<Navigate to="register-member" replace />} />
         <Route path="dashboard" element={<AttendantDashboard />} />
         <Route path="menudash" element={<MenuDashboard />} />
-        {/* <Route
-          path="menudash/buy"
-          element={
-            <Pubmenubuy backTo="/attendant/menudash" afterConfirmTo="/attendant/confirm-order-page" />
-          }
-        /> */}
         <Route path="register-member" element={<RegisterMember />} />
         <Route path="item/:id" element={<ItemDetails />} />
         <Route path="cart" element={<AttendantCart />} />
@@ -196,10 +190,7 @@ export default function AppRoutes() {
         <Route path="dashboard" element={<UserDashboard />} />
         <Route path="dashboard-Page" element={<UserDashboard />} />
         <Route path="menudash" element={<MenuDashboard />} />
-        {/* <Route
-          path="menudash/buy"
-          element={<Pubmenubuy backTo="/user/menudash" afterConfirmTo="/user/confirm-order-page" />}
-        /> */}
+       
         <Route path="snacks" element={<Snacks />} />
         <Route path="drinks" element={<Drinks />} />
         <Route path="item/:id" element={<ItemDetails />} />
