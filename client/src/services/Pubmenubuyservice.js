@@ -7,6 +7,10 @@ export const Pubmenubuyservice = {
     api.patch(`/Pubmenubuy/${orderNumber}/item/${itemCode}`, { delta }),
   deleteItem: (orderNumber, itemCode) => api.delete(`/Pubmenubuy/${orderNumber}/item/${itemCode}`),
   cancelOrder: (orderNumber) => api.delete(`/Pubmenubuy/${orderNumber}`),
+  getOrderCocktailIngredients: (orderNumber, itemCode) =>
+    api.get(`/Pubmenubuy/${orderNumber}/item/${itemCode}/ingredients`),
+  updateOrderCocktailIngredients: (orderNumber, itemCode, ingredients) =>
+    api.put(`/Pubmenubuy/${orderNumber}/item/${itemCode}/ingredients`, { ingredients }),
 };
 
 export default Pubmenubuyservice;

@@ -37,6 +37,71 @@ const getReservedOrderQuantity = async (connection, itemCode) => {
   return Number(rows[0]?.reserved || 0);
 };
 
+const getIngredientStockQuantities = async (connection, itemCodes) => {
+  const normalizedCodes = [...new Set((Array.isArray(itemCodes) ? itemCodes : [])
+    .map((code) => Number(code))
+    .filter((code) => Number.isFinite(code) && code > 0))];
+
+  if (normalizedCodes.length === 0) return {};
+
+  const placeholders = normalizedCodes.map(() => "?").join(",");
+  const [inventoryRows] = await connection.execute(
+    `SELECT item_code, IFNULL(stock_quantity, 0) AS stock_quantity
+     FROM xxafmc_inventory
+     WHERE item_code IN (${placeholders})`,
+    normalizedCodes
+  );
+  const inventoryMap = inventoryRows.reduce((map, row) => {
+    map[String(row.item_code)] = Number(row.stock_quantity || 0);
+    return map;
+  }, {});
+
+  const [stockOutRows] = await connection.execute(
+    `SELECT item_code, IFNULL(SUM(stock_quantity), 0) AS stock_quantity
+     FROM xxafmc_stock_out
+     WHERE item_code IN (${placeholders})
+     GROUP BY item_code`,
+    normalizedCodes
+  );
+  const stockOutMap = stockOutRows.reduce((map, row) => {
+    map[String(row.item_code)] = Number(row.stock_quantity || 0);
+    return map;
+  }, {});
+
+  return normalizedCodes.reduce((map, code) => {
+    const key = String(code);
+    map[key] = Math.max(Number(inventoryMap[key] || 0), Number(stockOutMap[key] || 0));
+    return map;
+  }, {});
+};
+
+const getIngredientReservedQuantities = async (connection, itemCodes) => {
+  const normalizedCodes = [...new Set((Array.isArray(itemCodes) ? itemCodes : [])
+    .map((code) => Number(code))
+    .filter((code) => Number.isFinite(code) && code > 0))];
+
+  if (normalizedCodes.length === 0) return {};
+
+  const placeholders = normalizedCodes.map(() => "?").join(",");
+  const [rows] = await connection.execute(
+    `SELECT xod.item_id AS item_code, IFNULL(SUM(xod.quantity), 0) AS reserved
+     FROM xxafmc_order_details xod
+     LEFT JOIN xxafmc_invoices xi
+       ON xi.order_num = xod.order_id
+     WHERE xod.item_id IN (${placeholders})
+       AND xod.order_status IS NULL
+       AND xod.price IS NULL
+       AND xi.order_num IS NULL
+     GROUP BY xod.item_id`,
+    normalizedCodes
+  );
+
+  return rows.reduce((map, row) => {
+    map[String(row.item_code)] = Number(row.reserved || 0);
+    return map;
+  }, {});
+};
+
 async function getNextOrderLineId(connection) {
   const [[row]] = await connection.execute(
     `
@@ -295,6 +360,8 @@ async function getOrderSummary(orderNumber) {
         XXINV.IMAGE,
         LENGTH(XXINV.IMAGE) AS CARD_TITLE,
         XXINV.ITEM_CODE,
+        XXINV.CATEGORY_ID,
+        XXINV.SUB_CATEGORY,
         '#' AS CARD_LINK,
         CASE
           WHEN xxod.PRICE = 0 THEN NULL
@@ -309,6 +376,20 @@ async function getOrderSummary(orderNumber) {
     [normalizedOrderNumber]
   );
 
+  // Map items to include the canEdit flag based on cocktail and free item logic
+  const formattedItems = itemRows.map((row) => {
+    const isCocktailItem =
+      Number(row.CATEGORY_ID) === 10 &&
+      [14, 15].includes(Number(row.SUB_CATEGORY));
+    // Strictly check for 0 price, excluding NULL (pending items)
+    const isFreeItem = row.PRICE !== null && Number(row.PRICE) === 0;
+
+    return {
+      ...row,
+      canEdit: isCocktailItem && !isFreeItem,
+    };
+  });
+
   return {
     header: {
       ...headerRows[0],
@@ -316,7 +397,7 @@ async function getOrderSummary(orderNumber) {
       order_total: Number(orderTotal.toFixed(2)),
       food_pr_charges: foodPrCharges,
     },
-    items: itemRows,
+    items: formattedItems,
   };
 }
 
@@ -474,6 +555,18 @@ async function updateOrderItemQuantity(orderNumber, itemCode, delta, authUser = 
       `,
       [nextQty, nextQty, existingRow.order_line_id]
     );
+
+    // Sync ingredient quantities if it's a cocktail item
+    if (isMocktailItem) {
+      await connection.execute(
+        `UPDATE xxafmc_custom_cocktails_mocktails_details SET quantity = ? WHERE order_number = ? AND inventory_item_code = ?`,
+        [nextQty, normalizedOrderNumber, normalizedItemCode]
+      );
+      await connection.execute(
+        `UPDATE xxafmc_custom_cocktails_mocktails_details_dummy SET quantity = ? WHERE order_number = ? AND inventory_item_code = ?`,
+        [nextQty, normalizedOrderNumber, normalizedItemCode]
+      );
+    }
 
     await syncFreeItemForOrderItem(connection, {
       orderNumber: normalizedOrderNumber,
@@ -755,6 +848,23 @@ async function createOrder(payload = {}, authUser = {}) {
       appUser,
     });
 
+    // Initialize cocktail ingredients dummy if it's a cocktail/mocktail
+    if (isMocktailItem) {
+      const [masterIngredients] = await connection.execute(
+        `SELECT item_code, item_name, pegs FROM xxafmc_cocktails_mocktails_details WHERE inventory_item_code = ?`,
+        [itemCode]
+      );
+
+      for (const ing of masterIngredients) {
+        await connection.execute(
+          `INSERT INTO xxafmc_custom_cocktails_mocktails_details_dummy
+            (item_code, item_name, pegs, inventory_item_code, user_id, quantity, order_number, creation_date)
+          VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
+          [ing.item_code, ing.item_name, ing.pegs, itemCode, userId, quantity, orderNumber]
+        );
+      }
+    }
+
     await connection.commit();
 
     return {
@@ -770,10 +880,155 @@ async function createOrder(payload = {}, authUser = {}) {
   }
 }
 
+async function getOrderCocktailDetails(orderNumber, itemCode) {
+  const normalizedOrderNumber = Number(orderNumber);
+  const normalizedItemCode = Number(itemCode);
+
+  const [[itemInfo]] = await db.execute(
+    `SELECT xi.category_id, xi.sub_category, xi.item_name, xu.login_type
+     FROM xxafmc_inventory xi
+     JOIN xxafmc_order_header oh ON oh.order_num = ?
+     JOIN xxafmc_users xu ON xu.user_id = oh.user_id
+     WHERE xi.item_code = ? LIMIT 1`,
+    [normalizedOrderNumber, normalizedItemCode]
+  );
+
+  if (!itemInfo) throw createValidationError("Item not found");
+
+  let [ingredients] = await db.execute(
+    `SELECT item_code, item_name, pegs, quantity 
+     FROM xxafmc_custom_cocktails_mocktails_details
+     WHERE order_number = ? AND inventory_item_code = ?`,
+    [normalizedOrderNumber, normalizedItemCode]
+  );
+
+  if (ingredients.length === 0) {
+    [ingredients] = await db.execute(
+      `SELECT item_code, item_name, pegs, quantity 
+       FROM xxafmc_custom_cocktails_mocktails_details_dummy
+       WHERE order_number = ? AND inventory_item_code = ?`,
+      [normalizedOrderNumber, normalizedItemCode]
+    );
+  }
+
+  if (ingredients.length === 0) {
+    const [masterRows] = await db.execute(
+      `SELECT item_code, item_name, pegs, price, non_member_price FROM xxafmc_cocktails_mocktails_details WHERE inventory_item_code = ?`,
+      [normalizedItemCode]
+    );
+    const [orderItem] = await db.execute(
+      `SELECT quantity FROM xxafmc_order_details WHERE order_id = ? AND item_id = ? AND price != 0 LIMIT 1`,
+      [normalizedOrderNumber, normalizedItemCode]
+    );
+    const orderQty = orderItem[0]?.quantity || 1;
+    const loginType = String(itemInfo.login_type || "").trim().toUpperCase();
+
+    ingredients = masterRows.map((row) => {
+      const pegs = Number(row.pegs || 0);
+      const selectedPrice = loginType === "NON MEMBER" ? Number(row.non_member_price ?? row.price ?? 0) : Number(row.price ?? row.non_member_price ?? 0);
+      const unitPrice = pegs > 0 ? selectedPrice / pegs : selectedPrice;
+      return { itemCode: row.item_code, itemName: row.item_name, pegs: row.pegs, quantity: orderQty, unitPrice: Number(unitPrice.toFixed(2)) };
+    });
+  } else {
+    const itemCodes = ingredients.map((i) => i.item_code);
+    if (itemCodes.length > 0) {
+      const placeholders = itemCodes.map(() => "?").join(",");
+      const [masterPrices] = await db.execute(
+        `SELECT item_code, price, non_member_price, pegs FROM xxafmc_cocktails_mocktails_details WHERE inventory_item_code = ? AND item_code IN (${placeholders})`,
+        [normalizedItemCode, ...itemCodes]
+      );
+      const [inventoryPrices] = await db.execute(
+        `SELECT item_code, unit_price FROM xxafmc_inventory WHERE item_code IN (${placeholders})`,
+        itemCodes
+      );
+      const loginType = String(itemInfo.login_type || "").trim().toUpperCase();
+      const priceMap = masterPrices.reduce((acc, row) => {
+        const pegs = Number(row.pegs || 0);
+        const selectedPrice = loginType === "NON MEMBER" ? Number(row.non_member_price ?? row.price ?? 0) : Number(row.price ?? row.non_member_price ?? 0);
+        acc[row.item_code] = pegs > 0 ? selectedPrice / pegs : selectedPrice;
+        return acc;
+      }, {});
+      inventoryPrices.forEach((row) => {
+        if (priceMap[row.item_code] == null) {
+          priceMap[row.item_code] = Number(row.unit_price || 0);
+        }
+      });
+      ingredients = ingredients.map((ing) => ({ ...ing, unitPrice: Number((priceMap[ing.item_code] || 0).toFixed(2)) }));
+    }
+  }
+
+  const ingredientCodes = [...new Set(ingredients
+    .map((ingredient) => Number(ingredient.itemCode ?? ingredient.item_code))
+    .filter((code) => Number.isFinite(code) && code > 0))];
+  const stockMap = await getIngredientStockQuantities(db, ingredientCodes);
+  const reservedMap = await getIngredientReservedQuantities(db, ingredientCodes);
+
+  ingredients = ingredients.map((ingredient) => {
+    const code = Number(ingredient.itemCode ?? ingredient.item_code);
+    const pegs = Number(ingredient.pegs || 0);
+    const orderQuantity = Number(ingredient.quantity || 1);
+    const stockQuantity = Number(stockMap[String(code)] || 0);
+    const reservedQuantity = Number(reservedMap[String(code)] || 0);
+    const availableQuantity = Math.max(0, stockQuantity - reservedQuantity);
+    const requiredQuantity = pegs * orderQuantity;
+
+    return {
+      ...ingredient,
+      stockQuantity: availableQuantity,
+      requiredQuantity,
+      stockStatus: availableQuantity >= requiredQuantity ? "In Stock" : "Out Of Stock",
+    };
+  });
+
+  return { orderNumber: normalizedOrderNumber, itemCode: normalizedItemCode, itemName: itemInfo.item_name, ingredients };
+}
+
+async function updateOrderCocktailIngredients(orderNumber, itemCode, ingredients, authUser = {}) {
+  const normalizedOrderNumber = Number(orderNumber);
+  const normalizedItemCode = Number(itemCode);
+  const appUser = authUser?.username || authUser?.user_name || "SYSTEM";
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+    const [[orderItem]] = await connection.execute(
+      `SELECT quantity, order_line_id FROM xxafmc_order_details WHERE order_id = ? AND item_id = ? AND (price IS NULL OR price != 0) LIMIT 1`,
+      [normalizedOrderNumber, normalizedItemCode]
+    );
+    if (!orderItem) throw createValidationError("Order item not found");
+    const [[userRows]] = await connection.execute(`SELECT user_id FROM xxafmc_users WHERE UPPER(user_name) = UPPER(?) LIMIT 1`, [appUser]);
+    const userId = userRows?.user_id;
+    await connection.execute(`DELETE FROM xxafmc_custom_cocktails_mocktails_details WHERE order_number = ? AND inventory_item_code = ?`, [normalizedOrderNumber, normalizedItemCode]);
+    await connection.execute(`DELETE FROM xxafmc_custom_cocktails_mocktails_details_dummy WHERE order_number = ? AND inventory_item_code = ?`, [normalizedOrderNumber, normalizedItemCode]);
+
+    let newTotalPrice = 0;
+    for (const ing of ingredients) {
+      const pegs = Number(ing.quantity ?? ing.pegs ?? 0);
+      const unitPrice = Number(ing.unitPrice || 0);
+      newTotalPrice += pegs * unitPrice;
+      await connection.execute(
+        `INSERT INTO xxafmc_custom_cocktails_mocktails_details (item_code, item_name, pegs, inventory_item_code, user_id, quantity, order_number, creation_date)
+         VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
+        [ing.itemCode, ing.itemName, pegs, normalizedItemCode, userId, orderItem.quantity, normalizedOrderNumber]
+      );
+    }
+    const finalPrice = Number(newTotalPrice.toFixed(2));
+    await connection.execute(`UPDATE xxafmc_order_details SET price = ?, subtotal = ? * quantity WHERE order_line_id = ?`, [finalPrice, finalPrice, orderItem.order_line_id]);
+    await connection.commit();
+    return getOrderSummary(normalizedOrderNumber);
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
 module.exports = {
   createOrder,
   getOrderSummary,
   cancelOrder,
   updateOrderItemQuantity,
   deleteOrderItem,
+  getOrderCocktailDetails,
+  updateOrderCocktailIngredients,
 };

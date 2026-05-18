@@ -237,7 +237,7 @@ export default function OutletOrderDetails() {
             quantity: ing.scanQuantity,
           })),
         });
-        setShowCocktailModal(true);
+        // setShowCocktailModal(true);
       }
 
       setTimeout(() => {

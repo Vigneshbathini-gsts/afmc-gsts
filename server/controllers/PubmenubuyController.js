@@ -126,3 +126,24 @@ exports.deletePubMenuOrderItem = async (req, res) => {
     });
   }
 };
+
+exports.getOrderCocktailIngredients = async (req, res) => {
+  try {
+    const { ORDER_NUMBER, ITEM_CODE } = req.params;
+    const data = await Pubmenubuyservice.getOrderCocktailDetails(ORDER_NUMBER, ITEM_CODE);
+    return res.status(200).json({ success: true, data });
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({ success: false, message: error.message });
+  }
+};
+
+exports.updateOrderCocktailIngredients = async (req, res) => {
+  try {
+    const { ORDER_NUMBER, ITEM_CODE } = req.params;
+    const { ingredients } = req.body;
+    const data = await Pubmenubuyservice.updateOrderCocktailIngredients(ORDER_NUMBER, ITEM_CODE, ingredients, req.user);
+    return res.status(200).json({ success: true, message: "Ingredients updated", data });
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({ success: false, message: error.message });
+  }
+};

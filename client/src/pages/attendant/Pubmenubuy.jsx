@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { CheckCircle2, ChevronLeft, Minus, Plus, Trash2, XCircle } from "lucide-react";
+import { CheckCircle2, ChevronLeft, Minus, Plus, Trash2, XCircle, Edit2 } from "lucide-react";
 import Pubmenubuyservice from "../../services/Pubmenubuyservice";
 import ConfirmOrderservice from "../../services/ConfirmOrderservice";
 
@@ -42,6 +42,7 @@ function normalizeItem(item, fallbackIndex = 0) {
     price: rawPrice,
     barcode: item.barcode || item.BARCODE || null,
     isFreeItem,
+    canEdit: item.canEdit || item.CAN_EDIT || false,
   };
 }
 
@@ -180,6 +181,24 @@ export default function Pubmenubuy({ backTo = "" }) {
     }
   };
 
+  const handleEditItem = (item) => {
+    if (!orderNumber || !item?.item_code) {
+      return;
+    }
+
+    const returnTo = `${location.pathname}?orderNumber=${encodeURIComponent(orderNumber)}`;
+    navigate(
+      `${currentBasePath}/item/${encodeURIComponent(item.item_code)}?orderNumber=${encodeURIComponent(orderNumber)}&itemCode=${encodeURIComponent(item.item_code)}&returnTo=${encodeURIComponent(returnTo)}`,
+      {
+        state: {
+          orderNumber,
+          itemCode: item.item_code,
+          returnTo,
+        },
+      }
+    );
+  };
+
   const handleCancelOrder = async () => {
     if (!orderNumber || cancelling) {
       return;
@@ -196,7 +215,7 @@ export default function Pubmenubuy({ backTo = "" }) {
     try {
       setCancelling(true);
       setError("");
-      const response = await Pubmenubuyservice.cancelOrder(orderNumber);
+      await Pubmenubuyservice.cancelOrder(orderNumber);
       // window.alert(response?.data?.message || "Order cancelled");
       if (backTo) {
         navigate(backTo, { replace: true });
@@ -361,6 +380,20 @@ export default function Pubmenubuy({ backTo = "" }) {
 
                         {/* Controls */}
                         <div className="flex items-center justify-between rounded-xl bg-stone-50 px-3 py-2">
+                          <div className="flex items-center gap-1">
+                            {item.canEdit && (
+                              <button
+                                type="button"
+                                onClick={() => handleEditItem(item)}
+                                disabled={disableItemActions}
+                                className="rounded-md bg-afmc-gold/10 p-1.5 text-afmc-gold transition hover:bg-afmc-gold/20 disabled:cursor-not-allowed disabled:opacity-50"
+                                title="Edit Ingredients"
+                              >
+                               <Edit2 className="h-4 w-4 text-black" />
+
+                              </button>
+                            )}
+                          </div>
                           <div className="flex items-center gap-1">
                             <button
                               type="button"
