@@ -44,6 +44,7 @@ import AttendantCart from "../pages/attendant/Cart";
 import AttendantConfirmOrder from "../pages/attendant/ConfirmOrder";
 import Buyflowconfirmorder from "../pages/attendant/Buyflowconfirmorder";
 import AttendantPayment from "../pages/attendant/Payment";
+import ConfirmOrderpage from "../pages/attendant/ConfirmOrderpage";
 import AttendantInvoice from "../pages/attendant/Invoice";
 import AttendantBuyflowinvoicereport from "../pages/attendant/Buyflowinvoicereport";
 import AttendantActiveOrders from "../pages/attendant/ActiveOrders";
@@ -61,6 +62,7 @@ import UserConfirmOrder from "../pages/user/ConfirmOrder";
 import UserPayment from "../pages/user/Payment";
 import UserInvoice from "../pages/user/Invoice";
 import UserBuyflowinvoicereport from "../pages/user/Buyflowinvoicereport";
+import UserInvoiceReport from "../pages/user/InvoiceReport";
 import ActiveOrders from "../pages/user/ActiveOrders";
 import UserOrderStatus from "../pages/user/OrderStatus";
 import MenuDashboard from "../components/common/MenuDashboard";
@@ -163,15 +165,14 @@ export default function AppRoutes() {
         <Route index element={<Navigate to="register-member" replace />} />
         <Route path="dashboard" element={<AttendantDashboard />} />
         <Route path="menudash" element={<MenuDashboard />} />
-        <Route path="" element={<Pubmenubuy />} />
+        <Route path="menudash/buy" element={<Pubmenubuy />} />
         <Route path="register-member" element={<RegisterMember />} />
         <Route path="item/:id" element={<ItemDetails />} />
         <Route path="cart" element={<AttendantCart />} />
         <Route path="cart/buy" element={<CartBuy />} />
-        <Route path="item/:id" element={<ItemDetails />} />
         <Route path="confirm-order" element={<AttendantConfirmOrder />} />
         <Route path="Buyflowconfirmorder" element={<Buyflowconfirmorder />} />
-        
+        <Route path="confirm-order-page" element={<ConfirmOrderpage />} />
         <Route path="payment" element={<AttendantPayment />} />
         <Route path="invoice" element={<AttendantInvoice />} />
         <Route path="Buyflowinvoicereport" element={<AttendantBuyflowinvoicereport />} />
@@ -195,6 +196,7 @@ export default function AppRoutes() {
         <Route path="dashboard-Page" element={<UserDashboard />} />
         <Route path="menudash" element={<MenuDashboard />} />
         <Route path="menudash/buy" element={<Pubmenubuy />} />
+       
         <Route path="snacks" element={<Snacks />} />
         <Route path="drinks" element={<Drinks />} />
         <Route path="item/:id" element={<ItemDetails />} />
@@ -202,10 +204,11 @@ export default function AppRoutes() {
         <Route path="cart/buy" element={<CartBuy />} />
         <Route path="confirm-order" element={<UserConfirmOrder />} />
         <Route path="Buyflowconfirmorder" element={<Buyflowconfirmorder />} />
-        
+        <Route path="confirm-order-page" element={<ConfirmOrderpage />} />
         <Route path="payment" element={<UserPayment />} />
         <Route path="invoice" element={<UserInvoice />} />
         <Route path="Buyflowinvoicereport" element={<UserBuyflowinvoicereport />} />
+        <Route path="invoice-report" element={<UserInvoiceReport />} />
         <Route path="active-orders" element={<ActiveOrders />} />
         <Route path="order-status" element={<UserOrderStatus />} />
 

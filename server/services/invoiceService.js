@@ -14,10 +14,15 @@ const createInvoice = async (invoiceData) => {
 };
 
 const fetchInvoiceByOrder = async (orderNumber) => {
-  const rows = await invoiceModel.findInvoiceWithItemsByOrder(orderNumber);
+  let rows = await invoiceModel.findInvoiceWithItemsByOrder(orderNumber);
 
   if (!rows || rows.length === 0) {
-    return null;
+    // APEX "invoice report" page reads directly from order_details even before an invoice row exists.
+    // Provide the same behavior by falling back to order header/details.
+    rows = await invoiceModel.findOrderWithItemsByOrder(orderNumber);
+    if (!rows || rows.length === 0) {
+      return null;
+    }
   }
 
   const invoiceRow = rows[0];
@@ -41,4 +46,15 @@ const fetchInvoiceByOrder = async (orderNumber) => {
 module.exports = {
   createInvoice,
   fetchInvoiceByOrder,
+  saveInvoicePayment: async ({ orderNumber, paymentMode, paymentReference, paymentStatus, createdBy }) => {
+    await invoiceModel.updateInvoicePayment({
+      orderNumber,
+      paymentMode,
+      paymentReference,
+      paymentStatus,
+      createdBy,
+    });
+
+    return { orderNumber, paymentStatus };
+  },
 };

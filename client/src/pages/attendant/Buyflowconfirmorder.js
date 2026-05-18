@@ -73,10 +73,15 @@ export default function Buyflowconfirmorder() {
     };
   }, [orderNumber]);
 
-  const items = Array.isArray(orderData?.items) ? orderData.items : [];
+  const items = useMemo(
+    () => (Array.isArray(orderData?.items) ? orderData.items : []),
+    [orderData?.items]
+  );
+
   const orderStatus = String(orderData?.header?.status || "Received");
-  const orderAmount = Number(orderData?.header?.order_total || 0);
-  const canProceedToPayment = orderStatus === "Completed";
+  const paymentStatus = String(orderData?.header?.payment_status || "Not Paid");
+  const canProceedToPayment = orderStatus === "Completed" && paymentStatus !== "Paid";
+  const isPaymentDone = paymentStatus === "Paid";
   const totalQuantity = useMemo(
     () => items.reduce((sum, item) => sum + Number(item.quantity || 0), 0),
     [items]
@@ -99,18 +104,17 @@ return (
               type="button"
               onClick={() =>
                 navigate(
-                  `${currentBasePath}/invoice?orderNumber=${encodeURIComponent(orderData?.header?.order_num || orderNumber)}&amount=${encodeURIComponent(orderAmount.toFixed(2))}`,
+                  `${currentBasePath}/payment?orderNumber=${encodeURIComponent(orderData?.header?.order_num || orderNumber)}`,
                   {
                     state: {
                       orderNumber: orderData?.header?.order_num || orderNumber,
-                      amount: orderAmount,
                     },
                   }
                 )
               }
               className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-5 py-2 text-sm font-medium text-white transition hover:bg-emerald-700"
             >
-              Payment
+              Go to Payment
             </button>
           ) : null}
 
@@ -140,6 +144,26 @@ return (
           <p className="mt-2 text-sm text-stone-500">
             Your order has been received successfully.
           </p>
+
+          <div className="mt-4 rounded-2xl border border-stone-200 bg-[#fff4f0] px-4 py-4 text-left text-sm text-stone-700">
+            {orderStatus === "Completed" && paymentStatus === "Paid" ? (
+              <p>
+                Payment has been completed. Here is your invoice.
+              </p>
+            ) : orderStatus === "Completed" ? (
+              <p>
+                Kitchen has completed all items. You can now proceed to payment.
+              </p>
+            ) : orderStatus === "Cancelled" ? (
+              <p>
+                The order has been cancelled by the kitchen. Please contact support for details.
+              </p>
+            ) : (
+              <p>
+                Kitchen status is currently <strong>{orderStatus}</strong>. Payment will be available once all items are completed.
+              </p>
+            )}
+          </div>
 
           {/* Compact Order Details */}
           <div className="mt-6 inline-flex flex-wrap items-center justify-center gap-3 rounded-full border border-[#d4af37]/30 bg-[#fff8eb] px-5 py-3 text-sm">
@@ -215,9 +239,11 @@ return (
                       Quantity
                     </th>
 
-                    <th className="px-5 py-3 text-left text-sm font-semibold text-[#6b0f1a]">
-                      Subtotal
-                    </th>
+                    {isPaymentDone && (
+                      <th className="px-5 py-3 text-left text-sm font-semibold text-[#6b0f1a]">
+                        Subtotal
+                      </th>
+                    )}
 
                     <th className="px-5 py-3 text-left text-sm font-semibold text-[#6b0f1a]">
                       Status
@@ -239,9 +265,11 @@ return (
                         {item.quantity}
                       </td>
 
-                      <td className="px-5 py-4 text-sm text-stone-700">
-                        ₹{Number(item.subtotal || 0).toFixed(2)}
-                      </td>
+                      {isPaymentDone && (
+                        <td className="px-5 py-4 text-sm text-stone-700">
+                          ₹{Number(item.subtotal || 0).toFixed(2)}
+                        </td>
+                      )}
 
                       <td className="px-5 py-4">
                         <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700">
@@ -271,17 +299,19 @@ return (
                   </span>
                 </span>
 
-                <span>
-                  Total Amount :
-                  <span className="ml-1 font-semibold text-stone-900">
-                    ₹{totalAmount.toFixed(2)}
+                {isPaymentDone && (
+                  <span>
+                    Total Amount :
+                    <span className="ml-1 font-semibold text-stone-900">
+                      ₹{totalAmount.toFixed(2)}
+                    </span>
                   </span>
-                </span>
+                )}
               </div>
 
               <button
                 type="button"
-                onClick={() => navigate(-1)}
+                onClick={() => navigate(`${currentBasePath}/menudash`)}
                 className="inline-flex items-center gap-2 rounded-full border border-stone-300 bg-white px-5 py-2 text-sm font-medium text-[#6b0f1a] transition hover:bg-stone-100"
               >
                 <ChevronLeft className="h-4 w-4" />

@@ -20,10 +20,15 @@ const deleteOrderItem = async (orderNumber, itemCode) => {
   return Pubmenubuymodel.deleteOrderItem(orderNumber, itemCode);
 };
 
+const updateOrderLineQuantity = async (orderNumber, orderLineId, userId, quantity) => {
+  return Pubmenubuymodel.updateOrderLineQuantity(orderNumber, orderLineId, userId, quantity);
+};
+
 module.exports = {
   createOrder,
   getOrderSummary,
   cancelOrder,
   updateOrderItemQuantity,
   deleteOrderItem,
+  updateOrderLineQuantity,
 };

@@ -105,6 +105,8 @@ const Pubmenubuyroutes = require("./routes/Pubmenubuyroutes");
 const ConfirmOrderroutes = require("./routes/ConfirmOrderroutes");
 const invoiceRoutes = require("./routes/invoiceRoutes");
 const InvoiceReportroute = require("./routes/InvoiceReportroute");
+const orderHistoryRoutes = require("./routes/orderHistoryRoutes");
+const paymentRoutes = require("./routes/paymentRoutes");
 
 const apiPrefixes = ["/api", API_BASE_PATH];
 for (const prefix of apiPrefixes) {
@@ -128,6 +130,8 @@ for (const prefix of apiPrefixes) {
   app.use(prefix, ConfirmOrderroutes);
   app.use(`${prefix}/invoice`, invoiceRoutes);
   app.use(`${prefix}/invoice-report`, InvoiceReportroute);
+  app.use(`${prefix}/order-history`, orderHistoryRoutes);
+  app.use(`${prefix}/payment`, paymentRoutes);
 }
 
 const PORT = process.env.PORT || 5000;

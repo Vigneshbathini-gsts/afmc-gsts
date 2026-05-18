@@ -325,7 +325,10 @@ async function getOrderDetails(orderNumber) {
   od.price,
   od.subtotal,
   COALESCE(NULLIF(xi.type, ''), NULLIF(od.type, ''), 'NA') AS type,
-  COALESCE(NULLIF(od.order_status, ''), 'Pending') AS status
+  COALESCE(NULLIF(od.order_status, ''), 'Pending') AS status,
+  od.barcode AS barcode,
+  od.FREE_ITEM_CODE AS free_item_code,
+  od.FREE_ITEM_QUANTITY AS free_item_quantity
 FROM xxafmc_order_details od
 LEFT JOIN (
     SELECT 
@@ -348,11 +351,17 @@ async function getOrderSummary(orderNumber) {
   const query = `
     SELECT
       xxoh.order_num,
-      ROUND(COALESCE(xxoh.order_total, (
-        SELECT SUM(od.subtotal)
-        FROM xxafmc_order_details od
-        WHERE od.order_id = xxoh.order_num
-      ), 0), 2) AS totalAmount,
+      ROUND(
+        CASE 
+          WHEN COALESCE(xxoh.order_total, 0) > 0 THEN xxoh.order_total
+          ELSE COALESCE((
+            SELECT SUM(COALESCE(od.subtotal, 0))
+            FROM xxafmc_order_details od
+            WHERE od.order_id = xxoh.order_num
+          ), 0)
+        END,
+        2
+      ) AS totalAmount,
       DATE_FORMAT(STR_TO_DATE(xxoh.order_date, '%m/%d/%Y'), '%c/%e/%Y') AS orderDate,
       IFNULL(MAX(inv.payment_method), '') AS paymentMethod,
       IFNULL(MAX(inv.payment_status), 'Un Paid') AS paymentStatus

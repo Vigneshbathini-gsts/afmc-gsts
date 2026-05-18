@@ -152,6 +152,7 @@ const getDefaultCocktailIngredientRows = async (conn, parentItemCode, loginType 
 };
 
 const validateCustomizationStock = async (conn, ingredients, cartQuantity = 1) => {
+  console.log("Validating customization stock for ingredients:", ingredients, "with cart quantity:", cartQuantity);
   for (const ingredient of ingredients) {
     const itemCode = Number(ingredient.itemCode);
     const requiredQty = Number(ingredient.quantity || 0) * Number(cartQuantity || 1);
@@ -162,7 +163,10 @@ const validateCustomizationStock = async (conn, ingredients, cartQuantity = 1) =
 
     if (requiredQty + reservedQty > stockQty) {
       const availableQty = Math.max(0, stockQty - reservedQty);
-      throw createValidationError(`Out of stock for ingredient ${ingredient.itemName || itemCode}. Available quantity: ${availableQty}`);
+      // throw createValidationError(`Out of stock for ingredient ${ingredient.itemName || itemCode} in ${ingredient.parentItemName}. Available quantity: ${availableQty}`);
+      throw createValidationError(
+  `Only ${availableQty} ${ingredient.itemName || itemCode} available for ${ingredient.parentItemName}.`
+);
     }
   }
 };
@@ -424,7 +428,7 @@ const addCartItem = async (userId, itemData) => {
 
   try {
     const [[itemInfo]] = await conn.execute(
-      `SELECT category_id, sub_category, profit, non_member_profit, food_pr_charges, pr_charges
+      `SELECT category_id, sub_category, profit, non_member_profit, food_pr_charges, pr_charges, item_name
          FROM xxafmc_inventory
          WHERE item_code = ?`,
       [item_id]
@@ -463,9 +467,19 @@ const addCartItem = async (userId, itemData) => {
       ? customIngredients 
       : await getDefaultCocktailIngredientRows(conn, item_id, loginType);
 
+    // if (isCocktailOrMocktail) {
+    //   await validateCustomizationStock(conn, ingredientsToUse, quantity);
+    // }
+
     if (isCocktailOrMocktail) {
-      await validateCustomizationStock(conn, ingredientsToUse, quantity);
-    }
+
+ const ingredientsWithParentName = ingredientsToUse.map((ingredient) => ({
+  ...ingredient,
+  parentItemName: itemInfo?.item_name || item_id
+}));
+
+  await validateCustomizationStock(conn, ingredientsWithParentName, quantity);
+}
 
     if (!isCocktailOrMocktail && existingCartQty + quantity + orderReservedQty > stockQty) {
       const availableQty = Math.max(0, stockQty - orderReservedQty - existingCartQty);
@@ -809,15 +823,29 @@ const updateCartItemQuantity = async (cartId, userId, quantity) => {
 
       if (quantity + orderReservedQty > stockQty) {
         const availableQty = Math.max(0, stockQty - orderReservedQty);
-        throw new Error(`Available stock is : ${availableQty}`);
+        throw createValidationError(`Out of stock. Available quantity: ${availableQty}`);
       }
     }
     if (isCocktailOrMocktail) {
-      const customization = await getCartCustomization(cartId, userId);
-      if (customization.ingredients.length > 0) {
-        await validateCustomizationStock(conn, customization.ingredients, quantity);
-      }
-    }
+
+  const customization = await getCartCustomization(cartId, userId);
+
+  const [[parentItem]] = await conn.execute(
+    `SELECT item_name
+     FROM xxafmc_inventory
+     WHERE item_code = ?`,
+    [itemId]
+  );
+
+  const ingredientsWithParentName = customization.ingredients.map((ingredient) => ({
+    ...ingredient,
+    parentItemName: parentItem?.item_name || itemId
+  }));
+
+  if (ingredientsWithParentName.length > 0) {
+    await validateCustomizationStock(conn, ingredientsWithParentName, quantity);
+  }
+}
 
     // Update the main item quantity
     await conn.execute(

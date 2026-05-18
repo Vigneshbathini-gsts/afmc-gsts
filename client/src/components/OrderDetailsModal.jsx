@@ -8,6 +8,13 @@ const toInitCap = (str) => {
   if (typeof str !== "string") str = String(str);
   return str.toLowerCase().replace(/\b\w/g, (char) => char.toUpperCase());
 };
+
+const parseNumber = (value) => {
+  if (value === null || value === undefined || value === "") return 0;
+  const parsed = Number(String(value).replace(/,/g, ""));
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
 const getStatusClassName = (status) => {
   const normalizedStatus = String(status || "").toLowerCase();
 
@@ -30,7 +37,7 @@ export default function OrderDetailsModal({ isOpen, onClose, orderNumber }) {
   const [error, setError] = useState("");
 
   const grandTotal = items.reduce(
-    (total, item) => total + Number(item.subtotal || item.SUBTOTAL || item.total || 0),
+    (total, item) => total + parseNumber(item.subtotal || item.SUBTOTAL || item.total || 0),
     0
   );
 
@@ -43,8 +50,13 @@ export default function OrderDetailsModal({ isOpen, onClose, orderNumber }) {
         setError("");
 
         const response = await orderAPI.getOrderDetails(orderNumber);
-        // console.log("Order Details Response:", response.data);
-        setItems(response.data?.data || []);
+        const responseData = response.data?.data;
+        const fetchedItems = Array.isArray(responseData)
+          ? responseData
+          : Array.isArray(responseData?.items)
+            ? responseData.items
+            : [];
+        setItems(fetchedItems);
       } catch (err) {
         console.error("Error fetching order details:", err);
         setError("Failed To Fetch Order Details");
@@ -104,20 +116,39 @@ export default function OrderDetailsModal({ isOpen, onClose, orderNumber }) {
                 </tr>
               </thead>
               <tbody>
-                {items.map((item, index) => (
-                  <tr key={index} className="border-t hover:bg-gray-50">
-                    <td className="px-4 py-3">{toInitCap(item.item_name || item.ITEM_NAME)}</td>
-                    <td className="px-4 py-3">
-                      <span className={`font-semibold ${getStatusClassName(item.status)}`}>
-                        {toInitCap(item.status || "Received")}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">{item.quantity || item.QUANTITY || 0}</td>
-                    <td className="px-4 py-3">{toInitCap(item.type || item.TYPE || "Na")}</td>
-                    <td className="px-4 py-3 text-right">₹ {formatCurrency(item.price || item.PRICE)}</td>
-                    <td className="px-4 py-3 text-right font-semibold">₹ {formatCurrency(item.subtotal || item.SUBTOTAL || item.total)}</td>
-                  </tr>
-                ))}
+                {items.map((item, index) => {
+                  const priceValue = parseNumber(item.price || item.PRICE);
+                  const subtotalValue = parseNumber(item.subtotal || item.SUBTOTAL || item.total);
+                  const isFreeItem = priceValue === 0 && subtotalValue === 0;
+                  const displayType = toInitCap(item.type || item.TYPE || (isFreeItem ? "Free Item" : "Na"));
+
+                  return (
+                    <tr key={index} className="border-t hover:bg-gray-50">
+                      <td className="px-4 py-3">
+                        <div className="flex flex-col gap-1">
+                          <span>{toInitCap(item.item_name || item.ITEM_NAME)}</span>
+                          {isFreeItem && (
+                            <span className="text-xs font-semibold text-amber-600">Free item</span>
+                          )}
+                          {item.free_item_code && item.free_item_quantity && !isFreeItem && (
+                            <span className="text-xs text-gray-500">
+                              Offer linked: free item code {item.free_item_code}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`font-semibold ${getStatusClassName(item.status)}`}>
+                          {toInitCap(item.status || "Received")}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">{item.quantity || item.QUANTITY || 0}</td>
+                      <td className="px-4 py-3">{displayType}</td>
+                      <td className="px-4 py-3 text-right">₹ {formatCurrency(priceValue)}</td>
+                      <td className="px-4 py-3 text-right font-semibold">₹ {formatCurrency(subtotalValue)}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
               <tfoot className="bg-gray-50">
                 <tr className="border-t font-bold text-gray-800">

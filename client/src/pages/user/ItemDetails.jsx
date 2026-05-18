@@ -104,7 +104,8 @@ export default function ItemDetails() {
                     if (isEditingCartItem) {
                         try {
                             const savedResponse = await cartAPI.getCocktailDetails(cartId);
-                            const savedIngredients = savedResponse.data?.data?.ingredients || [];
+                            const savedCollection = savedResponse.data?.data || {};
+                            const savedIngredients = savedCollection?.ingredients || [];
                             if (savedIngredients.length > 0) {
                                 details = savedIngredients.map((ingredient) => ({
                                     itemName: ingredient.itemName,
@@ -120,6 +121,7 @@ export default function ItemDetails() {
                                 details.forEach((detail, idx) => {
                                     initialQuantities[idx] = getDetailPegs(detail) || 1;
                                 });
+                                fetchedItem.cartItemQuantity = savedCollection?.cartItemQuantity;
                             }
                         } catch (err) {
                             console.warn("Could not load cart customization:", err);
@@ -158,6 +160,20 @@ export default function ItemDetails() {
         const oldQty = quantities[index] || 1;
         const newVal = oldQty + delta;
         if (newVal < 1) return;
+
+        const currentDetail = item?.details?.[index];
+        if (currentDetail) {
+            const stockQuantity = Number(getDetailStockQuantity(currentDetail));
+            const cartItemQuantity = Number(item?.cartItemQuantity || 1);
+            const effectiveCartQty = Number.isFinite(cartItemQuantity) && cartItemQuantity > 0 ? cartItemQuantity : 1;
+            if (Number.isFinite(stockQuantity)) {
+                const requiredNext = Number(newVal) * effectiveCartQty;
+                if (requiredNext > stockQuantity) {
+                    toast.error(`Out of stock. Available quantity: ${stockQuantity}`);
+                    return;
+                }
+            }
+        }
 
         const newQuantities = { ...quantities, [index]: newVal };
         setQuantities(newQuantities);

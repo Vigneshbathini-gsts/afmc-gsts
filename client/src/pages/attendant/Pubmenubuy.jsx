@@ -1,10 +1,50 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { CheckCircle2, ChevronLeft, Minus, Plus, Trash2, XCircle } from "lucide-react";
+import { CheckCircle2, ChevronLeft, Minus, Plus, ShoppingCart, Trash2, XCircle } from "lucide-react";
 import Pubmenubuyservice from "../../services/Pubmenubuyservice";
 import ConfirmOrderservice from "../../services/ConfirmOrderservice";
+import { getMaxAllowedQuantity, isCocktailOrMocktail, isOutOfStock, validateNextQuantity } from "../../utils/stockValidation";
 
 const BASEAPI = "https://afmc.globalsparkteksolutions.com/AFMCIMAGES/";
+
+function Toast({ message, type = "success", onClose }) {
+  const [isVisible, setIsVisible] = useState(true);
+
+  useEffect(() => {
+    // Reset visibility whenever a new toast message is shown
+    setIsVisible(true);
+  }, [message, type]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsVisible(false);
+      setTimeout(() => onClose?.(), 300);
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [message, type, onClose]);
+
+  return (
+    <div
+      className={`fixed bottom-4 right-4 z-50 rounded-lg shadow-lg p-4 ${type === "error" ? "bg-red-600" : "bg-green-600"
+        } text-white min-w-[220px] transition-all duration-300 ease-in-out pointer-events-auto ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3 pointer-events-none"
+        }`}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-sm">{message}</span>
+        <button
+          type="button"
+          onClick={() => {
+            setIsVisible(false);
+            setTimeout(() => onClose?.(), 300);
+          }}
+          className="hover:opacity-80"
+        >
+          <XCircle className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function formatDate(value = new Date()) {
   const date = value instanceof Date ? value : new Date(value);
@@ -27,22 +67,123 @@ function parseCardText(cardText = "") {
 
 function normalizeItem(item, fallbackIndex = 0) {
   const parsed = parseCardText(item.card_text || item.CARD_TEXT);
-  const rawPrice = item.price ?? item.PRICE;
-  const isFreeItem = rawPrice === 0 || String(rawPrice) === "0";
+  const quantity = Number(item.quantity || item.QUANTITY || parsed.quantity || 1);
+  const subtotal = Number(item.subtotal || item.SUBTOTAL || item.unit_price || item.UNIT_PRICE || 0);
+  const explicitUnitPrice = Number(item.price || item.PRICE || item.unitPrice || item.UNIT_PRICE);
+  const rawOfferQuantity = item.offer_quantity ?? item.OFFER_QUANTITY ?? item.offerQuantity ?? null;
+  const rawFreeItemQuantity = item.free_item_quantity ?? item.FREE_ITEM_QUANTITY ?? item.freeItemQuantity ?? null;
+  const rawFreeItemCode = item.free_item_code ?? item.FREE_ITEM_CODE ?? item.freeItemCode ?? null;
+  const rawComputedFreeItemQuantity =
+    item.computed_free_item_quantity ?? item.COMPUTED_FREE_ITEM_QUANTITY ?? item.computedFreeItemQuantity ?? null;
+  const offer_quantity =
+    rawOfferQuantity === null || rawOfferQuantity === undefined || rawOfferQuantity === ""
+      ? null
+      : Number(rawOfferQuantity);
+  const free_item_quantity =
+    rawFreeItemQuantity === null || rawFreeItemQuantity === undefined || rawFreeItemQuantity === ""
+      ? null
+      : Number(rawFreeItemQuantity);
+  const free_item_code =
+    rawFreeItemCode === null || rawFreeItemCode === undefined || rawFreeItemCode === ""
+      ? null
+      : Number(rawFreeItemCode);
+  const computed_free_item_quantity =
+    rawComputedFreeItemQuantity === null ||
+    rawComputedFreeItemQuantity === undefined ||
+    rawComputedFreeItemQuantity === ""
+      ? null
+      : Number(rawComputedFreeItemQuantity);
+  const parentCodeRaw = item.barcode ?? item.BARCODE ?? item.parent_code ?? item.PARENT_CODE ?? null;
+  const parentCode =
+    parentCodeRaw === null || parentCodeRaw === undefined || parentCodeRaw === ""
+      ? null
+      : String(parentCodeRaw);
+  const rawAvailableQuantity =
+    item.available_quantity ?? item.AVAILABLE_QUANTITY ?? item.stock_quantity ?? item.STOCK_QUANTITY;
+  const availableQuantity =
+    rawAvailableQuantity === undefined || rawAvailableQuantity === null
+      ? null
+      : Number(rawAvailableQuantity);
+  const rawStockStatus = item.stock_status ?? item.STOCK_STATUS ?? item.stockStatus ?? null;
+  const stockStatus =
+    rawStockStatus === null || rawStockStatus === undefined || rawStockStatus === ""
+      ? null
+      : String(rawStockStatus);
+  const rawStockIssueMessage =
+    item.stock_issue_message ?? item.STOCK_ISSUE_MESSAGE ?? item.stockIssueMessage ?? null;
+  const stockIssueMessage =
+    rawStockIssueMessage === null || rawStockIssueMessage === undefined || rawStockIssueMessage === ""
+      ? null
+      : String(rawStockIssueMessage);
+  const unitPrice =
+    Number.isFinite(explicitUnitPrice) && explicitUnitPrice >= 0
+      ? explicitUnitPrice
+      : quantity > 0
+        ? Number((subtotal / quantity).toFixed(2))
+        : 0;
+
+  const isFreeItem = Number(unitPrice || 0) === 0 && Number(subtotal || 0) === 0;
+  const rawSubcategory = item.subcategory ?? item.SUBCATEGORY ?? item.sub_category ?? item.SUB_CATEGORY ?? null;
+  const subcategory =
+    rawSubcategory === null || rawSubcategory === undefined || rawSubcategory === ""
+      ? null
+      : Number(rawSubcategory);
+
+  // Some order-details payloads may send `available_quantity: 0` for cocktails/mocktails while
+  // ingredient-based availability is still being computed server-side. Treat that as "unknown"
+  // unless an explicit out-of-stock status/message is present, to avoid showing false OOS.
+  const isCocktail = [14, 15].includes(Number(subcategory));
+  const normalizedStockStatus = String(stockStatus || "").trim().toLowerCase();
+  const hasExplicitStockIssue =
+    String(stockIssueMessage || "").trim().length > 0 || normalizedStockStatus === "out of stock";
+  const normalizedAvailableQuantity =
+    isCocktail && Number(availableQuantity) === 0 && !hasExplicitStockIssue ? null : availableQuantity;
+
+  const rawOrderLineId = item.order_line_id ?? item.ORDER_LINE_ID ?? item.orderLineId ?? item.id ?? 0;
+  const orderLineId = Number(rawOrderLineId) || 0;
+  const fallbackId = orderLineId > 0
+    ? orderLineId
+    : Number(item.item_id || item.ITEM_ID || item.item_code || item.ITEM_CODE || fallbackIndex) || fallbackIndex;
 
   return {
-    id: item.order_line_id || item.ORDER_LINE_ID || item.item_id || item.ITEM_ID || fallbackIndex,
-    order_line_id: item.order_line_id || item.ORDER_LINE_ID || null,
+    id: fallbackId,
+    orderLineId: orderLineId > 0 ? orderLineId : fallbackId,
     item_code: item.item_code || item.ITEM_CODE || "",
     item_name: item.item_name || item.ITEM_NAME || parsed.item_name,
-    quantity: Number(item.quantity || item.QUANTITY || parsed.quantity || 1),
-    subtotal: Number(item.subtotal || item.SUBTOTAL || item.unit_price || item.UNIT_PRICE || 0),
+    quantity,
+    unitPrice,
+    subtotal,
     image: item.image || item.IMAGE || "",
     card_text: item.card_text || item.CARD_TEXT || "",
-    price: rawPrice,
-    barcode: item.barcode || item.BARCODE || null,
+    availableQuantity: Number.isFinite(normalizedAvailableQuantity) ? normalizedAvailableQuantity : null,
+    parentCode,
     isFreeItem,
+    offer_quantity: Number.isFinite(offer_quantity) ? offer_quantity : null,
+    free_item_quantity: Number.isFinite(free_item_quantity) ? free_item_quantity : null,
+    free_item_code: Number.isFinite(free_item_code) ? free_item_code : null,
+    computed_free_item_quantity: Number.isFinite(computed_free_item_quantity) ? computed_free_item_quantity : null,
+    subcategory: Number.isFinite(subcategory) ? subcategory : null,
+    stockStatus,
+    stockIssueMessage,
   };
+}
+
+function fallbackItemFromState(source) {
+  if (!source) {
+    return [];
+  }
+
+  return [
+    {
+      id: source.item_id || source.item_code || "selected-item",
+      item_code: source.item_code || "",
+      item_name: source.item_name || "Item",
+      quantity: Number(source.quantity || 1),
+      subtotal: Number(source.unit_price || source.subtotal || 0),
+      image: source.image || "",
+      card_text: `Name: ${source.item_name || "Item"} Quantity: ${source.quantity || 1}`,
+    },
+  ];
 }
 
 function ActionButton({ children, className = "", ...props }) {
@@ -57,7 +198,7 @@ function ActionButton({ children, className = "", ...props }) {
   );
 }
 
-export default function Pubmenubuy({ backTo = "" }) {
+export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
@@ -67,12 +208,53 @@ export default function Pubmenubuy({ backTo = "" }) {
   const [loading, setLoading] = useState(Boolean(orderNumber));
   const [cancelling, setCancelling] = useState(false);
   const [confirming, setConfirming] = useState(false);
-  const [updatingItemCode, setUpdatingItemCode] = useState(null);
+  const [updatingLineId, setUpdatingLineId] = useState(null);
   const [error, setError] = useState("");
-  const [itemError, setItemError] = useState({ itemCode: null, message: "" });
+  const [toast, setToast] = useState(null);
   const currentBasePath = location.pathname.startsWith("/attendant")
     ? "/attendant"
     : "/user";
+  const MAX_QTY = 99;
+  const stockIssue = useMemo(() => {
+    return items.find(
+      (item) =>
+        (() => {
+          const maxAllowed = getMaxAllowedQuantity(item);
+          return (
+            maxAllowed !== null &&
+            maxAllowed !== undefined &&
+            Number(item.quantity || 0) > Number(maxAllowed || 0)
+          );
+        })()
+    ) || null;
+  }, [items]);
+
+  const cocktailStockIssue = useMemo(() => {
+    return (
+      items.find(
+        (item) =>
+          isCocktailOrMocktail(item) && isOutOfStock(item)
+      ) || null
+    );
+  }, [items]);
+
+  const stockIssueMessage = useMemo(() => {
+    if (!stockIssue && !cocktailStockIssue) return "";
+    if (cocktailStockIssue) {
+      return (
+        cocktailStockIssue.stockIssueMessage ||
+        "Out of stock for cocktail/mocktail ingredients. Please reduce quantity or update selection."
+      );
+    }
+    const available = Number(getMaxAllowedQuantity(stockIssue) ?? stockIssue.availableQuantity ?? 0);
+    return stockIssue.isFreeItem
+      ? `Out of stock for free item. Available quantity: ${available}`
+      : `Out of stock. Available quantity: ${available}`;
+  }, [stockIssue, cocktailStockIssue]);
+
+  const showToast = (message, type = "success") => {
+    setToast({ message, type });
+  };
 
   useEffect(() => {
     let ignore = false;
@@ -91,9 +273,9 @@ export default function Pubmenubuy({ backTo = "" }) {
         const data = response?.data?.data || {};
         const rows = Array.isArray(data?.items) ? data.items : [];
         if (!ignore) {
-          setItemError({ itemCode: null, message: "" });
           setOrderHeader(data?.header || null);
-          setItems(rows.map((item, index) => normalizeItem(item, index)));
+          const normalized = rows.map((item, index) => normalizeItem(item, index));
+          setItems(ensureOfferFreeRows(normalized));
         }
       } catch (fetchError) {
         if (!ignore) {
@@ -114,69 +296,450 @@ export default function Pubmenubuy({ backTo = "" }) {
     };
   }, [orderNumber]);
 
-  const syncFromSummary = (payload) => {
-    const data = payload?.data || payload || {};
-    const rows = Array.isArray(data?.items) ? data.items : [];
-    setItemError({ itemCode: null, message: "" });
-    setOrderHeader(data?.header || null);
-    setItems(rows.map((item, index) => normalizeItem(item, index)));
-  };
+  const totalAmount = useMemo(
+    () => items.reduce((sum, item) => sum + Number(item.subtotal || 0), 0),
+    [items]
+  );
 
-  const adjustQuantity = async (item, delta) => {
-    if (!orderNumber || !item?.item_code || item?.isFreeItem || updatingItemCode) {
-      return;
+  const ensureOfferFreeRows = (nextItems) => {
+    if (!Array.isArray(nextItems) || nextItems.length === 0) return nextItems;
+
+    const parents = nextItems.filter((row) => !row?.isFreeItem);
+    const children = nextItems.filter((row) => row?.isFreeItem);
+    const hasChildForParent = new Set(
+      children.map((row) => String(row?.parentCode || "").trim()).filter(Boolean)
+    );
+
+    const insertionsByAfterId = new Map();
+
+    for (const parent of parents) {
+      const parentCode = String(parent?.item_code || "").trim();
+      if (!parentCode) continue;
+      if (hasChildForParent.has(parentCode)) continue;
+
+      const expected =
+        Number(parent?.computed_free_item_quantity) > 0
+          ? Number(parent.computed_free_item_quantity)
+          : calculateFreeQuantity(parent?.quantity, parent?.offer_quantity, parent?.free_item_quantity);
+
+      const freeItemCode = Number(parent?.free_item_code || 0);
+      if (!Number.isFinite(expected) || expected <= 0) continue;
+      if (!Number.isFinite(freeItemCode) || freeItemCode <= 0) continue;
+
+      const afterId = Number(parent?.orderLineId ?? parent?.id) || 0;
+      const placeholderId = -Number(`${Date.now()}${Math.floor(Math.random() * 1000)}`);
+
+      const placeholder = {
+        id: placeholderId,
+        orderLineId: placeholderId,
+        item_code: String(freeItemCode),
+        item_name: "Free item",
+        quantity: expected,
+        unitPrice: 0,
+        subtotal: 0,
+        image: "",
+        card_text: `Name: Free item Quantity: ${expected}`,
+        availableQuantity: null,
+        parentCode,
+        isFreeItem: true,
+        offer_quantity: null,
+        free_item_quantity: null,
+        free_item_code: null,
+        computed_free_item_quantity: null,
+        subcategory: null,
+        stockStatus: null,
+        stockIssueMessage: null,
+      };
+
+      if (!insertionsByAfterId.has(afterId)) insertionsByAfterId.set(afterId, []);
+      insertionsByAfterId.get(afterId).push(placeholder);
     }
 
+    if (insertionsByAfterId.size === 0) return nextItems;
+
+    const merged = [];
+    for (const row of nextItems) {
+      merged.push(row);
+      const key = Number(row?.orderLineId ?? row?.id) || 0;
+      const toAdd = insertionsByAfterId.get(key);
+      if (toAdd?.length) merged.push(...toAdd);
+    }
+    return merged;
+  };
+
+  const calculateFreeQuantity = (paidQuantity, offerQuantity, freeItemQuantity) => {
+    const paid = Number(paidQuantity || 0);
+    if (!Number.isFinite(paid) || paid <= 0) return 0;
+
+    const offerQty = Number(offerQuantity);
+    const freeQty = Number(freeItemQuantity);
+
+    if (Number.isFinite(offerQty) && offerQty > 0) {
+      const freePerOffer = Number.isFinite(freeQty) && freeQty > 0 ? freeQty : 1;
+      return Math.floor(paid / offerQty) * freePerOffer;
+    }
+
+    // Fallback: Buy 2 get 1 free
+    return Math.floor(paid / 2);
+  };
+
+  const refreshOrderSummary = async () => {
+    if (!orderNumber) return;
+
     try {
-      setUpdatingItemCode(String(item.item_code));
-      setError("");
-      setItemError({ itemCode: null, message: "" });
-      const response = await Pubmenubuyservice.updateItemQuantity(orderNumber, item.item_code, delta);
-      syncFromSummary(response?.data);
-    } catch (updateError) {
-      const message = updateError.response?.data?.message || "Unable to update quantity.";
-      if (message.toLowerCase().includes("out of stock")) {
-        setItemError({ itemCode: String(item.item_code), message });
-      } else {
-        setError(message);
+      const refreshed = await Pubmenubuyservice.getByOrderNumber(orderNumber);
+      const refreshedData = refreshed?.data?.data || {};
+      const refreshedRows = Array.isArray(refreshedData?.items) ? refreshedData.items : [];
+      setOrderHeader(refreshedData?.header || null);
+      const normalized = refreshedRows.map((item, index) => normalizeItem(item, index));
+      setItems(ensureOfferFreeRows(normalized));
+    } catch {
+      // Ignore refresh failures here; the existing order state is still valid.
+    }
+  };
+
+  const syncFreeItemQuantities = async (nextItems) => {
+    if (!orderNumber) return;
+
+    const parents = nextItems.filter((item) => !item.isFreeItem);
+    const children = nextItems.filter((item) => item.isFreeItem && item.parentCode);
+    if (children.length === 0) return;
+
+    const updates = [];
+
+    for (const parent of parents) {
+      const parentCode = String(parent.item_code || "").trim();
+      if (!parentCode) continue;
+
+      const linkedChildren = children.filter(
+        (child) => String(child.parentCode || "").trim() === parentCode
+      );
+      if (linkedChildren.length === 0) continue;
+
+      const desiredFreeQty = calculateFreeQuantity(
+        parent.quantity,
+        parent.offer_quantity,
+        parent.free_item_quantity
+      );
+      for (const child of linkedChildren) {
+        if (Number(child.quantity || 0) === desiredFreeQty) continue;
+        if (!Number.isFinite(Number(child.orderLineId)) || Number(child.orderLineId) <= 0) continue;
+        updates.push({
+          orderLineId: Number(child.orderLineId),
+          quantity: desiredFreeQty,
+        });
       }
-    } finally {
-      setUpdatingItemCode(null);
     }
+
+    if (updates.length === 0) return;
+
+    await refreshOrderSummary();
   };
 
-  const removeItem = async (item) => {
-    if (!orderNumber || !item?.item_code || item?.isFreeItem || updatingItemCode) {
+  const adjustQuantity = async (orderLineId, delta) => {
+    if (!orderNumber) return;
+    const numericOrderLineId = Number(orderLineId);
+    if (!Number.isFinite(numericOrderLineId) || numericOrderLineId <= 0) {
+      const invalidMessage = "Unable to identify order item for quantity update.";
+      setError(invalidMessage);
+      showToast(invalidMessage, "error");
       return;
     }
 
-    try {
-      setUpdatingItemCode(String(item.item_code));
-      setError("");
-      setItemError({ itemCode: null, message: "" });
-      await Pubmenubuyservice.deleteItem(orderNumber, item.item_code);
+    setUpdatingLineId(numericOrderLineId);
+    let validationMessage = "";
+    let nextQuantity = null;
 
-      try {
-        const summaryResponse = await Pubmenubuyservice.getByOrderNumber(orderNumber);
-        syncFromSummary(summaryResponse?.data);
-      } catch (summaryError) {
-        if (summaryError?.response?.status === 404) {
-          navigate(location.pathname.replace(/\/buy$/, ""), { replace: true });
-          return;
+    setItems((current) => {
+      const targetItem = current.find((item) => item.orderLineId === numericOrderLineId) || null;
+      if (!targetItem) {
+        validationMessage = "Item not found.";
+        return current;
+      }
+
+      if (targetItem.isFreeItem) {
+        validationMessage = "Free items cannot be updated.";
+        return current;
+      }
+
+      const currentQty = Number(targetItem.quantity || 1);
+      const nextQtyCandidate = currentQty + delta;
+
+      if (nextQtyCandidate < 1) {
+        validationMessage = "Quantity cannot be less than 1.";
+        return current;
+      }
+
+      if (nextQtyCandidate > MAX_QTY) {
+        validationMessage = `Quantity cannot be more than ${MAX_QTY}.`;
+        return current;
+      }
+
+      const availableQty = targetItem.availableQuantity;
+      if (delta > 0 && String(targetItem.stockIssueMessage || "").trim().length > 0) {
+        validationMessage = String(targetItem.stockIssueMessage || "").trim();
+        return current;
+      }
+
+      const stockValidation = validateNextQuantity(targetItem, nextQtyCandidate);
+      if (!stockValidation.ok) {
+        validationMessage =
+          stockValidation.message ||
+          (availableQty !== null && availableQty !== undefined
+            ? `Out of stock. Available quantity: ${availableQty}`
+            : "Out of stock.");
+        return current;
+      }
+
+      const expectedFreeQty = calculateFreeQuantity(
+        nextQtyCandidate,
+        targetItem.offer_quantity,
+        targetItem.free_item_quantity
+      );
+
+      const targetCode = String(targetItem.item_code || "").trim();
+      const linkedFreeItems = targetCode
+        ? current.filter(
+            (item) => item.isFreeItem && String(item.parentCode || "").trim() === targetCode
+          )
+        : [];
+
+      for (const freeItem of linkedFreeItems) {
+        const freeAvailableQty = freeItem.availableQuantity;
+        if (
+          freeAvailableQty !== null &&
+          freeAvailableQty !== undefined &&
+          expectedFreeQty > Number(freeAvailableQty)
+        ) {
+          validationMessage = `Out of stock for free item. Available quantity: ${freeAvailableQty}`;
+          return current;
+        }
+      }
+
+      nextQuantity = nextQtyCandidate;
+
+      const nextItems = current.map((item) => {
+        if (item.orderLineId === numericOrderLineId) {
+          const unitPrice = Number(
+            item.unitPrice || (currentQty > 0 ? item.subtotal / currentQty : 0) || 0
+          );
+          const nextSubtotal = Number((unitPrice * nextQtyCandidate).toFixed(2));
+          return { ...item, quantity: nextQtyCandidate, unitPrice, subtotal: nextSubtotal };
         }
 
-        throw summaryError;
+        if (
+          linkedFreeItems.length > 0 &&
+          item.isFreeItem &&
+          String(item.parentCode || "").trim() === targetCode
+        ) {
+          return { ...item, quantity: expectedFreeQty };
+        }
+
+        return item;
+      });
+
+      // If the parent crosses the offer threshold, the linked free line may not exist yet.
+      // Optimistically create a placeholder free row so the UI updates immediately; it will be
+      // replaced by the backend response after `updateLineQuantity`.
+      const freeItemCode = Number(targetItem.free_item_code || 0);
+      if (
+        expectedFreeQty > 0 &&
+        linkedFreeItems.length === 0 &&
+        Number.isFinite(freeItemCode) &&
+        freeItemCode > 0 &&
+        targetCode
+      ) {
+        const placeholderId = -Date.now();
+        const placeholder = {
+          id: placeholderId,
+          orderLineId: placeholderId,
+          item_code: String(freeItemCode),
+          item_name: "Free item",
+          quantity: expectedFreeQty,
+          unitPrice: 0,
+          subtotal: 0,
+          image: "",
+          card_text: `Name: Free item Quantity: ${expectedFreeQty}`,
+          availableQuantity: null,
+          parentCode: targetCode,
+          isFreeItem: true,
+          offer_quantity: null,
+          free_item_quantity: null,
+          subcategory: null,
+          stockStatus: null,
+          stockIssueMessage: null,
+        };
+
+        const merged = [];
+        for (const row of nextItems) {
+          merged.push(row);
+          if (row.orderLineId === numericOrderLineId) {
+            merged.push(placeholder);
+          }
+        }
+        return merged;
       }
-    } catch (removeError) {
-      if (removeError?.response?.status === 404) {
-        navigate(location.pathname.replace(/\/buy$/, ""), { replace: true });
+
+      return nextItems;
+    });
+
+    setError(validationMessage);
+    if (validationMessage) {
+      showToast(validationMessage, "error");
+      setUpdatingLineId(null);
+      return;
+    }
+
+    if (nextQuantity === null) {
+      setUpdatingLineId(null);
+      return;
+    }
+
+    try {
+      const response = await Pubmenubuyservice.updateLineQuantity(orderNumber, numericOrderLineId, nextQuantity);
+      const data = response?.data?.data || {};
+      const rows = Array.isArray(data?.items) ? data.items : [];
+      setOrderHeader(data?.header || null);
+      const normalized = rows.map((item, index) => normalizeItem(item, index));
+      setItems(normalized);
+      setError("");
+      showToast("Quantity updated successfully", "success");
+      // The backend response already returns an updated order summary (including offer-linked free items).
+      // Avoid an immediate refetch here; it can briefly reintroduce stale quantities in slow networks.
+      await syncFreeItemQuantities(normalized);
+    } catch (updateError) {
+      const message = updateError?.response?.data?.message || "Unable to update quantity.";
+      setError(message);
+      showToast(message, "error");
+      try {
+        const response = await Pubmenubuyservice.getByOrderNumber(orderNumber);
+        const data = response?.data?.data || {};
+        const rows = Array.isArray(data?.items) ? data.items : [];
+        setOrderHeader(data?.header || null);
+        setItems(rows.map((item, index) => normalizeItem(item, index)));
+      } catch {
+        // ignore refresh failure
+      }
+    } finally {
+      setUpdatingLineId(null);
+    }
+  };
+
+  const handleQtyClick = (item, delta) => {
+    const lineId = Number(item?.orderLineId ?? item?.id);
+    if (!Number.isFinite(lineId) || lineId <= 0) {
+      showToast("Unable to identify order item for quantity update.", "error");
+      return;
+    }
+
+    if (updatingLineId === lineId) {
+      showToast("Please wait… updating quantity.", "error");
+      return;
+    }
+
+    const liveItem = items.find((row) => Number(row?.orderLineId ?? row?.id) === lineId) || item;
+
+    if (liveItem?.isFreeItem) {
+      showToast("Free items cannot be updated.", "error");
+      return;
+    }
+
+    const currentQty = Number(liveItem?.quantity || 1);
+    if (delta < 0 && currentQty <= 1) {
+      showToast("Quantity cannot be less than 1.", "error");
+      return;
+    }
+
+    if (delta > 0 && currentQty >= MAX_QTY) {
+      showToast(`Quantity cannot be more than ${MAX_QTY}.`, "error");
+      return;
+    }
+
+    const nextQtyCandidate = currentQty + delta;
+
+    // Cocktail/mocktail stock validation (mirrors CartPage behavior)
+    if (delta > 0) {
+      const stockMessage = String(liveItem?.stockIssueMessage || "").trim();
+
+      // Backend may return ingredient-level stock issues via message only (often for cocktail/mocktail),
+      // without reliable subcategory/stockStatus in this screen's payload.
+      if (stockMessage) {
+        showToast(stockMessage, "error");
         return;
       }
 
-      setError(removeError.response?.data?.message || "Unable to remove item.");
-    } finally {
-      setUpdatingItemCode(null);
+      // Fallback: cocktail/mocktail sometimes marks overall status as out-of-stock.
+      if (
+        isCocktailOrMocktail(liveItem) &&
+        String(liveItem?.stockStatus || "").toLowerCase() === "out of stock"
+      ) {
+        showToast(
+          "Out of stock for cocktail/mocktail ingredients. Please reduce quantity or update selection.",
+          "error"
+        );
+        return;
+      }
     }
+
+    const availableQty = liveItem?.availableQuantity;
+    if (
+      !isCocktailOrMocktail(liveItem) &&
+      availableQty !== null &&
+      availableQty !== undefined &&
+      Number.isFinite(Number(availableQty)) &&
+      nextQtyCandidate > Number(availableQty)
+    ) {
+      showToast(`Out of stock. Available quantity: ${availableQty}`, "error");
+      return;
+    }
+
+    // Offer/free-item stock validation (same messaging as cart)
+    const expectedFreeQty = calculateFreeQuantity(
+      nextQtyCandidate,
+      liveItem?.offer_quantity,
+      liveItem?.free_item_quantity
+    );
+
+    const parentCode = String(liveItem?.item_code || "").trim();
+    if (parentCode && expectedFreeQty > 0) {
+      const linkedFreeItems = items.filter(
+        (row) => row?.isFreeItem && String(row?.parentCode || "").trim() === parentCode
+      );
+
+      for (const freeItem of linkedFreeItems) {
+        const freeAvailableQty = freeItem?.availableQuantity;
+        if (
+          freeAvailableQty !== null &&
+          freeAvailableQty !== undefined &&
+          Number.isFinite(Number(freeAvailableQty)) &&
+          expectedFreeQty > Number(freeAvailableQty)
+        ) {
+          showToast(`Out of stock for free item. Available quantity: ${freeAvailableQty}`, "error");
+          return;
+        }
+      }
+    }
+
+    adjustQuantity(lineId, delta);
+  };
+
+  const removeItem = (id) => {
+    setItems((current) => {
+      const target = current.find((item) => item.id === id);
+      if (!target) return current;
+      if (target.isFreeItem) return current;
+
+      const targetCode = String(target.item_code || "").trim();
+      if (!targetCode) {
+        return current.filter((item) => item.id !== id);
+      }
+
+      // Remove parent + any free child lines linked via `barcode` (stored as `parentCode`)
+      return current.filter((item) => {
+        if (item.id === id) return false;
+        return String(item.parentCode || "") !== targetCode;
+      });
+    });
   };
 
   const handleCancelOrder = async () => {
@@ -212,7 +775,7 @@ export default function Pubmenubuy({ backTo = "" }) {
   };
 
   const handleConfirmOrder = async () => {
-    if (!orderNumber || confirming || loading) {
+    if (!orderNumber || confirming || loading || stockIssue || cocktailStockIssue) {
       return;
     }
 
@@ -220,7 +783,15 @@ export default function Pubmenubuy({ backTo = "" }) {
       setConfirming(true);
       setError("");
       await ConfirmOrderservice.confirmOrder(orderNumber);
-      navigate(`${currentBasePath}/Buyflowconfirmorder?orderNumber=${orderNumber}`);
+      if (afterConfirmTo) {
+        navigate(`${afterConfirmTo}?orderNumber=${encodeURIComponent(orderNumber)}`, {
+          state: { orderNumber },
+        });
+      } else {
+        navigate(`${currentBasePath}/Buyflowconfirmorder?orderNumber=${encodeURIComponent(orderNumber)}`, {
+          state: { orderNumber },
+        });
+      }
     } catch (confirmError) {
       setError(
         confirmError.response?.data?.message || "Unable to confirm this order."
@@ -232,6 +803,7 @@ export default function Pubmenubuy({ backTo = "" }) {
 
   return (
    <div className="min-h-screen bg-stone-50 px-3 py-4 md:px-6">
+     {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
      <div className="mx-auto max-w-[1180px] space-y-4">
         {/* Header */}
         <div className="overflow-hidden rounded-2xl border border-afmc-gold/20 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
@@ -246,7 +818,7 @@ export default function Pubmenubuy({ backTo = "" }) {
  
             <div className="flex flex-wrap gap-2">
               <ActionButton
-                onClick={() => (backTo ? navigate(backTo) : navigate(-1))}
+                onClick={() => (backTo ? navigate(backTo, { replace: true }) : navigate(-1))}
                 className="bg-white/15 px-4 py-2 hover:bg-white/25"
               >
                 <ChevronLeft className="h-4 w-4" />
@@ -255,7 +827,7 @@ export default function Pubmenubuy({ backTo = "" }) {
  
               <ActionButton
                 onClick={handleConfirmOrder}
-                disabled={confirming || loading}
+                disabled={Boolean(stockIssue) || confirming || loading}
                  className="bg-afmc-maroon px-4 py-2 text-white shadow-sm hover:bg-afmc-maroon/90 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <CheckCircle2 className="h-4 w-4" />
@@ -306,97 +878,156 @@ export default function Pubmenubuy({ backTo = "" }) {
           <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
             {error}
           </div>
-        ) : items.length === 0 ? (
-          <div className="py-16 text-center text-sm text-stone-500">
-            No items found for this order.
-          </div>
+         ) : stockIssueMessage ? (
+           <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+             {stockIssueMessage}
+           </div>
+         ) : items.length === 0 ? (
+           <div className="py-16 text-center text-sm text-stone-500">
+             No items found for this order.
+           </div>
         ) : (
           <div className="space-y-4">
             {/* Products */}
              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {items.map((item) => {
-                  const isBusy = updatingItemCode === String(item.item_code);
-                  const disableItemActions = Boolean(isBusy || item.isFreeItem);
-                  const showItemError =
-                    itemError.itemCode === String(item.item_code) && itemError.message;
+                {items.map((item) => (
+                  <div
+                    key={item.orderLineId ?? item.id}
+                    className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                  >
+                    {/* Image */}
+                   <div className="flex h-40 items-center justify-center bg-stone-50 p-4">
+                      <img
+                        src={`${BASEAPI}${item.image || "default.jpg"}`}
+                        alt={item.item_name}
+                        className="max-h-full w-auto object-contain"
+                      />
+                  </div>
 
-                  return (
-                    <div
-                      key={item.id}
-                      className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-                    >
-                      {/* Image */}
-                      <div className="relative flex h-40 items-center justify-center bg-stone-50 p-4">
-                        <img
-                          src={`${BASEAPI}${item.image || "default.jpg"}`}
-                          alt={item.item_name}
-                          className="max-h-full w-auto object-contain"
-                        />
-                        {showItemError ? (
-                          <div className="pointer-events-none absolute inset-0 flex items-start justify-center bg-red-950/10 p-3">
-                            <div className="rounded-lg bg-red-600/95 px-3 py-2 text-center text-xs font-semibold text-white shadow-lg">
-                              {itemError.message}
-                            </div>
-                          </div>
-                        ) : null}
-                      </div>
+                  {/* Details */}
+                  <div className="space-y-3 p-4">
+                    <div>
+                      <h3 className="line-clamp-1 text-base font-semibold text-stone-900">
+                        {item.item_name}
+                      </h3>
 
-                      {/* Details */}
-                      <div className="space-y-3 p-4">
-                        <div>
-                          <h3 className="line-clamp-1 text-base font-semibold text-stone-900">
-                            {item.item_name}
-                          </h3>
-
-                          <p className="mt-1 text-sm text-stone-500">
-                            Quantity: {item.quantity}
+                      <p className="mt-1 text-sm text-stone-500">
+                        Quantity: {item.quantity}{item.isFreeItem ? " (Free)" : ""}
+                      </p>
+                      {isCocktailOrMocktail(item) && item.stockStatus && (
+                        <p className={`mt-1 text-xs font-semibold ${String(item.stockStatus).toLowerCase() === "out of stock" ? "text-red-600" : "text-green-700"}`}>
+                          {item.stockStatus}
+                        </p>
+                      )}
+                      {isCocktailOrMocktail(item) && item.stockIssueMessage && (
+                        <p className="mt-1 text-xs font-semibold text-red-600">
+                          {item.stockIssueMessage}
+                        </p>
+                      )}
+                      {item.availableQuantity !== null && item.availableQuantity !== undefined && (
+                        <p className="mt-1 text-xs text-stone-400">
+                          Available: {item.availableQuantity}
+                        </p>
+                      )}
+                      {item.availableQuantity !== null &&
+                        item.availableQuantity !== undefined &&
+                        Number(item.quantity || 0) > Number(item.availableQuantity || 0) && (
+                          <p className="mt-1 text-xs font-semibold text-red-600">
+                            Out of stock for this quantity
                           </p>
-                          {item.isFreeItem ? (
-                            <p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-emerald-600">
-                              Free Item
-                            </p>
-                          ) : null}
-                        </div>
+                        )}
+                    </div>
 
-                        {/* Controls */}
-                        <div className="flex items-center justify-between rounded-xl bg-stone-50 px-3 py-2">
-                          <div className="flex items-center gap-1">
-                            <button
+                     {/* Controls */}
+                     {!item.isFreeItem ? (
+                     <div className="flex items-center justify-between rounded-xl bg-stone-50 px-3 py-2">
+                       <div className="flex items-center gap-1">
+                           <button
                               type="button"
-                              onClick={() => adjustQuantity(item, -1)}
-                              disabled={disableItemActions || Number(item.quantity || 1) <= 1}
-                              className="rounded-md bg-white p-1.5 text-stone-700 shadow-sm transition hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-50"
+                              onClick={() => handleQtyClick(item, -1)}
+                              aria-disabled={updatingLineId === Number(item.orderLineId ?? item.id) || item.quantity <= 1}
+                              disabled={updatingLineId === Number(item.orderLineId ?? item.id) || item.quantity <= 1}
+                              className={`rounded-md bg-white p-1.5 text-stone-700 shadow-sm transition hover:bg-stone-100 ${
+                                updatingLineId === Number(item.orderLineId ?? item.id) || item.quantity <= 1
+                                  ? "opacity-50"
+                                  : ""
+                              }`}
                             >
-                              <Minus className="h-4 w-4" />
-                            </button>
+                             <Minus className="h-4 w-4" />
+                           </button>
 
-                            <span className="min-w-[28px] text-center text-sm font-semibold text-stone-900">
-                              {item.quantity}
-                            </span>
+                        <span className="min-w-[28px] text-center text-sm font-semibold text-stone-900">
+                          {item.quantity}
+                        </span>
 
-                            <button
-                              type="button"
-                              onClick={() => adjustQuantity(item, 1)}
-                              disabled={disableItemActions}
-                              className="rounded-md bg-afmc-maroon p-1.5 text-white transition hover:bg-afmc-maroon2 disabled:cursor-not-allowed disabled:opacity-50"
-                            >
+                             <button
+                               type="button"
+                               onClick={() => handleQtyClick(item, 1)}
+                               aria-disabled={
+                                 updatingLineId === Number(item.orderLineId ?? item.id) ||
+                                 String(item.stockIssueMessage || "").trim().length > 0 ||
+                                 isOutOfStock(item) ||
+                                 (() => {
+                                   const maxAllowed = getMaxAllowedQuantity(item);
+                                   return (
+                                     Number.isFinite(Number(maxAllowed)) &&
+                                     Number(maxAllowed) >= 0 &&
+                                     Number(item.quantity || 0) >= Number(maxAllowed)
+                                   );
+                                 })() ||
+                                 item.quantity >= MAX_QTY
+                               }
+                               disabled={
+                                 updatingLineId === Number(item.orderLineId ?? item.id) ||
+                                 String(item.stockIssueMessage || "").trim().length > 0 ||
+                                 isOutOfStock(item) ||
+                                 (() => {
+                                   const maxAllowed = getMaxAllowedQuantity(item);
+                                   return (
+                                     Number.isFinite(Number(maxAllowed)) &&
+                                     Number(maxAllowed) >= 0 &&
+                                     Number(item.quantity || 0) >= Number(maxAllowed)
+                                   );
+                                 })() ||
+                                 item.quantity >= MAX_QTY
+                               }
+                                className={`rounded-md bg-afmc-maroon p-1.5 text-white transition hover:bg-afmc-maroon2 ${
+                                  updatingLineId === Number(item.orderLineId ?? item.id) ||
+                                 String(item.stockIssueMessage || "").trim().length > 0 ||
+                                 isOutOfStock(item) ||
+                                 (() => {
+                                   const maxAllowed = getMaxAllowedQuantity(item);
+                                   return (
+                                     Number.isFinite(Number(maxAllowed)) &&
+                                     Number(maxAllowed) >= 0 &&
+                                     Number(item.quantity || 0) >= Number(maxAllowed)
+                                   );
+                                 })() ||
+                                  item.quantity >= MAX_QTY
+                                    ? "opacity-60"
+                                    : ""
+                                }`}
+                              >
                               <Plus className="h-4 w-4" />
                             </button>
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={() => removeItem(item)}
-                            disabled={disableItemActions}
-                            className="rounded-md bg-red-50 p-1.5 text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
                         </div>
-                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => removeItem(item.id)}
+                        className="rounded-md bg-red-50 p-1.5 text-red-600 transition hover:bg-red-100"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
                     </div>
-                  );
-                })}
+                    ) : (
+                      <div className="rounded-xl bg-stone-50 px-3 py-2 text-xs font-medium text-stone-600">
+                        Free item
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
 
            
