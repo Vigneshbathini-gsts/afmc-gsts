@@ -291,13 +291,15 @@ export const barOrdersAPI = {
   getScannedItems: (orderNumber) => api.get(`/bar-orders/scanned-items/${orderNumber}`),
   clearScannedItems: (orderNumber) => api.delete(`/bar-orders/scanned-items/${orderNumber}`),
   cancelItem: (data) => api.put("/bar-orders/cancel", data),
+  cancelOrder: (data) => api.put("/bar-orders/cancel", data),
   getActiveOrders: (kitchen = "Bar") => api.get(`/bar-orders/active?kitchen=${kitchen}`),
   markNotificationAsRead: (data) => api.put("/bar-orders/notifications/read", data),
 getCocktailDetailsById: (itemId, orderNumber) => api.get(`/bar-orders/cocktail/${itemId}?orderNumber=${orderNumber}`),
 getCancelledOrders: (params) => api.get("/bar-orders/cancelled-orders", { params }),
 getOrderHistory: (params) => api.get("/bar-orders/order-history", { params }),
-getOrderDetailsByOrderNumber: (orderNumber) => api.get(`/bar-orders/cancelled-order-details/${orderNumber}`),
-getOrderHistoryItemDetails: (orderNumber) => api.get(`/bar-orders/order-history-details/${orderNumber}`),
+getOrderDetailsByOrderNumber: (orderNumber, kitchen) => api.get(`/bar-orders/cancelled-order-details/${orderNumber}`, { params: { kitchen } }),
+getOrderHistoryItemDetails: (orderNumber, kitchen) => api.get(`/bar-orders/order-history-details/${orderNumber}`, { params: { kitchen } }),
+completeOrder: (data) => api.post("/bar-orders/completeOrder", data),
 
 };
 // ================================

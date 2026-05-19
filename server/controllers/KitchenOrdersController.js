@@ -1,4 +1,5 @@
 const pool = require("../config/db");
+const { getStartOfDay, getEndOfDay } = require("../utils/dateUtils");
 
 const getRequestUsername = (req) =>
   String(req.user?.username || req.user?.user_name || req.body?.appUser || "").trim();
@@ -109,7 +110,7 @@ exports.getOrders = async (req, res) => {
           MAX(a.handled_by_kitchen) AS Handled_by_kitchen,
 
           CASE
-            WHEN SUM(CASE WHEN a.STATUS = 'Received' THEN 1 ELSE 0 END) > 0 THEN 'Y'
+            WHEN SUM(CASE WHEN a.STATUS IN ('Received','Preparing') THEN 1 ELSE 0 END) > 0 THEN 'Y'
             ELSE 'N'
           END AS CAN_CANCEL,
 
@@ -162,6 +163,7 @@ exports.updateBarOrderStatus = async (req, res) => {
   let connection;
   try {
     const { ORDERNUMBER, KITCHEN = "Bar", STATUS = "Preparing" } = req.body;
+
     const appUser = getRequestUsername(req);
 
     if (!ORDERNUMBER) {
@@ -839,7 +841,7 @@ exports.processBarcodeScan = async (req, res) => {
     for (const comp of componentsWithRemaining) {
       if (reqQtyLeft <= 0) break;
       const qtyToAdd = Math.min(reqQtyLeft, comp.coll_qty);
-      
+
       let finalPrice = calculatedPaidPrice;
       let isFree = false;
 
@@ -848,10 +850,10 @@ exports.processBarcodeScan = async (req, res) => {
         finalPrice = 0;
         isFree = true;
         if (!comp.free_item_quantity) {
-           await connection.query(
-             `UPDATE xxafmc_order_details SET free_item_quantity = '1' WHERE order_line_id = ?`,
-             [comp.order_line_id]
-           );
+          await connection.query(
+            `UPDATE xxafmc_order_details SET free_item_quantity = '1' WHERE order_line_id = ?`,
+            [comp.order_line_id]
+          );
         }
       }
 
@@ -955,12 +957,46 @@ exports.clearScannedItemsFromSession = async (req, res) => {
 
 exports.cancelBarOrderItem = async (req, res) => {
   try {
-    const { ORDER_LINE_ID } = req.body;
+    const { ORDER_LINE_ID, ORDERNUMBER, KITCHEN = "Bar" } = req.body;
+    const { categoryId } = getKitchenConfig(KITCHEN);
+
+    if (ORDERNUMBER) {
+      const [updateResult] = await pool.query(
+        `
+        UPDATE xxafmc_order_details xod
+        JOIN (${inventorySummarySql}) inv ON inv.item_code = xod.item_id
+        SET xod.ORDER_STATUS = 'CANCELLED'
+        WHERE xod.ORDER_ID = ?
+          AND inv.category_id = ?
+          AND (xod.ORDER_STATUS IS NULL OR TRIM(xod.ORDER_STATUS) = '')
+        `,
+        [ORDERNUMBER, categoryId]
+      );
+
+      await pool.query(
+        `
+        UPDATE xxafmc_kitchen_notification kn
+        JOIN (${inventorySummarySql}) inv ON inv.item_code = kn.item_id
+        SET kn.status = 'Cancelled'
+        WHERE kn.ordernumber = ?
+          AND inv.category_id = ?
+          AND kn.status IN ('Received', 'Preparing')
+        `,
+        [ORDERNUMBER, categoryId]
+      );
+
+      return res.status(200).json({
+        success: true,
+        message: updateResult.affectedRows > 0
+          ? "Order cancelled successfully"
+          : "No cancellable order items found",
+      });
+    }
 
     if (!ORDER_LINE_ID) {
       return res.status(400).json({
         success: false,
-        message: "Order line ID is required",
+        message: "Order line ID or order number is required",
       });
     }
 
@@ -1184,20 +1220,14 @@ exports.getCocktailDetailsById = async (req, res) => {
 
 exports.getCancelledOrders = async (req, res) => {
   try {
-    let { fromDate, toDate } = req.query;
+    let { fromDate, toDate, kitchen = "Bar" } = req.query;
+    const { categoryId } = getKitchenConfig(kitchen);
 
     // console.log("Fetching cancelled orders from", fromDate, "to", toDate);
 
     //   Normalize input dates (important)
-    const normalizeDate = (date) => {
-      if (!date) return null;
-      const d = new Date(date);
-      return isNaN(d) ? null : d.toISOString().slice(0, 10); // YYYY-MM-DD
-    };
-
-    const from = normalizeDate(fromDate);
-    const to = normalizeDate(toDate);
-
+    const from = getStartOfDay(fromDate);
+    const to = getEndOfDay(toDate);
 
     const dateExpression = `
       CASE 
@@ -1207,40 +1237,64 @@ exports.getCancelledOrders = async (req, res) => {
     `;
 
     const query = `
-      SELECT 
-          xxkn.order_num,
-          xxkn.order_date,
-          COALESCE(xnm.first_name, xu.first_name) AS first_name,
+  SELECT 
+      xxkn.order_num,
+      xxkn.order_date,
+
+      COALESCE(xnm.first_name, xu.first_name) AS first_name,
+
+      COALESCE(
+        NULLIF(
           CONCAT(
-            UPPER(LEFT(xp.pubmed_name, 1)),
-            LOWER(SUBSTRING(xp.pubmed_name, 2))
-          ) AS pubmed_name
-      FROM xxafmc_order_header xxkn
-      LEFT JOIN xxafmc_non_members xnm 
-          ON xnm.id = xxkn.member_id
-      LEFT JOIN xxafmc_users xu 
-          ON xu.user_id = xxkn.user_id
-      JOIN xxafmc_pubmed xp 
-          ON xp.pubmed_id = xxkn.pubmed
-      WHERE EXISTS (
-          SELECT 1
-          FROM xxafmc_order_details xod
-          WHERE xod.order_id = xxkn.order_num
-          GROUP BY xod.order_id
-          HAVING COUNT(*) = COUNT(
-              CASE WHEN TRIM(UPPER(IFNULL(xod.order_status, ''))) = 'CANCELLED' THEN 1 END
-          )
+            UPPER(LEFT(TRIM(xp.pubmed_name), 1)),
+            LOWER(SUBSTRING(TRIM(xp.pubmed_name), 2))
+          ),
+          ''
+        ),
+        'N/A'
+      ) AS pubmed_name
+
+  FROM xxafmc_order_header xxkn
+
+  LEFT JOIN xxafmc_non_members xnm 
+      ON xnm.id = xxkn.member_id
+
+  LEFT JOIN xxafmc_users xu 
+      ON xu.user_id = xxkn.user_id
+
+  LEFT JOIN xxafmc_pubmed xp 
+      ON TRIM(CAST(xp.pubmed_id AS CHAR)) = TRIM(CAST(xxkn.pubmed AS CHAR))
+
+  WHERE EXISTS (
+      SELECT 1
+      FROM xxafmc_order_details xod
+      JOIN (${inventorySummarySql}) inv 
+          ON inv.item_code = xod.item_id
+      WHERE xod.order_id = xxkn.order_num
+        AND inv.category_id = ?
+      GROUP BY xod.order_id
+      HAVING COUNT(*) = COUNT(
+          CASE 
+              WHEN TRIM(UPPER(IFNULL(xod.order_status, ''))) = 'CANCELLED' 
+              THEN 1 
+          END
       )
-      AND ${dateExpression} BETWEEN COALESCE(?, CURDATE()) AND COALESCE(?, CURDATE())
-      ORDER BY xxkn.order_num DESC
-    `;
+  )
+
+  AND ${dateExpression} 
+      BETWEEN COALESCE(?, CURDATE()) 
+      AND COALESCE(?, CURDATE())
+
+  ORDER BY xxkn.order_num DESC
+`;
 
     const [rows] = await pool.execute(query, [
+      categoryId,
       from || null,
       to || null
     ]);
 
-    // console.log("Cancelled orders fetched:", rows);
+    console.log("Cancelled orders fetched:", rows);
 
     res.json({
       success: true,
@@ -1261,23 +1315,18 @@ exports.getCancelledOrders = async (req, res) => {
 
 exports.getOrderHistory = async (req, res) => {
   try {
-    const { fromDate, toDate, page = 1, limit = 10 } = req.query;
+    const { fromDate, toDate, page = 1, limit = 10, kitchen = "Bar" } = req.query;
+    const { categoryId } = getKitchenConfig(kitchen);
     // console.log("Fetching order history with params:", { fromDate, toDate, page, limit });
-    const normalizeDate = (date) => {
-      if (!date) return null;
-      const d = new Date(date);
-      return isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
-    };
-
-    let from = normalizeDate(fromDate);
-    let to = normalizeDate(toDate);
+    let from = getStartOfDay(fromDate);
+    let to = getEndOfDay(toDate);
 
     if (!from) {
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      from = thirtyDaysAgo.toISOString().slice(0, 10);
+      from = getStartOfDay(thirtyDaysAgo);
     }
-    if (!to) to = new Date().toISOString().slice(0, 10);
+    if (!to) to = getEndOfDay(new Date());
 
     const pageNum = Math.max(1, parseInt(page));
     const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
@@ -1290,7 +1339,7 @@ exports.getOrderHistory = async (req, res) => {
       END
     `;
 
-   const query = `
+    const query = `
     SELECT 
   kn.ordernumber AS order_num,
   nm.order_date,
@@ -1298,7 +1347,10 @@ exports.getOrderHistory = async (req, res) => {
   COALESCE(xnm.first_name, xu.first_name) AS first_name,
   COALESCE(xnm.phone_number, xu.phone_number) AS phone_number,
 
-  CONCAT(UPPER(LEFT(xp.pubmed_name, 1)), LOWER(SUBSTRING(xp.pubmed_name, 2))) AS pubmed_name,
+  COALESCE(
+    CONCAT(UPPER(LEFT(xp.pubmed_name, 1)), LOWER(SUBSTRING(xp.pubmed_name, 2))),
+    'N/A'
+  ) AS pubmed_name,
 
   --   ADDED SUBTOTAL
   FORMAT(nm.order_total, 2) AS subtotal,
@@ -1322,6 +1374,8 @@ exports.getOrderHistory = async (req, res) => {
   END AS status
 
 FROM xxafmc_kitchen_notification kn
+JOIN (${inventorySummarySql}) inv
+  ON inv.item_code = kn.item_id
 
 LEFT JOIN xxafmc_order_header nm 
   ON nm.order_num = kn.ordernumber
@@ -1332,10 +1386,11 @@ LEFT JOIN xxafmc_non_members xnm
 LEFT JOIN xxafmc_users xu 
   ON xu.user_id = nm.user_id
 
-JOIN xxafmc_pubmed xp 
+LEFT JOIN xxafmc_pubmed xp 
   ON xp.pubmed_id = nm.pubmed
 
-WHERE ${dateExpression} BETWEEN STR_TO_DATE(?, '%Y-%m-%d') AND STR_TO_DATE(?, '%Y-%m-%d')
+WHERE inv.category_id = ?
+  AND ${dateExpression} BETWEEN ? AND ?
 
 GROUP BY kn.ordernumber, nm.order_date, first_name, phone_number, xp.pubmed_name, nm.order_total
 
@@ -1351,25 +1406,28 @@ LIMIT ? OFFSET ?
       FROM (
         SELECT kn.ordernumber
         FROM xxafmc_kitchen_notification kn
+        JOIN (${inventorySummarySql}) inv
+          ON inv.item_code = kn.item_id
         LEFT JOIN xxafmc_order_header nm 
           ON nm.order_num = kn.ordernumber
-        WHERE ${dateExpression} BETWEEN STR_TO_DATE(?, '%Y-%m-%d') AND STR_TO_DATE(?, '%Y-%m-%d')
+        WHERE inv.category_id = ?
+          AND ${dateExpression} BETWEEN ? AND ?
         GROUP BY kn.ordernumber
         HAVING SUM(CASE WHEN UPPER(kn.status) = 'COMPLETED' THEN 1 ELSE 0 END) > 0
       ) history_orders
     `;
 
-    const dateParams = [from, to];
+    const dateParams = [categoryId, from, to];
 
     const [countResult] = await pool.execute(countQuery, dateParams);
     const totalRecords = countResult[0]?.total || 0;
     const totalPages = Math.ceil(totalRecords / limitNum);
 
     // Critical fix for MySQL 8.0.22+ bug
-    const queryParams = [from, to, String(limitNum), String(offset)];
+    const queryParams = [categoryId, from, to, String(limitNum), String(offset)];
 
     const [rows] = await pool.execute(query, queryParams);
-    // console.log(rows);
+
 
     res.json({
       success: true,
@@ -1399,6 +1457,8 @@ LIMIT ? OFFSET ?
 exports.getOrderHistoryItemDetails = async (req, res) => {
   try {
     const { orderNumber } = req.params;
+    const { kitchen = "Bar" } = req.query;
+    const { categoryId } = getKitchenConfig(kitchen);
     // console.log("Fetching item details for order:", orderNumber);
     if (!orderNumber) {
       return res.status(400).json({
@@ -1442,6 +1502,7 @@ exports.getOrderHistoryItemDetails = async (req, res) => {
        AND xxkn.item_id = xo.item_id
 
       WHERE xo.order_id = ?
+        AND xi.category_id = ?
 
       GROUP BY 
         xo.order_line_id,
@@ -1466,14 +1527,16 @@ exports.getOrderHistoryItemDetails = async (req, res) => {
       SELECT 
         SUM(xo.subtotal) AS total_amount
       FROM xxafmc_order_details xo
+      JOIN (${inventorySummarySql}) xi
+        ON xo.item_id = xi.item_code
       WHERE xo.order_id = ?
+        AND xi.category_id = ?
     `;
 
-    const [items] = await pool.execute(itemsQuery, [orderNumber]);
-    const [totalResult] = await pool.execute(totalQuery, [orderNumber]);
+    const [items] = await pool.execute(itemsQuery, [orderNumber, categoryId]);
+    const [totalResult] = await pool.execute(totalQuery, [orderNumber, categoryId]);
 
     const totalAmount = totalResult[0]?.total_amount || 0;
-    // console.log(`Fetched ${items.length} items for order ${orderNumber} with total amount ${totalAmount}`);
     res.json({
       success: true,
       data: {
@@ -1501,6 +1564,8 @@ exports.getOrderDetailsByOrderNumber = async (req, res) => {
 
   try {
     const { orderNumber } = req.params;
+    const { kitchen = "Bar" } = req.query;
+    const { categoryId } = getKitchenConfig(kitchen);
 
     if (!orderNumber) {
       return res.status(400).json({
@@ -1529,10 +1594,11 @@ exports.getOrderDetailsByOrderNumber = async (req, res) => {
         ON xod.order_id = xkn.ordernumber 
         AND xod.item_id = xkn.item_id
       WHERE xod.order_id = ?
-      AND TRIM(UPPER(IFNULL(xod.order_status, ''))) = 'CANCELLED'
+        AND inv.category_id = ?
+        AND TRIM(UPPER(IFNULL(xod.order_status, ''))) = 'CANCELLED'
     `;
 
-    const [rows] = await connection.execute(sql, [orderNumber]);
+    const [rows] = await connection.execute(sql, [orderNumber, categoryId]);
 
 
     res.json({
@@ -1551,6 +1617,86 @@ exports.getOrderDetailsByOrderNumber = async (req, res) => {
   } finally {
     if (connection) {
 
+      connection.release();
+    }
+  }
+};
+
+
+exports.completeOrder = async (req, res) => {
+  let connection;
+
+  try {
+    const {
+      ORDERNUMBER,
+      KITCHEN = "Bar",
+      STATUS = "Completed"
+    } = req.body;
+
+
+
+    if (!ORDERNUMBER) {
+      return res.status(400).json({
+        success: false,
+        message: "Order number is required"
+      });
+    }
+
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    // 1. Update order header
+    const [headerResult] = await connection.query(
+      `
+      UPDATE xxafmc_order_header
+      SET 
+        order_status = ?,
+        kitchen_type = ?,
+        order_total = (
+          SELECT ROUND(SUM(IFNULL(subtotal, 0)), 2)
+          FROM xxafmc_order_details
+          WHERE order_id = ?
+            AND TRIM(UPPER(IFNULL(order_status, ''))) != 'CANCELLED'
+        )
+      WHERE order_num = ?
+      `,
+      [
+        STATUS,
+        KITCHEN,
+        ORDERNUMBER,
+        ORDERNUMBER
+      ]
+    );
+
+
+
+    await connection.commit();
+
+    return res.status(200).json({
+      success: true,
+      message:
+        headerResult.affectedRows > 0
+          ? "Order completed successfully"
+          : "No order found"
+    });
+
+  } catch (error) {
+    if (connection) {
+      try {
+        await connection.rollback();
+      } catch (_) { }
+    }
+
+    console.error("Error completing order:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to complete order",
+      error: error.message
+    });
+
+  } finally {
+    if (connection) {
       connection.release();
     }
   }

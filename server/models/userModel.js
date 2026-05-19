@@ -1,5 +1,6 @@
 const db = require("../config/db");
 const crypto = require("crypto");
+const { formatToSql, toISO } = require("../utils/dateUtils");
 
 const BASE_USER_SELECT = `
   SELECT
@@ -311,7 +312,7 @@ const createUser = async ({
         roleDetails.ROLE_ID,
         normalizedLoginType,
         createdBy,
-        new Date().toLocaleDateString("en-US"),
+        formatToSql(new Date()),
         "A",
         "Y",
         md5Password,
@@ -512,9 +513,9 @@ const createBulkUsers = async ({ rows, createdBy }) => {
           row.lastName,
           row.fullName,
           row.email,
-          new Date(),
+          formatToSql(new Date()),
           createdBy,
-          new Date(),
+          formatToSql(new Date()),
           createdBy,
         ]
       );
@@ -561,8 +562,8 @@ const createBulkUsers = async ({ rows, createdBy }) => {
           "Member",
           "N",
           createdBy,
-          new Date(),
-          new Date(),
+          formatToSql(new Date()),
+          formatToSql(new Date()),
           createdBy,
           "A",
           encryptedPassword,
@@ -603,5 +604,3 @@ module.exports = {
   updateUser,
   createBulkUsers,
 };
-
-
