@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { inventoryAPI, cartAPI } from "../../services/api";
+import Pubmenubuyservice from "../../services/Pubmenubuyservice";
 import { FaArrowLeft, FaPlus, FaMinus, FaTrash, FaSearch } from "react-icons/fa";
 import { toast } from "react-toastify";
 
@@ -9,13 +10,26 @@ const getDetailItemName = (detail) => detail?.itemName ?? detail?.ITEM_NAME;
 const getDetailPegs = (detail) => detail?.pegs ?? detail?.PEGS;
 const getDetailStockQuantity = (detail) => detail?.stockQuantity ?? detail?.STOCK_QUANTITY;
 const getDetailRequiredQuantity = (detail) => detail?.requiredQuantity ?? detail?.REQUIRED_QUANTITY;
+const setDetailPegs = (detail, pegs) => {
+    const nextDetail = { ...detail, pegs };
+    if (Object.prototype.hasOwnProperty.call(detail || {}, "PEGS")) {
+        nextDetail.PEGS = pegs;
+    }
+    return nextDetail;
+};
 
 export default function ItemDetails() {
     const { id } = useParams();
     const navigate = useNavigate();
     const location = useLocation();
-    const cartId = location.state?.cartId || new URLSearchParams(location.search).get("cartId");
+    const searchParams = new URLSearchParams(location.search);
+    const cartId = location.state?.cartId || searchParams.get("cartId");
+    const orderNumber = location.state?.orderNumber || searchParams.get("orderNumber");
+    const orderItemCode = location.state?.itemCode || searchParams.get("itemCode") || id;
+    const returnTo = location.state?.returnTo || searchParams.get("returnTo");
     const isEditingCartItem = Boolean(cartId);
+    const isEditingOrderItem = Boolean(orderNumber && orderItemCode);
+    const isEditingExistingItem = isEditingCartItem || isEditingOrderItem;
     const [item, setItem] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -55,6 +69,21 @@ export default function ItemDetails() {
     const persistCustomDetails = useCallback(async (details, quantitiesState) => {
         if (!details) return true;
 
+        if (isEditingOrderItem) {
+            try {
+                await Pubmenubuyservice.updateOrderCocktailIngredients(
+                    orderNumber,
+                    orderItemCode,
+                    buildCustomizationPayload(details, quantitiesState)
+                );
+                return true;
+            } catch (err) {
+                console.error("Error saving order customization:", err);
+                toast.error(err.response?.data?.message || err.message || "Failed to save customization");
+                return false;
+            }
+        }
+
         if (isEditingCartItem && cartId) {
             try {
                 await cartAPI.customizeCocktail(cartId, {
@@ -74,7 +103,7 @@ export default function ItemDetails() {
             console.warn("Could not save customization draft:", err);
         }
         return true;
-    }, [buildCustomizationPayload, cartId, draftKey, isEditingCartItem]);
+    }, [buildCustomizationPayload, cartId, draftKey, isEditingCartItem, isEditingOrderItem, orderItemCode, orderNumber]);
 
     // Auto-clear validation errors after 5 seconds
     useEffect(() => {
@@ -101,7 +130,31 @@ export default function ItemDetails() {
                         }
                     });
 
-                    if (isEditingCartItem) {
+                    if (isEditingOrderItem) {
+                        try {
+                            const savedResponse = await Pubmenubuyservice.getOrderCocktailIngredients(orderNumber, orderItemCode);
+                            const savedIngredients = savedResponse.data?.data?.ingredients || [];
+                            if (savedIngredients.length > 0) {
+                                details = savedIngredients.map((ingredient) => ({
+                                    itemName: ingredient.itemName ?? ingredient.item_name,
+                                    itemCode: ingredient.itemCode ?? ingredient.item_code,
+                                    pegs: ingredient.pegs ?? ingredient.quantity,
+                                    memberPrice: ingredient.lineTotal,
+                                    unitPrice: ingredient.unitPrice ?? ingredient.unit_price,
+                                    stockQuantity: ingredient.stockQuantity ?? ingredient.stock_quantity,
+                                    stockStatus: ingredient.stockStatus ?? ingredient.stock_status,
+                                    requiredQuantity: ingredient.requiredQuantity ?? ingredient.required_quantity,
+                                }));
+                                initialQuantities = {};
+                                details.forEach((detail, idx) => {
+                                    initialQuantities[idx] = getDetailPegs(detail) || 1;
+                                });
+                            }
+                        } catch (err) {
+                            console.warn("Could not load order customization:", err);
+                            toast.error(err.response?.data?.message || err.message || "Failed to load saved customization");
+                        }
+                    } else if (isEditingCartItem) {
                         try {
                             const savedResponse = await cartAPI.getCocktailDetails(cartId);
                             const savedCollection = savedResponse.data?.data || {};
@@ -154,7 +207,7 @@ export default function ItemDetails() {
         if (id) {
             fetchItemDetails();
         }
-    }, [cartId, draftKey, id, isEditingCartItem]);
+    }, [cartId, draftKey, id, isEditingCartItem, isEditingOrderItem, orderItemCode, orderNumber]);
 
     const updateQuantity = async (index, delta) => {
         const oldQty = quantities[index] || 1;
@@ -176,11 +229,24 @@ export default function ItemDetails() {
         }
 
         const newQuantities = { ...quantities, [index]: newVal };
-        setQuantities(newQuantities);
+        const oldDetails = item?.details || [];
+        const newDetails = oldDetails.map((detail, idx) =>
+            idx === index ? setDetailPegs(detail, newVal) : detail
+        );
 
-        const saved = await persistCustomDetails(item?.details || [], newQuantities);
+        setQuantities(newQuantities);
+        setItem((prev) => ({
+            ...prev,
+            details: newDetails,
+        }));
+
+        const saved = await persistCustomDetails(newDetails, newQuantities);
         if (!saved) {
             setQuantities((prev) => ({ ...prev, [index]: oldQty }));
+            setItem((prev) => ({
+                ...prev,
+                details: oldDetails,
+            }));
         }
     };
 
@@ -322,6 +388,22 @@ export default function ItemDetails() {
         };
 
         try {
+            if (isEditingOrderItem) {
+                const response = await Pubmenubuyservice.updateOrderCocktailIngredients(
+                    orderNumber,
+                    orderItemCode,
+                    selectedIngredients
+                );
+
+                if (response?.data?.success) {
+                    toast.success(`Updated ${item.ITEM_NAME} customization`);
+                    navigate(returnTo || `${basePath}/menudash/buy?orderNumber=${encodeURIComponent(orderNumber)}`);
+                } else {
+                    toast.error(response?.data?.message || "Failed to save customization");
+                }
+                return;
+            }
+
             const response = isEditingCartItem
                 ? await cartAPI.customizeCocktail(cartId, { ingredients: selectedIngredients })
                 : await cartAPI.addNewItem(payload);
@@ -389,7 +471,7 @@ export default function ItemDetails() {
                     onClick={handleAddToCart}
                     className="bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-8 rounded-xl transition shadow-sm"
                 >
-                    {isEditingCartItem ? "Save Customization" : "Add to cart"}
+                    {isEditingExistingItem ? "Save Customization" : "Add to cart"}
                 </button>
                 <button
                     onClick={handleAddIngredientsClick}

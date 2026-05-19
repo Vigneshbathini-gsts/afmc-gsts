@@ -24,6 +24,14 @@ const updateOrderLineQuantity = async (orderNumber, orderLineId, userId, quantit
   return Pubmenubuymodel.updateOrderLineQuantity(orderNumber, orderLineId, userId, quantity);
 };
 
+const getOrderCocktailDetails = async (orderNumber, itemCode) => {
+  return Pubmenubuymodel.getOrderCocktailDetails(orderNumber, itemCode);
+};
+
+const updateOrderCocktailIngredients = async (orderNumber, itemCode, ingredients, authUser) => {
+  return Pubmenubuymodel.updateOrderCocktailIngredients(orderNumber, itemCode, ingredients, authUser);
+};
+
 module.exports = {
   createOrder,
   getOrderSummary,
@@ -31,4 +39,6 @@ module.exports = {
   updateOrderItemQuantity,
   deleteOrderItem,
   updateOrderLineQuantity,
+  getOrderCocktailDetails,
+  updateOrderCocktailIngredients,
 };

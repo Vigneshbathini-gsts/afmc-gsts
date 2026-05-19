@@ -226,6 +226,22 @@ export default function OutletOrderDetails() {
         setItemName(scanData.itemName || "");
         setPrice(scanData.calculatedPrice || "");
 
+        // Cocktail modal
+        if (scanData.isCocktailIngredient && Array.isArray(scanData.addedThisScan) && scanData.addedThisScan.length > 0) {
+          const parent = String(scanData.addedThisScan?.[0]?.parentItem || "").trim();
+          if (parent) setActiveRecipeParentItem(parent);
+          setScannedCocktailData({
+            name: scanData.itemName || "Cocktail",
+            ingredients: scanData.addedThisScan.map(ing => ({
+              item_code: ing.itemCode,
+              item_name: ing.itemName,
+              pegs: ing.pegs || 1,
+              quantity: ing.scanQuantity,
+            })),
+          });
+          // setShowCocktailModal(true);
+        }
+
         setTimeout(() => {
           if (isMountedRef.current) {
             setBarcode("");

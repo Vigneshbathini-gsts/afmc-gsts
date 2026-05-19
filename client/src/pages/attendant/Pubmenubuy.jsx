@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { CheckCircle2, ChevronLeft, Minus, Plus, ShoppingCart, Trash2, XCircle } from "lucide-react";
+import { CheckCircle2, ChevronLeft, Edit2, Minus, Plus, ShoppingCart, Trash2, XCircle } from "lucide-react";
 import Pubmenubuyservice from "../../services/Pubmenubuyservice";
 import ConfirmOrderservice from "../../services/ConfirmOrderservice";
 import { getMaxAllowedQuantity, isCocktailOrMocktail, isOutOfStock, validateNextQuantity } from "../../utils/stockValidation";
@@ -165,6 +165,7 @@ function normalizeItem(item, fallbackIndex = 0) {
     subcategory: Number.isFinite(subcategory) ? subcategory : null,
     stockStatus,
     stockIssueMessage,
+    canEdit: item.canEdit || item.CAN_EDIT || false,
   };
 }
 
@@ -271,6 +272,7 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
       try {
         const response = await Pubmenubuyservice.getByOrderNumber(orderNumber);
         const data = response?.data?.data || {};
+        console.log("Fetched order details:", data);
         const rows = Array.isArray(data?.items) ? data.items : [];
         if (!ignore) {
           setOrderHeader(data?.header || null);
@@ -742,6 +744,24 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
     });
   };
 
+  const handleEditItem = (item) => {
+    if (!orderNumber || !item?.item_code) {
+      return;
+    }
+
+    const returnTo = `${location.pathname}?orderNumber=${encodeURIComponent(orderNumber)}`;
+    navigate(
+      `${currentBasePath}/item/${encodeURIComponent(item.item_code)}?orderNumber=${encodeURIComponent(orderNumber)}&itemCode=${encodeURIComponent(item.item_code)}&returnTo=${encodeURIComponent(returnTo)}`,
+      {
+        state: {
+          orderNumber,
+          itemCode: item.item_code,
+          returnTo,
+        },
+      }
+    );
+  };
+
   const handleCancelOrder = async () => {
     if (!orderNumber || cancelling) {
       return;
@@ -758,7 +778,7 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
     try {
       setCancelling(true);
       setError("");
-      const response = await Pubmenubuyservice.cancelOrder(orderNumber);
+      await Pubmenubuyservice.cancelOrder(orderNumber);
       // window.alert(response?.data?.message || "Order cancelled");
       if (backTo) {
         navigate(backTo, { replace: true });
@@ -938,11 +958,24 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
                         )}
                     </div>
 
-                     {/* Controls */}
-                     {!item.isFreeItem ? (
-                     <div className="flex items-center justify-between rounded-xl bg-stone-50 px-3 py-2">
-                       <div className="flex items-center gap-1">
-                           <button
+                    {/* Controls */}
+                    {!item.isFreeItem ? (
+                      <div className="flex items-center justify-between rounded-xl bg-stone-50 px-3 py-2">
+                        <div className="flex items-center gap-1">
+                          {item.canEdit && (
+                            <button
+                              type="button"
+                              onClick={() => handleEditItem(item)}
+                              disabled={updatingLineId === Number(item.orderLineId ?? item.id)}
+                              className="rounded-md bg-afmc-gold/10 p-1.5 text-afmc-gold transition hover:bg-afmc-gold/20 disabled:cursor-not-allowed disabled:opacity-50"
+                              title="Edit Ingredients"
+                            >
+                              <Edit2 className="h-4 w-4 text-black" />
+                            </button>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <button
                               type="button"
                               onClick={() => handleQtyClick(item, -1)}
                               aria-disabled={updatingLineId === Number(item.orderLineId ?? item.id) || item.quantity <= 1}
@@ -953,12 +986,12 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
                                   : ""
                               }`}
                             >
-                             <Minus className="h-4 w-4" />
-                           </button>
+                            <Minus className="h-4 w-4" />
+                          </button>
 
-                        <span className="min-w-[28px] text-center text-sm font-semibold text-stone-900">
-                          {item.quantity}
-                        </span>
+                          <span className="min-w-[28px] text-center text-sm font-semibold text-stone-900">
+                            {item.quantity}
+                          </span>
 
                              <button
                                type="button"
@@ -1012,14 +1045,15 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
                             </button>
                         </div>
 
-                      <button
-                        type="button"
-                        onClick={() => removeItem(item.id)}
-                        className="rounded-md bg-red-50 p-1.5 text-red-600 transition hover:bg-red-100"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
+                        <button
+                          type="button"
+                          onClick={() => removeItem(item.id)}
+                          disabled={updatingLineId === Number(item.orderLineId ?? item.id)}
+                          className="rounded-md bg-red-50 p-1.5 text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
                     ) : (
                       <div className="rounded-xl bg-stone-50 px-3 py-2 text-xs font-medium text-stone-600">
                         Free item

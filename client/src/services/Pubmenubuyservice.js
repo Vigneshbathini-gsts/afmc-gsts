@@ -9,6 +9,10 @@ export const Pubmenubuyservice = {
   cancelOrder: (orderNumber) => api.delete(`/Pubmenubuy/${orderNumber}`),
   updateLineQuantity: (orderNumber, orderLineId, quantity) =>
     api.put(`/Pubmenubuy/${orderNumber}/line/${orderLineId}/quantity`, { quantity: Number(quantity) }),
+  getOrderCocktailIngredients: (orderNumber, itemCode) =>
+    api.get(`/Pubmenubuy/${orderNumber}/item/${itemCode}/ingredients`),
+  updateOrderCocktailIngredients: (orderNumber, itemCode, ingredients) =>
+    api.put(`/Pubmenubuy/${orderNumber}/item/${itemCode}/ingredients`, { ingredients }),
 };
 
 export default Pubmenubuyservice;
