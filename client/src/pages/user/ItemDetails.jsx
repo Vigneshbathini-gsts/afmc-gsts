@@ -3,6 +3,7 @@ import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { inventoryAPI, cartAPI } from "../../services/api";
 import { FaArrowLeft, FaPlus, FaMinus, FaTrash, FaSearch } from "react-icons/fa";
 import { toast } from "react-toastify";
+import { useAuth } from "../../context/AuthContext";
 
 const getDetailItemCode = (detail) => detail?.itemCode ?? detail?.ITEM_CODE;
 const getDetailItemName = (detail) => detail?.itemName ?? detail?.ITEM_NAME;
@@ -14,6 +15,7 @@ export default function ItemDetails() {
     const { id } = useParams();
     const navigate = useNavigate();
     const location = useLocation();
+    const { user } = useAuth();
     const cartId = location.state?.cartId || new URLSearchParams(location.search).get("cartId");
     const isEditingCartItem = Boolean(cartId);
     const prefillDetails = location.state?.prefillDetails;
@@ -29,7 +31,7 @@ export default function ItemDetails() {
     const [lovData, setLovData] = useState([]);
     const [lovLoading, setLovLoading] = useState(false);
 
-    const draftKey = `afmc-custom-item-draft:${id}`;
+    const draftKey = `afmc-custom-item-draft:${user?.userId || "anon"}:${id}`;
 
     const buildCustomizationPayload = useCallback((details, quantitiesState) => {
         return (details || [])
