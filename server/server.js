@@ -96,17 +96,17 @@ const collectionRoutes = require("./routes/collectionRoutes");
 const priceRoutes = require("./routes/priceRoutes");
 const offerRoutes = require("./routes/offerRoutes");
 const inventoryRoutes = require("./routes/inventoryRoutes");
-const cartRoutes = require("./routes/cartRoutes");
+const cartRoutes = require("./modules/cart/cartRoutes");
 const profitRoutes = require("./routes/profitRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const cancelledOrdersRoutes = require("./routes/cancelledOrdersRoutes");
 const menuRoutesbeer = require("./routes/MenuRoutesbeer");
-const Pubmenubuyroutes = require("./routes/Pubmenubuyroutes");
+const Pubmenubuyroutes = require("./modules/pubmenubuy/Pubmenubuyroutes");
 const ConfirmOrderroutes = require("./routes/ConfirmOrderroutes");
-const invoiceRoutes = require("./routes/invoiceRoutes");
-const InvoiceReportroute = require("./routes/InvoiceReportroute");
+const invoiceRoutes = require("./modules/invoice/invoiceRoutes");
+const InvoiceReportroute = require("./modules/invoice-report/InvoiceReportroute");
 const orderHistoryRoutes = require("./routes/orderHistoryRoutes");
-const paymentRoutes = require("./routes/paymentRoutes");
+const paymentRoutes = require("./modules/payment/paymentRoutes");
 
 const apiPrefixes = ["/api", API_BASE_PATH];
 for (const prefix of apiPrefixes) {

@@ -5,7 +5,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useAuth } from "../../context/AuthContext";
 import { API_BASE_URL, authFetchJson, cartAPI, offersAPI } from "../../services/api";
-import Pubmenubuyservice from "../../services/Pubmenubuyservice";
+import Pubmenubuyservice from "../../flows/buy/services/Pubmenubuyservice";
 import FilterDropdown from "./FilterDropdown";
 
 // const BASEAPI = "https://afmc.globalsparkteksolutions.com/AFMCIMAGES/";

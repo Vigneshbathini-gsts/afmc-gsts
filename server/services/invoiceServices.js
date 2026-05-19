@@ -1,4 +1,4 @@
-const invoiceModel = require("../models/invoiceModel");
+const invoiceModel = require("../modules/invoice/invoiceModel");
 
 const getInvoiceDetails = async (orderNumber) =>
   invoiceModel.getInvoiceDetails(orderNumber);

@@ -40,29 +40,29 @@ import OfferEdit from "../pages/admin/OfferEdit";
 // Attendant Pages
 import AttendantDashboard from "../pages/attendant/Dashboard";
 import RegisterMember from "../pages/attendant/RegisterMember";
-import AttendantCart from "../pages/attendant/Cart";
-import AttendantConfirmOrder from "../pages/attendant/ConfirmOrder";
+import AttendantCart from "../flows/cart/role/attendant/Cart";
+import AttendantConfirmOrder from "../flows/cart/role/attendant/ConfirmOrder";
 import Buyflowconfirmorder from "../pages/attendant/Buyflowconfirmorder";
-import AttendantPayment from "../pages/attendant/Payment";
-import ConfirmOrderpage from "../pages/attendant/ConfirmOrderpage";
-import AttendantInvoice from "../pages/attendant/Invoice";
+import AttendantPayment from "../flows/cart/role/attendant/Payment";
+import ConfirmOrderpage from "../flows/cart/role/attendant/ConfirmOrderpage";
+import AttendantInvoice from "../flows/cart/role/attendant/Invoice";
 import AttendantBuyflowinvoicereport from "../pages/attendant/Buyflowinvoicereport";
 import AttendantActiveOrders from "../pages/attendant/ActiveOrders";
 import AttendantOrderStatus from "../pages/attendant/OrderStatus";
-import Pubmenubuy from "../pages/attendant/Pubmenubuy";
-import CartBuy from "../pages/common/CartBuy";
+import Pubmenubuy from "../flows/buy/pages/Pubmenubuy";
+import CartBuy from "../flows/cart/pages/CartBuy";
 
 // User Pages
 import UserDashboard from "../pages/user/Dashboard";
 import Snacks from "../pages/user/Snacks";
 import Drinks from "../pages/user/Drinks";
 import ItemDetails from "../pages/user/ItemDetails";
-import UserCart from "../pages/user/Cart";
-import UserConfirmOrder from "../pages/user/ConfirmOrder";
-import UserPayment from "../pages/user/Payment";
-import UserInvoice from "../pages/user/Invoice";
+import UserCart from "../flows/cart/role/user/Cart";
+import UserConfirmOrder from "../flows/cart/role/user/ConfirmOrder";
+import UserPayment from "../flows/cart/role/user/Payment";
+import UserInvoice from "../flows/cart/role/user/Invoice";
 import UserBuyflowinvoicereport from "../pages/user/Buyflowinvoicereport";
-import UserInvoiceReport from "../pages/user/InvoiceReport";
+import UserInvoiceReport from "../flows/cart/role/user/InvoiceReport";
 import ActiveOrders from "../pages/user/ActiveOrders";
 import UserOrderStatus from "../pages/user/OrderStatus";
 import MenuDashboard from "../components/common/MenuDashboard";
@@ -71,9 +71,9 @@ import EnduserMocktail from "../components/common/ENDUSERFLOW/EnduserMocktail";
 import Snackveg from "../components/common/ENDUSERFLOW/Snackveg";
 import Snacknonveg from "../components/common/ENDUSERFLOW/Snacknonveg";
 import Drinkharddrink from "../components/common/ENDUSERFLOW/Drinkharddrink";
-import InvoicePage from "../pages/common/InvoicePage";
+import InvoicePage from "../flows/cart/pages/InvoicePage";
 import OrderHistoryPage from "../pages/common/OrderHistoryPage";
-import Payment from "../pages/user/Payment";
+import Payment from "../flows/cart/role/user/Payment";
 
 
 // Kitchen Pages

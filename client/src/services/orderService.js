@@ -41,7 +41,7 @@ const getOrderDetailsInPayment = async (orderNumber) => {
   }
 };
 
-export default {
+const orderService = {
   getOrders,
   getOrderDetails,
   getOrderSummary,
@@ -51,3 +51,5 @@ export default {
   getOrderDetailsInPayment,
   getOrderDetailsInPayement: getOrderDetailsInPayment,
 };
+
+export default orderService;
