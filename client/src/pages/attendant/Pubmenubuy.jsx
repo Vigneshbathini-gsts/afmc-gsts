@@ -89,8 +89,8 @@ function normalizeItem(item, fallbackIndex = 0) {
       : Number(rawFreeItemCode);
   const computed_free_item_quantity =
     rawComputedFreeItemQuantity === null ||
-    rawComputedFreeItemQuantity === undefined ||
-    rawComputedFreeItemQuantity === ""
+      rawComputedFreeItemQuantity === undefined ||
+      rawComputedFreeItemQuantity === ""
       ? null
       : Number(rawComputedFreeItemQuantity);
   const parentCodeRaw = item.barcode ?? item.BARCODE ?? item.parent_code ?? item.PARENT_CODE ?? null;
@@ -215,19 +215,33 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
     ? "/attendant"
     : "/user";
   const MAX_QTY = 99;
-  const stockIssue = useMemo(() => {
-    return items.find(
-      (item) =>
-        (() => {
-          const maxAllowed = getMaxAllowedQuantity(item);
-          return (
-            maxAllowed !== null &&
-            maxAllowed !== undefined &&
-            Number(item.quantity || 0) > Number(maxAllowed || 0)
-          );
-        })()
-    ) || null;
-  }, [items]);
+ const stockIssue = useMemo(() => {
+  return (
+    items.find((item) => {
+      // Ignore free-item stock validation
+      // when backend sends 0/null stock
+      if (item.isFreeItem) {
+        const freeAvailable = item.availableQuantity;
+
+        if (
+          freeAvailable === null ||
+          freeAvailable === undefined ||
+          Number(freeAvailable) <= 0
+        ) {
+          return false;
+        }
+      }
+
+      const maxAllowed = getMaxAllowedQuantity(item);
+
+      return (
+        maxAllowed !== null &&
+        maxAllowed !== undefined &&
+        Number(item.quantity || 0) > Number(maxAllowed || 0)
+      );
+    }) || null
+  );
+}, [items]);
 
   const cocktailStockIssue = useMemo(() => {
     return (
@@ -272,6 +286,7 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
         const response = await Pubmenubuyservice.getByOrderNumber(orderNumber);
         const data = response?.data?.data || {};
         const rows = Array.isArray(data?.items) ? data.items : [];
+        console.log("[getByOrderNumber] FETCH RESPONSE", response.data);
         if (!ignore) {
           setOrderHeader(data?.header || null);
           const normalized = rows.map((item, index) => normalizeItem(item, index));
@@ -301,71 +316,113 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
     [items]
   );
 
-  const ensureOfferFreeRows = (nextItems) => {
-    if (!Array.isArray(nextItems) || nextItems.length === 0) return nextItems;
 
-    const parents = nextItems.filter((row) => !row?.isFreeItem);
-    const children = nextItems.filter((row) => row?.isFreeItem);
-    const hasChildForParent = new Set(
-      children.map((row) => String(row?.parentCode || "").trim()).filter(Boolean)
+const ensureOfferFreeRows = (nextItems) => {
+  if (!Array.isArray(nextItems) || nextItems.length === 0) {
+    return [];
+  }
+
+  // NEVER keep free rows with qty <= 0
+  const cleanedItems = nextItems.filter(
+    (row) => !(row?.isFreeItem && Number(row?.quantity || 0) <= 0)
+  );
+
+  const parents = cleanedItems.filter((row) => !row?.isFreeItem);
+
+  const children = cleanedItems.filter(
+    (row) => row?.isFreeItem
+  );
+
+  const hasChildForParent = new Set(
+    children
+      .map((row) => String(row?.parentCode || "").trim())
+      .filter(Boolean)
+  );
+
+  const insertionsByAfterId = new Map();
+
+  for (const parent of parents) {
+    const parentCode = String(parent?.item_code || "").trim();
+
+    if (!parentCode) continue;
+
+    const expectedFreeQty = calculateFreeQuantity(
+      parent?.quantity,
+      parent?.offer_quantity,
+      parent?.free_item_quantity
     );
 
-    const insertionsByAfterId = new Map();
-
-    for (const parent of parents) {
-      const parentCode = String(parent?.item_code || "").trim();
-      if (!parentCode) continue;
-      if (hasChildForParent.has(parentCode)) continue;
-
-      const expected =
-        Number(parent?.computed_free_item_quantity) > 0
-          ? Number(parent.computed_free_item_quantity)
-          : calculateFreeQuantity(parent?.quantity, parent?.offer_quantity, parent?.free_item_quantity);
-
-      const freeItemCode = Number(parent?.free_item_code || 0);
-      if (!Number.isFinite(expected) || expected <= 0) continue;
-      if (!Number.isFinite(freeItemCode) || freeItemCode <= 0) continue;
-
-      const afterId = Number(parent?.orderLineId ?? parent?.id) || 0;
-      const placeholderId = -Number(`${Date.now()}${Math.floor(Math.random() * 1000)}`);
-
-      const placeholder = {
-        id: placeholderId,
-        orderLineId: placeholderId,
-        item_code: String(freeItemCode),
-        item_name: "Free item",
-        quantity: expected,
-        unitPrice: 0,
-        subtotal: 0,
-        image: "",
-        card_text: `Name: Free item Quantity: ${expected}`,
-        availableQuantity: null,
-        parentCode,
-        isFreeItem: true,
-        offer_quantity: null,
-        free_item_quantity: null,
-        free_item_code: null,
-        computed_free_item_quantity: null,
-        subcategory: null,
-        stockStatus: null,
-        stockIssueMessage: null,
-      };
-
-      if (!insertionsByAfterId.has(afterId)) insertionsByAfterId.set(afterId, []);
-      insertionsByAfterId.get(afterId).push(placeholder);
+    // REMOVE FREE ITEM COMPLETELY
+    if (expectedFreeQty <= 0) {
+      continue;
     }
 
-    if (insertionsByAfterId.size === 0) return nextItems;
-
-    const merged = [];
-    for (const row of nextItems) {
-      merged.push(row);
-      const key = Number(row?.orderLineId ?? row?.id) || 0;
-      const toAdd = insertionsByAfterId.get(key);
-      if (toAdd?.length) merged.push(...toAdd);
+    // Already exists
+    if (hasChildForParent.has(parentCode)) {
+      continue;
     }
-    return merged;
-  };
+
+    const freeItemCode = Number(parent?.free_item_code || 0);
+
+    if (!Number.isFinite(freeItemCode) || freeItemCode <= 0) {
+      continue;
+    }
+
+    const afterId =
+      Number(parent?.orderLineId ?? parent?.id) || 0;
+
+    const placeholderId = -Date.now() - Math.floor(Math.random() * 1000);
+
+    const placeholder = {
+      id: placeholderId,
+      orderLineId: placeholderId,
+      item_code: String(freeItemCode),
+      item_name: "Free item",
+      quantity: expectedFreeQty,
+      unitPrice: 0,
+      subtotal: 0,
+      image: "",
+      card_text: `Name: Free item Quantity: ${expectedFreeQty}`,
+      availableQuantity: null,
+      parentCode,
+      isFreeItem: true,
+      offer_quantity: null,
+      free_item_quantity: null,
+      free_item_code: null,
+      computed_free_item_quantity: null,
+      subcategory: null,
+      stockStatus: null,
+      stockIssueMessage: null,
+    };
+
+    if (!insertionsByAfterId.has(afterId)) {
+      insertionsByAfterId.set(afterId, []);
+    }
+
+    insertionsByAfterId.get(afterId).push(placeholder);
+  }
+
+  const merged = [];
+
+  for (const row of cleanedItems) {
+    merged.push(row);
+
+    const key =
+      Number(row?.orderLineId ?? row?.id) || 0;
+
+    const toAdd = insertionsByAfterId.get(key);
+
+    if (toAdd?.length) {
+      merged.push(...toAdd);
+    }
+  }
+
+  return merged.filter(
+    (row) => !(row?.isFreeItem && Number(row?.quantity || 0) <= 0)
+  );
+};
+
+
 
   const calculateFreeQuantity = (paidQuantity, offerQuantity, freeItemQuantity) => {
     const paid = Number(paidQuantity || 0);
@@ -398,42 +455,10 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
     }
   };
 
-  const syncFreeItemQuantities = async (nextItems) => {
-    if (!orderNumber) return;
-
-    const parents = nextItems.filter((item) => !item.isFreeItem);
-    const children = nextItems.filter((item) => item.isFreeItem && item.parentCode);
-    if (children.length === 0) return;
-
-    const updates = [];
-
-    for (const parent of parents) {
-      const parentCode = String(parent.item_code || "").trim();
-      if (!parentCode) continue;
-
-      const linkedChildren = children.filter(
-        (child) => String(child.parentCode || "").trim() === parentCode
-      );
-      if (linkedChildren.length === 0) continue;
-
-      const desiredFreeQty = calculateFreeQuantity(
-        parent.quantity,
-        parent.offer_quantity,
-        parent.free_item_quantity
-      );
-      for (const child of linkedChildren) {
-        if (Number(child.quantity || 0) === desiredFreeQty) continue;
-        if (!Number.isFinite(Number(child.orderLineId)) || Number(child.orderLineId) <= 0) continue;
-        updates.push({
-          orderLineId: Number(child.orderLineId),
-          quantity: desiredFreeQty,
-        });
-      }
-    }
-
-    if (updates.length === 0) return;
-
-    await refreshOrderSummary();
+  const syncFreeItemQuantities = async () => {
+    // No-op by design.
+    // Free items are computed/persisted by the backend in `updateLineQuantity` and returned in its response.
+    // A follow-up refetch here can overwrite fresh local state with stale backend data under some conditions.
   };
 
   const adjustQuantity = async (orderLineId, delta) => {
@@ -500,43 +525,78 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
       const targetCode = String(targetItem.item_code || "").trim();
       const linkedFreeItems = targetCode
         ? current.filter(
-            (item) => item.isFreeItem && String(item.parentCode || "").trim() === targetCode
-          )
+          (item) => item.isFreeItem && String(item.parentCode || "").trim() === targetCode
+        )
         : [];
 
       for (const freeItem of linkedFreeItems) {
-        const freeAvailableQty = freeItem.availableQuantity;
+        // Ignore stale/placeholder/generated free rows
         if (
-          freeAvailableQty !== null &&
-          freeAvailableQty !== undefined &&
-          expectedFreeQty > Number(freeAvailableQty)
+          Number(freeItem?.quantity || 0) <= 0 ||
+          Number(freeItem?.orderLineId || 0) <= 0
         ) {
-          validationMessage = `Out of stock for free item. Available quantity: ${freeAvailableQty}`;
-          return current;
+          continue;
+        }
+
+        const freeAvailableQty = freeItem?.availableQuantity;
+
+        // Ignore invalid backend stock responses for free items
+        if (
+          freeAvailableQty === null ||
+          freeAvailableQty === undefined ||
+          Number(freeAvailableQty) <= 0
+        ) {
+          continue;
+        }
+
+        if (expectedFreeQty > Number(freeAvailableQty)) {
+          showToast(
+            `Out of stock for free item. Available quantity: ${freeAvailableQty}`,
+            "error"
+          );
+          return;
         }
       }
 
       nextQuantity = nextQtyCandidate;
 
-      const nextItems = current.map((item) => {
-        if (item.orderLineId === numericOrderLineId) {
-          const unitPrice = Number(
-            item.unitPrice || (currentQty > 0 ? item.subtotal / currentQty : 0) || 0
-          );
-          const nextSubtotal = Number((unitPrice * nextQtyCandidate).toFixed(2));
-          return { ...item, quantity: nextQtyCandidate, unitPrice, subtotal: nextSubtotal };
-        }
+      const nextItems = current
+        .map((item) => {
+          // Update parent item
+          if (item.orderLineId === numericOrderLineId) {
+            const unitPrice = Number(
+              item.unitPrice || (currentQty > 0 ? item.subtotal / currentQty : 0) || 0
+            );
 
-        if (
-          linkedFreeItems.length > 0 &&
-          item.isFreeItem &&
-          String(item.parentCode || "").trim() === targetCode
-        ) {
-          return { ...item, quantity: expectedFreeQty };
-        }
+            const nextSubtotal = Number((unitPrice * nextQtyCandidate).toFixed(2));
 
-        return item;
-      });
+            return {
+              ...item,
+              quantity: nextQtyCandidate,
+              unitPrice,
+              subtotal: nextSubtotal,
+            };
+          }
+
+          // Update linked free items
+          if (
+            item.isFreeItem &&
+            String(item.parentCode || "").trim() === targetCode
+          ) {
+            // REMOVE FREE ITEM COMPLETELY
+            if (expectedFreeQty <= 0) {
+              return null;
+            }
+
+            return {
+              ...item,
+              quantity: expectedFreeQty,
+            };
+          }
+
+          return item;
+        })
+        .filter(Boolean);
 
       // If the parent crosses the offer threshold, the linked free line may not exist yet.
       // Optimistically create a placeholder free row so the UI updates immediately; it will be
@@ -599,14 +659,15 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
       const response = await Pubmenubuyservice.updateLineQuantity(orderNumber, numericOrderLineId, nextQuantity);
       const data = response?.data?.data || {};
       const rows = Array.isArray(data?.items) ? data.items : [];
+      console.log("[updateLineQuantity] UPDATED RESPONSE", response.data);
       setOrderHeader(data?.header || null);
       const normalized = rows.map((item, index) => normalizeItem(item, index));
-      setItems(normalized);
+      setItems(ensureOfferFreeRows(normalized));
       setError("");
       showToast("Quantity updated successfully", "success");
       // The backend response already returns an updated order summary (including offer-linked free items).
       // Avoid an immediate refetch here; it can briefly reintroduce stale quantities in slow networks.
-      await syncFreeItemQuantities(normalized);
+      await syncFreeItemQuantities();
     } catch (updateError) {
       const message = updateError?.response?.data?.message || "Unable to update quantity.";
       setError(message);
@@ -615,8 +676,9 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
         const response = await Pubmenubuyservice.getByOrderNumber(orderNumber);
         const data = response?.data?.data || {};
         const rows = Array.isArray(data?.items) ? data.items : [];
+        console.log("[adjustQuantity error] FETCH RESPONSE", response.data);
         setOrderHeader(data?.header || null);
-        setItems(rows.map((item, index) => normalizeItem(item, index)));
+        setItems(ensureOfferFreeRows(rows.map((item, index) => normalizeItem(item, index))));
       } catch {
         // ignore refresh failure
       }
@@ -707,14 +769,30 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
       );
 
       for (const freeItem of linkedFreeItems) {
-        const freeAvailableQty = freeItem?.availableQuantity;
+        // Ignore stale/placeholder/generated free rows
         if (
-          freeAvailableQty !== null &&
-          freeAvailableQty !== undefined &&
-          Number.isFinite(Number(freeAvailableQty)) &&
-          expectedFreeQty > Number(freeAvailableQty)
+          Number(freeItem?.quantity || 0) <= 0 ||
+          Number(freeItem?.orderLineId || 0) <= 0
         ) {
-          showToast(`Out of stock for free item. Available quantity: ${freeAvailableQty}`, "error");
+          continue;
+        }
+
+        const freeAvailableQty = freeItem?.availableQuantity;
+
+        // Ignore invalid backend stock responses for free items
+        if (
+          freeAvailableQty === null ||
+          freeAvailableQty === undefined ||
+          Number(freeAvailableQty) <= 0
+        ) {
+          continue;
+        }
+
+        if (expectedFreeQty > Number(freeAvailableQty)) {
+          showToast(
+            `Out of stock for free item. Available quantity: ${freeAvailableQty}`,
+            "error"
+          );
           return;
         }
       }
@@ -802,239 +880,240 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
   };
 
   return (
-   <div className="min-h-screen bg-stone-50 px-3 py-4 md:px-6">
-     {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
-     <div className="mx-auto max-w-[1180px] space-y-4">
+    <div className="min-h-screen bg-stone-50 px-3 py-4 md:px-6">
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+      <div className="mx-auto max-w-[1180px] space-y-4">
         {/* Header */}
         <div className="overflow-hidden rounded-2xl border border-afmc-gold/20 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
-        <div className="bg-afmc-maroon px-5 py-5 text-white">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <p className="text-xs uppercase tracking-[0.18em] text-white/80">
-                Order Details
-              </p>
- 
-            </div>
- 
-            <div className="flex flex-wrap gap-2">
-              <ActionButton
-                onClick={() => (backTo ? navigate(backTo, { replace: true }) : navigate(-1))}
-                className="bg-white/15 px-4 py-2 hover:bg-white/25"
-              >
-                <ChevronLeft className="h-4 w-4" />
-                Back
-              </ActionButton>
- 
-              <ActionButton
-                onClick={handleConfirmOrder}
-                disabled={Boolean(stockIssue) || confirming || loading}
-                 className="bg-afmc-maroon px-4 py-2 text-white shadow-sm hover:bg-afmc-maroon/90 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <CheckCircle2 className="h-4 w-4" />
-                {confirming ? "Confirming..." : "Confirm"}
-              </ActionButton>
+          <div className="bg-afmc-maroon px-5 py-5 text-white">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-[0.18em] text-white/80">
+                  Order Details
+                </p>
 
-              <ActionButton
-                onClick={handleCancelOrder}
-                disabled={cancelling || loading}
-                className="bg-white/10 px-4 py-2 text-white shadow-sm ring-1 ring-white/25 hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <XCircle className="h-4 w-4" />
-                {cancelling ? "Cancelling..." : "Cancel"}
-              </ActionButton>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <ActionButton
+                  onClick={() => (backTo ? navigate(backTo, { replace: true }) : navigate(-1))}
+                  className="bg-white/15 px-4 py-2 hover:bg-white/25"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Back
+                </ActionButton>
+
+                <ActionButton
+                  onClick={handleConfirmOrder}
+                  disabled={Boolean(stockIssue) || confirming || loading}
+                  className="bg-afmc-maroon px-4 py-2 text-white shadow-sm hover:bg-afmc-maroon/90 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <CheckCircle2 className="h-4 w-4" />
+                  {confirming ? "Confirming..." : "Confirm"}
+                </ActionButton>
+
+                <ActionButton
+                  onClick={handleCancelOrder}
+                  disabled={cancelling || loading}
+                  className="bg-white/10 px-4 py-2 text-white shadow-sm ring-1 ring-white/25 hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <XCircle className="h-4 w-4" />
+                  {cancelling ? "Cancelling..." : "Cancel"}
+                </ActionButton>
+              </div>
             </div>
+          </div>
+
+          {/* Summary */}
+          <div className="grid gap-3 border-t border-stone-200 bg-white p-4 md:grid-cols-3">
+            <div className="rounded-xl border border-stone-200 bg-white p-3">
+              <p className="text-xs text-stone-500">Order Number</p>
+
+              <h3 className="mt-1 text-xl font-semibold text-stone-900">
+                {orderHeader?.order_num || orderNumber}
+              </h3>
+            </div>
+
+            <div className="rounded-xl border border-stone-200 bg-white p-3">
+              <p className="text-xs text-stone-500">Order Date</p>
+
+              <h3 className="mt-1 text-xl font-semibold text-stone-900">
+                {formatDate(orderHeader?.order_date)}
+              </h3>
+            </div>
+
+
           </div>
         </div>
 
-        {/* Summary */}
-        <div className="grid gap-3 border-t border-stone-200 bg-white p-4 md:grid-cols-3">
-          <div className="rounded-xl border border-stone-200 bg-white p-3">
-            <p className="text-xs text-stone-500">Order Number</p>
+        {/* Content */}
+        <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
+          {loading ? (
+            <div className="py-16 text-center text-sm text-stone-500">
+              Loading order details...
+            </div>
+          ) : error ? (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+              {error}
+            </div>
+          ) : stockIssueMessage ? (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {stockIssueMessage}
+            </div>
+          ) : items.length === 0 ? (
+            <div className="py-16 text-center text-sm text-stone-500">
+              No items found for this order.
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* Products */}
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {items
+                  .filter((item) => Number(item.quantity || 0) > 0)
+                  .map((item) => (
+                    <div
+                      key={item.orderLineId ?? item.id}
+                      className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                    >
+                      {/* Image */}
+                      <div className="flex h-40 items-center justify-center bg-stone-50 p-4">
+                        <img
+                          src={`${BASEAPI}${item.image || "default.jpg"}`}
+                          alt={item.item_name}
+                          className="max-h-full w-auto object-contain"
+                        />
+                      </div>
 
-            <h3 className="mt-1 text-xl font-semibold text-stone-900">
-              {orderHeader?.order_num || orderNumber}
-            </h3>
-          </div>
+                      {/* Details */}
+                      <div className="space-y-3 p-4">
+                        <div>
+                          <h3 className="line-clamp-1 text-base font-semibold text-stone-900">
+                            {item.item_name}
+                          </h3>
 
-          <div className="rounded-xl border border-stone-200 bg-white p-3">
-            <p className="text-xs text-stone-500">Order Date</p>
-
-            <h3 className="mt-1 text-xl font-semibold text-stone-900">
-              {formatDate(orderHeader?.order_date)}
-            </h3>
-          </div>
-
-          
-        </div>
-      </div>
-
-       {/* Content */}
-       <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
-         {loading ? (
-           <div className="py-16 text-center text-sm text-stone-500">
-             Loading order details...
-           </div>
-        ) : error ? (
-          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
-            {error}
-          </div>
-         ) : stockIssueMessage ? (
-           <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-             {stockIssueMessage}
-           </div>
-         ) : items.length === 0 ? (
-           <div className="py-16 text-center text-sm text-stone-500">
-             No items found for this order.
-           </div>
-        ) : (
-          <div className="space-y-4">
-            {/* Products */}
-             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {items.map((item) => (
-                  <div
-                    key={item.orderLineId ?? item.id}
-                    className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-                  >
-                    {/* Image */}
-                   <div className="flex h-40 items-center justify-center bg-stone-50 p-4">
-                      <img
-                        src={`${BASEAPI}${item.image || "default.jpg"}`}
-                        alt={item.item_name}
-                        className="max-h-full w-auto object-contain"
-                      />
-                  </div>
-
-                  {/* Details */}
-                  <div className="space-y-3 p-4">
-                    <div>
-                      <h3 className="line-clamp-1 text-base font-semibold text-stone-900">
-                        {item.item_name}
-                      </h3>
-
-                      <p className="mt-1 text-sm text-stone-500">
-                        Quantity: {item.quantity}{item.isFreeItem ? " (Free)" : ""}
-                      </p>
-                      {isCocktailOrMocktail(item) && item.stockStatus && (
-                        <p className={`mt-1 text-xs font-semibold ${String(item.stockStatus).toLowerCase() === "out of stock" ? "text-red-600" : "text-green-700"}`}>
-                          {item.stockStatus}
-                        </p>
-                      )}
-                      {isCocktailOrMocktail(item) && item.stockIssueMessage && (
-                        <p className="mt-1 text-xs font-semibold text-red-600">
-                          {item.stockIssueMessage}
-                        </p>
-                      )}
-                      {item.availableQuantity !== null && item.availableQuantity !== undefined && (
-                        <p className="mt-1 text-xs text-stone-400">
-                          Available: {item.availableQuantity}
-                        </p>
-                      )}
-                      {item.availableQuantity !== null &&
-                        item.availableQuantity !== undefined &&
-                        Number(item.quantity || 0) > Number(item.availableQuantity || 0) && (
-                          <p className="mt-1 text-xs font-semibold text-red-600">
-                            Out of stock for this quantity
+                          <p className="mt-1 text-sm text-stone-500">
+                            Quantity: {item.quantity}{item.isFreeItem ? " (Free)" : ""}
                           </p>
-                        )}
-                    </div>
-
-                     {/* Controls */}
-                     {!item.isFreeItem ? (
-                     <div className="flex items-center justify-between rounded-xl bg-stone-50 px-3 py-2">
-                       <div className="flex items-center gap-1">
-                           <button
-                              type="button"
-                              onClick={() => handleQtyClick(item, -1)}
-                              aria-disabled={updatingLineId === Number(item.orderLineId ?? item.id) || item.quantity <= 1}
-                              disabled={updatingLineId === Number(item.orderLineId ?? item.id) || item.quantity <= 1}
-                              className={`rounded-md bg-white p-1.5 text-stone-700 shadow-sm transition hover:bg-stone-100 ${
-                                updatingLineId === Number(item.orderLineId ?? item.id) || item.quantity <= 1
-                                  ? "opacity-50"
-                                  : ""
-                              }`}
-                            >
-                             <Minus className="h-4 w-4" />
-                           </button>
-
-                        <span className="min-w-[28px] text-center text-sm font-semibold text-stone-900">
-                          {item.quantity}
-                        </span>
-
-                             <button
-                               type="button"
-                               onClick={() => handleQtyClick(item, 1)}
-                               aria-disabled={
-                                 updatingLineId === Number(item.orderLineId ?? item.id) ||
-                                 String(item.stockIssueMessage || "").trim().length > 0 ||
-                                 isOutOfStock(item) ||
-                                 (() => {
-                                   const maxAllowed = getMaxAllowedQuantity(item);
-                                   return (
-                                     Number.isFinite(Number(maxAllowed)) &&
-                                     Number(maxAllowed) >= 0 &&
-                                     Number(item.quantity || 0) >= Number(maxAllowed)
-                                   );
-                                 })() ||
-                                 item.quantity >= MAX_QTY
-                               }
-                               disabled={
-                                 updatingLineId === Number(item.orderLineId ?? item.id) ||
-                                 String(item.stockIssueMessage || "").trim().length > 0 ||
-                                 isOutOfStock(item) ||
-                                 (() => {
-                                   const maxAllowed = getMaxAllowedQuantity(item);
-                                   return (
-                                     Number.isFinite(Number(maxAllowed)) &&
-                                     Number(maxAllowed) >= 0 &&
-                                     Number(item.quantity || 0) >= Number(maxAllowed)
-                                   );
-                                 })() ||
-                                 item.quantity >= MAX_QTY
-                               }
-                                className={`rounded-md bg-afmc-maroon p-1.5 text-white transition hover:bg-afmc-maroon2 ${
-                                  updatingLineId === Number(item.orderLineId ?? item.id) ||
-                                 String(item.stockIssueMessage || "").trim().length > 0 ||
-                                 isOutOfStock(item) ||
-                                 (() => {
-                                   const maxAllowed = getMaxAllowedQuantity(item);
-                                   return (
-                                     Number.isFinite(Number(maxAllowed)) &&
-                                     Number(maxAllowed) >= 0 &&
-                                     Number(item.quantity || 0) >= Number(maxAllowed)
-                                   );
-                                 })() ||
-                                  item.quantity >= MAX_QTY
-                                    ? "opacity-60"
-                                    : ""
-                                }`}
-                              >
-                              <Plus className="h-4 w-4" />
-                            </button>
+                          {isCocktailOrMocktail(item) && item.stockStatus && (
+                            <p className={`mt-1 text-xs font-semibold ${String(item.stockStatus).toLowerCase() === "out of stock" ? "text-red-600" : "text-green-700"}`}>
+                              {item.stockStatus}
+                            </p>
+                          )}
+                          {isCocktailOrMocktail(item) && item.stockIssueMessage && (
+                            <p className="mt-1 text-xs font-semibold text-red-600">
+                              {item.stockIssueMessage}
+                            </p>
+                          )}
+                          {item.availableQuantity !== null && item.availableQuantity !== undefined && (
+                            <p className="mt-1 text-xs text-stone-400">
+                              Available: {item.availableQuantity}
+                            </p>
+                          )}
+                          {!item.isFreeItem &&
+ item.availableQuantity !== null &&
+ item.availableQuantity !== undefined &&
+ Number(item.quantity || 0) > Number(item.availableQuantity || 0) && (
+   <p className="mt-1 text-xs font-semibold text-red-600">
+     Out of stock for this quantity
+   </p>
+)}
                         </div>
 
-                      <button
-                        type="button"
-                        onClick={() => removeItem(item.id)}
-                        className="rounded-md bg-red-50 p-1.5 text-red-600 transition hover:bg-red-100"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                    ) : (
-                      <div className="rounded-xl bg-stone-50 px-3 py-2 text-xs font-medium text-stone-600">
-                        Free item
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
+                        {/* Controls */}
+                        {!item.isFreeItem ? (
+                          <div className="flex items-center justify-between rounded-xl bg-stone-50 px-3 py-2">
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleQtyClick(item, -1)}
+                                aria-disabled={updatingLineId === Number(item.orderLineId ?? item.id) || item.quantity <= 1}
+                                disabled={updatingLineId === Number(item.orderLineId ?? item.id) || item.quantity <= 1}
+                                className={`rounded-md bg-white p-1.5 text-stone-700 shadow-sm transition hover:bg-stone-100 ${updatingLineId === Number(item.orderLineId ?? item.id) || item.quantity <= 1
+                                    ? "opacity-50"
+                                    : ""
+                                  }`}
+                              >
+                                <Minus className="h-4 w-4" />
+                              </button>
 
-           
-          </div>
-        )}
+                              <span className="min-w-[28px] text-center text-sm font-semibold text-stone-900">
+                                {item.quantity}
+                              </span>
+
+                              <button
+                                type="button"
+                                onClick={() => handleQtyClick(item, 1)}
+                                aria-disabled={
+                                  updatingLineId === Number(item.orderLineId ?? item.id) ||
+                                  String(item.stockIssueMessage || "").trim().length > 0 ||
+                                  isOutOfStock(item) ||
+                                  (() => {
+                                    const maxAllowed = getMaxAllowedQuantity(item);
+                                    return (
+                                      Number.isFinite(Number(maxAllowed)) &&
+                                      Number(maxAllowed) >= 0 &&
+                                      Number(item.quantity || 0) >= Number(maxAllowed)
+                                    );
+                                  })() ||
+                                  item.quantity >= MAX_QTY
+                                }
+                                disabled={
+                                  updatingLineId === Number(item.orderLineId ?? item.id) ||
+                                  String(item.stockIssueMessage || "").trim().length > 0 ||
+                                  isOutOfStock(item) ||
+                                  (() => {
+                                    const maxAllowed = getMaxAllowedQuantity(item);
+                                    return (
+                                      Number.isFinite(Number(maxAllowed)) &&
+                                      Number(maxAllowed) >= 0 &&
+                                      Number(item.quantity || 0) >= Number(maxAllowed)
+                                    );
+                                  })() ||
+                                  item.quantity >= MAX_QTY
+                                }
+                                className={`rounded-md bg-afmc-maroon p-1.5 text-white transition hover:bg-afmc-maroon2 ${updatingLineId === Number(item.orderLineId ?? item.id) ||
+                                    String(item.stockIssueMessage || "").trim().length > 0 ||
+                                    isOutOfStock(item) ||
+                                    (() => {
+                                      const maxAllowed = getMaxAllowedQuantity(item);
+                                      return (
+                                        Number.isFinite(Number(maxAllowed)) &&
+                                        Number(maxAllowed) >= 0 &&
+                                        Number(item.quantity || 0) >= Number(maxAllowed)
+                                      );
+                                    })() ||
+                                    item.quantity >= MAX_QTY
+                                    ? "opacity-60"
+                                    : ""
+                                  }`}
+                              >
+                                <Plus className="h-4 w-4" />
+                              </button>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => removeItem(item.id)}
+                              className="rounded-md bg-red-50 p-1.5 text-red-600 transition hover:bg-red-100"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="rounded-xl bg-stone-50 px-3 py-2 text-xs font-medium text-stone-600">
+                            Free item
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+              </div>
+
+
+            </div>
+          )}
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
 }
