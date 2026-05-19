@@ -24,6 +24,44 @@ function getBuyflowOverrideDetails(orderNumber, itemCode) {
   }
 }
 
+function getBuyflowOverrideStorageKey(orderNumber, itemCode) {
+  const safeOrder = String(orderNumber || "").trim();
+  const safeItemCode = String(itemCode || "").trim();
+  if (!safeOrder || !safeItemCode) return "";
+  return `afmc-buyflow-custom:${safeOrder}:${safeItemCode}`;
+}
+
+function buildCocktailCustomizationPayload(orderNumber, items) {
+  return (Array.isArray(items) ? items : [])
+    .filter((item) => isCocktailOrMocktail(item))
+    .map((item) => {
+      const itemCode = String(item?.item_code || "").trim();
+      const details = getBuyflowOverrideDetails(orderNumber, itemCode);
+
+      if (!itemCode || !Array.isArray(details) || details.length === 0) {
+        return null;
+      }
+
+      const ingredients = details
+        .map((detail) => ({
+          itemCode: Number(detail.ITEM_CODE ?? detail.itemCode),
+          itemName: detail.ITEM_NAME ?? detail.itemName ?? "",
+          quantity: Number(detail.PEGS ?? detail.pegs ?? detail.QUANTITY ?? detail.quantity ?? 0),
+        }))
+        .filter((ingredient) => Number.isFinite(ingredient.itemCode) && ingredient.itemCode > 0 && ingredient.quantity > 0);
+
+      if (ingredients.length === 0) {
+        return null;
+      }
+
+      return {
+        itemCode: Number(itemCode),
+        ingredients,
+      };
+    })
+    .filter(Boolean);
+}
+
 function Toast({ message, type = "success", onClose }) {
   const [isVisible, setIsVisible] = useState(true);
 
@@ -978,7 +1016,17 @@ const ensureOfferFreeRows = (nextItems) => {
     try {
       setConfirming(true);
       setError("");
-      await ConfirmOrderservice.confirmOrder(orderNumber);
+      const cocktailCustomizations = buildCocktailCustomizationPayload(orderNumber, items);
+      await ConfirmOrderservice.confirmOrder(
+        orderNumber,
+        cocktailCustomizations.length > 0 ? { cocktailCustomizations } : {}
+      );
+      cocktailCustomizations.forEach((customization) => {
+        const key = getBuyflowOverrideStorageKey(orderNumber, customization.itemCode);
+        if (key) {
+          localStorage.removeItem(key);
+        }
+      });
       if (afterConfirmTo) {
         navigate(`${afterConfirmTo}?orderNumber=${encodeURIComponent(orderNumber)}`, {
           state: { orderNumber },

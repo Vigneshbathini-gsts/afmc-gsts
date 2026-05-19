@@ -164,6 +164,140 @@ async function getCocktailMaxQuantityMap(connection, orderNumber, parentItemIds)
   return maxMap;
 }
 
+function normalizeCocktailCustomizations(payload) {
+  const rawCustomizations =
+    Array.isArray(payload?.cocktailCustomizations)
+      ? payload.cocktailCustomizations
+      : Array.isArray(payload?.customizations)
+        ? payload.customizations
+        : [];
+
+  return rawCustomizations
+    .map((customization) => {
+      const parentItemCode = Number(
+        customization?.itemCode ??
+        customization?.ITEM_CODE ??
+        customization?.parentItemCode ??
+        customization?.inventoryItemCode
+      );
+
+      const ingredients = (Array.isArray(customization?.ingredients) ? customization.ingredients : [])
+        .map((ingredient) => ({
+          itemCode: Number(ingredient?.itemCode ?? ingredient?.ITEM_CODE),
+          itemName: String(ingredient?.itemName ?? ingredient?.ITEM_NAME ?? "").trim(),
+          quantity: Number(ingredient?.quantity ?? ingredient?.QUANTITY ?? ingredient?.pegs ?? ingredient?.PEGS),
+        }))
+        .filter((ingredient) =>
+          Number.isFinite(ingredient.itemCode) &&
+          ingredient.itemCode > 0 &&
+          Number.isFinite(ingredient.quantity) &&
+          ingredient.quantity > 0
+        );
+
+      if (!Number.isFinite(parentItemCode) || parentItemCode <= 0 || ingredients.length === 0) {
+        return null;
+      }
+
+      return { parentItemCode, ingredients };
+    })
+    .filter(Boolean);
+}
+
+async function applyCocktailCustomizations(connection, {
+  orderNumber,
+  userId,
+  createdBy,
+  detailRows,
+  payload,
+}) {
+  const customizations = normalizeCocktailCustomizations(payload);
+  if (customizations.length === 0) return;
+
+  const cocktailRowsByItemCode = new Map(
+    (Array.isArray(detailRows) ? detailRows : [])
+      .filter((row) => [14, 15].includes(Number(row.sub_category)))
+      .map((row) => [Number(row.item_id), row])
+  );
+
+  const ingredientCodes = [
+    ...new Set(
+      customizations
+        .flatMap((customization) => customization.ingredients.map((ingredient) => ingredient.itemCode))
+        .filter((code) => Number.isFinite(code) && code > 0)
+    ),
+  ];
+
+  let inventoryNameByCode = new Map();
+  if (ingredientCodes.length > 0) {
+    const placeholders = ingredientCodes.map(() => "?").join(",");
+    const [inventoryRows] = await connection.execute(
+      `
+        SELECT item_code, item_name
+        FROM xxafmc_inventory
+        WHERE item_code IN (${placeholders})
+      `,
+      ingredientCodes
+    );
+    inventoryNameByCode = inventoryRows.reduce((map, row) => {
+      map.set(Number(row.item_code), String(row.item_name || "").trim());
+      return map;
+    }, new Map());
+  }
+
+  for (const customization of customizations) {
+    const parentRow = cocktailRowsByItemCode.get(customization.parentItemCode);
+    if (!parentRow) {
+      const error = new Error("Invalid cocktail/mocktail customization for this order");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    await connection.execute(
+      `
+        DELETE FROM xxafmc_custom_cocktails_mocktails_details
+        WHERE order_number = ?
+          AND inventory_item_code = ?
+      `,
+      [orderNumber, customization.parentItemCode]
+    );
+
+    await connection.execute(
+      `
+        DELETE FROM xxafmc_custom_cocktails_mocktails_details_dummy
+        WHERE order_number = ?
+          AND inventory_item_code = ?
+      `,
+      [orderNumber, customization.parentItemCode]
+    );
+
+    for (const ingredient of customization.ingredients) {
+      const itemName =
+        inventoryNameByCode.get(ingredient.itemCode) ||
+        ingredient.itemName ||
+        String(ingredient.itemCode);
+
+      await connection.execute(
+        `
+          INSERT INTO xxafmc_custom_cocktails_mocktails_details
+            (item_code, item_name, pegs, inventory_item_code, user_id, quantity, order_number, created_by, creation_date)
+          VALUES
+            (?, ?, ?, ?, ?, ?, ?, ?, NOW())
+        `,
+        [
+          ingredient.itemCode,
+          itemName,
+          ingredient.quantity,
+          customization.parentItemCode,
+          userId,
+          Number(parentRow.quantity || 1),
+          orderNumber,
+          createdBy,
+        ]
+      );
+    }
+  }
+}
+
 async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
   const normalizedOrderNumber = Number(orderNumber);
   if (!Number.isFinite(normalizedOrderNumber) || normalizedOrderNumber <= 0) {
@@ -358,6 +492,14 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
       .filter((row) => [14, 15].includes(Number(row.sub_category)))
       .map((row) => Number(row.item_id))
       .filter((code) => Number.isFinite(code) && code > 0))];
+
+    await applyCocktailCustomizations(connection, {
+      orderNumber: normalizedOrderNumber,
+      userId: notificationUserId,
+      createdBy,
+      detailRows,
+      payload,
+    });
 
     const cocktailMaxMap = await getCocktailMaxQuantityMap(connection, normalizedOrderNumber, cocktailItemIds);
 
