@@ -299,6 +299,7 @@ getCancelledOrders: (params) => api.get("/bar-orders/cancelled-orders", { params
 getOrderHistory: (params) => api.get("/bar-orders/order-history", { params }),
 getOrderDetailsByOrderNumber: (orderNumber, kitchen) => api.get(`/bar-orders/cancelled-order-details/${orderNumber}`, { params: { kitchen } }),
 getOrderHistoryItemDetails: (orderNumber, kitchen) => api.get(`/bar-orders/order-history-details/${orderNumber}`, { params: { kitchen } }),
+completeOrder: (data) => api.post("/bar-orders/completeOrder", data),
 
 };
 // ================================

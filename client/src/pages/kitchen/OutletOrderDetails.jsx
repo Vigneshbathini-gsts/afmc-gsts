@@ -410,15 +410,28 @@ export default function OutletOrderDetails() {
 
   // Complete order
   const handleCompleteOrder = async () => {
-    const totalOrderedQty = items.reduce((sum, item) => sum + (item.quantity || 0), 0);
-    const totalScannedQty = scannedItems.reduce((sum, item) => sum + Number(item.scanQuantity || 0), 0);
+    const totalOrderedQty = items.reduce(
+      (sum, item) => sum + Number(item.quantity || 0),
+      0
+    );
+
+    const totalScannedQty = scannedItems.reduce(
+      (sum, item) => sum + Number(item.scanQuantity || 0),
+      0
+    );
 
     if (totalScannedQty < totalOrderedQty) {
-      alert(`Cannot complete order. Only ${totalScannedQty} of ${totalOrderedQty} items scanned.`);
+      alert(
+        `Cannot complete order. Only ${totalScannedQty} of ${totalOrderedQty} items scanned.`
+      );
       return;
     }
 
-    if (window.confirm(`Are you sure you want to complete Order #${orderData.ORDERNUMBER}?`)) {
+    if (
+      window.confirm(
+        `Are you sure you want to complete Order #${orderData.ORDERNUMBER}?`
+      )
+    ) {
       try {
         setCompleting(true);
         await barOrdersAPI.updateStatus({
@@ -426,11 +439,26 @@ export default function OutletOrderDetails() {
           KITCHEN: department,
           STATUS: "Completed",
         });
+
+        // 1st API
+        await barOrdersAPI.completeOrder({
+          ORDERNUMBER: orderData.ORDERNUMBER,
+          KITCHEN: department,
+          STATUS: "Completed",
+        });
+
+
+
         alert("Order completed successfully!");
         navigate(-1);
+
       } catch (error) {
         console.error("Error completing order:", error);
-        alert("Failed to complete order. Please try again.");
+
+        alert(
+          error?.response?.data?.message ||
+          "Failed to complete order. Please try again."
+        );
       } finally {
         setCompleting(false);
       }
@@ -518,21 +546,21 @@ export default function OutletOrderDetails() {
         <div className="bg-white/80 border border-white/60 rounded-3xl shadow-xl backdrop-blur-sm p-5">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
-              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider">Order Number</label>
+              <label className="block text-xs font-medium text-gray-500   tracking-wider">Order Number</label>
               <div className="text-lg font-semibold text-gray-900">{orderData.ORDERNUMBER}</div>
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider">Name</label>
+              <label className="block text-xs font-medium text-gray-500   tracking-wider">Name</label>
               <div className="text-gray-800">{orderedBy || orderData.FIRST_NAME || "Naveen Member"}</div>
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</label>
+              <label className="block text-xs font-medium text-gray-500   tracking-wider">Quantity</label>
               <div className="text-gray-800">
                 {totalOrderedQty} {totalScannedQty > 0 && `(Scanned: ${totalScannedQty})`}
               </div>
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider">Status</label>
+              <label className="block text-xs font-medium text-gray-500   tracking-wider">Status</label>
               <div className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${isComplete ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>
                 {isComplete ? "Ready to Complete" : `${totalOrderedQty - totalScannedQty} item(s) remaining`}
               </div>
@@ -553,12 +581,12 @@ export default function OutletOrderDetails() {
                 <table className="min-w-full">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item Name</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ordered (Paid + Free)</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Scanned</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Remaining</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
-                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Cancel</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500  ">Item Name</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500  ">Ordered (Paid + Free)</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500  ">Scanned</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500  ">Remaining</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500  ">Type</th>
+                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500  ">Cancel</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -646,8 +674,8 @@ export default function OutletOrderDetails() {
                       onClick={scanning ? stopScanner : startScanner}
                       disabled={processingScan}
                       className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg transition text-white font-medium disabled:opacity-50 ${scanning
-                          ? "bg-gray-700 hover:bg-gray-800"
-                          : "bg-afmc-maroon hover:bg-afmc-maroon2"
+                        ? "bg-gray-700 hover:bg-gray-800"
+                        : "bg-afmc-maroon hover:bg-afmc-maroon2"
                         }`}
                     >
                       <FaCamera /> {scanning ? "Stop Camera" : "Start Camera"}
@@ -724,12 +752,12 @@ export default function OutletOrderDetails() {
                 <table className="min-w-full">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item Code</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item Name</th>
-                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Qty</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Price</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Barcode</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500  ">Item Code</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500  ">Item Name</th>
+                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500  ">Qty</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500  ">Time</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500  ">Price</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500  ">Barcode</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -763,15 +791,15 @@ export default function OutletOrderDetails() {
               </div>
               <div className="p-6 space-y-4">
                 <div className="bg-gray-50 rounded-lg p-4">
-                  <p className="text-xs text-gray-400 uppercase tracking-wider">Item Code</p>
+                  <p className="text-xs text-gray-400   tracking-wider">Item Code</p>
                   <p className="mt-1 font-mono text-lg font-semibold text-gray-800">{itemCode || "-"}</p>
                 </div>
                 <div className="bg-gray-50 rounded-lg p-4">
-                  <p className="text-xs text-gray-400 uppercase tracking-wider">Item Name</p>
+                  <p className="text-xs text-gray-400   tracking-wider">Item Name</p>
                   <p className="mt-1 font-medium text-gray-800">{itemName ? toInitCap(itemName) : "-"}</p>
                 </div>
                 <div className="bg-gray-50 rounded-lg p-4">
-                  <p className="text-xs text-gray-400 uppercase tracking-wider">Price</p>
+                  <p className="text-xs text-gray-400   tracking-wider">Price</p>
                   <p className="mt-1 font-semibold text-gray-800">{price ? `Rs ${price}` : "-"}</p>
                 </div>
               </div>

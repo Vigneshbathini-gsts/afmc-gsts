@@ -163,6 +163,7 @@ exports.updateBarOrderStatus = async (req, res) => {
   let connection;
   try {
     const { ORDERNUMBER, KITCHEN = "Bar", STATUS = "Preparing" } = req.body;
+
     const appUser = getRequestUsername(req);
 
     if (!ORDERNUMBER) {
@@ -840,7 +841,7 @@ exports.processBarcodeScan = async (req, res) => {
     for (const comp of componentsWithRemaining) {
       if (reqQtyLeft <= 0) break;
       const qtyToAdd = Math.min(reqQtyLeft, comp.coll_qty);
-      
+
       let finalPrice = calculatedPaidPrice;
       let isFree = false;
 
@@ -849,10 +850,10 @@ exports.processBarcodeScan = async (req, res) => {
         finalPrice = 0;
         isFree = true;
         if (!comp.free_item_quantity) {
-           await connection.query(
-             `UPDATE xxafmc_order_details SET free_item_quantity = '1' WHERE order_line_id = ?`,
-             [comp.order_line_id]
-           );
+          await connection.query(
+            `UPDATE xxafmc_order_details SET free_item_quantity = '1' WHERE order_line_id = ?`,
+            [comp.order_line_id]
+          );
         }
       }
 
@@ -1235,7 +1236,7 @@ exports.getCancelledOrders = async (req, res) => {
       END
     `;
 
-   const query = `
+    const query = `
   SELECT 
       xxkn.order_num,
       xxkn.order_date,
@@ -1338,7 +1339,7 @@ exports.getOrderHistory = async (req, res) => {
       END
     `;
 
-   const query = `
+    const query = `
     SELECT 
   kn.ordernumber AS order_num,
   nm.order_date,
@@ -1426,7 +1427,7 @@ LIMIT ? OFFSET ?
     const queryParams = [categoryId, from, to, String(limitNum), String(offset)];
 
     const [rows] = await pool.execute(query, queryParams);
-    console.log(rows);
+
 
     res.json({
       success: true,
@@ -1536,7 +1537,6 @@ exports.getOrderHistoryItemDetails = async (req, res) => {
     const [totalResult] = await pool.execute(totalQuery, [orderNumber, categoryId]);
 
     const totalAmount = totalResult[0]?.total_amount || 0;
-    console.log(`Fetched ${items.length} items for order ${orderNumber} with total amount ${totalAmount}`);
     res.json({
       success: true,
       data: {
@@ -1617,6 +1617,86 @@ exports.getOrderDetailsByOrderNumber = async (req, res) => {
   } finally {
     if (connection) {
 
+      connection.release();
+    }
+  }
+};
+
+
+exports.completeOrder = async (req, res) => {
+  let connection;
+
+  try {
+    const {
+      ORDERNUMBER,
+      KITCHEN = "Bar",
+      STATUS = "Completed"
+    } = req.body;
+
+
+
+    if (!ORDERNUMBER) {
+      return res.status(400).json({
+        success: false,
+        message: "Order number is required"
+      });
+    }
+
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    // 1. Update order header
+    const [headerResult] = await connection.query(
+      `
+      UPDATE xxafmc_order_header
+      SET 
+        order_status = ?,
+        kitchen_type = ?,
+        order_total = (
+          SELECT ROUND(SUM(IFNULL(subtotal, 0)), 2)
+          FROM xxafmc_order_details
+          WHERE order_id = ?
+            AND TRIM(UPPER(IFNULL(order_status, ''))) != 'CANCELLED'
+        )
+      WHERE order_num = ?
+      `,
+      [
+        STATUS,
+        KITCHEN,
+        ORDERNUMBER,
+        ORDERNUMBER
+      ]
+    );
+
+
+
+    await connection.commit();
+
+    return res.status(200).json({
+      success: true,
+      message:
+        headerResult.affectedRows > 0
+          ? "Order completed successfully"
+          : "No order found"
+    });
+
+  } catch (error) {
+    if (connection) {
+      try {
+        await connection.rollback();
+      } catch (_) { }
+    }
+
+    console.error("Error completing order:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to complete order",
+      error: error.message
+    });
+
+  } finally {
+    if (connection) {
       connection.release();
     }
   }
