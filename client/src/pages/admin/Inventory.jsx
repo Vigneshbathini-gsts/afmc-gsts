@@ -82,6 +82,7 @@ export default function Inventory() {
   const [error, setError] = useState("");
   const [addItemError, setAddItemError] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showLowerSection, setShowLowerSection] = useState(false);
   const [showStockModal, setShowStockModal] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
   const [isAddCategoryDropdownOpen, setIsAddCategoryDropdownOpen] = useState(false);
@@ -106,8 +107,6 @@ export default function Inventory() {
   const [imagePreviewUrl, setImagePreviewUrl] = useState("");
   const [imageCacheBusters, setImageCacheBusters] = useState({});
   const [scannerOpen, setScannerOpen] = useState(false);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
   const [imageForm, setImageForm] = useState({
     itemCode: "",
     itemName: "",
@@ -357,14 +356,6 @@ export default function Inventory() {
 
   const allAcUnitOptions = useMemo(() => ["Nos", "Pegs", "Glass", "Mug", "Can"], []);
 
-  const PAGE_SIZE_OPTIONS = useMemo(() => [5, 10, 25, 50], []);
-
-  const totalPages = useMemo(() => Math.max(1, Math.ceil(inventory.length / pageSize)), [inventory.length, pageSize]);
-  const pageStartIndex = useMemo(() => (page - 1) * pageSize, [page, pageSize]);
-  const paginatedInventory = useMemo(() => inventory.slice(pageStartIndex, pageStartIndex + pageSize), [inventory, pageStartIndex, pageSize]);
-  const showingFrom = useMemo(() => (inventory.length === 0 ? 0 : pageStartIndex + 1), [inventory.length, pageStartIndex]);
-  const showingTo = useMemo(() => Math.min(pageStartIndex + pageSize, inventory.length), [pageStartIndex, pageSize, inventory.length]);
-
   const acUnitOptions = useMemo(() => {
     const allowed = getAllowedAcUnits(formValues.categoryId, formValues.subCategory);
     if (allowed.length === 0) return allAcUnitOptions;
@@ -383,10 +374,6 @@ export default function Inventory() {
       setFormValues((prev) => ({ ...prev, acUnit: allowed[0] }));
     }
   }, [formValues.categoryId, formValues.subCategory, formValues.acUnit]);
-
-  useEffect(() => {
-    setPage(1);
-  }, [categoryId, itemCode, search, inventory]);
 
   const formatDate = (date) => {
     const d = date instanceof Date ? date : new Date(date);
@@ -500,6 +487,7 @@ export default function Inventory() {
     setStockError("");
     setStockInfo("");
     setStockRows([]);
+    setShowLowerSection(false);
     setStockRowSearch("");
     const normalizedType = normalizeStockType(row.ac_unit);
     setStockForm({
@@ -604,13 +592,14 @@ export default function Inventory() {
       },
     ]);
 
+    setShowLowerSection(true);
     setStockInfo("Stock row staged.");
 
     setStockForm((prev) => ({
       ...prev,
       barcode: "",
     }));
-  }, [stockForm, stockRows]);
+  }, [stockForm, stockRows, setShowLowerSection]);
 
   const handleStageStock = async () => {
     await stageStockRow(stockForm.barcode);
@@ -640,6 +629,7 @@ export default function Inventory() {
 
   const handleCancelStockRows = () => {
     setStockRows([]);
+    setShowLowerSection(false);
     setStockRowSearch("");
     setStockError("");
   };
@@ -1051,7 +1041,7 @@ export default function Inventory() {
                       </td>
                     </tr>
                   ) : (
-                    paginatedInventory.map((row) => (
+                    inventory.map((row) => (
                       <tr
                         key={row.item_id}
                         className="border-t border-gray-100 hover:bg-afmc-gold/10 transition-colors"
@@ -1087,81 +1077,28 @@ export default function Inventory() {
                 </tbody>
               </table>
             </div>
-
-            <div className="mt-4 flex flex-col gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                Showing {showingFrom} to {showingTo} of {inventory.length} items
-              </div>
-
-              <div className="flex flex-wrap items-center gap-3">
-                <select
-                  value={pageSize}
-                  onChange={(event) => setPageSize(Number(event.target.value))}
-                  className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
-                >
-                  {PAGE_SIZE_OPTIONS.map((size) => (
-                    <option key={size} value={size}>
-                      {size} / page
-                    </option>
-                  ))}
-                </select>
-
-                <button
-                  type="button"
-                  onClick={() => setPage((current) => Math.max(1, current - 1))}
-                  disabled={page === 1}
-                  className="rounded-lg border border-gray-300 px-4 py-2 font-medium text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Previous
-                </button>
-
-                <span className="font-medium text-gray-700">
-                  Page {page} of {totalPages}
-                </span>
-
-                <button
-                  type="button"
-                  onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
-                  disabled={page === totalPages}
-                  className="rounded-lg border border-gray-300 px-4 py-2 font-medium text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Next
-                </button>
-              </div>
-            </div>
           </div>
         </div>
       </div>
 
       {showStockModal && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black/40 px-4 py-6">
-          <div className="mx-auto w-full max-w-5xl rounded-3xl bg-white/95 shadow-2xl border border-white/70 backdrop-blur-md p-8 relative max-h-[calc(100vh-3rem)] overflow-y-auto">
-            <button
-              type="button"
-              onClick={closeStockModal}
-              className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"
-              aria-label="Close"
-            >
-              X
-            </button>
-
-            <div className="sticky top-0 z-10 -mx-8 mb-6 flex items-center justify-between border-b border-gray-100 bg-white/95 px-8 py-4 backdrop-blur-md">
-              <h2 className="text-xl font-semibold text-gray-800">Item Transaction</h2>
+          <div className="mx-auto w-full max-w-5xl rounded-3xl bg-white shadow-2xl border border-white/70 relative max-h-[calc(100vh-3rem)] overflow-y-auto pt-0 px-8 pb-8">
+            <div className="sticky top-0 z-20 -mx-8 mb-6 flex items-center justify-end border-b border-gray-100 bg-white px-8 py-4 rounded-t-3xl shadow-sm">
               <div className="flex items-center gap-3">
                 <button
                   type="button"
-                  onClick={handleAddStock}
-                  disabled={stockSaving || stockRows.length === 0}
+                  onClick={handleStageStock}
                   className="px-6 py-2.5 rounded-full bg-afmc-maroon text-white font-semibold shadow-afmc hover:bg-afmc-maroon2 focus:outline-none focus:ring-2 focus:ring-afmc-gold/50 disabled:opacity-70"
                 >
-                  {stockSaving ? "Saving..." : "Add"}
+                  Add
                 </button>
                 <button
                   type="button"
                   onClick={closeStockModal}
-                  className="px-6 py-2.5 rounded-full bg-gray-600 text-white font-semibold"
+                  className="px-6 py-2.5 rounded-full bg-gray-100 text-gray-700 font-semibold hover:bg-gray-200 transition-colors"
                 >
-                  Back
+                  Close
                 </button>
               </div>
             </div>
@@ -1323,18 +1260,8 @@ export default function Inventory() {
               </div>
             </div>
 
-            <div className="mt-8 rounded-3xl border border-gray-200 bg-white shadow-sm">
-              {/* <div className="border-b border-gray-100 p-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <div className="text-sm font-semibold text-gray-800">Scanner</div>
-                    <div className="text-xs text-gray-500">
-                      Use the Scan button near Barcode to open the camera.
-                    </div>
-                  </div>
-                </div>
-              </div> */}
-
+            {showLowerSection && (
+              <div className="mt-8 rounded-3xl border border-gray-200 bg-white shadow-sm">
               <div className="flex flex-wrap items-center justify-between gap-4 p-4">
                 <button
                   type="button"
@@ -1346,11 +1273,11 @@ export default function Inventory() {
 
                 <button
                   type="button"
-                  onClick={handleStageStock}
-                  className="inline-flex items-center gap-2 rounded-full bg-afmc-maroon px-5 py-2.5 text-white font-semibold shadow-afmc hover:bg-afmc-maroon2 focus:outline-none focus:ring-2 focus:ring-afmc-gold/50"
+                  onClick={handleAddStock}
+                  disabled={stockSaving || stockRows.length === 0}
+                  className="inline-flex items-center gap-2 rounded-full bg-afmc-maroon px-5 py-2.5 text-white font-semibold shadow-afmc hover:bg-afmc-maroon2 focus:outline-none focus:ring-2 focus:ring-afmc-gold/50 disabled:opacity-70"
                 >
-                  <FaPlus />
-                  Add Stock
+                  {stockSaving ? "Saving..." : "Add Stock"}
                 </button>
               </div>
 
@@ -1422,6 +1349,7 @@ export default function Inventory() {
                 {filteredStockRows.length}-{stockRows.length}
               </div>
             </div>
+            )}
           </div>
         </div>
       )}
@@ -1836,4 +1764,3 @@ export default function Inventory() {
     </div>
   );
 }
-
