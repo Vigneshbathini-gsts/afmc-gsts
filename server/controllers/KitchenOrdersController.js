@@ -1294,7 +1294,7 @@ exports.getCancelledOrders = async (req, res) => {
       to || null
     ]);
 
-    // console.log("Cancelled orders fetched:", rows);
+    console.log("Cancelled orders fetched:", rows);
 
     res.json({
       success: true,
