@@ -1,33 +1,5 @@
 const db = require("../config/db");
-
-const normalizeDate = (value) => {
-  if (!value) {
-    return null;
-  }
-
-  const trimmed = String(value).trim();
-
-  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
-    return trimmed;
-  }
-
-  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(trimmed)) {
-    const [month, day, year] = trimmed.split("/");
-    return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
-  }
-
-  const parsed = new Date(trimmed);
-
-  if (Number.isNaN(parsed.getTime())) {
-    return null;
-  }
-
-  const year = parsed.getFullYear();
-  const month = String(parsed.getMonth() + 1).padStart(2, "0");
-  const day = String(parsed.getDate()).padStart(2, "0");
-
-  return `${year}-${month}-${day}`;
-};
+const { getStartOfDay, getEndOfDay, parseDate, toISO } = require("../utils/dateUtils");
 
 async function getAdminOrderHistory({
   from = null,
@@ -107,12 +79,7 @@ async function getAdminOrderHistory({
         ? IS NULL
         OR xxoh.user_id = ?
       )
-      AND COALESCE(
-        STR_TO_DATE(xxoh.order_date, '%m/%d/%Y'),
-        DATE(xxoh.order_date)
-      ) BETWEEN
-        COALESCE(?, COALESCE(STR_TO_DATE(xxoh.order_date, '%m/%d/%Y'), DATE(xxoh.order_date)))
-        AND COALESCE(?, COALESCE(STR_TO_DATE(xxoh.order_date, '%m/%d/%Y'), DATE(xxoh.order_date)))
+      AND xxoh.order_date >= ? AND xxoh.order_date <= ?
       AND (
         ? IS NULL
         OR ? = ''
@@ -170,12 +137,7 @@ async function getAdminOrderHistory({
             ? IS NULL
             OR xxoh.user_id = ?
           )
-          AND COALESCE(
-            STR_TO_DATE(xxoh.order_date, '%m/%d/%Y'),
-            DATE(xxoh.order_date)
-          ) BETWEEN
-            COALESCE(?, COALESCE(STR_TO_DATE(xxoh.order_date, '%m/%d/%Y'), DATE(xxoh.order_date)))
-            AND COALESCE(?, COALESCE(STR_TO_DATE(xxoh.order_date, '%m/%d/%Y'), DATE(xxoh.order_date)))
+          AND xxoh.order_date >= ? AND xxoh.order_date <= ?
           AND (
             ? IS NULL
             OR ? = ''
@@ -201,8 +163,8 @@ async function getAdminOrderHistory({
     ORDER BY ord DESC, order_num DESC
   `;
 
-  const fromDate = normalizeDate(from);
-  const toDate = normalizeDate(to);
+  const fromDate = from ? getStartOfDay(from) : null;
+  const toDate = to ? getEndOfDay(to) : null;
   const requestedUser = username?.trim() || null;
   const activeUserId = userId || null;
 
@@ -289,8 +251,8 @@ async function getActiveOrders({
     ORDER BY creation_date DESC, oh.order_num DESC
   `;
 
-  const fromDate = normalizeDate(from);
-  const toDate = normalizeDate(to);
+  const fromDate = from ? getStartOfDay(from) : null;
+  const toDate = to ? getEndOfDay(to) : null;
   const searchTerm = search?.trim() || null;
   const searchLike = searchTerm ? `%${searchTerm}%` : null;
   const normalizedAppUser = appUser?.trim() || null;
@@ -474,5 +436,3 @@ module.exports = {
   getOrderSummary,
   saveNonMember,
 };
-
-

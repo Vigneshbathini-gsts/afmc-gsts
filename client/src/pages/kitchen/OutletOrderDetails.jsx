@@ -15,6 +15,7 @@ import { useAuth } from "../../context/AuthContext";
 import { barOrdersAPI } from "../../services/api";
 import { Html5Qrcode } from "html5-qrcode";
 import { toInitCap } from "../../utils/textFormat";
+import { formatDisplayTime } from "../../utils/dateUtils";
 
 export default function OutletOrderDetails() {
   const location = useLocation();
@@ -441,11 +442,10 @@ export default function OutletOrderDetails() {
     if (window.confirm(`Are you sure you want to cancel Order #${orderData.ORDERNUMBER}? This action cannot be undone.`)) {
       try {
         setCancelling(true);
-        for (const item of items) {
-          if (item.CAN_CANCEL === "Y") {
-            await barOrdersAPI.cancelItem({ ORDER_LINE_ID: item.ORDER_LINE_ID });
-          }
-        }
+        await barOrdersAPI.cancelOrder({
+          ORDERNUMBER: orderData.ORDERNUMBER,
+          KITCHEN: department,
+        });
         alert("Order cancelled successfully!");
         navigate(-1);
       } catch (error) {
@@ -742,7 +742,7 @@ export default function OutletOrderDetails() {
                           <td className="px-4 py-3 text-sm text-gray-800">{toInitCap(item.itemName || "")}</td>
                           <td className="px-4 py-3 text-sm text-center font-medium">{item.scanQuantity}</td>
                           <td className="px-4 py-3 text-sm text-gray-500">
-                            {new Date(item.scannedAt).toLocaleTimeString()}
+                            {formatDisplayTime(item.scannedAt)}
                           </td>
                           <td className="px-4 py-3 text-sm text-right font-semibold">Rs {item.itemPrice || "0"}</td>
                           <td className="px-4 py-3 text-sm font-mono text-gray-500">{item.barcode}</td>

@@ -1,4 +1,5 @@
 const db = require("../config/db");
+const { formatToSql, getStartOfDay, getEndOfDay, parseDate, toISO } = require("../utils/dateUtils");
 
 const ID_LOCKS = {
   inventory: "xxafmc_inventory_item_id_lock",
@@ -244,7 +245,7 @@ const createItem = async (payload) => {
       foodPrCharges,
       nonMemberProfit,
       prCharges,
-      new Date().toISOString(),
+      formatToSql(new Date()),
       createdBy || "SYSTEM",
       null,
       mimeType || null,
@@ -437,25 +438,8 @@ const parseVolumeToNumber = (volume) => {
 };
 
 const normalizeTransactionDate = (value) => {
-  if (!value) return null;
-  const raw = String(value).trim();
-  if (!raw) return null;
-
-  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) {
-    return raw;
-  }
-
-  if (/^\d{2}\/\d{2}\/\d{4}$/.test(raw)) {
-    const [mm, dd, yyyy] = raw.split("/");
-    return `${yyyy}-${mm}-${dd}`;
-  }
-
-  const parsed = new Date(raw);
-  if (Number.isNaN(parsed.getTime())) return null;
-  const year = parsed.getFullYear();
-  const month = String(parsed.getMonth() + 1).padStart(2, "0");
-  const day = String(parsed.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  const parsed = parseDate(value);
+  return parsed ? parsed.toISOString().split('T')[0] : null;
 };
 
 const normalizeReportDate = (value) => normalizeTransactionDate(value);
@@ -593,7 +577,7 @@ const addStockTransactions = async (payload) => {
         normalizedBarcode,
         Math.round(Number(pegs || 0)),
         createdBy || "SYSTEM",
-        new Date().toISOString(),
+        formatToSql(new Date()),
       ]);
 
       const updateSql = `
@@ -707,7 +691,7 @@ const addStockOutTransactions = async (payload) => {
       }
 
       const totalValue = Number(stockItem.unit_price || 0) * numericQuantity;
-      const creationTimestamp = new Date().toISOString();
+      const creationTimestamp = formatToSql(new Date());
 
       await connection.execute(
         `
@@ -794,8 +778,8 @@ const addStockOutTransactions = async (payload) => {
 };
 
 const getStockInReport = async ({ fromDate, toDate }) => {
-  const normalizedFrom = normalizeReportDate(fromDate);
-  const normalizedTo = normalizeReportDate(toDate);
+  const start = getStartOfDay(fromDate);
+  const end = getEndOfDay(toDate);
   const sql = `
     SELECT
       XIT.ITEM_CODE AS item_code,
@@ -807,20 +791,19 @@ const getStockInReport = async ({ fromDate, toDate }) => {
       MIN(XIT.CREATION_DATE) AS creation_date
     FROM xxafmc_items_transactions XIT
     JOIN xxafmc_inventory XI ON XIT.ITEM_CODE = XI.ITEM_CODE
-    WHERE DATE(XIT.TRANSACTION_DATE) BETWEEN COALESCE(?, CURDATE())
-      AND COALESCE(?, CURDATE())
+    WHERE XIT.TRANSACTION_DATE >= ? AND XIT.TRANSACTION_DATE <= ?
       AND XIT.FLAG = 'IN'
       AND XI.SUB_CATEGORY NOT IN (14, 15)
     GROUP BY XIT.ITEM_CODE, XI.ITEM_NAME, XIT.BATCH_ID, XI.\`A/C_UNIT\`
     ORDER BY creation_date DESC
   `;
-  const [rows] = await db.execute(sql, [normalizedFrom, normalizedTo]);
+  const [rows] = await db.execute(sql, [start, end]);
   return rows;
 };
 
 const getStockOutReport = async ({ fromDate, toDate }) => {
-  const normalizedFrom = normalizeReportDate(fromDate);
-  const normalizedTo = normalizeReportDate(toDate);
+  const start = getStartOfDay(fromDate);
+  const end = getEndOfDay(toDate);
   const sql = `
     SELECT
       XSO.ITEM_CODE AS item_code,
@@ -831,12 +814,11 @@ const getStockOutReport = async ({ fromDate, toDate }) => {
       COALESCE(NULLIF(XI.\`A/C_UNIT\`, ''), 'Nos') AS ac_unit
     FROM xxafmc_stock_out XSO
     JOIN xxafmc_inventory XI ON XSO.ITEM_CODE = XI.ITEM_CODE
-    WHERE DATE(XSO.CREATION_DATE) BETWEEN COALESCE(?, CURDATE())
-      AND COALESCE(?, CURDATE())
+    WHERE XSO.CREATION_DATE >= ? AND XSO.CREATION_DATE <= ?
     GROUP BY XSO.ITEM_NAME, XSO.ITEM_CODE, XI.\`A/C_UNIT\`
     ORDER BY creation_date DESC
   `;
-  const [rows] = await db.execute(sql, [normalizedFrom, normalizedTo]);
+  const [rows] = await db.execute(sql, [start, end]);
   return rows;
 };
 
@@ -888,5 +870,3 @@ module.exports = {
   getStockOutReport,
   getTodayStockOutDetails,
 };
-
-

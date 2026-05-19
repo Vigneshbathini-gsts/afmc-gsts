@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useLocation, useNavigate } from "react-router-dom";
 import { barOrdersAPI } from '../../services/api';
 import {
@@ -14,6 +14,7 @@ import {
   FaArrowLeft,
 } from "react-icons/fa";
 import { exportTableToPdf } from '../../utils/pdfExport';
+import { formatDisplayDate, formatForInput } from '../../utils/dateUtils';
 
 const KitchenOrderHistory = () => {
   const navigate = useNavigate();
@@ -22,6 +23,10 @@ const KitchenOrderHistory = () => {
   const dashboardPath = useMemo(() => {
     const pathname = location?.pathname || "";
     return pathname.startsWith("/bar") ? "/bar/dashboard" : "/kitchen/dashboard";
+  }, [location?.pathname]);
+  const kitchenType = useMemo(() => {
+    const pathname = location?.pathname || "";
+    return pathname.startsWith("/bar") ? "Bar" : "Kitchen";
   }, [location?.pathname]);
   const [orders, setOrders] = useState([]);
   const [filteredOrders, setFilteredOrders] = useState([]);
@@ -38,23 +43,14 @@ const KitchenOrderHistory = () => {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
   const rowsPerPage = 10;
-  // Set default dates (Today) when component mounts
-  useEffect(() => {
-    const today = new Date().toISOString().split('T')[0];
-    setTempFromDate(today);
-    setTempToDate(today);
-    setFromDate(today);
-    setToDate(today);
-    // Fetch orders immediately with today's date
-    fetchOrderHistory(today, today);
-  }, []);
   // Fetch orders from API (only dates)
-  const fetchOrderHistory = async (startDate, endDate, page = 1) => {
+  const fetchOrderHistory = useCallback(async (startDate, endDate, page = 1) => {
     setLoading(true);
     try {
       const params = {
         page,
         limit: rowsPerPage,
+        kitchen: kitchenType,
       };
       if (startDate) params.fromDate = startDate;
       if (endDate) params.toDate = endDate;
@@ -82,7 +78,18 @@ const KitchenOrderHistory = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [kitchenType]);
+
+  // Set default dates (Today) when component mounts
+  useEffect(() => {
+    const today = formatForInput(new Date());
+    setTempFromDate(today);
+    setTempToDate(today);
+    setFromDate(today);
+    setToDate(today);
+    // Fetch orders immediately with today's date
+    fetchOrderHistory(today, today);
+  }, [fetchOrderHistory]);
   // Handle search/apply button click
   const handleApplyFilters = () => {
     setFromDate(tempFromDate);
@@ -93,7 +100,7 @@ const KitchenOrderHistory = () => {
   };
   // Handle reset button click
   const handleReset = () => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = formatForInput(new Date());
     setTempFromDate(today);
     setTempToDate(today);
     setFromDate(today);
@@ -162,7 +169,7 @@ const KitchenOrderHistory = () => {
 
     setLoadingDetails(true);
     try {
-      const response = await barOrdersAPI.getOrderHistoryItemDetails(orderNumber);
+      const response = await barOrdersAPI.getOrderHistoryItemDetails(orderNumber, kitchenType);
 
       let details = [];
       let summary = null;
@@ -196,11 +203,7 @@ const KitchenOrderHistory = () => {
   };
 
   // Format date for display
-  const formatDate = (dateString) => {
-    if (!dateString) return "-";
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-IN');
-  };
+  const formatDate = (dateString) => formatDisplayDate(dateString);
 
   const formatCurrency = (value) => {
     const numericValue = Number(String(value ?? 0).replace(/,/g, ""));
@@ -239,7 +242,7 @@ const KitchenOrderHistory = () => {
     exportTableToPdf({
       mainHeader: "ARMED FORCES MEDICAL COLLEGE",
       title: "Kitchen Order History Report",
-      fileName: `order-history-${new Date().toISOString().split("T")[0]}.pdf`,
+      fileName: `order-history-${formatForInput(new Date())}.pdf`,
       subtitle: subtitle,
       headers: [
         "Order Number",

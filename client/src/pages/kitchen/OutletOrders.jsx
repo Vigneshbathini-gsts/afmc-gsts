@@ -20,6 +20,7 @@ const GOLD = "#DAA520";
 export default function OutletOrders({ kitchenType = "Bar" }) {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [cancellingOrder, setCancellingOrder] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -108,6 +109,32 @@ export default function OutletOrders({ kitchenType = "Bar" }) {
       });
     } catch (err) {
       alert("Failed to open order");
+    }
+  };
+
+  const handleCancelOrder = async (order, event) => {
+    event.stopPropagation();
+
+    if (order.CAN_CANCEL !== "Y" || cancellingOrder) return;
+
+    const orderNumber = order.ORDERNUMBER;
+    if (!window.confirm(`Are you sure you want to cancel Order #${orderNumber}? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      setCancellingOrder(String(orderNumber));
+      await barOrdersAPI.cancelOrder({
+        ORDERNUMBER: orderNumber,
+        KITCHEN: kitchenType,
+      });
+      alert("Order cancelled successfully!");
+      fetchOrders();
+    } catch (error) {
+      console.error("Error cancelling order:", error);
+      alert("Failed to cancel order. Please try again.");
+    } finally {
+      setCancellingOrder("");
     }
   };
 
@@ -285,16 +312,22 @@ export default function OutletOrders({ kitchenType = "Bar" }) {
                     <td style={td}>{toInitCap(o.Handled_by_kitchen || "")}</td>
 
                     <td style={{ ...td, textAlign: "center" }}>
-                      <FaTimesCircle
-                        style={{
-                          color:
-                            o.CAN_CANCEL === "Y" ? "#e74c3c" : "#ccc",
-                          cursor:
-                            o.CAN_CANCEL === "Y"
-                              ? "pointer"
-                              : "not-allowed",
-                        }}
-                      />
+                      {cancellingOrder === String(o.ORDERNUMBER) ? (
+                        <FaSpinner className="spin" style={{ color: "#999" }} />
+                      ) : (
+                        <FaTimesCircle
+                          onClick={(event) => handleCancelOrder(o, event)}
+                          title={o.CAN_CANCEL === "Y" ? "Cancel order" : "Order cannot be cancelled"}
+                          style={{
+                            color:
+                              o.CAN_CANCEL === "Y" ? "#e74c3c" : "#ccc",
+                            cursor:
+                              o.CAN_CANCEL === "Y"
+                                ? "pointer"
+                                : "not-allowed",
+                          }}
+                        />
+                      )}
                     </td>
                   </tr>
                 ))}

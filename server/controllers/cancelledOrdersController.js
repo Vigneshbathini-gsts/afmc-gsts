@@ -48,7 +48,6 @@ exports.getCancelledOrders = async (req, res) => {
     `;
 
     const [rows] = await pool.query(query, [from, to]);
-    // console.log("Cancelled Orders Query Result:", rows);
     return res.status(200).json({
       success: true,
       count: rows.length,

@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useLocation, useNavigate } from "react-router-dom";
 import { barOrdersAPI } from '../../services/api';
 import { exportTableToPdf } from '../../utils/pdfExport';
+import { formatDisplayDate, formatForInput } from '../../utils/dateUtils';
 import {
     FaTimesCircle,
     FaSpinner,
@@ -22,6 +23,10 @@ const KitchenCancelledOrder = () => {
         const pathname = location?.pathname || "";
         return pathname.startsWith("/bar") ? "/bar/dashboard" : "/kitchen/dashboard";
     }, [location?.pathname]);
+    const kitchenType = useMemo(() => {
+        const pathname = location?.pathname || "";
+        return pathname.startsWith("/bar") ? "Bar" : "Kitchen";
+    }, [location?.pathname]);
     const [cancelledOrders, setCancelledOrders] = useState([]);
     const [filteredOrders, setFilteredOrders] = useState([]);
     const [fromDate, setFromDate] = useState('');
@@ -38,28 +43,19 @@ const KitchenCancelledOrder = () => {
 
     const rowsPerPage = 10;
     // Set default dates (Today) when component mounts
-    useEffect(() => {
-        const today = new Date().toISOString().split('T')[0];
-        setTempFromDate(today);
-        setTempToDate(today);
-        setFromDate(today);
-        setToDate(today);
-        // Fetch orders immediately with today's date
-        fetchCancelledOrders(today, today);
-    }, []);
-
-    const fetchCancelledOrders = async (startDate, endDate) => {
+    const fetchCancelledOrders = useCallback(async (startDate, endDate) => {
         setLoading(true);
         try {
             const params = {};
             if (startDate) params.fromDate = startDate;
             if (endDate) params.toDate = endDate;
+            params.kitchen = kitchenType;
 
             console.log("Fetching cancelled orders with params:", params);
 
             const response = await barOrdersAPI.getCancelledOrders(params);
             const ordersData = response.data?.data || [];
-
+console.log("API response for cancelled orders:", ordersData);
             setCancelledOrders(ordersData);
             console.log(`Loaded ${ordersData.length} cancelled orders`);
         } catch (error) {
@@ -69,7 +65,17 @@ const KitchenCancelledOrder = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [kitchenType]);
+
+    useEffect(() => {
+        const today = formatForInput(new Date());
+        setTempFromDate(today);
+        setTempToDate(today);
+        setFromDate(today);
+        setToDate(today);
+        // Fetch orders immediately with today's date
+        fetchCancelledOrders(today, today);
+    }, [fetchCancelledOrders]);
 
     // Handle search/apply button click
     const handleApplyFilters = () => {
@@ -138,7 +144,7 @@ const KitchenCancelledOrder = () => {
 
         setLoadingDetails(true);
         try {
-            const response = await barOrdersAPI.getOrderDetailsByOrderNumber(orderNumber);
+            const response = await barOrdersAPI.getOrderDetailsByOrderNumber(orderNumber, kitchenType);
             const details = response.data?.data || [];
 
             setOrderItemDetails(prev => ({
@@ -164,11 +170,7 @@ const KitchenCancelledOrder = () => {
     };
 
     // Format date for display
-    const formatDate = (dateString) => {
-        if (!dateString) return "N/A";
-        const date = new Date(dateString);
-        return date.toLocaleDateString('en-IN');
-    };
+    const formatDate = (dateString) => formatDisplayDate(dateString);
 
     // Download PDF using exportTableToPdf utility
     const downloadPDF = () => {
@@ -201,7 +203,7 @@ const KitchenCancelledOrder = () => {
         exportTableToPdf({
             mainHeader: "ARMED FORCES MEDICAL COLLEGE",
             title: "Cancelled Orders Report",
-            fileName: `cancelled-orders-${new Date().toISOString().split("T")[0]}.pdf`,
+            fileName: `cancelled-orders-${formatForInput(new Date())}.pdf`,
             subtitle: subtitle,
             headers: [
                 "Order Number",
@@ -340,9 +342,9 @@ const KitchenCancelledOrder = () => {
                     <>
                         <div className="overflow-x-auto">
                             <table className="min-w-full text-sm">
-                                <thead className="bg-gray-50 text-gray-700 uppercase text-xs tracking-wider">
+                                <thead className="bg-gray-50 text-gray-700  text-xs tracking-wider">
                                     <tr>
-                                        <th className="px-6 py-4 text-left">Order #</th>
+                                        <th className="px-6 py-4 text-left">Order</th>
                                         <th className="px-6 py-4 text-left">Date</th>
                                         <th className="px-6 py-4 text-left">Customer Name</th>
                                         <th className="px-6 py-4 text-left">Pubmed</th>
