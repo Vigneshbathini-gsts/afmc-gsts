@@ -16,6 +16,9 @@ export default function ItemDetails() {
     const location = useLocation();
     const cartId = location.state?.cartId || new URLSearchParams(location.search).get("cartId");
     const isEditingCartItem = Boolean(cartId);
+    const prefillDetails = location.state?.prefillDetails;
+    const fromBuyFlow = Boolean(location.state?.fromBuyFlow);
+    const buyOrderNumber = location.state?.orderNumber;
     const [item, setItem] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -94,10 +97,17 @@ export default function ItemDetails() {
                     let details = fetchedItem.details || [];
                     let initialQuantities = {};
 
+                    if (!isEditingCartItem && Array.isArray(prefillDetails) && prefillDetails.length > 0) {
+                        details = prefillDetails;
+                    }
+
                     details.forEach((detail, idx) => {
                         const pegs = getDetailPegs(detail);
+                        const fallbackQty = detail?.quantity ?? detail?.QUANTITY;
                         if (pegs !== 0 && pegs !== null) {
                             initialQuantities[idx] = pegs || 1;
+                        } else if (fallbackQty !== undefined && fallbackQty !== null && fallbackQty !== "") {
+                            initialQuantities[idx] = Number(fallbackQty) || 0;
                         }
                     });
 
@@ -138,6 +148,14 @@ export default function ItemDetails() {
                         }
                     }
 
+                    if (!isEditingCartItem && Array.isArray(prefillDetails) && prefillDetails.length > 0) {
+                        try {
+                            localStorage.setItem(draftKey, JSON.stringify({ details, quantities: initialQuantities }));
+                        } catch (err) {
+                            console.warn("Could not save customization draft:", err);
+                        }
+                    }
+
                     setItem({ ...fetchedItem, details, cartId: isEditingCartItem ? cartId : undefined });
                     setQuantities(initialQuantities);
                 } else {
@@ -154,7 +172,7 @@ export default function ItemDetails() {
         if (id) {
             fetchItemDetails();
         }
-    }, [cartId, draftKey, id, isEditingCartItem]);
+    }, [cartId, draftKey, id, isEditingCartItem, prefillDetails]);
 
     const updateQuantity = async (index, delta) => {
         const oldQty = quantities[index] || 1;
@@ -311,6 +329,50 @@ export default function ItemDetails() {
             ? "/attendant"
             : "/user";
 
+        const postSavePath =
+            fromBuyFlow && buyOrderNumber
+                ? `${basePath}/menudash/buy?orderNumber=${encodeURIComponent(buyOrderNumber)}`
+                : `${basePath}/cart`;
+
+        if (fromBuyFlow && !isEditingCartItem) {
+            const ok = await persistCustomDetails(item?.details || [], quantities);
+            if (ok) {
+                try {
+                    const itemCodeKey = String(item?.ITEM_CODE ?? item?.ITEM_ID ?? id ?? "").trim();
+                    if (buyOrderNumber && itemCodeKey) {
+                        const normalizedDetails = (item?.details || []).map((detail, idx) => {
+                            const qty = Number(quantities?.[idx] ?? getDetailPegs(detail) ?? detail?.quantity ?? detail?.QUANTITY ?? 0) || 0;
+                            const itemCode = getDetailItemCode(detail);
+                            const itemName = getDetailItemName(detail);
+                            const stockQuantity = getDetailStockQuantity(detail);
+                            const requiredQuantity = getDetailRequiredQuantity(detail);
+
+                            return {
+                                ITEM_CODE: itemCode,
+                                ITEM_NAME: itemName,
+                                PEGS: qty,
+                                QUANTITY: qty,
+                                STOCK_QUANTITY: stockQuantity,
+                                REQUIRED_QUANTITY: requiredQuantity,
+                                STOCK_STATUS: detail?.stockStatus ?? detail?.STOCK_STATUS ?? detail?.stock_status,
+                                UNIT_PRICE: detail?.unitPrice ?? detail?.UNIT_PRICE,
+                                PRICE: detail?.memberPrice ?? detail?.PRICE,
+                            };
+                        }).filter((row) => Number(row.ITEM_CODE) > 0);
+                        localStorage.setItem(
+                            `afmc-buyflow-custom:${buyOrderNumber}:${itemCodeKey}`,
+                            JSON.stringify({ details: normalizedDetails, savedAt: Date.now() })
+                        );
+                    }
+                } catch (err) {
+                    console.warn("Could not persist buyflow customization override:", err);
+                }
+                toast.success(`Saved ${item.ITEM_NAME} customization`);
+                navigate(postSavePath);
+            }
+            return;
+        }
+
         const payload = {
             item_id: item.ITEM_ID || item.ITEM_CODE,
             quantity: 1,
@@ -339,7 +401,7 @@ export default function ItemDetails() {
                         : `Added ${item.ITEM_NAME} to cart with ${selectedIngredients.length} ingredients`
                 );
 
-                navigate(`${basePath}/cart`);
+                navigate(postSavePath);
             } else {
                 toast.error(response?.data?.message || "Failed to add item to cart");
             }
@@ -385,12 +447,12 @@ export default function ItemDetails() {
         <div className="min-h-screen bg-gray-100">
             {/* Action Buttons - Reduced width */}
             <div className="flex gap-3 mt-6 justify-end">
-                <button
-                    onClick={handleAddToCart}
-                    className="bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-8 rounded-xl transition shadow-sm"
-                >
-                    {isEditingCartItem ? "Save Customization" : "Add to cart"}
-                </button>
+                 <button
+                     onClick={handleAddToCart}
+                     className="bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-8 rounded-xl transition shadow-sm"
+                 >
+                    {isEditingCartItem ? "Save Customization" : fromBuyFlow ? "Save to Buy Flow" : "Add to cart"}
+                 </button>
                 <button
                     onClick={handleAddIngredientsClick}
                     className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-3 px-8 rounded-xl transition"

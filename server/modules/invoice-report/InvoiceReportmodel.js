@@ -30,7 +30,6 @@ async function getInvoiceReportByOrderNumber(orderNumber) {
       LEFT JOIN xxafmc_inventory xi
         ON xi.item_code = od.item_id
       WHERE od.order_id = ?
-        AND od.order_status IS NULL
       ORDER BY od.order_line_id ASC
     `,
     [normalizedOrderNumber]

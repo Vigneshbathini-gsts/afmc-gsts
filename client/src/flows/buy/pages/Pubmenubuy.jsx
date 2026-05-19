@@ -1,11 +1,28 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { CheckCircle2, ChevronLeft, Minus, Plus, ShoppingCart, Trash2, XCircle } from "lucide-react";
+import { CheckCircle2, ChevronLeft, Minus, Pencil, Plus, ShoppingCart, Trash2, XCircle } from "lucide-react";
 import Pubmenubuyservice from "../services/Pubmenubuyservice";
 import ConfirmOrderservice from "../../../services/ConfirmOrderservice";
 import { getMaxAllowedQuantity, isCocktailOrMocktail, isOutOfStock, validateNextQuantity } from "../../../utils/stockValidation";
+import { barOrdersAPI } from "../../../services/api";
 
 const BASEAPI = "https://afmc.globalsparkteksolutions.com/AFMCIMAGES/";
+
+function getBuyflowOverrideDetails(orderNumber, itemCode) {
+  const safeOrder = String(orderNumber || "").trim();
+  const safeItemCode = String(itemCode || "").trim();
+  if (!safeOrder || !safeItemCode) return null;
+
+  try {
+    const raw = localStorage.getItem(`afmc-buyflow-custom:${safeOrder}:${safeItemCode}`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const details = parsed?.details;
+    return Array.isArray(details) ? details : null;
+  } catch {
+    return null;
+  }
+}
 
 function Toast({ message, type = "success", onClose }) {
   const [isVisible, setIsVisible] = useState(true);
@@ -141,6 +158,10 @@ function normalizeItem(item, fallbackIndex = 0) {
 
   const rawOrderLineId = item.order_line_id ?? item.ORDER_LINE_ID ?? item.orderLineId ?? item.id ?? 0;
   const orderLineId = Number(rawOrderLineId) || 0;
+  const rawItemId = item.item_id ?? item.ITEM_ID ?? null;
+  const itemId = rawItemId === null || rawItemId === undefined || rawItemId === "" ? null : Number(rawItemId);
+  const rawCartId = item.cart_id ?? item.CART_ID ?? item.cartId ?? null;
+  const cartId = rawCartId === null || rawCartId === undefined || rawCartId === "" ? null : Number(rawCartId);
   const fallbackId = orderLineId > 0
     ? orderLineId
     : Number(item.item_id || item.ITEM_ID || item.item_code || item.ITEM_CODE || fallbackIndex) || fallbackIndex;
@@ -149,6 +170,7 @@ function normalizeItem(item, fallbackIndex = 0) {
     id: fallbackId,
     orderLineId: orderLineId > 0 ? orderLineId : fallbackId,
     item_code: item.item_code || item.ITEM_CODE || "",
+    itemId: Number.isFinite(itemId) && itemId > 0 ? itemId : null,
     item_name: item.item_name || item.ITEM_NAME || parsed.item_name,
     quantity,
     unitPrice,
@@ -165,6 +187,7 @@ function normalizeItem(item, fallbackIndex = 0) {
     subcategory: Number.isFinite(subcategory) ? subcategory : null,
     stockStatus,
     stockIssueMessage,
+    cartId: Number.isFinite(cartId) && cartId > 0 ? cartId : null,
   };
 }
 
@@ -211,6 +234,7 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
   const [updatingLineId, setUpdatingLineId] = useState(null);
   const [error, setError] = useState("");
   const [toast, setToast] = useState(null);
+  const [cocktailDetailsByItemCode, setCocktailDetailsByItemCode] = useState({});
   const currentBasePath = location.pathname.startsWith("/attendant")
     ? "/attendant"
     : "/user";
@@ -270,6 +294,48 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
     setToast({ message, type });
   };
 
+  const handleEditCocktail = (item) => {
+    const rawItemId =
+      item?.itemId ??
+      item?.item_id ??
+      item?.ITEM_ID ??
+      item?.id ??
+      item?.item_code ??
+      item?.ITEM_CODE ??
+      0;
+    const itemId = Number(rawItemId) || 0;
+
+    const rawCartId =
+      item?.cartId ??
+      item?.cart_id ??
+      item?.CART_ID ??
+      item?.cartID ??
+      0;
+    const cartId = Number(rawCartId) || 0;
+
+    if (itemId > 0 && cartId > 0) {
+      navigate(`${currentBasePath}/item/${encodeURIComponent(itemId)}?cartId=${encodeURIComponent(cartId)}`, {
+        state: { cartId },
+      });
+      return;
+    }
+
+    if (itemId > 0) {
+      const itemCodeKey = String(item?.item_code || item?.ITEM_CODE || "").trim();
+      const prefillDetails = itemCodeKey ? cocktailDetailsByItemCode[itemCodeKey] : null;
+
+      if (Array.isArray(prefillDetails) && prefillDetails.length > 0) {
+        navigate(`${currentBasePath}/item/${encodeURIComponent(itemId)}`, {
+          state: { prefillDetails, fromBuyFlow: true, orderNumber },
+        });
+        return;
+      }
+    }
+
+    showToast("Cart item not linked. Open cart to edit selection.", "error");
+    navigate(`${currentBasePath}/cart`);
+  };
+
   useEffect(() => {
     let ignore = false;
 
@@ -310,6 +376,58 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
       ignore = true;
     };
   }, [orderNumber]);
+
+  useEffect(() => {
+    let ignore = false;
+
+    const fetchCocktailDetails = async () => {
+      if (!orderNumber) return;
+
+      const cocktailItems = items.filter((item) => isCocktailOrMocktail(item));
+      if (cocktailItems.length === 0) return;
+
+      const uniqueItemCodes = [
+        ...new Set(
+          cocktailItems
+            .map((item) => String(item?.item_code || "").trim())
+            .filter(Boolean)
+        ),
+      ];
+
+      if (uniqueItemCodes.length === 0) return;
+
+      await Promise.all(
+        uniqueItemCodes.map(async (itemCode) => {
+          if (cocktailDetailsByItemCode[itemCode]) return;
+
+          try {
+            const res = await barOrdersAPI.getCocktailDetailsById(itemCode, orderNumber);
+            const details = res?.data?.data?.details || [];
+
+            if (!ignore) {
+              setCocktailDetailsByItemCode((current) => ({
+                ...current,
+                [itemCode]: Array.isArray(details) ? details : [],
+              }));
+            }
+          } catch {
+            if (!ignore) {
+              setCocktailDetailsByItemCode((current) => ({
+                ...current,
+                [itemCode]: [],
+              }));
+            }
+          }
+        })
+      );
+    };
+
+    fetchCocktailDetails();
+
+    return () => {
+      ignore = true;
+    };
+  }, [items, orderNumber, cocktailDetailsByItemCode]);
 
   const totalAmount = useMemo(
     () => items.reduce((sum, item) => sum + Number(item.subtotal || 0), 0),
@@ -1004,6 +1122,32 @@ const ensureOfferFreeRows = (nextItems) => {
                               {item.stockIssueMessage}
                             </p>
                           )}
+
+                          {isCocktailOrMocktail(item) && (() => {
+                            const itemCode = String(item?.item_code || "").trim();
+                            const overridden = getBuyflowOverrideDetails(orderNumber, itemCode);
+                            const details = overridden || (itemCode ? cocktailDetailsByItemCode[itemCode] : null);
+                            if (!details || details.length === 0) return null;
+
+                            return (
+                              <div className="mt-2 rounded-lg bg-stone-50 px-3 py-2 text-xs text-stone-700">
+                                <p className="mb-1 font-semibold text-stone-800">Ingredients</p>
+                                <ul className="space-y-0.5">
+                                  {details.slice(0, 6).map((ing, idx) => (
+                                    <li key={`${ing.ITEM_CODE || ing.itemCode || idx}`} className="flex justify-between gap-2">
+                                      <span className="truncate">{ing.ITEM_NAME || ing.itemName || "Item"}</span>
+                                      <span className="shrink-0 text-stone-600">
+                                        {Number(ing.PEGS ?? ing.pegs ?? ing.QUANTITY ?? ing.quantity ?? 0) || 0}
+                                      </span>
+                                    </li>
+                                  ))}
+                                </ul>
+                                {details.length > 6 ? (
+                                  <p className="mt-1 text-[11px] text-stone-500">+{details.length - 6} more…</p>
+                                ) : null}
+                              </div>
+                            );
+                          })()}
                           {item.availableQuantity !== null && item.availableQuantity !== undefined && (
                             <p className="mt-1 text-xs text-stone-400">
                               Available: {item.availableQuantity}
@@ -1098,6 +1242,17 @@ const ensureOfferFreeRows = (nextItems) => {
                             >
                               <Trash2 className="h-4 w-4" />
                             </button>
+
+                            {isCocktailOrMocktail(item) && (
+                              <button
+                                type="button"
+                                onClick={() => handleEditCocktail(item)}
+                                className="ml-2 rounded-md bg-stone-100 p-1.5 text-stone-700 transition hover:bg-stone-200"
+                                title="Edit cocktail/mocktail selection"
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </button>
+                            )}
                           </div>
                         ) : (
                           <div className="rounded-xl bg-stone-50 px-3 py-2 text-xs font-medium text-stone-600">

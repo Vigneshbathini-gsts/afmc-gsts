@@ -706,6 +706,19 @@ async function getOrderSummary(orderNumber) {
     `
       SELECT
         xxod.ORDER_LINE_ID AS order_line_id,
+        (
+          SELECT ci.CART_ID
+          FROM xxafmc_cart_items ci
+          WHERE ci.user_id = (
+            SELECT oh.user_id
+            FROM xxafmc_order_header oh
+            WHERE oh.order_num = xxod.order_id
+            LIMIT 1
+          )
+            AND ci.item_id = xxod.item_id
+          ORDER BY ci.CART_ID DESC
+          LIMIT 1
+        ) AS cart_id,
         xxod.ITEM_ID AS item_id,
         xxod.QUANTITY AS quantity,
         xxod.PRICE AS price,
