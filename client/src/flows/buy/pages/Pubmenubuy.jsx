@@ -277,33 +277,33 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
     ? "/attendant"
     : "/user";
   const MAX_QTY = 99;
- const stockIssue = useMemo(() => {
-  return (
-    items.find((item) => {
-      // Ignore free-item stock validation
-      // when backend sends 0/null stock
-      if (item.isFreeItem) {
-        const freeAvailable = item.availableQuantity;
+  const stockIssue = useMemo(() => {
+    return (
+      items.find((item) => {
+        // Ignore free-item stock validation
+        // when backend sends 0/null stock
+        if (item.isFreeItem) {
+          const freeAvailable = item.availableQuantity;
 
-        if (
-          freeAvailable === null ||
-          freeAvailable === undefined ||
-          Number(freeAvailable) <= 0
-        ) {
-          return false;
+          if (
+            freeAvailable === null ||
+            freeAvailable === undefined ||
+            Number(freeAvailable) <= 0
+          ) {
+            return false;
+          }
         }
-      }
 
-      const maxAllowed = getMaxAllowedQuantity(item);
+        const maxAllowed = getMaxAllowedQuantity(item);
 
-      return (
-        maxAllowed !== null &&
-        maxAllowed !== undefined &&
-        Number(item.quantity || 0) > Number(maxAllowed || 0)
-      );
-    }) || null
-  );
-}, [items]);
+        return (
+          maxAllowed !== null &&
+          maxAllowed !== undefined &&
+          Number(item.quantity || 0) > Number(maxAllowed || 0)
+        );
+      }) || null
+    );
+  }, [items]);
 
   const cocktailStockIssue = useMemo(() => {
     return (
@@ -473,110 +473,110 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
   );
 
 
-const ensureOfferFreeRows = (nextItems) => {
-  if (!Array.isArray(nextItems) || nextItems.length === 0) {
-    return [];
-  }
+  const ensureOfferFreeRows = (nextItems) => {
+    if (!Array.isArray(nextItems) || nextItems.length === 0) {
+      return [];
+    }
 
-  // NEVER keep free rows with qty <= 0
-  const cleanedItems = nextItems.filter(
-    (row) => !(row?.isFreeItem && Number(row?.quantity || 0) <= 0)
-  );
-
-  const parents = cleanedItems.filter((row) => !row?.isFreeItem);
-
-  const children = cleanedItems.filter(
-    (row) => row?.isFreeItem
-  );
-
-  const hasChildForParent = new Set(
-    children
-      .map((row) => String(row?.parentCode || "").trim())
-      .filter(Boolean)
-  );
-
-  const insertionsByAfterId = new Map();
-
-  for (const parent of parents) {
-    const parentCode = String(parent?.item_code || "").trim();
-
-    if (!parentCode) continue;
-
-    const expectedFreeQty = calculateFreeQuantity(
-      parent?.quantity,
-      parent?.offer_quantity,
-      parent?.free_item_quantity
+    // NEVER keep free rows with qty <= 0
+    const cleanedItems = nextItems.filter(
+      (row) => !(row?.isFreeItem && Number(row?.quantity || 0) <= 0)
     );
 
-    // REMOVE FREE ITEM COMPLETELY
-    if (expectedFreeQty <= 0) {
-      continue;
+    const parents = cleanedItems.filter((row) => !row?.isFreeItem);
+
+    const children = cleanedItems.filter(
+      (row) => row?.isFreeItem
+    );
+
+    const hasChildForParent = new Set(
+      children
+        .map((row) => String(row?.parentCode || "").trim())
+        .filter(Boolean)
+    );
+
+    const insertionsByAfterId = new Map();
+
+    for (const parent of parents) {
+      const parentCode = String(parent?.item_code || "").trim();
+
+      if (!parentCode) continue;
+
+      const expectedFreeQty = calculateFreeQuantity(
+        parent?.quantity,
+        parent?.offer_quantity,
+        parent?.free_item_quantity
+      );
+
+      // REMOVE FREE ITEM COMPLETELY
+      if (expectedFreeQty <= 0) {
+        continue;
+      }
+
+      // Already exists
+      if (hasChildForParent.has(parentCode)) {
+        continue;
+      }
+
+      const freeItemCode = Number(parent?.free_item_code || 0);
+
+      if (!Number.isFinite(freeItemCode) || freeItemCode <= 0) {
+        continue;
+      }
+
+      const afterId =
+        Number(parent?.orderLineId ?? parent?.id) || 0;
+
+      const placeholderId = -Date.now() - Math.floor(Math.random() * 1000);
+
+      const placeholder = {
+        id: placeholderId,
+        orderLineId: placeholderId,
+        item_code: String(freeItemCode),
+        item_name: "Free item",
+        quantity: expectedFreeQty,
+        unitPrice: 0,
+        subtotal: 0,
+        image: "",
+        card_text: `Name: Free item Quantity: ${expectedFreeQty}`,
+        availableQuantity: null,
+        parentCode,
+        isFreeItem: true,
+        offer_quantity: null,
+        free_item_quantity: null,
+        free_item_code: null,
+        computed_free_item_quantity: null,
+        subcategory: null,
+        stockStatus: null,
+        stockIssueMessage: null,
+      };
+
+      if (!insertionsByAfterId.has(afterId)) {
+        insertionsByAfterId.set(afterId, []);
+      }
+
+      insertionsByAfterId.get(afterId).push(placeholder);
     }
 
-    // Already exists
-    if (hasChildForParent.has(parentCode)) {
-      continue;
+    const merged = [];
+
+    for (const row of cleanedItems) {
+      merged.push(row);
+
+      const key =
+        Number(row?.orderLineId ?? row?.id) || 0;
+
+      const toAdd = insertionsByAfterId.get(key);
+
+      if (toAdd?.length) {
+        merged.push(...toAdd);
+      }
     }
 
-    const freeItemCode = Number(parent?.free_item_code || 0);
-
-    if (!Number.isFinite(freeItemCode) || freeItemCode <= 0) {
-      continue;
-    }
-
-    const afterId =
-      Number(parent?.orderLineId ?? parent?.id) || 0;
-
-    const placeholderId = -Date.now() - Math.floor(Math.random() * 1000);
-
-    const placeholder = {
-      id: placeholderId,
-      orderLineId: placeholderId,
-      item_code: String(freeItemCode),
-      item_name: "Free item",
-      quantity: expectedFreeQty,
-      unitPrice: 0,
-      subtotal: 0,
-      image: "",
-      card_text: `Name: Free item Quantity: ${expectedFreeQty}`,
-      availableQuantity: null,
-      parentCode,
-      isFreeItem: true,
-      offer_quantity: null,
-      free_item_quantity: null,
-      free_item_code: null,
-      computed_free_item_quantity: null,
-      subcategory: null,
-      stockStatus: null,
-      stockIssueMessage: null,
-    };
-
-    if (!insertionsByAfterId.has(afterId)) {
-      insertionsByAfterId.set(afterId, []);
-    }
-
-    insertionsByAfterId.get(afterId).push(placeholder);
-  }
-
-  const merged = [];
-
-  for (const row of cleanedItems) {
-    merged.push(row);
-
-    const key =
-      Number(row?.orderLineId ?? row?.id) || 0;
-
-    const toAdd = insertionsByAfterId.get(key);
-
-    if (toAdd?.length) {
-      merged.push(...toAdd);
-    }
-  }
-
-  return merged.filter(
-    (row) => !(row?.isFreeItem && Number(row?.quantity || 0) <= 0)
-  );
-};
+    return merged.filter(
+      (row) => !(row?.isFreeItem && Number(row?.quantity || 0) <= 0)
+    );
+  };
 
 
 
@@ -1211,13 +1211,13 @@ const ensureOfferFreeRows = (nextItems) => {
                             </p>
                           )}
                           {!item.isFreeItem &&
- item.availableQuantity !== null &&
- item.availableQuantity !== undefined &&
- Number(item.quantity || 0) > Number(item.availableQuantity || 0) && (
-   <p className="mt-1 text-xs font-semibold text-red-600">
-     Out of stock for this quantity
-   </p>
-)}
+                            item.availableQuantity !== null &&
+                            item.availableQuantity !== undefined &&
+                            Number(item.quantity || 0) > Number(item.availableQuantity || 0) && (
+                              <p className="mt-1 text-xs font-semibold text-red-600">
+                                Out of stock for this quantity
+                              </p>
+                            )}
                         </div>
 
                         {/* Controls */}
@@ -1230,8 +1230,8 @@ const ensureOfferFreeRows = (nextItems) => {
                                 aria-disabled={updatingLineId === Number(item.orderLineId ?? item.id) || item.quantity <= 1}
                                 disabled={updatingLineId === Number(item.orderLineId ?? item.id) || item.quantity <= 1}
                                 className={`rounded-md bg-white p-1.5 text-stone-700 shadow-sm transition hover:bg-stone-100 ${updatingLineId === Number(item.orderLineId ?? item.id) || item.quantity <= 1
-                                    ? "opacity-50"
-                                    : ""
+                                  ? "opacity-50"
+                                  : ""
                                   }`}
                               >
                                 <Minus className="h-4 w-4" />
@@ -1273,19 +1273,19 @@ const ensureOfferFreeRows = (nextItems) => {
                                   item.quantity >= MAX_QTY
                                 }
                                 className={`rounded-md bg-afmc-maroon p-1.5 text-white transition hover:bg-afmc-maroon2 ${updatingLineId === Number(item.orderLineId ?? item.id) ||
-                                    String(item.stockIssueMessage || "").trim().length > 0 ||
-                                    isOutOfStock(item) ||
-                                    (() => {
-                                      const maxAllowed = getMaxAllowedQuantity(item);
-                                      return (
-                                        Number.isFinite(Number(maxAllowed)) &&
-                                        Number(maxAllowed) >= 0 &&
-                                        Number(item.quantity || 0) >= Number(maxAllowed)
-                                      );
-                                    })() ||
-                                    item.quantity >= MAX_QTY
-                                    ? "opacity-60"
-                                    : ""
+                                  String(item.stockIssueMessage || "").trim().length > 0 ||
+                                  isOutOfStock(item) ||
+                                  (() => {
+                                    const maxAllowed = getMaxAllowedQuantity(item);
+                                    return (
+                                      Number.isFinite(Number(maxAllowed)) &&
+                                      Number(maxAllowed) >= 0 &&
+                                      Number(item.quantity || 0) >= Number(maxAllowed)
+                                    );
+                                  })() ||
+                                  item.quantity >= MAX_QTY
+                                  ? "opacity-60"
+                                  : ""
                                   }`}
                               >
                                 <Plus className="h-4 w-4" />
