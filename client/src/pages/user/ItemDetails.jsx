@@ -8,7 +8,7 @@ import { useAuth } from "../../context/AuthContext";
 const getDetailItemCode = (detail) => detail?.itemCode ?? detail?.ITEM_CODE;
 const getDetailItemName = (detail) => detail?.itemName ?? detail?.ITEM_NAME;
 const getDetailPegs = (detail) => detail?.pegs ?? detail?.PEGS;
-const getDetailStockQuantity = (detail) => detail?.stockQuantity ?? detail?.STOCK_QUANTITY;
+const getDetailStockQuantity = (detail) => detail?.stockQuantity ?? detail?.STOCK_QUANTITY ?? detail?.stock_quantity ?? 0;
 const getDetailStockStatus = (detail) => detail?.stockStatus ?? detail?.STOCK_STATUS ?? detail?.stock_status;
 const getDetailRequiredQuantity = (detail) => detail?.requiredQuantity ?? detail?.REQUIRED_QUANTITY;
 const normalizeDetail = (detail) => detail && ({
@@ -192,13 +192,14 @@ export default function ItemDetails() {
 
         const currentDetail = item?.details?.[index];
         if (currentDetail) {
-            const stockQuantity = Number(getDetailStockQuantity(currentDetail));
+            const stockQuantity = Number(getDetailStockQuantity(currentDetail)) || 0;
             const cartItemQuantity = Number(item?.cartItemQuantity || 1);
             const effectiveCartQty = Number.isFinite(cartItemQuantity) && cartItemQuantity > 0 ? cartItemQuantity : 1;
-            if (Number.isFinite(stockQuantity)) {
+            if (Number.isFinite(stockQuantity) && stockQuantity > 0) {
                 const requiredNext = Number(newVal) * effectiveCartQty;
                 if (requiredNext > stockQuantity) {
-                    toast.error(`Out of stock. Available quantity: ${stockQuantity}`);
+                    const itemName = getDetailItemName(currentDetail);
+                    toast.error(`${itemName} available quantity: ${stockQuantity || 0}`);
                     return;
                 }
             }

@@ -195,7 +195,9 @@ export default function CartPage({ isAttendant = false }) {
 
     const handleGoToMenu = useCallback(() => {
         const basePath = isAttendant ? "/attendant" : "/user";
-        navigate(`${basePath}/menudash`);
+        // Use replace to avoid leaving the cart page in history
+        // so browser Back goes to the previous dashboard instead of back to cart
+        navigate(`${basePath}/menudash`, { replace: true });
     }, [navigate, isAttendant]);
 
     // Show remove confirmation

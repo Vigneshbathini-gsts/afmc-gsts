@@ -116,7 +116,7 @@ const getIngredientMetaRows = async (conn, itemCodes) => {
   }, new Map());
 };
 
-const getDefaultCocktailIngredientRows = async (conn, parentItemCode, loginType = "") => {
+const getDefaultCocktailIngredientRows = async (conn, parentItemCode, loginType = "", cartQuantity = 1) => {
   const normalizedLoginType = String(loginType || "").trim().toUpperCase();
   const [rows] = await conn.execute(
     `
@@ -133,7 +133,7 @@ const getDefaultCocktailIngredientRows = async (conn, parentItemCode, loginType 
     [parentItemCode]
   );
 
-  return rows.map((row) => {
+  const baseIngredients = rows.map((row) => {
     const quantity = Number(row.PEGS || 0);
     const selectedPrice = normalizedLoginType === "NON MEMBER"
       ? Number(row.NON_MEMBER_PRICE ?? row.PRICE ?? 0)
@@ -149,6 +149,9 @@ const getDefaultCocktailIngredientRows = async (conn, parentItemCode, loginType 
       lineTotal,
     };
   });
+
+  // Enrich with stock information
+  return await enrichIngredientsWithStock(conn, baseIngredients, cartQuantity);
 };
 
 const validateCustomizationStock = async (conn, ingredients, cartQuantity = 1) => {
@@ -163,12 +166,39 @@ const validateCustomizationStock = async (conn, ingredients, cartQuantity = 1) =
 
     if (requiredQty + reservedQty > stockQty) {
       const availableQty = Math.max(0, stockQty - reservedQty);
-      // throw createValidationError(`Out of stock for ingredient ${ingredient.itemName || itemCode} in ${ingredient.parentItemName}. Available quantity: ${availableQty}`);
+      const ingredientName = ingredient.itemName || itemCode || "ingredient";
+      const parentSuffix = ingredient.parentItemName ? ` for ${ingredient.parentItemName}` : "";
       throw createValidationError(
-  `Only ${availableQty} ${ingredient.itemName || itemCode} available for ${ingredient.parentItemName}.`
-);
+        `Only ${availableQty} ${ingredientName} available${parentSuffix}.`
+      );
     }
   }
+};
+
+const enrichIngredientsWithStock = async (conn, ingredients, cartQuantity = 1) => {
+  if (ingredients.length === 0) return ingredients;
+
+  const itemCodes = ingredients.map((ing) => Number(ing.itemCode)).filter((code) => Number.isFinite(code) && code > 0);
+  const stockMap = await getIngredientStockQuantities(conn, itemCodes);
+  const reservedMap = await getIngredientReservedQuantities(conn, itemCodes);
+
+  return ingredients.map((ingredient) => {
+    const itemCode = Number(ingredient.itemCode);
+    const quantity = Number(ingredient.quantity || 0);
+    const cartQty = Number(cartQuantity || 1);
+    const requiredQuantity = quantity * cartQty;
+    const stockQuantity = Number(stockMap[String(itemCode)] || 0);
+    const reservedQuantity = Number(reservedMap[String(itemCode)] || 0);
+    const availableQuantity = Math.max(0, stockQuantity - reservedQuantity);
+    const stockStatus = availableQuantity >= requiredQuantity ? "In Stock" : "Out Of Stock";
+
+    return {
+      ...ingredient,
+      requiredQuantity,
+      stockQuantity: availableQuantity,
+      stockStatus,
+    };
+  });
 };
 
 const replaceCartCustomization = async (conn, cartId, ingredients) => {
@@ -198,13 +228,13 @@ const replaceCartCustomization = async (conn, cartId, ingredients) => {
 };
 
 const createDefaultCustomizationForCart = async (conn, { cartId, parentItemCode, cartQuantity, loginType }) => {
-  const ingredients = await getDefaultCocktailIngredientRows(conn, parentItemCode, loginType);
+  const ingredients = await getDefaultCocktailIngredientRows(conn, parentItemCode, loginType, cartQuantity);
   await validateCustomizationStock(conn, ingredients, cartQuantity);
   await replaceCartCustomization(conn, cartId, ingredients);
   return ingredients;
 };
 
-const normalizeCustomizationUpdates = async (conn, updates) => {
+const normalizeCustomizationUpdates = async (conn, updates, cartQuantity = 1) => {
   const normalized = (Array.isArray(updates) ? updates : [])
     .map((item) => ({
       itemCode: Number(item?.itemCode ?? item?.ingredient_item_code ?? item?.ingredientItemCode),
@@ -216,7 +246,7 @@ const normalizeCustomizationUpdates = async (conn, updates) => {
 
   const metaMap = await getIngredientMetaRows(conn, normalized.map((item) => item.itemCode));
 
-  return normalized.map((item) => {
+  const enriched = normalized.map((item) => {
     const meta = metaMap.get(String(item.itemCode));
     const itemName = item.itemName || meta?.ITEM_NAME || String(item.itemCode);
     const unitPrice = item.unitPrice != null && Number.isFinite(item.unitPrice)
@@ -232,6 +262,9 @@ const normalizeCustomizationUpdates = async (conn, updates) => {
       lineTotal,
     };
   });
+
+  // Enrich with stock information
+  return await enrichIngredientsWithStock(conn, enriched, cartQuantity);
 };
 
 const getIngredientStockQuantities = async (conn, itemCodes) => {
@@ -392,12 +425,13 @@ const updateCartCustomization = async (cartId, userId, updates) => {
       throw error;
     }
 
-    const ingredients = await normalizeCustomizationUpdates(conn, updates);
+    const cartQuantity = Number(cartItem.quantity || 1);
+    const ingredients = await normalizeCustomizationUpdates(conn, updates, cartQuantity);
     if (ingredients.length === 0) {
       throw createValidationError("At least one valid ingredient is required");
     }
 
-    await validateCustomizationStock(conn, ingredients, cartItem.quantity);
+    await validateCustomizationStock(conn, ingredients, cartQuantity);
     await replaceCartCustomization(conn, cartId, ingredients);
 
     const unitPrice = Number(ingredients.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0).toFixed(2));
@@ -409,7 +443,7 @@ const updateCartCustomization = async (cartId, userId, updates) => {
     await conn.commit();
     return {
       cartId: Number(cartId),
-      cartItemQuantity: Number(cartItem.quantity || 1),
+      cartItemQuantity: cartQuantity,
       ingredients,
       totalPrice: unitPrice,
     };
@@ -463,9 +497,13 @@ const addCartItem = async (userId, itemData) => {
     }
 
     // If cocktail, we must have ingredients
-    const ingredientsToUse = customIngredients && customIngredients.length > 0 
-      ? customIngredients 
-      : await getDefaultCocktailIngredientRows(conn, item_id, loginType);
+    let ingredientsToUse;
+    if (customIngredients && customIngredients.length > 0) {
+      // Enrich custom ingredients with stock information
+      ingredientsToUse = await enrichIngredientsWithStock(conn, customIngredients, quantity);
+    } else {
+      ingredientsToUse = await getDefaultCocktailIngredientRows(conn, item_id, loginType, quantity);
+    }
 
     // if (isCocktailOrMocktail) {
     //   await validateCustomizationStock(conn, ingredientsToUse, quantity);
@@ -526,7 +564,7 @@ const addCartItem = async (userId, itemData) => {
       );
       insertId = insertResult.insertId;
       if (isCocktailOrMocktail) {
-        const normalized = await normalizeCustomizationUpdates(conn, ingredientsToUse);
+        const normalized = await normalizeCustomizationUpdates(conn, ingredientsToUse, quantity);
         await replaceCartCustomization(conn, insertId, normalized);
 
         const customizedUnitPrice = Number(
