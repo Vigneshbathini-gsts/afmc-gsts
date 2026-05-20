@@ -148,6 +148,12 @@ export default function CartPage({ isAttendant = false }) {
             setCartItems(items);
             setCartCount(items.length);
             showToast("Item removed from cart");
+
+            if (items.length === 0) {
+                // If cart is empty after deletion, navigate back to menu/dashboard
+                const basePath = isAttendant ? "/attendant" : "/user";
+                navigate(`${basePath}/menudash`, { replace: true });
+            }
         } catch (err) {
             setError(err?.response?.data?.message || "Unable to remove item");
             showToast(err?.response?.data?.message || "Failed to remove item", 'error');

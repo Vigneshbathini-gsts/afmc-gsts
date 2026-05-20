@@ -957,24 +957,53 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
     adjustQuantity(lineId, delta);
   };
 
-  const removeItem = (id) => {
-    setItems((current) => {
-      const target = current.find((item) => item.id === id);
-      if (!target) return current;
-      if (target.isFreeItem) return current;
+const removeItem = (id) => {
+  const confirmed = window.confirm(
+    "Are you sure you want to delete this item?"
+  );
 
-      const targetCode = String(target.item_code || "").trim();
-      if (!targetCode) {
-        return current.filter((item) => item.id !== id);
-      }
+  if (!confirmed) {
+    return;
+  }
 
-      // Remove parent + any free child lines linked via `barcode` (stored as `parentCode`)
-      return current.filter((item) => {
+  setItems((current) => {
+    const target = current.find((item) => item.id === id);
+
+    if (!target) return current;
+    if (target.isFreeItem) return current;
+
+    const targetCode = String(target.item_code || "").trim();
+
+    let updatedItems = [];
+
+    if (!targetCode) {
+      updatedItems = current.filter((item) => item.id !== id);
+    } else {
+      // Remove parent + linked free items
+      updatedItems = current.filter((item) => {
         if (item.id === id) return false;
         return String(item.parentCode || "") !== targetCode;
       });
-    });
-  };
+    }
+
+    const remainingPaidItems = updatedItems.filter(
+      (item) => !item.isFreeItem
+    );
+
+    // Navigate if no items left
+    if (remainingPaidItems.length === 0) {
+      // if (backTo) {
+      //   navigate(backTo, { replace: true });
+      // } else {
+        navigate(`${currentBasePath}/menudash`, {
+          replace: true,
+        });
+      // }
+    }
+
+    return updatedItems;
+  });
+};
 
   const handleCancelOrder = async () => {
     if (!orderNumber || cancelling) {
