@@ -1318,11 +1318,23 @@ const removeItem = (id) => {
                           <p className="mt-1 text-sm text-stone-500">
                             Quantity: {item.quantity}{item.isFreeItem ? " (Free)" : ""}
                           </p>
-                          {isCocktailOrMocktail(item) && item.stockStatus && (
-                            <p className={`mt-1 text-xs font-semibold ${String(item.stockStatus).toLowerCase() === "out of stock" ? "text-red-600" : "text-green-700"}`}>
-                              {item.stockStatus}
-                            </p>
-                          )}
+                          {isCocktailOrMocktail(item) && (() => {
+                            const itemCode = String(item?.item_code || "").trim();
+                            const override = itemCode ? cocktailOverrideIssues?.[itemCode] : null;
+                            const statusText = override?.hasOverride
+                              ? (override.isOutOfStock ? "Out Of Stock" : "In Stock")
+                              : (item.stockStatus || "");
+
+                            if (!statusText) return null;
+
+                            return (
+                              <p
+                                className={`mt-1 text-xs font-semibold ${String(statusText).toLowerCase() === "out of stock" ? "text-red-600" : "text-green-700"}`}
+                              >
+                                {statusText}
+                              </p>
+                            );
+                          })()}
                           {isCocktailOrMocktail(item) && (() => {
                             const itemCode = String(item?.item_code || "").trim();
                             const override = itemCode ? cocktailOverrideIssues?.[itemCode] : null;
@@ -1364,12 +1376,13 @@ const removeItem = (id) => {
                               </div>
                             );
                           })()}
-                          {item.availableQuantity !== null && item.availableQuantity !== undefined && (
+                          {!isCocktailOrMocktail(item) && item.availableQuantity !== null && item.availableQuantity !== undefined && (
                             <p className="mt-1 text-xs text-stone-400">
                               Available: {item.availableQuantity}
                             </p>
                           )}
-                          {!item.isFreeItem &&
+                          {!isCocktailOrMocktail(item) &&
+                            !item.isFreeItem &&
                             item.availableQuantity !== null &&
                             item.availableQuantity !== undefined &&
                             Number(item.quantity || 0) > Number(item.availableQuantity || 0) && (
