@@ -1144,7 +1144,7 @@ const removeItem = (id) => {
   };
 
   const handleConfirmOrder = async () => {
-    if (!orderNumber || confirming || loading || stockIssue || cocktailStockIssue) {
+    if (!orderNumber || confirming || loading || Boolean(stockIssueMessage)) {
       return;
     }
 
@@ -1323,11 +1323,21 @@ const removeItem = (id) => {
                               {item.stockStatus}
                             </p>
                           )}
-                          {isCocktailOrMocktail(item) && item.stockIssueMessage && (
-                            <p className="mt-1 text-xs font-semibold text-red-600">
-                              {item.stockIssueMessage}
-                            </p>
-                          )}
+                          {isCocktailOrMocktail(item) && (() => {
+                            const itemCode = String(item?.item_code || "").trim();
+                            const override = itemCode ? cocktailOverrideIssues?.[itemCode] : null;
+                            const message = override?.hasOverride
+                              ? (override.stockIssueMessage || "")
+                              : String(item.stockIssueMessage || "").trim();
+
+                            if (!message) return null;
+
+                            return (
+                              <p className="mt-1 text-xs font-semibold text-red-600">
+                                {message}
+                              </p>
+                            );
+                          })()}
 
                           {isCocktailOrMocktail(item) && (() => {
                             const itemCode = String(item?.item_code || "").trim();

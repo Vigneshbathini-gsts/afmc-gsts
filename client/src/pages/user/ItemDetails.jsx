@@ -42,7 +42,8 @@ export default function ItemDetails() {
     const [lovData, setLovData] = useState([]);
     const [lovLoading, setLovLoading] = useState(false);
 
-    const draftKey = `afmc-custom-item-draft:${user?.userId || "anon"}:${id}`;
+    const draftScope = fromBuyFlow && buyOrderNumber ? `buy:${buyOrderNumber}` : "default";
+    const draftKey = `afmc-custom-item-draft:${user?.userId || "anon"}:${draftScope}:${id}`;
 
     const buildCustomizationPayload = useCallback((details, quantitiesState) => {
         return (details || [])
@@ -180,7 +181,7 @@ export default function ItemDetails() {
                         } catch (err) {
                             console.warn("Could not load cart customization:", err);
                         }
-                    } else {
+                    } else if (!fromBuyFlow) {
                         try {
                             const draft = JSON.parse(localStorage.getItem(draftKey) || "null");
                             if (draft?.details?.length) {
