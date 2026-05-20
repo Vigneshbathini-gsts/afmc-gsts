@@ -9,7 +9,13 @@ const getDetailItemCode = (detail) => detail?.itemCode ?? detail?.ITEM_CODE;
 const getDetailItemName = (detail) => detail?.itemName ?? detail?.ITEM_NAME;
 const getDetailPegs = (detail) => detail?.pegs ?? detail?.PEGS;
 const getDetailStockQuantity = (detail) => detail?.stockQuantity ?? detail?.STOCK_QUANTITY;
+const getDetailStockStatus = (detail) => detail?.stockStatus ?? detail?.STOCK_STATUS ?? detail?.stock_status;
 const getDetailRequiredQuantity = (detail) => detail?.requiredQuantity ?? detail?.REQUIRED_QUANTITY;
+const normalizeDetail = (detail) => detail && ({
+    ...detail,
+    stockQuantity: getDetailStockQuantity(detail),
+    stockStatus: getDetailStockStatus(detail),
+});
 
 export default function ItemDetails() {
     const { id } = useParams();
@@ -116,10 +122,11 @@ export default function ItemDetails() {
                     if (isEditingCartItem) {
                         try {
                             const savedResponse = await cartAPI.getCocktailDetails(cartId);
+                            console.log("Fetched saved cocktail details for cart item:", savedResponse.data);
                             const savedCollection = savedResponse.data?.data || {};
                             const savedIngredients = savedCollection?.ingredients || [];
                             if (savedIngredients.length > 0) {
-                                details = savedIngredients.map((ingredient) => ({
+                                details = savedIngredients.map((ingredient) => normalizeDetail({
                                     itemName: ingredient.itemName,
                                     itemCode: ingredient.itemCode,
                                     pegs: ingredient.quantity,
@@ -127,6 +134,8 @@ export default function ItemDetails() {
                                     unitPrice: ingredient.unitPrice,
                                     stockQuantity: ingredient.stockQuantity,
                                     stockStatus: ingredient.stockStatus,
+                                    stock_status: ingredient.stock_status,
+                                    STOCK_STATUS: ingredient.STOCK_STATUS,
                                     requiredQuantity: ingredient.requiredQuantity,
                                 }));
                                 initialQuantities = {};
@@ -142,7 +151,7 @@ export default function ItemDetails() {
                         try {
                             const draft = JSON.parse(localStorage.getItem(draftKey) || "null");
                             if (draft?.details?.length) {
-                                details = draft.details;
+                                details = draft.details.map(normalizeDetail);
                                 initialQuantities = draft.quantities || initialQuantities;
                             }
                         } catch (err) {
@@ -290,6 +299,7 @@ export default function ItemDetails() {
                 memberPrice: null,
                 unitPrice: ingredient.unitPrice,
                 stockQuantity,
+                stockStatus: stockQuantity > 0 ? "In Stock" : "Out Of Stock",
             });
         });
 
@@ -356,7 +366,7 @@ export default function ItemDetails() {
                                 QUANTITY: qty,
                                 STOCK_QUANTITY: stockQuantity,
                                 REQUIRED_QUANTITY: requiredQuantity,
-                                STOCK_STATUS: detail?.stockStatus ?? detail?.STOCK_STATUS ?? detail?.stock_status,
+                                STOCK_STATUS: getDetailStockStatus(detail),
                                 UNIT_PRICE: detail?.unitPrice ?? detail?.UNIT_PRICE,
                                 PRICE: detail?.memberPrice ?? detail?.PRICE,
                             };
@@ -514,7 +524,7 @@ export default function ItemDetails() {
                                                 ? (Number(stockQuantity) >= Number(requiredQuantity) ? "In Stock" : "Out Of Stock")
                                                 : (Number(stockQuantity) >= Number(currentQty) ? "In Stock" : "Out Of Stock")
                                           )
-                                        : (detail.stockStatus || "Unknown");
+                                        : (getDetailStockStatus(detail) || "Unknown");
 
                                     return (
                                         <tr key={index} className="border-b border-gray-50 hover:bg-gray-50 transition">
