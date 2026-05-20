@@ -64,7 +64,7 @@ const getOrderItemDetails = async (req, res) => {
     : "";
 
   const dateFilterClause = buildDateFilterClause(
-    "oh.order_date_new",
+    "oh.order_date",
     fromDate,
     toDate
   );
@@ -194,7 +194,7 @@ const getOrderItemFilterOptions = async (req, res) => {
   const toDate = normalizeDateParam(req.query.toDate);
 
   const dateFilterClause = buildDateFilterClause(
-    "oh.order_date_new",
+    "oh.order_date",
     fromDate,
     toDate
   );

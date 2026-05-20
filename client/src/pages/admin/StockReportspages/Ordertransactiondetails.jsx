@@ -175,13 +175,13 @@ export default function OrderTransactionUI() {
     }
   };
 
-  useEffect(() => {
-    // Auto-load today's report on first open (dates are pre-filled).
-    setAppliedFilters(initialFilters);
-    setHasSearched(true);
-    fetchData(initialFilters);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // useEffect(() => {
+  //   // Auto-load today's report on first open (dates are pre-filled).
+  //   setAppliedFilters(initialFilters);
+  //   setHasSearched(true);
+  //   fetchData(initialFilters);
+  //   // eslint-disable-next-line react-hooks/exhaustive-deps
+  // }, []);
 
   const handleSearch = async () => {
     // Validate dates

@@ -2,17 +2,17 @@ const pool = require("../config/db");
 
 exports.getInventory = async (itemCode, subCategory) => {
     const query = `
-SELECT 
-    inv.item_code, 
-    inv.item_name, 
-    inv.image, 
+SELECT
+    inv.item_code,
+    inv.item_name,
+    inv.image,
     inv.sub_category,
     sc.SUB_CATEGORY_NAME AS sub_category_name,
     MIN(inv.item_id) AS item_id,
 
     (
-        SELECT 
-            CASE 
+        SELECT
+            CASE
                 WHEN SUM(IFNULL(xso.stock_quantity, 0)) = 0 THEN 'Out Of Stock'
                 ELSE NULL
             END
@@ -25,10 +25,10 @@ FROM xxafmc_inventory inv
 LEFT JOIN xxafmc_sub_categories sc
   ON sc.SUB_CATEGORY_ID = inv.sub_category
 
-WHERE 
+WHERE
     inv.item_code IN (
-        SELECT DISTINCT item_code 
-        FROM xxafmc_stock_out 
+        SELECT DISTINCT item_code
+        FROM xxafmc_stock_out
         WHERE item_code = inv.item_code
     )
 
@@ -37,14 +37,14 @@ WHERE
     AND inv.item_code = IFNULL(?, inv.item_code)
     AND inv.sub_category = IFNULL(?, inv.sub_category)
 
-GROUP BY 
-    inv.item_code, 
-    inv.item_name, 
+GROUP BY
+    inv.item_code,
+    inv.item_name,
     inv.image,
     inv.sub_category,
     sc.SUB_CATEGORY_NAME
 
-ORDER BY 
+ORDER BY
     item_id ASC`;
 
     const [rows] = await pool.execute(query, [itemCode, subCategory]);
@@ -89,19 +89,35 @@ ORDER BY
 
 exports.fetchMocktail = async (itemcode) => {
     const query = `
-    SELECT 
-    inv.item_code, 
-    inv.item_name, 
+    SELECT
+    inv.item_code,
+    inv.item_name,
     inv.image,
-    inv.item_id
-  
-FROM 
+    inv.category_id,
+    inv.sub_category,
+    inv.item_id,
+    (
+        SELECT COALESCE(SUM(IFNULL(xso.stock_quantity, 0)), 0)
+        FROM xxafmc_stock_out xso
+        WHERE xso.item_code = inv.item_code
+    ) AS stockQuantity,
+    (
+        SELECT
+            CASE
+                WHEN COALESCE(SUM(IFNULL(xso.stock_quantity, 0)), 0) = 0 THEN 'Out Of Stock'
+                ELSE NULL
+            END
+        FROM xxafmc_stock_out xso
+        WHERE xso.item_code = inv.item_code
+    ) AS stock_status
+
+FROM
     xxafmc_inventory inv
 WHERE 1=1
     AND inv.category_id = 10
-    AND inv.sub_category IN (14)
+    AND inv.sub_category IN (15)
     AND inv.item_code = IFNULL(?, inv.item_code)
-ORDER BY 
+ORDER BY
     inv.item_id ASC`;
 
     const [row] = await pool.execute(query, [itemcode]);
@@ -114,8 +130,8 @@ exports.Snacksveg = async (itemcode, subcategory) => {
    inv.item_name,
    inv.image ,
    inv.item_id,
-     (SELECT 
-        CASE 
+     (SELECT
+        CASE
             WHEN SUM(IFNULL(xso.stock_quantity, 0)) = 0 THEN 'Out Of Stock'
             ELSE NULL
         END AS stock_status
@@ -123,15 +139,15 @@ exports.Snacksveg = async (itemcode, subcategory) => {
     WHERE xso.item_code = inv.item_code
     GROUP BY xso.item_code) AS stock_status
 from xxafmc_inventory inv
-where inv.item_code in 
-(select xso.item_code 
+where inv.item_code in
+(select xso.item_code
 from xxafmc_stock_out xso
  where xso.item_code =inv.item_code)
 and inv.category_id = 14
 and inv.sub_category = 10
 and inv.item_code =IFNULL(?,inv.item_code)
 order by inv.item_id asc;`;
-    
+
     const [row] = await pool.execute(query, [itemcode, subcategory]);
     return row
 };
@@ -143,8 +159,8 @@ exports.Snacknonveg = async (itemcode) => {
    inv.item_name,
    inv.image ,
    inv.item_id,
-     (SELECT 
-        CASE 
+     (SELECT
+        CASE
             WHEN SUM(IFNULL(xso.stock_quantity, 0)) = 0 THEN 'Out Of Stock'
             ELSE NULL
         END AS stock_status
@@ -152,9 +168,9 @@ exports.Snacknonveg = async (itemcode) => {
     WHERE xso.item_code = inv.item_code
     GROUP BY xso.item_code) AS stock_status
 from xxafmc_inventory inv
-where inv.item_code in 
-(select xso.item_code 
-from xxafmc_stock_out xso 
+where inv.item_code in
+(select xso.item_code
+from xxafmc_stock_out xso
 where xso.item_code =inv.item_code)
 and inv.category_id = 14
 and inv.sub_category = 7
@@ -173,31 +189,31 @@ order by inv.item_id asc;
 
 
 exports.Drinkhardbeer = async (itemcode) => {
-    const query = `SELECT 
-    inv.item_code, 
-    inv.item_name, 
+    const query = `SELECT
+    inv.item_code,
+    inv.item_name,
     inv.image,
     inv.item_id,
-    (SELECT 
-        CASE 
+    (SELECT
+        CASE
             WHEN SUM(IFNULL(xso.stock_quantity, 0)) = 0 THEN 'Out Of Stock'
             ELSE NULL
         END AS stock_status
     FROM xxafmc_stock_out xso
     WHERE xso.item_code = inv.item_code
     GROUP BY xso.item_code) AS stock_status
-FROM 
+FROM
     xxafmc_inventory inv
-WHERE 
+WHERE
     (inv.item_code IN (
-        SELECT DISTINCT xso.item_code 
-        FROM xxafmc_stock_out xso 
+        SELECT DISTINCT xso.item_code
+        FROM xxafmc_stock_out xso
         WHERE xso.item_code = inv.item_code
     ) )
     AND inv.category_id = 10
     AND inv.sub_category IN (1)
     AND inv.item_code = IFNULL(?, inv.item_code)
-ORDER BY 
+ORDER BY
     inv.item_id ASC;`
     const [rows] = await pool.execute(query, [itemcode]);
     return rows
@@ -205,31 +221,31 @@ ORDER BY
 
 
 exports.Drinkhardbrandy = async (itemcode) => {
-    const query = `SELECT 
-    inv.item_code, 
-    inv.item_name, 
+    const query = `SELECT
+    inv.item_code,
+    inv.item_name,
     inv.image,
     inv.item_id,
-    (SELECT 
-        CASE 
+    (SELECT
+        CASE
             WHEN SUM(IFNULL(xso.stock_quantity, 0)) = 0 THEN 'Out Of Stock'
             ELSE NULL
         END AS stock_status
     FROM xxafmc_stock_out xso
     WHERE xso.item_code = inv.item_code
     GROUP BY xso.item_code) AS stock_status
-FROM 
+FROM
     xxafmc_inventory inv
-WHERE 
+WHERE
     (inv.item_code IN (
-        SELECT DISTINCT xso.item_code 
-        FROM xxafmc_stock_out xso 
+        SELECT DISTINCT xso.item_code
+        FROM xxafmc_stock_out xso
         WHERE xso.item_code = inv.item_code
     ) )
     AND inv.category_id = 10
     AND inv.sub_category IN (2)
     AND inv.item_code = IFNULL(null, inv.item_code)
-ORDER BY 
+ORDER BY
     inv.item_id ASC;
     `
     const [rows] = await pool.execute(query, [itemcode]);
@@ -239,32 +255,32 @@ ORDER BY
 
 
 exports.Drinkhardbreezer = async (itemcode) => {
-    const query = `SELECT 
-    inv.item_code, 
-    inv.item_name, 
+    const query = `SELECT
+    inv.item_code,
+    inv.item_name,
     inv.image,
     inv.item_id,
-    (SELECT 
-        CASE 
+    (SELECT
+        CASE
             WHEN SUM(IFNULL(xso.stock_quantity, 0)) = 0 THEN 'Out Of Stock'
             ELSE NULL
         END AS stock_status
     FROM xxafmc_stock_out xso
     WHERE xso.item_code = inv.item_code
     GROUP BY xso.item_code) AS stock_status
-FROM 
+FROM
     xxafmc_inventory inv
-WHERE 
+WHERE
     (inv.item_code IN (
-        SELECT DISTINCT xso.item_code 
-        FROM xxafmc_stock_out xso 
+        SELECT DISTINCT xso.item_code
+        FROM xxafmc_stock_out xso
         WHERE xso.item_code = inv.item_code
-        
+
     ) )
     AND inv.category_id = 10
     AND inv.sub_category IN (3)
     AND inv.item_code = IFNULL(null, inv.item_code)
-ORDER BY 
+ORDER BY
     inv.item_id ASC;
 
     `
@@ -275,32 +291,32 @@ ORDER BY
 
 exports.Drinkhardvodka = async (itemcode) => {
     const query = `
-    SELECT 
-    inv.item_code, 
-    inv.item_name, 
+    SELECT
+    inv.item_code,
+    inv.item_name,
     inv.image,
     inv.item_id,
-    (SELECT 
-        CASE 
+    (SELECT
+        CASE
             WHEN SUM(IFNULL(xso.stock_quantity, 0)) = 0 THEN 'Out Of Stock'
             ELSE NULL
         END AS stock_status
     FROM xxafmc_stock_out xso
     WHERE xso.item_code = inv.item_code
     GROUP BY xso.item_code) AS stock_status
-FROM 
+FROM
     xxafmc_inventory inv
-WHERE 
+WHERE
     (inv.item_code IN (
-        SELECT DISTINCT xso.item_code 
-        FROM xxafmc_stock_out xso 
+        SELECT DISTINCT xso.item_code
+        FROM xxafmc_stock_out xso
         WHERE xso.item_code = inv.item_code
-        
+
     ) )
     AND inv.category_id = 10
     AND inv.sub_category IN (11)
     AND inv.item_code = IFNULL(null, inv.item_code)
-ORDER BY 
+ORDER BY
     inv.item_id ASC;
     `
     const [rows] = await pool.execute(query, [itemcode]);
@@ -309,33 +325,33 @@ ORDER BY
 
 exports.DrinkhardGin = async (itemcode) => {
     const query = `
-   SELECT 
-    inv.item_code, 
-    inv.item_name, 
+   SELECT
+    inv.item_code,
+    inv.item_name,
     inv.image,
     inv.item_id,
-    (SELECT 
-        CASE 
+    (SELECT
+        CASE
             WHEN SUM(IFNULL(xso.stock_quantity, 0)) = 0 THEN 'Out Of Stock'
             ELSE NULL
         END AS stock_status
     FROM xxafmc_stock_out xso
     WHERE xso.item_code = inv.item_code
     GROUP BY xso.item_code) AS stock_status
-FROM 
+FROM
     xxafmc_inventory inv
-WHERE 
+WHERE
     (inv.item_code IN (
-        SELECT DISTINCT xso.item_code 
-        FROM xxafmc_stock_out xso 
+        SELECT DISTINCT xso.item_code
+        FROM xxafmc_stock_out xso
         WHERE xso.item_code = inv.item_code
-       
+
     ) )
     AND inv.category_id = 10
     AND inv.sub_category IN (5)
     AND inv.item_code = IFNULL(null, inv.item_code)
-   
-ORDER BY 
+
+ORDER BY
     inv.item_id ASC;
 
     `
@@ -346,33 +362,33 @@ ORDER BY
 
 exports.DrinkhardRum = async (itemcode) => {
     const query = `
-   SELECT 
-    inv.item_code, 
-    inv.item_name, 
+   SELECT
+    inv.item_code,
+    inv.item_name,
     inv.image,
     inv.item_id,
-    (SELECT 
-        CASE 
+    (SELECT
+        CASE
             WHEN SUM(IFNULL(xso.stock_quantity, 0)) = 0 THEN 'Out Of Stock'
             ELSE NULL
         END AS stock_status
     FROM xxafmc_stock_out xso
     WHERE xso.item_code = inv.item_code
     GROUP BY xso.item_code) AS stock_status
-FROM 
+FROM
     xxafmc_inventory inv
-WHERE 
+WHERE
     (inv.item_code IN (
-        SELECT DISTINCT xso.item_code 
-        FROM xxafmc_stock_out xso 
+        SELECT DISTINCT xso.item_code
+        FROM xxafmc_stock_out xso
         WHERE xso.item_code = inv.item_code
-        
+
     ) )
     AND inv.category_id = 10
     AND inv.sub_category IN (8)
     AND inv.item_code = IFNULL(null, inv.item_code)
-   
-ORDER BY 
+
+ORDER BY
     inv.item_id ASC;
 
 
@@ -384,33 +400,33 @@ ORDER BY
 
 exports.DrinkhardWhisky = async (itemcode) => {
     const query = `
-SELECT 
-    inv.item_code, 
-    inv.item_name, 
+SELECT
+    inv.item_code,
+    inv.item_name,
     inv.image,
     inv.item_id,
-    (SELECT 
-        CASE 
+    (SELECT
+        CASE
             WHEN SUM(IFNULL(xso.stock_quantity, 0)) = 0 THEN 'Out Of Stock'
             ELSE NULL
         END AS stock_status
     FROM xxafmc_stock_out xso
     WHERE xso.item_code = inv.item_code
     GROUP BY xso.item_code) AS stock_status
-FROM 
+FROM
     xxafmc_inventory inv
-WHERE 
+WHERE
     (inv.item_code IN (
-        SELECT DISTINCT xso.item_code 
-        FROM xxafmc_stock_out xso 
+        SELECT DISTINCT xso.item_code
+        FROM xxafmc_stock_out xso
         WHERE xso.item_code = inv.item_code
     ) )
-   
+
     AND inv.category_id = 10
     AND inv.sub_category IN (12)
     AND inv.item_code = IFNULL(null, inv.item_code)
-  
-ORDER BY 
+
+ORDER BY
     inv.item_id ASC;
     `
     const [rows] = await pool.execute(query, [itemcode]);
@@ -421,32 +437,32 @@ ORDER BY
 
 exports.DrinkhardWine = async (itemcode) => {
     const query = `
-        	SELECT 
-		inv.item_code, 
-		inv.item_name, 
+        SELECT
+		inv.item_code,
+		inv.item_name,
 		inv.image,
 		inv.item_id,
-		(SELECT 
-			CASE 
+		(SELECT
+			CASE
 				WHEN SUM(IFNULL(xso.stock_quantity, 0)) = 0 THEN 'Out Of Stock'
 				ELSE NULL
 			END AS stock_status
 		FROM xxafmc_stock_out xso
 		WHERE xso.item_code = inv.item_code
 		GROUP BY xso.item_code) AS stock_status
-	FROM 
+	FROM
 		xxafmc_inventory inv
-	WHERE 
+	WHERE
 		(inv.item_code IN (
-			SELECT DISTINCT xso.item_code 
-			FROM xxafmc_stock_out xso 
+			SELECT DISTINCT xso.item_code
+			FROM xxafmc_stock_out xso
 			WHERE xso.item_code = inv.item_code
 		) )
 		AND inv.category_id = 10
 		AND inv.sub_category IN (1310)
 		AND inv.item_code = IFNULL(null, inv.item_code)
-	  
-	ORDER BY 
+
+	ORDER BY
 		inv.item_id ASC;
 
     `
@@ -458,32 +474,32 @@ exports.DrinkhardWine = async (itemcode) => {
 exports.DrinkhardLiquor = async (itemcode) => {
     const query = `
 
-    SELECT 
-    inv.item_code, 
-    inv.item_name, 
+    SELECT
+    inv.item_code,
+    inv.item_name,
     inv.image,
     inv.item_id,
-    (SELECT 
-        CASE 
+    (SELECT
+        CASE
             WHEN SUM(IFNULL(xso.stock_quantity, 0)) = 0 THEN 'Out Of Stock'
             ELSE NULL
         END AS stock_status
     FROM xxafmc_stock_out xso
     WHERE xso.item_code = inv.item_code
     GROUP BY xso.item_code) AS stock_status
-FROM 
+FROM
     xxafmc_inventory inv
-WHERE 
+WHERE
     (inv.item_code IN (
-        SELECT DISTINCT xso.item_code 
-        FROM xxafmc_stock_out xso 
+        SELECT DISTINCT xso.item_code
+        FROM xxafmc_stock_out xso
         WHERE xso.item_code = inv.item_code
     ) )
-  
+
     AND inv.category_id = 10
     AND inv.sub_category IN (16)
     AND inv.item_code = IFNULL(NULL, inv.item_code)
-ORDER BY 
+ORDER BY
     inv.item_id ASC;
     `
     const [rows] = await pool.execute(query, [itemcode]);
@@ -493,32 +509,32 @@ ORDER BY
 
 exports.DrinkhardTequila = async (itemcode) => {
     const query = `
-    SELECT 
-    inv.item_code, 
-    inv.item_name, 
+    SELECT
+    inv.item_code,
+    inv.item_name,
     inv.image,
     inv.item_id,
-    (SELECT 
-        CASE 
+    (SELECT
+        CASE
             WHEN SUM(IFNULL(xso.stock_quantity, 0)) = 0 THEN 'Out Of Stock'
             ELSE NULL
         END AS stock_status
     FROM xxafmc_stock_out xso
     WHERE xso.item_code = inv.item_code
     GROUP BY xso.item_code) AS stock_status
-FROM 
+FROM
     xxafmc_inventory inv
-WHERE 
+WHERE
     (inv.item_code IN (
-        SELECT DISTINCT xso.item_code 
-        FROM xxafmc_stock_out xso 
+        SELECT DISTINCT xso.item_code
+        FROM xxafmc_stock_out xso
         WHERE xso.item_code = inv.item_code
     ) )
-   
+
     AND inv.category_id = 10
     AND inv.sub_category IN (17)
     AND inv.item_code = IFNULL(null, inv.item_code)
-ORDER BY 
+ORDER BY
     inv.item_id ASC;
     `
     const [rows] = await pool.execute(query, [itemcode]);
@@ -528,20 +544,36 @@ ORDER BY
 
 exports.DrinkhardCocktail = async (itemcode) => {
     const query = `
-        	SELECT 
-    inv.item_code, 
-    inv.item_name, 
+    SELECT
+    inv.item_code,
+    inv.item_name,
     inv.image,
-    inv.item_id
-    
-FROM 
+    inv.category_id,
+    inv.sub_category,
+    inv.item_id,
+    (
+        SELECT COALESCE(SUM(IFNULL(xso.stock_quantity, 0)), 0)
+        FROM xxafmc_stock_out xso
+        WHERE xso.item_code = inv.item_code
+    ) AS stockQuantity,
+    (
+        SELECT
+            CASE
+                WHEN COALESCE(SUM(IFNULL(xso.stock_quantity, 0)), 0) = 0 THEN 'Out Of Stock'
+                ELSE NULL
+            END
+        FROM xxafmc_stock_out xso
+        WHERE xso.item_code = inv.item_code
+    ) AS stock_status
+
+FROM
     xxafmc_inventory inv
 WHERE 1=1
     AND inv.category_id = 10
-    AND inv.sub_category IN (15)
+    AND inv.sub_category IN (14)
     AND inv.item_code = IFNULL(null, inv.item_code)
-    
-ORDER BY 
+
+ORDER BY
     inv.item_id ASC;
     `
     const [rows] = await pool.execute(query, [itemcode]);

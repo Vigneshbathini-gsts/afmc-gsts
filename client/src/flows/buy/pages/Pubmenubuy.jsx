@@ -901,15 +901,15 @@ const ensureOfferFreeRows = (nextItems) => {
 
     const availableQty = liveItem?.availableQuantity;
     if (
-      !isCocktailOrMocktail(liveItem) &&
-      availableQty !== null &&
-      availableQty !== undefined &&
-      Number.isFinite(Number(availableQty)) &&
-      nextQtyCandidate > Number(availableQty)
-    ) {
-      showToast(`Out of stock. Available quantity: ${availableQty}`, "error");
-      return;
-    }
+  !isCocktailOrMocktail(liveItem) &&
+  availableQty !== null &&
+  availableQty !== undefined &&
+  Number.isFinite(Number(availableQty))
+) {
+  if (nextQtyCandidate > Number(availableQty)) {
+    showToast(`Out of stock. Available quantity: ${availableQty}`, "error");
+  }
+}
 
     // Offer/free-item stock validation (same messaging as cart)
     const expectedFreeQty = calculateFreeQuantity(
@@ -1174,6 +1174,7 @@ const ensureOfferFreeRows = (nextItems) => {
                               {item.stockStatus}
                             </p>
                           )}
+                          {item.quantity }
                           {isCocktailOrMocktail(item) && item.stockIssueMessage && (
                             <p className="mt-1 text-xs font-semibold text-red-600">
                               {item.stockIssueMessage}
@@ -1213,6 +1214,7 @@ const ensureOfferFreeRows = (nextItems) => {
                           {!item.isFreeItem &&
  item.availableQuantity !== null &&
  item.availableQuantity !== undefined &&
+ Number(item.availableQuantity || 0) >= 0 &&
  Number(item.quantity || 0) > Number(item.availableQuantity || 0) && (
    <p className="mt-1 text-xs font-semibold text-red-600">
      Out of stock for this quantity

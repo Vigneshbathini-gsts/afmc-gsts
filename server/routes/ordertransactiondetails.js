@@ -64,7 +64,7 @@ const getOrderTransactionDetails = async (req, res) => {
     });
 
     const dateFilterClause = buildDateFilterClause(
-      "OH.ORDER_DATE_NEW",
+      "OH.ORDER_DATE",
       fromDate,
       toDate
     );
@@ -144,7 +144,7 @@ const getOrderTransactionDetails = async (req, res) => {
         IFNULL(OD.PROFIT, 0) AS TOTALPERCENT,
         OH.ORDER_NUM,
         OH.USER_ID,
-        OH.ORDER_DATE_NEW AS O_DATE,
+        OH.ORDER_DATE AS O_DATE,
         OH.ORDER_TOTAL,
         CONCAT(UCASE(LEFT(XI.ITEM_NAME,1)), LCASE(SUBSTRING(XI.ITEM_NAME,2))) AS ITEM_NAME,
         COALESCE(XNM.FIRST_NAME, XU.FIRST_NAME) AS FIRST_NAME,

@@ -37,12 +37,13 @@ exports.getStockReport = async (req, res) => {
         COALESCE(NULLIF(inv.\`A/C_UNIT\`, ''), 'Nos') AS A_C_UNIT
       FROM (
         SELECT
-          item_code,
+          item_code AS item_code,
           MAX(item_name) AS item_name,
           MAX(unit_price) AS unit_price,
           SUM(IFNULL(stock_quantity, 0)) AS stock_quantity,
           MAX(\`A/C_UNIT\`) AS \`A/C_UNIT\`,
-          MAX(sub_category) AS sub_category
+          MAX(sub_category) AS sub_category,
+          MAX(creation_date) AS latest_created_date
         FROM xxafmc_inventory
         GROUP BY item_code
       ) inv
@@ -77,7 +78,7 @@ exports.getStockReport = async (req, res) => {
       WHERE inv.sub_category NOT IN (14, 15)
         AND (? IS NULL OR UPPER(inv.item_name) LIKE CONCAT('%', UPPER(?), '%'))
         AND (? IS NULL OR inv.item_code = ?)
-      ORDER BY inv.item_name ASC
+     ORDER BY inv.item_code DESC
       LIMIT ${limitNum} OFFSET ${offsetNum}
     `;
 

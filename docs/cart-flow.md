@@ -52,7 +52,6 @@ This document maps the end-to-end **Cart flow** across frontend and backend so t
   - `invoiceAPI.getByOrderNumber` → `GET /invoice/:orderNumber`
   - `invoiceAPI.savePayment` → `POST /invoice/:orderNumber/payment`
 - `afmc-gsts/client/src/services/orderService.js`
-- `afmc-gsts/client/src/services/paymentService.js`
 - `afmc-gsts/client/src/services/Invoiceservice.js`
 - `afmc-gsts/client/src/services/InvoiceReportservice.js`
 - `afmc-gsts/client/src/services/ConfirmOrderservice.js` (separate confirm-order service usage in some screens)
@@ -87,7 +86,6 @@ Key endpoints (see `afmc-gsts/server/routes/cartRoutes.js`):
 - `afmc-gsts/server/routes/paymentRoutes.js`
 - `afmc-gsts/server/controllers/paymentController.js`
 - `afmc-gsts/server/services/paymentService.js`
-- `afmc-gsts/server/models/paymentModel.js`
 - `afmc-gsts/server/middleware/validatePayment.js` (validates payment reference for IMMEDIATE mode)
 
 ### Invoice
