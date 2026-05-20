@@ -155,7 +155,7 @@ const getDefaultCocktailIngredientRows = async (conn, parentItemCode, loginType 
 };
 
 const validateCustomizationStock = async (conn, ingredients, cartQuantity = 1) => {
-  console.log("Validating customization stock for ingredients:", ingredients, "with cart quantity:", cartQuantity);
+  // console.log("Validating customization stock for ingredients:", ingredients, "with cart quantity:", cartQuantity);
   for (const ingredient of ingredients) {
     const itemCode = Number(ingredient.itemCode);
     const requiredQty = Number(ingredient.quantity || 0) * Number(cartQuantity || 1);

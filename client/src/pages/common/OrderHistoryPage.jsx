@@ -73,8 +73,7 @@ const OrderHistoryPage = () => {
         try {
             setLoading(true);
             setError("");
-
-            const response = await orderAPI.getOrderHistory({
+            const response = await orderAPI.getUserOrderHistory({
                 from: filters.fromDate || null,
                 to: filters.toDate || null,
                 username: filters.username?.trim() || null,
@@ -178,7 +177,7 @@ const OrderHistoryPage = () => {
             ].filter(Boolean),
             rows: visibleOrders.map((order) => [
                 order.order_num ?? "",
-                formatDisplayDate(order.order_date),
+                formatDisplayDate(order.creation_date),
                 order.first_name ?? "",
                 order.status ?? "",
                 showPaymentMethod ? order.payment_method ?? "" : null,
