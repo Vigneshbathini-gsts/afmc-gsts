@@ -8,6 +8,7 @@ const {
   fetchOrderDetails,
   fetchOrderSummary,
   lookupNonMember,
+  fetchUserOrderHistory,
 } = require("../controllers/orderController");
 
 const router = express.Router();
@@ -20,6 +21,7 @@ router.post("/non-member", authMiddleware, createOrUpdateNonMember);
 router.get("/:id/summary", authMiddleware, fetchOrderSummary);
 router.get("/:id/details", authMiddleware, fetchOrderDetails);
 router.get("/:id", authMiddleware, fetchOrderDetails);
+router.get("/user/history", authMiddleware, fetchUserOrderHistory);
 
 module.exports = router;
 

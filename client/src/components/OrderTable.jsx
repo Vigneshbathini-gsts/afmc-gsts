@@ -86,16 +86,35 @@ const OrderTable = ({
                                         </button>
                                     </td>
                                     <td className="px-4 py-3 text-gray-600">
-                                        {formatOrderDate(order.order_date)}
+                                        {formatOrderDate(order.creation_date)}
                                     </td>
                                     <td className="px-4 py-3 text-gray-600">{order.first_name || "-"}</td>
-                                    <td className="px-4 py-3 text-gray-600">{order.status || "-"}</td>
+                                    <td className="px-4 py-3">
+                                        <span
+                                            className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${order.status === "Completed"
+                                                    ? "bg-green-100 text-green-700"
+                                                    : order.status === "Cancelled"
+                                                        ? "bg-red-100 text-red-700"
+                                                        : "bg-yellow-100 text-yellow-700"
+                                                }`}
+                                        >
+                                            {order.status || "-"}
+                                        </span>
+                                    </td>
 
                                     {showPaymentMethod && (
                                         <td className="px-4 py-3 text-gray-600">{order.payment_method || "-"}</td>
                                     )}
-                                    <td className="px-4 py-3 text-gray-600">{paymentStatus}</td>
-                                    <td className="px-4 py-3 text-gray-600">₹ {amount}</td>
+                                    <td className="px-4 py-3">
+                                        <span
+                                            className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${String(paymentStatus).trim().toLowerCase() === "paid"
+                                                    ? "bg-green-100 text-green-700"
+                                                    : "bg-red-100 text-red-700"
+                                                }`}
+                                        >
+                                            {paymentStatus}
+                                        </span>
+                                    </td>                                    <td className="px-4 py-3 text-gray-600">₹ {amount}</td>
                                     <td className="px-4 py-3 flex flex-wrap gap-2">
                                         <FaPencilAlt
                                             onClick={() => {
@@ -105,11 +124,10 @@ const OrderTable = ({
                                                     `${location.pathname.startsWith("/attendant") ? "/attendant" : "/user"}/payment?orderNumber=${encodeURIComponent(order.order_num)}`
                                                 );
                                             }}
-                                            className={`transition ${
-                                                isPaid
+                                            className={`transition ${isPaid
                                                     ? "cursor-not-allowed text-gray-300"
                                                     : "cursor-pointer text-green-600 hover:text-green-700"
-                                            }`}
+                                                }`}
                                             title={isPaid ? "Payment completed" : "Go to payment"}
                                         />
                                     </td>

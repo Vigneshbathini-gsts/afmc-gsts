@@ -5,6 +5,7 @@ const {
   getOrderDetails,
   getOrderSummary,
   saveNonMember,
+  getUserOrderHistory,
 } = require("../models/orderModel");
 
 exports.fetchActiveOrders = async (req, res) => {
@@ -19,7 +20,6 @@ exports.fetchActiveOrders = async (req, res) => {
       search,
       userId,
     });
-
     res.status(200).json({
       success: true,
       data,
@@ -72,7 +72,7 @@ exports.fetchAdminOrderHistory = async (req, res) => {
       username,
       userId,
     });
-
+// console.log("Fetched Admin Order History:", data);
     res.status(200).json({
       success: true,
       data,
@@ -191,4 +191,28 @@ exports.createOrUpdateNonMember = async (req, res) => {
   }
 };
 
+exports.fetchUserOrderHistory = async (req, res) => {
+  try {
+    const { from = null, to = null } = req.query;
+    const appUser = req.user?.username || null;
+
+    const data = await getUserOrderHistory({
+      fromDate: from,
+      toDate: to,
+      appUser,
+    }); 
+// console.log("Fetched User Order History:", data);
+    res.status(200).json({
+      success: true,
+      data,
+    });
+  } catch (error) {
+    console.error("Failed to fetch user order history:", error);
+    res.status(500).json({  
+      success: false,
+      message: "Unable to fetch order history.",
+      error: error.message,
+    });
+  } 
+};
 

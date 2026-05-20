@@ -249,6 +249,7 @@ export const orderAPI = {
   // User
   getMyOrders: () => api.get("/orders/my-orders"),
   getActiveOrders: (params) => api.get("/orders/active", { params }),
+  getUserOrderHistory: (params) => api.get("/orders/user/history", { params }),
 
   // Kitchen
   getKitchenOrders: () => api.get("/orders/kitchen"),
@@ -265,6 +266,7 @@ export const orderAPI = {
   // Admin
   getOrderHistory: (params) => api.get("/orders/history", { params }),
   getOrderSummary: (orderNumber) => api.get(`/orders/${orderNumber}/summary`),
+  getUserOrderHistory: (params) => api.get("/orders/user/history", { params }),
 };
 
 // ================================

@@ -4,6 +4,7 @@ import { cancelledOrdersAPI } from "../../services/api";
 import OrderDetailsModal from "../../components/OrderDetailsModal";
 import { useNavigate } from "react-router-dom";
 import { exportTableToPdf } from "../../utils/pdfExport";
+import { formatDisplayDate } from "../../utils/dateUtils";
 
 // Helper function to convert string to INITCAP (Title Case)
 const toInitCap = (str) => {
@@ -65,7 +66,7 @@ export default function CancelledOrders() {
   // Handle date selection - only filter when a complete date is selected
   const handleDateChange = (e) => {
     const { name, value } = e.target;
-    
+
     // Update the filter state
     setFilters(prev => ({ ...prev, [name]: value }));
   };
@@ -89,14 +90,14 @@ export default function CancelledOrders() {
   const handleReset = () => {
     const resetFromDate = today;
     const resetToDate = today;
-    
+
     const nextFilters = {
       fromDate: resetFromDate,
       toDate: resetToDate,
     };
 
     setFilters(nextFilters);
-    
+
     // Fetch immediately after reset
     setTimeout(() => {
       fetchCancelledOrders(nextFilters);
@@ -132,7 +133,7 @@ export default function CancelledOrders() {
       rows: orders.map((order) => [
         order?.ORDER_NUM ?? "",
         toInitCap(order?.status ?? ""),
-        order?.ORDER_DATE ?? "",
+        formatDisplayDate(order?.ORDER_DATE ?? ""),
         toInitCap(order?.FIRST_NAME ?? ""),
         toInitCap(order?.pubmed_name ?? ""),
       ]),
@@ -145,13 +146,13 @@ export default function CancelledOrders() {
   const filteredOrders = orders.filter((order) => {
     const searchTermLower = searchFilters.searchTerm.toLowerCase();
     if (!searchTermLower) return true;
-    
-    const matchesOrderNumber = order?.ORDER_NUM && 
+
+    const matchesOrderNumber = order?.ORDER_NUM &&
       order.ORDER_NUM.toString().toLowerCase().includes(searchTermLower);
-    
-    const matchesCustomerName = order?.FIRST_NAME && 
+
+    const matchesCustomerName = order?.FIRST_NAME &&
       order.FIRST_NAME.toLowerCase().includes(searchTermLower);
-    
+
     return matchesOrderNumber || matchesCustomerName;
   });
 
@@ -329,8 +330,10 @@ export default function CancelledOrders() {
                             {toInitCap(row.status)}
                           </span>
                         </td>
-                        <td className="border px-3 py-2">{row.ORDER_DATE}</td>
-                        <td className="border px-3 py-2">{toInitCap(row.FIRST_NAME)}</td>
+                        <td className="border px-3 py-2">
+                          {formatDisplayDate(row.ORDER_DATE)}
+                        </td>                      
+                          <td className="border px-3 py-2">{toInitCap(row.FIRST_NAME)}</td>
                         <td className="border px-3 py-2">{toInitCap(row.pubmed_name)}</td>
                       </tr>
                     ))
@@ -374,8 +377,8 @@ export default function CancelledOrders() {
                         key={pageNumber}
                         onClick={() => handlePageChange(pageNumber)}
                         className={`px-4 py-2 rounded-lg text-sm font-medium border transition ${currentPage === pageNumber
-                            ? "bg-afmc-maroon text-white border-afmc-maroon"
-                            : "bg-white text-slate-700 hover:bg-slate-50 border-slate-300"
+                          ? "bg-afmc-maroon text-white border-afmc-maroon"
+                          : "bg-white text-slate-700 hover:bg-slate-50 border-slate-300"
                           }`}
                       >
                         {pageNumber}

@@ -446,10 +446,72 @@ async function saveNonMember({ firstName, lastName = "", phoneNumber }) {
   }
 }
 
+
+
+async function getUserOrderHistory({ fromDate, toDate, username, appUser }) {
+  const query = `
+      SELECT  
+        xxoh.order_num,
+        ROUND(xxoh.order_total, 2) AS subtotal,
+        CASE 
+          WHEN MAX(CASE WHEN xxkn.status = 'Completed' THEN 1 END) = 1 
+          THEN 'Completed'
+          WHEN MAX(CASE WHEN xxkn.status = 'Cancelled' THEN 1 END) = 1
+          THEN 'Cancelled'
+        END AS status,
+        DATE_FORMAT(MAX(xxod.creation_date), '%Y-%m-%d %H:%i:%s') AS creation_date,
+        MAX(
+          IFNULL(
+            (SELECT xnm.first_name FROM xxafmc_non_members xnm WHERE xnm.id = xxoh.member_id), 
+            (SELECT xu2.first_name FROM xxafmc_users xu2 WHERE xu2.user_id = xxoh.user_id)
+          )
+        ) AS first_name,
+        CASE 
+  WHEN MAX(xxod.payment_status) = 'Paid' 
+  THEN 1
+  ELSE 0
+END AS is_paid,
+        CASE  
+          WHEN MAX(xxod.payment_status) IS NULL THEN 'Un Paid'
+          ELSE MAX(xxod.payment_status)
+        END AS payment_status1
+      FROM xxafmc_order_header xxoh
+      JOIN xxafmc_order_details xxod ON xxoh.order_num = xxod.order_id
+      JOIN xxafmc_inventory xxui ON xxod.item_id = xxui.item_code
+      JOIN xxafmc_kitchen_notification xxkn ON xxod.order_id = xxkn.ordernumber
+      JOIN xxafmc_users xu ON xxkn.user_name = xu.user_id
+      WHERE UPPER(xu.user_name) = UPPER(?)
+        AND xxoh.order_num IN (
+          SELECT ordernumber
+          FROM xxafmc_kitchen_notification
+          GROUP BY ordernumber
+          HAVING 
+            COUNT(*) = SUM(CASE WHEN status = 'Completed' THEN 1 ELSE 0 END)
+            OR (COUNT(CASE WHEN status = 'Completed' THEN 1 END) > 0 
+                AND COUNT(CASE WHEN status = 'Cancelled' THEN 1 END) > 0)
+        )
+        AND DATE(xxod.creation_date) BETWEEN IFNULL(?, CURDATE()) AND IFNULL(?, CURDATE())
+      GROUP BY 
+        xxoh.order_num,
+        xu.first_name,
+        xxoh.order_total
+      ORDER BY 
+        MAX(xxod.creation_date) DESC
+    `;
+
+  const cleanUser = appUser?.trim() || null;
+  const params = [cleanUser, fromDate || null, toDate || null];
+  const [rows] = await db.execute(query, params);
+ 
+  return rows;
+}
+
+
 module.exports = {
   getActiveOrders,
   getAdminOrderHistory,
   getNonMemberByPhone,
+  getUserOrderHistory,
   getOrderDetails,
   getOrderSummary,
   saveNonMember,

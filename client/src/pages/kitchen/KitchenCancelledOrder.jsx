@@ -55,7 +55,7 @@ const KitchenCancelledOrder = () => {
 
             const response = await barOrdersAPI.getCancelledOrders(params);
             const ordersData = response.data?.data || [];
-console.log("API response for cancelled orders:", ordersData);
+// console.log("API response for cancelled orders:", ordersData);
             setCancelledOrders(ordersData);
             console.log(`Loaded ${ordersData.length} cancelled orders`);
         } catch (error) {

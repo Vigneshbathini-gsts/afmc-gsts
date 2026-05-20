@@ -56,6 +56,7 @@ export default function OrderDetailsModal({ isOpen, onClose, orderNumber }) {
           : Array.isArray(responseData?.items)
             ? responseData.items
             : [];
+            console.log("Fetched order details:", fetchedItems);
         setItems(fetchedItems);
       } catch (err) {
         console.error("Error fetching order details:", err);
@@ -111,8 +112,7 @@ export default function OrderDetailsModal({ isOpen, onClose, orderNumber }) {
                   <th className="px-4 py-3 text-left">Status</th>
                   <th className="px-4 py-3 text-left">Quantity</th>
                   <th className="px-4 py-3 text-left">Type</th>
-                  <th className="px-4 py-3 text-right">Price</th>
-                  <th className="px-4 py-3 text-right">Total</th>
+               
                 </tr>
               </thead>
               <tbody>
@@ -144,22 +144,12 @@ export default function OrderDetailsModal({ isOpen, onClose, orderNumber }) {
                       </td>
                       <td className="px-4 py-3">{item.quantity || item.QUANTITY || 0}</td>
                       <td className="px-4 py-3">{displayType}</td>
-                      <td className="px-4 py-3 text-right">₹ {formatCurrency(priceValue)}</td>
-                      <td className="px-4 py-3 text-right font-semibold">₹ {formatCurrency(subtotalValue)}</td>
+                      
                     </tr>
                   );
                 })}
               </tbody>
-              <tfoot className="bg-gray-50">
-                <tr className="border-t font-bold text-gray-800">
-                  <td colSpan="5" className="px-4 py-3 text-right">
-                    Grand Total
-                  </td>
-                  <td className="px-4 py-3 text-right text-green-700">
-                    ₹ {formatCurrency(grandTotal)}
-                  </td>
-                </tr>
-              </tfoot>
+              
             </table>
           </div>
         )}

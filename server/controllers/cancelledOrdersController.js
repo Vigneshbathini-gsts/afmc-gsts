@@ -1,12 +1,12 @@
 const pool = require("../config/db");
 
+
 /**
  * GET CANCELLED ORDERS REPORT
  */
 exports.getCancelledOrders = async (req, res) => {
   try {
     const { fromDate, toDate } = req.query;
-
     const normalizeDate = (date) => {
       if (!date) return null;
       const parsed = new Date(date);

@@ -201,8 +201,7 @@ export default function ActiveOrdersView({
                     <th className="px-4 py-3 text-left font-medium">Order Number</th>
                     <th className="px-4 py-3 text-left font-medium">Order Date</th>
                     <th className="px-4 py-3 text-left font-medium">Name</th>
-                    <th className="px-4 py-3 text-left font-medium">Phone</th>
-                    <th className="px-4 py-3 text-left font-medium">Amount</th>
+                   
                     <th className="px-4 py-3 text-left font-medium">Status</th>
                   </tr>
                 </thead>
@@ -238,10 +237,7 @@ export default function ActiveOrdersView({
                           {formatDisplayDate(order.creation_date || order.order_date)}
                         </td>
                         <td className="px-4 py-3">{order.first_name || "-"}</td>
-                        <td className="px-4 py-3">{order.phone_number || "-"}</td>
-                        <td className="px-4 py-3">
-                          {Number(order.order_total || 0).toFixed(2)}
-                        </td>
+                       
                         <td className="px-4 py-3">
                           <span
                             className={`font-semibold ${getStatusClassName(order.status)}`}

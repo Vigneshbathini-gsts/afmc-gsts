@@ -15,7 +15,7 @@ import { useAuth } from "../../context/AuthContext";
 import { barOrdersAPI } from "../../services/api";
 import { Html5Qrcode } from "html5-qrcode";
 import { toInitCap } from "../../utils/textFormat";
-import { formatDisplayTime } from "../../utils/dateUtils";
+import { formatDisplayDate } from "../../utils/dateUtils";
 
 export default function OutletOrderDetails() {
   const location = useLocation();
@@ -770,7 +770,7 @@ export default function OutletOrderDetails() {
                           <td className="px-4 py-3 text-sm text-gray-800">{toInitCap(item.itemName || "")}</td>
                           <td className="px-4 py-3 text-sm text-center font-medium">{item.scanQuantity}</td>
                           <td className="px-4 py-3 text-sm text-gray-500">
-                            {formatDisplayTime(item.scannedAt)}
+                            {formatDisplayDate(item.scannedAt)}
                           </td>
                           <td className="px-4 py-3 text-sm text-right font-semibold">Rs {item.itemPrice || "0"}</td>
                           <td className="px-4 py-3 text-sm font-mono text-gray-500">{item.barcode}</td>
