@@ -16,6 +16,7 @@ router.patch("/:cartId", authMiddleware, cartController.updateCartItemQuantity);
 router.put("/quantity/:cartId", authMiddleware, cartController.updateCartItemQuantity);
 router.delete("/:cartId", authMiddleware, cartController.deleteCartItem);
 router.get("/lov-ingredients", authMiddleware, cartController.getLovIngredients);
+router.get("/ingredient-stocks", authMiddleware, cartController.getIngredientStocks);
 router.get("/item/:itemId/custom-details", authMiddleware, cartController.getCustomItemDetails);
 router.post("/item/:itemId/custom-details", authMiddleware, cartController.saveCustomItemDetails);
 router.delete("/item/:itemId/custom-details", authMiddleware, cartController.clearCustomItemDetails);

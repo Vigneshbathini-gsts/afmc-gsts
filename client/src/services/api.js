@@ -225,6 +225,8 @@ export const cartAPI = {
   getCocktailDetails: (cartId, params) => api.get(`/cart/cocktail/${cartId}`, { params }),
   updateCocktailIngredients: (cartId, data) => api.patch(`/cart/cocktail/${cartId}/ingredients`, data),
   customizeCocktail: (cartId, data) => api.put(`/cart/customize/${cartId}`, data),
+  getIngredientStocks: (codes) =>
+    api.get("/cart/ingredient-stocks", { params: { codes: Array.isArray(codes) ? codes.join(",") : codes } }),
   updateQuantity: (cartId, quantity) => api.patch(`/cart/${cartId}`, { quantity }),
   deleteItem: (cartId) => api.delete(`/cart/${cartId}`),
   confirmOrder: (data) => api.post("/cart/confirm-order", data),

@@ -900,3 +900,27 @@ exports.getLovIngredients = async (req, res) => {
     });
   }
 };
+
+exports.getIngredientStocks = async (req, res) => {
+  try {
+    const rawCodes = String(req.query?.codes || "").trim();
+    if (!rawCodes) {
+      return res.status(400).json({ success: false, message: "codes is required" });
+    }
+
+    const codes = rawCodes
+      .split(",")
+      .map((code) => Number(String(code).trim()))
+      .filter((code) => Number.isFinite(code) && code > 0);
+
+    if (codes.length === 0) {
+      return res.status(400).json({ success: false, message: "codes must be a comma-separated list of item codes" });
+    }
+
+    const data = await cartModel.getIngredientStockMap(codes);
+    return res.status(200).json({ success: true, data });
+  } catch (error) {
+    console.error("Error fetching ingredient stocks:", error);
+    return res.status(500).json({ success: false, message: "Failed to fetch ingredient stocks" });
+  }
+};

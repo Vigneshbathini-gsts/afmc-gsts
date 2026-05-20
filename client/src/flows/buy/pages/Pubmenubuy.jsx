@@ -1160,16 +1160,17 @@ const removeItem = (id) => {
             <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
               {error}
             </div>
-          ) : stockIssueMessage ? (
-            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {stockIssueMessage}
-            </div>
           ) : items.length === 0 ? (
             <div className="py-16 text-center text-sm text-stone-500">
               No items found for this order.
             </div>
           ) : (
             <div className="space-y-4">
+              {stockIssueMessage ? (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {stockIssueMessage}
+                </div>
+              ) : null}
               {/* Products */}
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {items
@@ -1191,9 +1192,22 @@ const removeItem = (id) => {
                       {/* Details */}
                       <div className="space-y-3 p-4">
                         <div>
-                          <h3 className="line-clamp-1 text-base font-semibold text-stone-900">
-                            {item.item_name}
-                          </h3>
+                          <div className="flex items-start justify-between gap-3">
+                            <h3 className="line-clamp-1 text-base font-semibold text-stone-900">
+                              {item.item_name}
+                            </h3>
+                            {isCocktailOrMocktail(item) && !item.isFreeItem ? (
+                              <button
+                                type="button"
+                                onClick={() => handleEditCocktail(item)}
+                                className="inline-flex items-center gap-1 rounded-lg border border-stone-200 bg-white px-2 py-1 text-xs font-semibold text-stone-700 shadow-sm transition hover:bg-stone-50"
+                                title="Edit ingredients"
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                                Edit
+                              </button>
+                            ) : null}
+                          </div>
 
                           <p className="mt-1 text-sm text-stone-500">
                             Quantity: {item.quantity}{item.isFreeItem ? " (Free)" : ""}

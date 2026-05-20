@@ -8,7 +8,7 @@ import { useAuth } from "../../context/AuthContext";
 const getDetailItemCode = (detail) => detail?.itemCode ?? detail?.ITEM_CODE;
 const getDetailItemName = (detail) => detail?.itemName ?? detail?.ITEM_NAME;
 const getDetailPegs = (detail) => detail?.pegs ?? detail?.PEGS;
-const getDetailStockQuantity = (detail) => detail?.stockQuantity ?? detail?.STOCK_QUANTITY ?? detail?.stock_quantity ?? 0;
+const getDetailStockQuantity = (detail) => detail?.stockQuantity ?? detail?.STOCK_QUANTITY ?? detail?.stock_quantity ?? null;
 const getDetailStockStatus = (detail) => detail?.stockStatus ?? detail?.STOCK_STATUS ?? detail?.stock_status;
 const getDetailRequiredQuantity = (detail) => detail?.requiredQuantity ?? detail?.REQUIRED_QUANTITY;
 const normalizeDetail = (detail) => detail && ({
@@ -16,6 +16,11 @@ const normalizeDetail = (detail) => detail && ({
     stockQuantity: getDetailStockQuantity(detail),
     stockStatus: getDetailStockStatus(detail),
 });
+
+const isUnknownStockStatus = (status) => {
+    const normalized = String(status || "").trim().toLowerCase();
+    return !normalized || normalized === "unknown";
+};
 
 export default function ItemDetails() {
     const { id } = useParams();
@@ -109,6 +114,34 @@ export default function ItemDetails() {
                         details = prefillDetails;
                     }
 
+                    // For buy-flow edits, prefilled ingredients often don't carry live stock data.
+                    // Enrich them using the cart stock endpoint so status matches cart flow.
+                    if (!isEditingCartItem && fromBuyFlow && Array.isArray(details) && details.length > 0) {
+                        try {
+                            const codes = details
+                                .map((detail) => Number(getDetailItemCode(detail)))
+                                .filter((code) => Number.isFinite(code) && code > 0);
+                            if (codes.length > 0) {
+                                const stockRes = await cartAPI.getIngredientStocks(codes);
+                                const stockMap = stockRes?.data?.data || {};
+                                details = details.map((detail) => {
+                                    const itemCode = Number(getDetailItemCode(detail));
+                                    const stockQuantity = stockMap?.[String(itemCode)];
+                                    if (stockQuantity === undefined) return normalizeDetail(detail);
+                                    return normalizeDetail({
+                                        ...detail,
+                                        stockQuantity,
+                                        stockStatus: isUnknownStockStatus(getDetailStockStatus(detail))
+                                            ? (Number(stockQuantity) > 0 ? "In Stock" : "Out Of Stock")
+                                            : getDetailStockStatus(detail),
+                                    });
+                                });
+                            }
+                        } catch (err) {
+                            console.warn("Could not enrich ingredient stocks:", err);
+                        }
+                    }
+
                     details.forEach((detail, idx) => {
                         const pegs = getDetailPegs(detail);
                         const fallbackQty = detail?.quantity ?? detail?.QUANTITY;
@@ -192,14 +225,18 @@ export default function ItemDetails() {
 
         const currentDetail = item?.details?.[index];
         if (currentDetail) {
-            const stockQuantity = Number(getDetailStockQuantity(currentDetail)) || 0;
+            const rawStockQuantity = getDetailStockQuantity(currentDetail);
+            const stockQuantity =
+                rawStockQuantity == null || rawStockQuantity === ""
+                    ? null
+                    : Number(rawStockQuantity);
             const cartItemQuantity = Number(item?.cartItemQuantity || 1);
             const effectiveCartQty = Number.isFinite(cartItemQuantity) && cartItemQuantity > 0 ? cartItemQuantity : 1;
-            if (Number.isFinite(stockQuantity) && stockQuantity > 0) {
+            if (Number.isFinite(stockQuantity) && stockQuantity >= 0) {
                 const requiredNext = Number(newVal) * effectiveCartQty;
                 if (requiredNext > stockQuantity) {
                     const itemName = getDetailItemName(currentDetail);
-                    toast.error(`${itemName} available quantity: ${stockQuantity || 0}`);
+                    toast.error(`${itemName} available quantity: ${stockQuantity}`);
                     return;
                 }
             }
@@ -292,7 +329,12 @@ export default function ItemDetails() {
         // Add selected ingredients to the item details with default quantity 1
         const newDetails = [...(item.details || [])];
         selectedIngredients.forEach(ingredient => {
-            const stockQuantity = Number(ingredient.stockQuantity ?? 0);
+            const rawStockQuantity = ingredient?.stockQuantity ?? ingredient?.STOCK_QUANTITY ?? ingredient?.stock_quantity ?? null;
+            const stockQuantity =
+                rawStockQuantity == null || rawStockQuantity === ""
+                    ? null
+                    : Number(rawStockQuantity);
+            const stockStatusRaw = ingredient?.stockStatus ?? ingredient?.STOCK_STATUS ?? ingredient?.stock_status ?? null;
             newDetails.push({
                 itemName: ingredient.d,
                 itemCode: ingredient.r, // Assuming r contains the item code
@@ -300,7 +342,11 @@ export default function ItemDetails() {
                 memberPrice: null,
                 unitPrice: ingredient.unitPrice,
                 stockQuantity,
-                stockStatus: stockQuantity > 0 ? "In Stock" : "Out Of Stock",
+                stockStatus:
+                    stockStatusRaw ||
+                    (Number.isFinite(stockQuantity) && stockQuantity >= 0
+                        ? (stockQuantity > 0 ? "In Stock" : "Out Of Stock")
+                        : "Unknown"),
             });
         });
 
@@ -519,13 +565,16 @@ export default function ItemDetails() {
                                     const currentQty = quantities[index] || 1;
                                     const stockQuantity = getDetailStockQuantity(detail);
                                     const requiredQuantity = getDetailRequiredQuantity(detail);
-                                    const stockStatus = stockQuantity != null
-                                        ? (
-                                            requiredQuantity != null
-                                                ? (Number(stockQuantity) >= Number(requiredQuantity) ? "In Stock" : "Out Of Stock")
-                                                : (Number(stockQuantity) >= Number(currentQty) ? "In Stock" : "Out Of Stock")
-                                          )
-                                        : (getDetailStockStatus(detail) || "Unknown");
+                                    const explicitStatus = getDetailStockStatus(detail);
+                                    const stockStatus = explicitStatus
+                                        ? explicitStatus
+                                        : stockQuantity != null
+                                            ? (
+                                                requiredQuantity != null
+                                                    ? (Number(stockQuantity) >= Number(requiredQuantity) ? "In Stock" : "Out Of Stock")
+                                                    : (Number(stockQuantity) >= Number(currentQty) ? "In Stock" : "Out Of Stock")
+                                            )
+                                            : "Unknown";
 
                                     return (
                                         <tr key={index} className="border-b border-gray-50 hover:bg-gray-50 transition">

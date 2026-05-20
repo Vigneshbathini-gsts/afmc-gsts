@@ -505,19 +505,8 @@ const addCartItem = async (userId, itemData) => {
       ingredientsToUse = await getDefaultCocktailIngredientRows(conn, item_id, loginType, quantity);
     }
 
-    // if (isCocktailOrMocktail) {
-    //   await validateCustomizationStock(conn, ingredientsToUse, quantity);
-    // }
-
-    if (isCocktailOrMocktail) {
-
- const ingredientsWithParentName = ingredientsToUse.map((ingredient) => ({
-  ...ingredient,
-  parentItemName: itemInfo?.item_name || item_id
-}));
-
-  await validateCustomizationStock(conn, ingredientsWithParentName, quantity);
-}
+    // For cocktails/mocktails, allow adding to cart even if ingredients are out of stock.
+    // Users can adjust ingredients later via the cart edit flow, and stock will be validated at purchase time.
 
     if (!isCocktailOrMocktail && existingCartQty + quantity + orderReservedQty > stockQty) {
       const availableQty = Math.max(0, stockQty - orderReservedQty - existingCartQty);
@@ -1134,6 +1123,63 @@ const getLovIngredients = async (subCategory) => {
   }
 };
 
+const getIngredientStockMap = async (itemCodes) => {
+  let connection;
+
+  const normalizedCodes = [...new Set((Array.isArray(itemCodes) ? itemCodes : [])
+    .map((code) => Number(code))
+    .filter((code) => Number.isFinite(code) && code > 0))];
+
+  if (normalizedCodes.length === 0) {
+    return {};
+  }
+
+  try {
+    connection = await db.getConnection();
+
+    const placeholders = normalizedCodes.map(() => "?").join(",");
+
+    const query = `
+      SELECT
+        xi.item_code AS itemCode,
+        GREATEST(IFNULL(stock_summary.stock_quantity, 0) - IFNULL(reserved_summary.reserved_quantity, 0), 0) AS stockQuantity
+      FROM xxafmc_inventory xi
+      LEFT JOIN (
+        SELECT item_code, IFNULL(SUM(stock_quantity), 0) AS stock_quantity
+        FROM xxafmc_stock_out
+        GROUP BY item_code
+      ) stock_summary
+        ON stock_summary.item_code = xi.item_code
+      LEFT JOIN (
+        SELECT xod.item_id AS item_code, IFNULL(SUM(xod.quantity), 0) AS reserved_quantity
+        FROM xxafmc_order_details xod
+        LEFT JOIN xxafmc_order_header xoh ON xod.order_id = xoh.order_num
+        LEFT JOIN xxafmc_invoices inv ON inv.order_num = xod.order_id
+        WHERE xod.order_status IS NULL
+          AND xod.price IS NULL
+          AND inv.order_num IS NULL
+        GROUP BY xod.item_id
+      ) reserved_summary
+        ON reserved_summary.item_code = xi.item_code
+      WHERE xi.item_code IN (${placeholders})
+    `;
+
+    const [rows] = await connection.query(query, normalizedCodes);
+
+    return rows.reduce((acc, row) => {
+      acc[String(row.itemCode)] = Number(row.stockQuantity || 0);
+      return acc;
+    }, {});
+  } catch (error) {
+    console.error("Model Error (getIngredientStockMap):", error);
+    throw error;
+  } finally {
+    if (connection) {
+      connection.release();
+    }
+  }
+};
+
 module.exports = {
   addCartItem,
   getCartItemsByUser,
@@ -1146,4 +1192,5 @@ module.exports = {
   createDefaultCustomizationForCart,
   ensureCustomizationTable,
   getLovIngredients,
+  getIngredientStockMap,
 };
