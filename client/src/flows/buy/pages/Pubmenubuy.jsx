@@ -4,7 +4,7 @@ import { CheckCircle2, ChevronLeft, Minus, Pencil, Plus, ShoppingCart, Trash2, X
 import Pubmenubuyservice from "../services/Pubmenubuyservice";
 import ConfirmOrderservice from "../../../services/ConfirmOrderservice";
 import { getMaxAllowedQuantity, isCocktailOrMocktail, isOutOfStock, validateNextQuantity } from "../../../utils/stockValidation";
-import { barOrdersAPI } from "../../../services/api";
+import { barOrdersAPI, cartAPI } from "../../../services/api";
 
 const BASEAPI = "https://afmc.globalsparkteksolutions.com/AFMCIMAGES/";
 
@@ -273,13 +273,107 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
   const [error, setError] = useState("");
   const [toast, setToast] = useState(null);
   const [cocktailDetailsByItemCode, setCocktailDetailsByItemCode] = useState({});
+  const [cocktailOverrideIssues, setCocktailOverrideIssues] = useState({});
   const currentBasePath = location.pathname.startsWith("/attendant")
     ? "/attendant"
     : "/user";
   const MAX_QTY = 99;
+
+  useEffect(() => {
+    let ignore = false;
+
+    const computeOverrideIssues = async () => {
+      if (!orderNumber || items.length === 0) {
+        if (!ignore) setCocktailOverrideIssues({});
+        return;
+      }
+
+      const cocktailItems = items.filter((item) => isCocktailOrMocktail(item));
+      if (cocktailItems.length === 0) {
+        if (!ignore) setCocktailOverrideIssues({});
+        return;
+      }
+
+      const overrides = cocktailItems
+        .map((item) => {
+          const itemCode = String(item?.item_code || "").trim();
+          const details = getBuyflowOverrideDetails(orderNumber, itemCode);
+          if (!itemCode || !Array.isArray(details) || details.length === 0) return null;
+          return { item, itemCode, details };
+        })
+        .filter(Boolean);
+
+      if (overrides.length === 0) {
+        if (!ignore) setCocktailOverrideIssues({});
+        return;
+      }
+
+      const allCodes = new Set();
+      for (const entry of overrides) {
+        for (const d of entry.details) {
+          const code = Number(d?.ITEM_CODE ?? d?.itemCode);
+          if (Number.isFinite(code) && code > 0) allCodes.add(code);
+        }
+      }
+
+      if (allCodes.size === 0) {
+        if (!ignore) setCocktailOverrideIssues({});
+        return;
+      }
+
+      try {
+        const stockRes = await cartAPI.getIngredientStocks([...allCodes]);
+        const stockMap = stockRes?.data?.data || {};
+
+        const next = {};
+        for (const entry of overrides) {
+          const parentQty = Number(entry.item?.quantity || 1) || 1;
+          const normalizedDetails = entry.details
+            .map((d) => ({
+              itemCode: Number(d?.ITEM_CODE ?? d?.itemCode),
+              itemName: String(d?.ITEM_NAME ?? d?.itemName ?? "").trim(),
+              pegs: Number(d?.PEGS ?? d?.pegs ?? d?.QUANTITY ?? d?.quantity ?? 0) || 0,
+            }))
+            .filter((d) => Number.isFinite(d.itemCode) && d.itemCode > 0 && d.pegs > 0);
+
+          let issueMessage = "";
+          for (const ing of normalizedDetails) {
+            const available = Number(stockMap?.[String(ing.itemCode)] ?? 0);
+            const required = ing.pegs * parentQty;
+            if (required > available) {
+              issueMessage = `Out of stock for ingredient ${ing.itemName || ing.itemCode}. Available quantity: ${available}`;
+              break;
+            }
+          }
+
+          next[entry.itemCode] = {
+            hasOverride: true,
+            stockIssueMessage: issueMessage || null,
+            isOutOfStock: Boolean(issueMessage),
+          };
+        }
+
+        if (!ignore) setCocktailOverrideIssues(next);
+      } catch (err) {
+        console.warn("Could not compute cocktail override stock issues:", err);
+        if (!ignore) setCocktailOverrideIssues({});
+      }
+    };
+
+    computeOverrideIssues();
+
+    return () => {
+      ignore = true;
+    };
+  }, [orderNumber, items]);
   const stockIssue = useMemo(() => {
     return (
       items.find((item) => {
+        // Cocktail/mocktail stock validation is handled separately (and may be overridden by edited ingredients).
+        if (isCocktailOrMocktail(item)) {
+          return false;
+        }
+
         // Ignore free-item stock validation
         // when backend sends 0/null stock
         if (item.isFreeItem) {
@@ -308,15 +402,27 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
   const cocktailStockIssue = useMemo(() => {
     return (
       items.find(
-        (item) =>
-          isCocktailOrMocktail(item) && isOutOfStock(item)
+        (item) => {
+          if (!isCocktailOrMocktail(item)) return false;
+          const itemCode = String(item?.item_code || "").trim();
+          const override = itemCode ? cocktailOverrideIssues?.[itemCode] : null;
+          if (override?.hasOverride) {
+            return Boolean(override.isOutOfStock);
+          }
+          return isOutOfStock(item);
+        }
       ) || null
     );
-  }, [items]);
+  }, [items, cocktailOverrideIssues]);
 
   const stockIssueMessage = useMemo(() => {
     if (!stockIssue && !cocktailStockIssue) return "";
     if (cocktailStockIssue) {
+      const itemCode = String(cocktailStockIssue?.item_code || "").trim();
+      const override = itemCode ? cocktailOverrideIssues?.[itemCode] : null;
+      if (override?.hasOverride) {
+        return override.stockIssueMessage || "";
+      }
       return (
         cocktailStockIssue.stockIssueMessage ||
         "Out of stock for cocktail/mocktail ingredients. Please reduce quantity or update selection."
@@ -1109,7 +1215,7 @@ const removeItem = (id) => {
 
                 <ActionButton
                   onClick={handleConfirmOrder}
-                  disabled={Boolean(stockIssue) || confirming || loading}
+                  disabled={Boolean(stockIssueMessage) || confirming || loading}
                   className="bg-afmc-maroon px-4 py-2 text-white shadow-sm hover:bg-afmc-maroon/90 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <CheckCircle2 className="h-4 w-4" />
