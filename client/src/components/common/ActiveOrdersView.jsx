@@ -80,6 +80,7 @@ export default function ActiveOrdersView({
 
     try {
       const response = await fetchOrders(params);
+      // console.log("Fetched active orders:", response.data);
       setOrders(response.data?.data || []);
     } catch (requestError) {
       console.error("Failed to load active orders:", requestError);

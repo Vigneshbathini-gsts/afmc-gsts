@@ -197,58 +197,80 @@ async function getActiveOrders({
   userId = null,
 }) {
   const query = `
-    SELECT
-      oh.order_num,
-      DATE_FORMAT(STR_TO_DATE(oh.order_date, '%m/%d/%Y'), '%c/%e/%Y') AS order_date,
-      STR_TO_DATE(oh.order_date, '%m/%d/%Y') AS creation_date,
-      COALESCE(MAX(nm.first_name), MAX(customer.first_name), '') AS first_name,
-      COALESCE(MAX(nm.phone_number), MAX(customer.phone_number), '') AS phone_number,
-      ROUND(MAX(oh.order_total), 2) AS order_total,
-      CASE
-        WHEN SUM(CASE WHEN UPPER(IFNULL(od.order_status, '')) = 'CANCELLED' THEN 1 ELSE 0 END) = COUNT(DISTINCT od.order_line_id)
-          THEN 'Cancelled'
-        WHEN SUM(CASE WHEN kn.status = 'Preparing' THEN 1 ELSE 0 END) > 0
-          THEN 'Preparing'
-        WHEN SUM(CASE WHEN kn.status = 'Received' THEN 1 ELSE 0 END) > 0
-          THEN 'Received'
-        WHEN SUM(CASE WHEN kn.status = 'Completed' THEN 1 ELSE 0 END) > 0
-          THEN 'Completed'
-        ELSE 'Pending'
-      END AS status
-    FROM xxafmc_order_header oh
-    JOIN xxafmc_order_details od
-      ON od.order_id = oh.order_num
-    LEFT JOIN xxafmc_kitchen_notification kn
-      ON kn.ordernumber = od.order_id
-      AND kn.item_id = od.item_id
-    LEFT JOIN xxafmc_users customer
-      ON customer.user_id = oh.user_id
-    LEFT JOIN xxafmc_non_members nm
-      ON nm.id = oh.member_id
-    LEFT JOIN xxafmc_users attendant
-      ON attendant.user_id = kn.user_name
-    WHERE STR_TO_DATE(oh.order_date, '%m/%d/%Y') BETWEEN
-      COALESCE(?, STR_TO_DATE(oh.order_date, '%m/%d/%Y'))
-      AND COALESCE(?, STR_TO_DATE(oh.order_date, '%m/%d/%Y'))
-      AND (
-        ? IS NULL
-        OR ? = ''
-        OR UPPER(attendant.user_name) = UPPER(?)
-      )
-      AND (
-        ? IS NULL
-        OR oh.user_id = ?
-      )
-      AND (
-        ? IS NULL
-        OR ? = ''
-        OR CAST(oh.order_num AS CHAR) LIKE ?
-        OR UPPER(COALESCE(nm.first_name, customer.first_name, '')) LIKE UPPER(?)
-        OR COALESCE(nm.phone_number, customer.phone_number, '') LIKE ?
-      )
-    GROUP BY oh.order_num, oh.order_date
-    HAVING status IN ('Received', 'Preparing', 'Pending')
-    ORDER BY creation_date DESC, oh.order_num DESC
+   SELECT
+  oh.order_num,
+
+  DATE_FORMAT(oh.order_date, '%c/%e/%Y') AS order_date,
+  oh.order_date AS creation_date,
+
+  COALESCE(MAX(nm.first_name), MAX(customer.first_name), '') AS first_name,
+  COALESCE(MAX(nm.phone_number), MAX(customer.phone_number), '') AS phone_number,
+
+  ROUND(MAX(oh.order_total), 2) AS order_total,
+
+  CASE
+    WHEN SUM(CASE WHEN UPPER(IFNULL(od.order_status,'')) = 'CANCELLED' THEN 1 ELSE 0 END)
+         = COUNT(DISTINCT od.order_line_id)
+      THEN 'Cancelled'
+
+    WHEN SUM(CASE WHEN kn.status = 'Preparing' THEN 1 ELSE 0 END) > 0
+      THEN 'Preparing'
+
+    WHEN SUM(CASE WHEN kn.status = 'Received' THEN 1 ELSE 0 END) > 0
+      THEN 'Received'
+
+    WHEN SUM(CASE WHEN kn.status = 'Completed' THEN 1 ELSE 0 END) > 0
+      THEN 'Completed'
+
+    ELSE 'Pending'
+  END AS status
+
+FROM xxafmc_order_header oh
+
+JOIN xxafmc_order_details od
+  ON od.order_id = oh.order_num
+
+LEFT JOIN xxafmc_kitchen_notification kn
+  ON kn.ordernumber = od.order_id
+ AND kn.item_id = od.item_id
+
+LEFT JOIN xxafmc_users customer
+  ON customer.user_id = oh.user_id
+
+LEFT JOIN xxafmc_non_members nm
+  ON nm.id = oh.member_id
+
+LEFT JOIN xxafmc_users attendant
+  ON attendant.user_id = kn.user_name
+
+WHERE
+  (
+    ? IS NULL OR oh.order_date >= ?
+  )
+  AND (
+    ? IS NULL OR oh.order_date <= ?
+  )
+
+  AND (
+    ? IS NULL OR UPPER(attendant.user_name) = UPPER(?)
+  )
+
+  AND (
+    ? IS NULL OR oh.user_id = ?
+  )
+
+  AND (
+    ? IS NULL
+    OR CAST(oh.order_num AS CHAR) LIKE ?
+    OR UPPER(COALESCE(nm.first_name, customer.first_name, '')) LIKE UPPER(?)
+    OR COALESCE(nm.phone_number, customer.phone_number, '') LIKE ?
+  )
+
+GROUP BY oh.order_num, oh.order_date
+
+HAVING status IN ('Received', 'Preparing', 'Pending')
+
+ORDER BY creation_date DESC, oh.order_num DESC;
   `;
 
   const fromDate = from ? getStartOfDay(from) : null;
@@ -259,14 +281,10 @@ async function getActiveOrders({
   const normalizedUserId = userId || null;
 
   const [rows] = await db.execute(query, [
-    fromDate,
-    toDate,
-    normalizedAppUser,
-    normalizedAppUser,
-    normalizedAppUser,
-    normalizedUserId,
-    normalizedUserId,
-    searchTerm,
+    fromDate, fromDate,
+    toDate, toDate,
+    normalizedAppUser, normalizedAppUser,
+    normalizedUserId, normalizedUserId,
     searchTerm,
     searchLike,
     searchLike,
