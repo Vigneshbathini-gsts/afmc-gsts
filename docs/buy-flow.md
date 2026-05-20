@@ -50,7 +50,6 @@ This document maps the **Buy flow** (the “Pub menu buy” order flow) across f
   - `cartAPI.proceedToBuy` → `POST /cart/proceed-to-buy` (used by `CartBuy.jsx` when starting buy from cart)
 - Payment/invoice services (same as cart flow):
   - `afmc-gsts/client/src/services/orderService.js`
-  - `afmc-gsts/client/src/services/paymentService.js`
   - `afmc-gsts/client/src/services/Invoiceservice.js`
   - `afmc-gsts/client/src/services/InvoiceReportservice.js`
 

@@ -81,6 +81,31 @@ function formatPrice(value) {
   return numericValue.toFixed(2);
 }
 
+function getStockQuantity(item) {
+  const rawValue =
+    item?.stockQuantity ??
+    item?.stock_quantity ??
+    item?.STOCK_QUANTITY ??
+    item?.quantity ??
+    item?.QUANTITY;
+  const numericValue = Number(rawValue);
+  return Number.isFinite(numericValue) ? numericValue : null;
+}
+
+function isOutOfStock(item) {
+  const stockQuantity = getStockQuantity(item);
+  if (stockQuantity !== null) return stockQuantity <= 0;
+  return String(item?.stock_status || "").trim().toLowerCase() === "out of stock";
+}
+
+function isCocktailOrMocktailItem(item) {
+  const subCategory = Number(item?.sub_category ?? item?.subcategory);
+  if (![14, 15].includes(subCategory)) return false;
+
+  const categoryId = Number(item?.category_id ?? item?.categoryId);
+  return !Number.isFinite(categoryId) || categoryId === 10;
+}
+
 function isOfferActive(statusValue) {
   if (statusValue === true || statusValue === 1) return true;
   if (typeof statusValue === "string") {
@@ -331,7 +356,7 @@ function MenuPopup({ item, loading, onClose }) {
                     <h2 className="text-lg sm:text-xl font-extrabold text-gray-900 leading-tight break-words">
                       {item?.item_name || "-"}
                     </h2>
-                    {item.stock_status ? (
+                    {!isCocktailOrMocktailItem(item) && item.stock_status ? (
                       <div className="mt-2">
                         <span className="inline-flex items-center rounded-full bg-red-50 px-3 py-1 text-[11px] font-bold text-red-700 ring-1 ring-red-200">
                           {item.stock_status}
@@ -427,64 +452,88 @@ function MenuPopup({ item, loading, onClose }) {
   );
 }
 
-function MenuGrid({ items, showStockStatus = false, onItemClick }) {
+function MenuGrid({ items, showStockStatus = false, ignoreStockStatus = false, onItemClick }) {
   return (
     <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-5">
-      {items.map((item, index) => (
-        <button
-          type="button"
-          onClick={() => onItemClick?.(item)}
-          key={item.item_id || item.item_code || `${item.item_name}-${index}`}
-          className="group relative overflow-hidden rounded-xl border border-gray-300 bg-white text-left shadow-sm transition-all duration-300 hover:shadow-md hover:border-afmc-maroon/50 focus:outline-none focus:ring-2 focus:ring-afmc-maroon"
-        >
-          {/* Image Container */}
-          <div className="relative aspect-square w-full overflow-hidden bg-gray-100">
-            <img
-              src={`${BASEAPI}${item.image || "default.jpg"}`}
-              alt={item.item_name}
-              className="h-full w-full object-contain p-3 transition-transform duration-300 group-hover:scale-105"
-            />
+      {items.map((item, index) => {
+        const shouldIgnoreStock = ignoreStockStatus || isCocktailOrMocktailItem(item);
+        const outOfStock = !shouldIgnoreStock && isOutOfStock(item);
+        const stockDisabled = outOfStock;
+        const stockStatus = outOfStock ? "Out Of Stock" : item.stock_status;
 
-            {/* Stock Status Badge */}
-            {showStockStatus && item.stock_status && (
-              <div className="absolute left-2 top-2 rounded-md bg-red-600 text-white px-2 py-1 text-xs font-bold shadow">
-                {item.stock_status}
-              </div>
-            )}
-          </div>
+        return (
+          <button
+            type="button"
+            onClick={() => {
+              if (stockDisabled) return;
+              onItemClick?.(item);
+            }}
+            disabled={stockDisabled}
+            key={item.item_id || item.item_code || `${item.item_name}-${index}`}
+            className={`group relative overflow-hidden rounded-xl border border-gray-300 bg-white text-left shadow-sm transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-afmc-maroon ${
+              stockDisabled
+                ? "cursor-not-allowed opacity-75"
+                : "hover:shadow-md hover:border-afmc-maroon/50"
+            }`}
+          >
+            {/* Image Container */}
+            <div className="relative aspect-square w-full overflow-hidden bg-gray-100">
+              <img
+                src={`${BASEAPI}${item.image || "default.jpg"}`}
+                alt={item.item_name}
+                className={`h-full w-full object-contain p-3 transition-transform duration-300 ${
+                  stockDisabled ? "grayscale" : "group-hover:scale-105"
+                }`}
+              />
 
-          {/* Content */}
-          <div className="space-y-2 p-3">
-            <div className="line-clamp-2 text-sm font-semibold text-gray-900 leading-tight">
-              {item.item_name}
+              {/* Stock Status Badge */}
+              {!shouldIgnoreStock && (outOfStock || (showStockStatus && item.stock_status)) && (
+                <div className="absolute left-2 top-2 rounded-md bg-red-600 text-white px-2 py-1 text-xs font-bold shadow">
+                  {stockStatus}
+                </div>
+              )}
             </div>
 
-            {item.unit_price && (
-              <div className="flex items-center justify-between pt-2 border-t border-gray-200">
-                <div className="text-lg font-bold text-afmc-maroon">
-                  â‚¹{formatPrice(item.unit_price)}
-                </div>
-                <div className="flex items-center gap-0.5 bg-amber-50 px-2 py-0.5 rounded">
-                  <Star size={12} className="text-amber-500" fill="currentColor" />
-                  <span className="text-xs font-bold text-gray-700">4.5</span>
-                </div>
+            {/* Content */}
+            <div className="space-y-2 p-3">
+              <div className="line-clamp-2 text-sm font-semibold text-gray-900 leading-tight">
+                {item.item_name}
               </div>
-            )}
 
-            {/* CTA Button */}
-            {/* <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onItemClick?.(item);
-              }}
-              className="w-full mt-2 py-2 px-3 rounded-lg bg-afmc-maroon text-white text-xs font-bold transition-all duration-300 hover:bg-afmc-maroon/90 active:scale-95"
-            >
-              Add to Cart
-            </button> */}
-          </div>
-        </button>
-      ))}
+              {outOfStock ? (
+                <div className="rounded-md bg-red-50 px-2 py-1 text-xs font-bold text-red-700 ring-1 ring-red-200">
+                  Out Of Stock
+                </div>
+              ) : null}
+
+              {item.unit_price && (
+                <div className="flex items-center justify-between pt-2 border-t border-gray-200">
+                  <div className="text-lg font-bold text-afmc-maroon">
+                    â‚¹{formatPrice(item.unit_price)}
+                  </div>
+                  <div className="flex items-center gap-0.5 bg-amber-50 px-2 py-0.5 rounded">
+                    <Star size={12} className="text-amber-500" fill="currentColor" />
+                    <span className="text-xs font-bold text-gray-700">4.5</span>
+                  </div>
+                </div>
+              )}
+
+              {/* CTA Button */}
+              {/* <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (outOfStock) return;
+                  onItemClick?.(item);
+                }}
+                className="w-full mt-2 py-2 px-3 rounded-lg bg-afmc-maroon text-white text-xs font-bold transition-all duration-300 hover:bg-afmc-maroon/90 active:scale-95"
+              >
+                Add to Cart
+              </button> */}
+            </div>
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -497,8 +546,7 @@ function MenuPopupCompact({ item, loading, onClose, onBuy }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const userId = user?.userId;
-  const isMocktailItem =
-    Number(item?.category_id) === 10 && [14, 15].includes(Number(item?.sub_category));
+  const isMocktailItem = isCocktailOrMocktailItem(item);
 
   const fetchCartCount = async () => {
     if (!userId) return;
@@ -719,7 +767,7 @@ function MenuPopupCompact({ item, loading, onClose, onBuy }) {
                   <div className="grid grid-cols-[auto_auto] items-start justify-start gap-x-4 gap-y-1 md:justify-end">
                     <div className="text-[14px] font-semibold leading-5 text-stone-600">Price</div>
                     <div className="text-[18px] font-bold text-stone-900">{formatPrice(item?.unit_price)}</div>
-                    {item?.stock_status ? (
+                    {!isMocktailItem && item?.stock_status ? (
                       <>
                         <div className="text-[14px] font-semibold leading-5 text-stone-600">Status</div>
                         <div className="text-[14px] font-medium text-red-600">{item.stock_status}</div>
@@ -793,6 +841,7 @@ function BottomLoader({ label = "Loading more..." }) {
 function ProgressiveMenuGrid({
   items,
   showStockStatus = false,
+  ignoreStockStatus = false,
   onItemClick,
   initialCount = 20,
   step = 20,
@@ -827,7 +876,12 @@ function ProgressiveMenuGrid({
 
   return (
     <div>
-      <MenuGrid items={slice} showStockStatus={showStockStatus} onItemClick={onItemClick} />
+      <MenuGrid
+        items={slice}
+        showStockStatus={showStockStatus}
+        ignoreStockStatus={ignoreStockStatus}
+        onItemClick={onItemClick}
+      />
       {hasMore ? <BottomLoader /> : null}
       <div ref={sentinelRef} />
     </div>
@@ -1362,7 +1416,7 @@ function EnduserMocktailSection({ onItemClick }) {
       ) : visibleItems.length === 0 ? (
         <EmptyState />
       ) : (
-        <ProgressiveMenuGrid items={visibleItems} onItemClick={onItemClick} />
+        <ProgressiveMenuGrid items={visibleItems} ignoreStockStatus onItemClick={onItemClick} />
       )}
     </FilterShell>
   );
@@ -1433,7 +1487,12 @@ function DrinkHardDrinkSection({ onItemClick }) {
       ) : visibleItems.length === 0 ? (
         <EmptyState />
       ) : (
-        <ProgressiveMenuGrid items={visibleItems} showStockStatus onItemClick={onItemClick} />
+        <ProgressiveMenuGrid
+          items={visibleItems}
+          showStockStatus
+          ignoreStockStatus={category === "cocktail"}
+          onItemClick={onItemClick}
+        />
       )}
     </div>
   );
@@ -1611,6 +1670,10 @@ function MenuDashboard() {
       : "/user";
 
   const handleItemClick = async (item) => {
+    if (isOutOfStock(item) && !isCocktailOrMocktailItem(item)) {
+      return;
+    }
+
     if (!item?.item_code || !item?.item_id) {
       return;
     }

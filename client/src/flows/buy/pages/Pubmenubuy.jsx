@@ -1007,15 +1007,15 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
 
     const availableQty = liveItem?.availableQuantity;
     if (
-      !isCocktailOrMocktail(liveItem) &&
-      availableQty !== null &&
-      availableQty !== undefined &&
-      Number.isFinite(Number(availableQty)) &&
-      nextQtyCandidate > Number(availableQty)
-    ) {
-      showToast(`Out of stock. Available quantity: ${availableQty}`, "error");
-      return;
-    }
+  !isCocktailOrMocktail(liveItem) &&
+  availableQty !== null &&
+  availableQty !== undefined &&
+  Number.isFinite(Number(availableQty))
+) {
+  if (nextQtyCandidate > Number(availableQty)) {
+    showToast(`Out of stock. Available quantity: ${availableQty}`, "error");
+  }
+}
 
     // Offer/free-item stock validation (same messaging as cart)
     const expectedFreeQty = calculateFreeQuantity(

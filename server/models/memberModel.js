@@ -1,3 +1,0 @@
-// member model
-
-

@@ -1,5 +1,5 @@
-// import PaymentPage from "../common/PaymentPage";
+import PaymentPage from "../../pages/PaymentPage";
 
-// export default function Payment() {
-//   return <PaymentPage />;
-// }
+export default function Payment() {
+  return <PaymentPage />;
+}

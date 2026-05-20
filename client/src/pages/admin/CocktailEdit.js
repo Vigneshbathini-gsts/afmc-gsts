@@ -15,6 +15,8 @@ const createEmptyRow = () => ({
   nonMemberPrice: "",
 });
 
+const normalizeItemCode = (value) => String(value ?? "").trim();
+
 export default function CocktailEdit() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -111,9 +113,22 @@ export default function CocktailEdit() {
   };
 
   const handleItemCodeChange = async (rowId, itemCode) => {
+    const normalizedItemCode = normalizeItemCode(itemCode);
+    const alreadySelected = rows.some(
+      (row) =>
+        row.id !== rowId &&
+        normalizeItemCode(row.itemCode) === normalizedItemCode
+    );
+
+    if (normalizedItemCode && alreadySelected) {
+      setError("This ingredient is already selected for this item.");
+      return;
+    }
+
     const option = getOptionByItemCode(itemCode);
     const selectedName = option?.ITEM_NAME || "";
     const existingRow = rows.find((row) => row.id === rowId);
+    setError("");
 
     setRows((current) =>
       current.map((row) =>
@@ -220,12 +235,34 @@ export default function CocktailEdit() {
     });
   }, [rows, search]);
 
-  const ingredientDropdownOptions = useMemo(() => {
-    return ingredientOptions.map((opt) => ({
-      value: String(opt.ITEM_CODE ?? "").trim(),
-      label: `${String(opt.ITEM_CODE ?? "").trim()} - ${toInitCap(opt.ITEM_NAME)}`,
-    }));
-  }, [ingredientOptions]);
+  const selectedIngredientCodes = useMemo(() => {
+    return new Set(
+      rows
+        .map((row) => normalizeItemCode(row.itemCode))
+        .filter(Boolean)
+    );
+  }, [rows]);
+
+  const getIngredientDropdownOptions = (currentRow) => {
+    const currentItemCode = normalizeItemCode(currentRow?.itemCode);
+
+    return ingredientOptions
+      .filter((opt) => {
+        const optionItemCode = normalizeItemCode(opt.ITEM_CODE);
+        return (
+          optionItemCode &&
+          (!selectedIngredientCodes.has(optionItemCode) ||
+            optionItemCode === currentItemCode)
+        );
+      })
+      .map((opt) => {
+        const itemCode = normalizeItemCode(opt.ITEM_CODE);
+        return {
+          value: itemCode,
+          label: `${itemCode} - ${toInitCap(opt.ITEM_NAME)}`,
+        };
+      });
+  };
 
   const formatIngredientLabel = (label) => {
     const str = String(label ?? "");
@@ -471,7 +508,7 @@ export default function CocktailEdit() {
                           <FilterDropdown
                             value={row.itemCode}
                             onChange={(next) => handleItemCodeChange(row.id, next)}
-                            options={ingredientDropdownOptions}
+                            options={getIngredientDropdownOptions(row)}
                             placeholder="Select Item"
                             allLabel="Clear"
                             formatLabel={formatIngredientLabel}
