@@ -429,6 +429,63 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
       [normalizedOrderNumber]
     );
 
+      // If the frontend provided updated item quantities, persist them before proceeding.
+      // Expected payload format: { items: [{ item_id: <id>, quantity: <qty> }, ...] }
+      try {
+        const payloadItems = Array.isArray(payload?.items) ? payload.items : [];
+        if (payloadItems.length > 0) {
+          for (const p of payloadItems) {
+            const iid = Number(p?.item_id ?? p?.itemId ?? p?.ITEM_ID);
+            const qty = Number(p?.quantity ?? p?.QUANTITY ?? p?.qty ?? 0);
+            if (!Number.isFinite(iid) || iid <= 0) continue;
+            if (!Number.isFinite(qty) || qty < 0) continue;
+            await connection.execute(
+              `UPDATE xxafmc_order_details SET quantity = ? WHERE order_id = ? AND item_id = ?`,
+              [qty, normalizedOrderNumber, iid]
+            );
+          }
+
+          // Refresh detailRows to reflect updated quantities
+          const [refreshedRows] = await connection.execute(
+            `
+            SELECT
+              od.item_id,
+              od.quantity,
+              od.price,
+              od.subtotal,
+              od.barcode,
+              od.type_id,
+              xi.item_name,
+              xi.description,
+              xi.sub_category,
+              c.category_name,
+              COALESCE(
+                NULLIF(xi.stock_quantity, 0),
+                (
+                  SELECT IFNULL(SUM(stock_quantity), 0)
+                  FROM xxafmc_stock_out so
+                  WHERE so.item_code = xi.item_code
+                ),
+                0
+              ) AS stock_quantity
+            FROM xxafmc_order_details od
+            JOIN xxafmc_inventory xi
+              ON od.item_id = xi.item_code
+            LEFT JOIN xxafmc_categories c
+              ON xi.category_id = c.category_id
+            WHERE od.order_id = ?
+            ORDER BY od.order_line_id ASC
+          `,
+            [normalizedOrderNumber]
+          );
+
+          detailRows.splice(0, detailRows.length, ...refreshedRows);
+        }
+      } catch (qtyErr) {
+        // Non-fatal: if applying quantities fails, rollback will happen later if needed.
+        console.error("Failed to apply frontend item quantities:", qtyErr);
+      }
+
     if (!detailRows.length) {
       const error = new Error("No order items found");
       error.statusCode = 404;

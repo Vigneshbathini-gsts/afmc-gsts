@@ -1017,10 +1017,19 @@ const ensureOfferFreeRows = (nextItems) => {
       setConfirming(true);
       setError("");
       const cocktailCustomizations = buildCocktailCustomizationPayload(orderNumber, items);
-      await ConfirmOrderservice.confirmOrder(
-        orderNumber,
-        cocktailCustomizations.length > 0 ? { cocktailCustomizations } : {}
-      );
+      // Include latest item quantities in the payload so backend can persist updates
+      const itemsPayload = (Array.isArray(items) ? items : [])
+        .map((it) => ({
+          item_id: Number(it.itemId || it.item_id || it.id || it.item_code || 0) || 0,
+          quantity: Number(it.quantity || 0),
+        }))
+        .filter((x) => Number.isFinite(x.item_id) && x.item_id > 0);
+
+      const payload = {};
+      if (cocktailCustomizations.length > 0) payload.cocktailCustomizations = cocktailCustomizations;
+      if (itemsPayload.length > 0) payload.items = itemsPayload;
+
+      await ConfirmOrderservice.confirmOrder(orderNumber, payload);
       cocktailCustomizations.forEach((customization) => {
         const key = getBuyflowOverrideStorageKey(orderNumber, customization.itemCode);
         if (key) {
