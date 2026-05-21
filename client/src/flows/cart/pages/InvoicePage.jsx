@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, CreditCard, ReceiptText, CheckCircle2 } from "lucide-react";
+import { ChevronLeft, ReceiptText, CheckCircle2 } from "lucide-react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import Invoiceservice from "../../../services/Invoiceservice";
 
@@ -23,7 +23,6 @@ export default function InvoicePage() {
   const orderNumber = searchParams.get("orderNumber") || location.state?.orderNumber || "";
   const amountFromQuery = Number(searchParams.get("amount") || location.state?.amount || 0);
   const [loading, setLoading] = useState(Boolean(orderNumber));
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [invoiceData, setInvoiceData] = useState(null);
@@ -116,34 +115,6 @@ export default function InvoicePage() {
     [items]
   );
 
-  const handleSaveInvoice = async () => {
-    setError("");
-    setSuccess("");
-
-    if (isImmediatePayment && !String(paymentReference || "").trim()) {
-      setError("Enter the Payment Reference ID.");
-      return;
-    }
-
-    try {
-      setSaving(true);
-      const response = await Invoiceservice.savePayment(orderNumber, {
-        paymentMode,
-        paymentReference,
-      });
-      const data = response?.data?.data || null;
-      setInvoiceData(data);
-      setPaymentMode(data?.invoice?.payment_method || paymentMode);
-      setPaymentReference(data?.invoice?.payment_reference || "");
-      setPaymentStatus(data?.invoice?.payment_status || paymentStatus);
-      setSuccess(response?.data?.message || "Invoice updated successfully.");
-    } catch (saveError) {
-      setError(saveError.response?.data?.message || "Unable to save invoice.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const handleComplete = () => {
     navigate(
       `${currentBasePath}/Buyflowinvoicereport?orderNumber=${encodeURIComponent(orderNumber)}&amount=${encodeURIComponent(formatMoney(computedAmount))}`,
@@ -159,7 +130,7 @@ export default function InvoicePage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f5f1ec] px-4 py-5 md:px-8">
+    <div className="min-h-screen bg-stone-50 px-4 py-5 md:px-8">
       <div className="mx-auto max-w-[1180px] space-y-5">
         <div className="overflow-hidden rounded-[28px] border border-stone-200 bg-white shadow-[0_10px_30px_rgba(15,23,42,0.08)]">
           <div className="flex items-center justify-between px-4 pt-4">
@@ -174,7 +145,7 @@ export default function InvoicePage() {
                 }
                 navigate(`${currentBasePath}/menudash`, { replace: true });
               }}
-              className="inline-flex items-center gap-2 rounded-full border border-stone-300 bg-white px-5 py-2 text-sm font-medium text-[#6b0f1a] transition hover:bg-stone-100"
+              className="inline-flex items-center gap-2 rounded-full border border-stone-300 bg-white px-5 py-2 text-sm font-medium text-afmc-maroon transition hover:bg-stone-100"
             >
               <ChevronLeft className="h-4 w-4" />
               Back
@@ -186,13 +157,13 @@ export default function InvoicePage() {
           </div>
 
           <div className="px-6 pb-8 pt-5 text-center">
-            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border-4 border-[#d4af37]/30 bg-[#fff8eb]">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#6b0f1a] text-white">
+            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border-4 border-afmc-gold/25 bg-afmc-gold/10">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-afmc-maroon text-white">
                 <ReceiptText className="h-6 w-6" />
               </div>
             </div>
 
-            <h1 className="mt-5 text-3xl font-bold tracking-tight text-[#6b0f1a]">
+            <h1 className="mt-5 text-3xl font-bold tracking-tight text-afmc-maroon">
               Payment Details
             </h1>
 
@@ -200,7 +171,7 @@ export default function InvoicePage() {
               Review your completed order and finish the invoice details.
             </p>
 
-            <div className="mt-6 inline-flex flex-wrap items-center justify-center gap-3 rounded-full border border-[#d4af37]/30 bg-[#fff8eb] px-5 py-3 text-sm">
+            <div className="mt-6 inline-flex flex-wrap items-center justify-center gap-3 rounded-full border border-afmc-gold/25 bg-afmc-gold/10 px-5 py-3 text-sm">
               <span className="text-stone-500">
                 Order No :
                 <span className="ml-1 font-semibold text-stone-900">
@@ -231,8 +202,8 @@ export default function InvoicePage() {
 
         <div className="grid gap-5 lg:grid-cols-[0.95fr_1.05fr]">
           <div className="overflow-hidden rounded-[28px] border border-stone-200 bg-white shadow-[0_10px_30px_rgba(15,23,42,0.08)]">
-            <div className="border-b border-stone-200 bg-gradient-to-r from-[#6b0f1a] to-[#8b1e2d] px-5 py-4">
-              <h2 className="text-lg font-semibold text-[#f4d28c]">
+            <div className="border-b border-stone-200 bg-gradient-to-r from-afmc-maroon to-afmc-maroon/85 px-5 py-4">
+              <h2 className="text-lg font-semibold text-afmc-gold">
                 Payment Panel
               </h2>
             </div>
@@ -245,7 +216,7 @@ export default function InvoicePage() {
                 <select
                   value={paymentMode}
                   onChange={(event) => setPaymentMode(event.target.value)}
-                  className="h-12 w-full rounded-2xl border border-stone-300 bg-white px-4 text-sm font-medium text-stone-800 outline-none transition focus:border-[#6b0f1a] focus:ring-2 focus:ring-[#6b0f1a]/15"
+                  className="h-12 w-full rounded-2xl border border-stone-300 bg-white px-4 text-sm font-medium text-stone-800 outline-none transition focus:border-afmc-maroon focus:ring-2 focus:ring-afmc-maroon/15"
                 >
                   <option value="Credit">Credit</option>
                   <option value="Immediate">Immediate</option>
@@ -262,7 +233,7 @@ export default function InvoicePage() {
                   onChange={(event) => setPaymentReference(event.target.value)}
                   placeholder="Enter payment reference"
                   disabled={isCreditPayment}
-                  className="h-12 w-full rounded-2xl border border-stone-300 bg-white px-4 text-sm font-medium text-stone-800 outline-none transition focus:border-[#6b0f1a] focus:ring-2 focus:ring-[#6b0f1a]/15 disabled:cursor-not-allowed disabled:bg-stone-100 disabled:text-stone-500"
+                  className="h-12 w-full rounded-2xl border border-stone-300 bg-white px-4 text-sm font-medium text-stone-800 outline-none transition focus:border-afmc-maroon focus:ring-2 focus:ring-afmc-maroon/15 disabled:cursor-not-allowed disabled:bg-stone-100 disabled:text-stone-500"
                 />
               </label>
 
@@ -280,7 +251,7 @@ export default function InvoicePage() {
               </label>
 
               {isImmediatePayment ? (
-                <div className="rounded-3xl border border-stone-200 bg-[#faf7f2] p-4">
+                <div className="rounded-3xl border border-stone-200 bg-stone-50 p-4">
                   <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
                     Scanner
                   </p>
@@ -321,7 +292,7 @@ export default function InvoicePage() {
                   type="button"
                   onClick={handleComplete}
                   disabled={loading}
-                  className="inline-flex items-center gap-2 rounded-full bg-[#6b0f1a] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#58101a] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex items-center gap-2 rounded-full bg-afmc-maroon px-6 py-3 text-sm font-semibold text-white shadow-sm ring-1 ring-afmc-gold/25 transition hover:bg-afmc-maroon/90 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <CheckCircle2 className="h-4 w-4" />
                   Complete
@@ -331,12 +302,12 @@ export default function InvoicePage() {
           </div>
 
           <div className="overflow-hidden rounded-[28px] border border-stone-200 bg-white shadow-[0_10px_30px_rgba(15,23,42,0.08)]">
-            <div className="flex items-center justify-between border-b border-stone-200 bg-gradient-to-r from-[#6b0f1a] to-[#8b1e2d] px-5 py-4">
-              <h2 className="text-lg font-semibold text-[#f4d28c]">
+            <div className="flex items-center justify-between border-b border-stone-200 bg-gradient-to-r from-afmc-maroon to-afmc-maroon/85 px-5 py-4">
+              <h2 className="text-lg font-semibold text-afmc-gold">
                 Invoice Preview
               </h2>
 
-              <div className="text-sm text-[#f8e7bd]/90">
+              <div className="text-sm text-white/80">
                 Items : {items.length}
               </div>
             </div>
@@ -349,19 +320,13 @@ export default function InvoicePage() {
               <div className="p-5">
                 <div className="overflow-hidden rounded-2xl border border-stone-200">
                   <table className="min-w-full">
-                    <thead className="bg-[#faf7f2]">
+                    <thead className="bg-stone-50">
                       <tr>
-                        <th className="px-5 py-3 text-left text-sm font-semibold text-[#6b0f1a]">
+                        <th className="px-5 py-3 text-left text-sm font-semibold text-afmc-maroon">
                           Item Name
                         </th>
-                        <th className="px-5 py-3 text-left text-sm font-semibold text-[#6b0f1a]">
+                        <th className="px-5 py-3 text-left text-sm font-semibold text-afmc-maroon">
                           Quantity
-                        </th>
-                        <th className="px-5 py-3 text-left text-sm font-semibold text-[#6b0f1a]">
-                          Price
-                        </th>
-                        <th className="px-5 py-3 text-left text-sm font-semibold text-[#6b0f1a]">
-                          Total
                         </th>
                       </tr>
                     </thead>
@@ -370,7 +335,7 @@ export default function InvoicePage() {
                       {items.map((item, index) => (
                         <tr
                           key={`${item.item_id}-${index}`}
-                          className="transition hover:bg-[#fffdf9]"
+                          className="transition hover:bg-afmc-gold/5"
                         >
                           <td className="px-5 py-4 text-sm font-medium text-stone-800">
                             {item.item_name}
@@ -378,19 +343,13 @@ export default function InvoicePage() {
                           <td className="px-5 py-4 text-sm text-stone-700">
                             {item.quantity}
                           </td>
-                          <td className="px-5 py-4 text-sm font-semibold text-stone-900">
-                            {formatMoney(item.price)}
-                          </td>
-                          <td className="px-5 py-4 text-sm font-semibold text-stone-900">
-                            {formatMoney(item.total)}
-                          </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
 
-                <div className="mt-5 flex flex-col gap-3 rounded-2xl bg-[#faf7f2] px-5 py-4 text-sm md:flex-row md:items-center md:justify-between">
+                <div className="mt-5 flex flex-col gap-3 rounded-2xl bg-stone-50 px-5 py-4 text-sm md:flex-row md:items-center md:justify-between">
                   <div className="flex items-center gap-5 text-stone-600">
                     <span>
                       Total Items :

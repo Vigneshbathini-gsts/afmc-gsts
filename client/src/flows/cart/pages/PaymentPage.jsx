@@ -148,11 +148,30 @@ const PaymentPage = () => {
     }
 
     return (
-        <div className="min-h-screen bg-gray-100 p-6">
-            <div className="max-w-4xl mx-auto bg-white rounded-2xl shadow-lg p-8">
-                <h1 className="text-3xl font-bold mb-8">
-                    Payment Page
-                </h1>
+        <div className="min-h-screen bg-stone-50 px-4 py-5 md:px-8">
+            <div className="max-w-4xl mx-auto space-y-5">
+                <div className="overflow-hidden rounded-[28px] border border-stone-200 bg-white shadow-[0_10px_30px_rgba(15,23,42,0.08)]">
+                    <div className="bg-gradient-to-r from-afmc-maroon to-afmc-maroon/85 px-6 py-5 text-white">
+                        <h1 className="text-2xl font-bold tracking-tight">Payment Details</h1>
+                        <p className="mt-1 text-sm text-white/80">Complete your payment information.</p>
+                    </div>
+                    <div className="grid gap-3 border-t border-stone-200 bg-white p-5 md:grid-cols-3">
+                        <div className="rounded-2xl border border-stone-200 bg-white px-4 py-3">
+                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">Order Number</p>
+                            <p className="mt-1 text-lg font-semibold text-stone-900">{orderNumber}</p>
+                        </div>
+                        <div className="rounded-2xl border border-stone-200 bg-white px-4 py-3">
+                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">Items</p>
+                            <p className="mt-1 text-lg font-semibold text-stone-900">{orderItems?.length || 0}</p>
+                        </div>
+                        <div className="rounded-2xl border border-afmc-gold/25 bg-gradient-to-br from-white to-afmc-gold/5 px-4 py-3">
+                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">Status</p>
+                            <p className="mt-1 text-lg font-semibold text-afmc-maroon">
+                                {paymentMode === "CREDIT" ? "Un Paid" : "Paid"}
+                            </p>
+                        </div>
+                    </div>
+                </div>
 
                 <div className="grid grid-cols-2 gap-6 mb-8">
                     <div>
@@ -167,11 +186,11 @@ const PaymentPage = () => {
 
                     <div>
                         <p className="text-gray-500 text-sm">
-                            Total Amount
+                            Items
                         </p>
 
                         <p className="font-semibold text-lg">
-                            ₹ {Number(order?.totalAmount || 0).toFixed(2)}
+                            {orderItems?.length || 0}
                         </p>
                     </div>
                 </div>

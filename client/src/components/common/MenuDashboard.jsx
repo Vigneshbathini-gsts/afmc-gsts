@@ -72,15 +72,6 @@ function CategoryButton({ active, label, onClick }) {
   );
 }
 
-function formatPrice(value) {
-  const numericValue = Number(value);
-  if (Number.isNaN(numericValue)) {
-    return "0.00";
-  }
-
-  return numericValue.toFixed(2);
-}
-
 function getStockQuantity(item) {
   const rawValue =
     item?.stockQuantity ??
@@ -367,12 +358,6 @@ function MenuPopup({ item, loading, onClose }) {
 
                   <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
                     <div className="flex items-center justify-between gap-3">
-                      <div className="text-xs font-bold uppercase tracking-wider text-gray-500">Price</div>
-                      <div className="text-xl font-extrabold text-afmc-maroon">
-                        ₹{formatPrice(item?.unit_price)}
-                      </div>
-                    </div>
-                    <div className="mt-2 flex items-center justify-between gap-3">
                       <div className="text-xs font-bold uppercase tracking-wider text-gray-500">Unit</div>
                       <div className="text-sm font-bold text-gray-900">{item?.ac_unit || "Nos"}</div>
                     </div>
@@ -506,17 +491,7 @@ function MenuGrid({ items, showStockStatus = false, ignoreStockStatus = false, o
                 </div>
               ) : null}
 
-              {item.unit_price && (
-                <div className="flex items-center justify-between pt-2 border-t border-gray-200">
-                  <div className="text-lg font-bold text-afmc-maroon">
-                    â‚¹{formatPrice(item.unit_price)}
-                  </div>
-                  <div className="flex items-center gap-0.5 bg-amber-50 px-2 py-0.5 rounded">
-                    <Star size={12} className="text-amber-500" fill="currentColor" />
-                    <span className="text-xs font-bold text-gray-700">4.5</span>
-                  </div>
-                </div>
-              )}
+              <div className="pt-2 border-t border-gray-200" />
 
               {/* CTA Button */}
               {/* <button
@@ -765,8 +740,6 @@ function MenuPopupCompact({ item, loading, onClose, onBuy }) {
                   </div>
 
                   <div className="grid grid-cols-[auto_auto] items-start justify-start gap-x-4 gap-y-1 md:justify-end">
-                    <div className="text-[14px] font-semibold leading-5 text-stone-600">Price</div>
-                    <div className="text-[18px] font-bold text-stone-900">{formatPrice(item?.unit_price)}</div>
                     {!isMocktailItem && item?.stock_status ? (
                       <>
                         <div className="text-[14px] font-semibold leading-5 text-stone-600">Status</div>
@@ -781,21 +754,21 @@ function MenuPopupCompact({ item, loading, onClose, onBuy }) {
                     type="button"
                     onClick={handleAddToCart}
                     disabled={isSubmitting}
-                    className="min-w-[170px] rounded-full border border-[#7BA43A] px-8 py-3 text-sm font-semibold text-[#5F8A22] transition hover:bg-[#7BA43A]/10"
+                    className="min-w-[170px] rounded-full bg-afmc-maroon px-8 py-3 text-sm font-semibold text-white shadow-sm ring-1 ring-afmc-gold/25 transition hover:bg-afmc-maroon/90 disabled:cursor-not-allowed disabled:opacity-70"
                   >
                     {isSubmitting ? "Adding..." : "Add to cart"}
                   </button>
                   <button
                     type="button"
                     onClick={handleBuyNow}
-                    className="min-w-[90px] rounded-full border border-[#7BA43A] px-8 py-3 text-sm font-semibold text-[#5F8A22] transition hover:bg-[#7BA43A]/10"
+                    className="min-w-[90px] rounded-full bg-white px-8 py-3 text-sm font-semibold text-afmc-maroon shadow-sm ring-1 ring-afmc-gold/35 transition hover:bg-afmc-gold/5"
                   >
                     Buy
                   </button>
                   <button
                     type="button"
                     onClick={onClose}
-                    className="min-w-[130px] rounded-full border border-red-400 px-8 py-3 text-sm font-semibold text-red-500 transition hover:bg-red-50"
+                    className="min-w-[130px] rounded-full bg-white px-8 py-3 text-sm font-semibold text-stone-700 shadow-sm ring-1 ring-stone-300 transition hover:bg-stone-50"
                   >
                     Cancel
                   </button>
