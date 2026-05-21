@@ -92,7 +92,7 @@ export default function Login() {
         if (user.outletType === "KITCHEN") return "/kitchen/dashboard";
         if (user.outletType === "BAR") return "/bar/dashboard";
         return "/kitchen/dashboard";
-      case 80: return "/storekeeper/dashboard";
+      case 80: return "/admin/dashboard";
       default: return "/unauthorized";
     }
   };
