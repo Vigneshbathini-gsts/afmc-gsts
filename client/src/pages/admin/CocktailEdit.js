@@ -149,14 +149,43 @@ export default function CocktailEdit() {
     }
   };
 
-  const handlePegsChange = async (rowId, pegs) => {
-    const existingRow = rows.find((row) => row.id === rowId);
-    updateRow(rowId, "pegs", pegs);
+  // const handlePegsChange = async (rowId, pegs) => {
+  //   const existingRow = rows.find((row) => row.id === rowId);
+  //   updateRow(rowId, "pegs", pegs);
 
-    if (existingRow?.itemCode) {
-      await recalculateRowPrices(rowId, existingRow.itemCode, pegs);
-    }
-  };
+  //   if (existingRow?.itemCode) {
+  //     await recalculateRowPrices(rowId, existingRow.itemCode, pegs);
+  //   }
+  // };
+
+
+  const handlePegsChange = async (rowId, pegs) => {
+  // Remove everything except digits and decimal point
+  let cleanedValue = pegs.replace(/[^0-9.]/g, "");
+
+  // Prevent dot as first character
+  if (cleanedValue.startsWith(".")) {
+    cleanedValue = cleanedValue.substring(1);
+  }
+
+  // Allow only one decimal point
+  const parts = cleanedValue.split(".");
+  if (parts.length > 2) {
+    cleanedValue = `${parts[0]}.${parts.slice(1).join("")}`;
+  }
+
+  const existingRow = rows.find((row) => row.id === rowId);
+
+  updateRow(rowId, "pegs", cleanedValue);
+
+  if (existingRow?.itemCode && cleanedValue) {
+    await recalculateRowPrices(
+      rowId,
+      existingRow.itemCode,
+      cleanedValue
+    );
+  }
+};
 
   const addRow = () => {
     setRows((current) => [...current, createEmptyRow()]);

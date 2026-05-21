@@ -2,7 +2,7 @@ const roleRedirectMap = {
   10: "/admin/dashboard",
   30: "/attendant/register-member",
   20: "/user/dashboard",
-  80: "/admin/dashboard",
+  80: "/storekeeper/dashboard",
   40: {
     KITCHEN: "/kitchen/dashboard",
     BAR: "/bar/dashboard",

@@ -162,15 +162,56 @@ export default function CocktailCreate() {
     }
   };
 
+//  const handlePegsChange = async (rowId, pegs) => {
+//   // Remove alphabets and special characters
+//   const numericValue = pegs.replace(/[^0-9.]/g, "");
+
+//   // Prevent multiple dots
+//   const cleanedValue = numericValue
+//     .replace(/(\..*)\./g, "$1");
+
+//   const existingRow = rows.find((row) => row.id === rowId);
+
+//   updateRow(rowId, "pegs", cleanedValue);
+
+//   if (existingRow?.itemCode) {
+//     await recalculateRowPrices(
+//       rowId,
+//       existingRow.itemCode,
+//       cleanedValue
+//     );
+//   }
+// };
+
+  
   const handlePegsChange = async (rowId, pegs) => {
-    const existingRow = rows.find((row) => row.id === rowId);
-    updateRow(rowId, "pegs", pegs);
+  // Remove everything except digits and dot
+  let cleanedValue = pegs.replace(/[^0-9.]/g, "");
 
-    if (existingRow?.itemCode) {
-      await recalculateRowPrices(rowId, existingRow.itemCode, pegs);
-    }
+  // Prevent dot as first character
+  if (cleanedValue.startsWith(".")) {
+    cleanedValue = cleanedValue.substring(1);
+  }
+
+  // Allow only one decimal point
+  const parts = cleanedValue.split(".");
+  if (parts.length > 2) {
+    cleanedValue = `${parts[0]}.${parts.slice(1).join("")}`;
+  }
+
+  const existingRow = rows.find((row) => row.id === rowId);
+
+  updateRow(rowId, "pegs", cleanedValue);
+
+  if (existingRow?.itemCode && cleanedValue) {
+    await recalculateRowPrices(
+      rowId,
+      existingRow.itemCode,
+      cleanedValue
+    );
+  }
   };
-
+  
   const addRow = () => {
     setRows((current) => [...current, createEmptyRow()]);
   };
@@ -455,7 +496,13 @@ export default function CocktailCreate() {
                         <FilterDropdown
                           value={row.itemCode}
                           onChange={(next) => handleItemCodeChange(row.id, next)}
-                          options={ingredientDropdownOptions}
+                          // options={ingredientDropdownOptions}
+                          options={ingredientDropdownOptions.filter((option) => {
+                          const selectedCodes = rows
+                          .filter((r) => r.id !== row.id)
+                            .map((r) => String(r.itemCode));
+                             return !selectedCodes.includes(String(option.value));
+                            })}
                           placeholder="Select Item"
                           allLabel="Clear"
                           formatLabel={formatIngredientLabel}
@@ -474,6 +521,8 @@ export default function CocktailCreate() {
                       </td>
                       <td className="border-r border-gray-100 px-2 py-3">
                         <input
+                          inputMode="decimal"
+                          pattern="[0-9]*"
                           value={row.pegs}
                           onChange={(event) =>
                             handlePegsChange(row.id, event.target.value)
