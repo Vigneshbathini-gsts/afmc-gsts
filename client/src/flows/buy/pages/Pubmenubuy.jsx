@@ -259,7 +259,12 @@ function ActionButton({ children, className = "", ...props }) {
   );
 }
 
-export default function Pubmenubuy({ backTo = "", afterConfirmTo = "", disableEdit = false }) {
+export default function Pubmenubuy({
+  backTo = "",
+  afterConfirmTo = "",
+  disableEdit = false,
+  hideCocktailEdit = false,
+}) {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
@@ -1414,7 +1419,7 @@ const removeItem = (id) => {
                             <h3 className="line-clamp-1 text-base font-semibold text-stone-900">
                               {item.item_name}
                             </h3>
-                            {!disableEdit && isCocktailOrMocktail(item) && !item.isFreeItem ? (
+                            {!disableEdit && !hideCocktailEdit && isCocktailOrMocktail(item) && !item.isFreeItem ? (
                               <button
                                 type="button"
                                 onClick={() => handleEditCocktail(item)}

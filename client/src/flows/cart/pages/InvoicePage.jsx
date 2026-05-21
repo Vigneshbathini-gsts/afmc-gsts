@@ -125,6 +125,7 @@ export default function InvoicePage() {
     navigate(
       `${currentBasePath}/Buyflowinvoicereport?orderNumber=${encodeURIComponent(orderNumber)}&amount=${encodeURIComponent(formatMoney(computedAmount))}`,
       {
+        replace: true,
         state: {
           orderNumber,
           amount: computedAmount,
@@ -141,7 +142,7 @@ export default function InvoicePage() {
           <div className="flex items-center justify-between px-4 pt-4">
             <button
               type="button"
-              onClick={() => navigate(-1)}
+              onClick={() => navigate(`${currentBasePath}/menudash`, { replace: true })}
               className="inline-flex items-center gap-2 rounded-full border border-stone-300 bg-white px-5 py-2 text-sm font-medium text-[#6b0f1a] transition hover:bg-stone-100"
             >
               <ChevronLeft className="h-4 w-4" />

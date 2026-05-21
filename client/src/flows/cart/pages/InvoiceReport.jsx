@@ -85,7 +85,7 @@ export default function InvoiceReport() {
           <div className="flex justify-end px-4 pt-4">
             <button
               type="button"
-              onClick={() => navigate(`${currentBasePath}/menudash`)}
+              onClick={() => navigate(`${currentBasePath}/menudash`, { replace: true })}
               className="inline-flex items-center gap-2 rounded-full bg-[#6b0f1a] px-5 py-2 text-sm font-medium text-white transition hover:bg-[#58101a]"
             >
               <ChevronsLeft className="h-4 w-4" />

@@ -77,6 +77,7 @@ export default function CartBuy() {
       // Cart buy page should allow final adjustments (qty/remove + cocktail edits)
       // before confirming the order, matching buy-flow behavior.
       disableEdit={false}
+      hideCocktailEdit={true}
     />
   );
 }

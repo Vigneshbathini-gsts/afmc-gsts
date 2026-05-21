@@ -118,6 +118,7 @@ const PaymentPage = () => {
                     amount.toFixed(2)
                 )}`,
                 {
+                    replace: true,
                     state: {
                         orderNumber,
                         amount,
