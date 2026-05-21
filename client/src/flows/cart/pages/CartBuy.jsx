@@ -74,6 +74,9 @@ export default function CartBuy() {
     <Pubmenubuy
       backTo={`${basePath}/cart`}
       afterConfirmTo={`${basePath}/confirm-order-page`}
+      // Cart buy page should allow final adjustments (qty/remove + cocktail edits)
+      // before confirming the order, matching buy-flow behavior.
+      disableEdit={false}
     />
   );
 }

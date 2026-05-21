@@ -917,7 +917,17 @@ exports.getIngredientStocks = async (req, res) => {
       return res.status(400).json({ success: false, message: "codes must be a comma-separated list of item codes" });
     }
 
-    const data = await cartModel.getIngredientStockMap(codes);
+    // Support multiple client param names:
+    // - excludeOrderNumber (legacy)
+    // - orderNumber / buyOrderNumber (buy-flow)
+    const rawExcludeOrderNumber = String(
+      req.query?.excludeOrderNumber || req.query?.buyOrderNumber || req.query?.orderNumber || ""
+    ).trim();
+    const excludeOrderNumber = Number.isFinite(Number(rawExcludeOrderNumber)) && Number(rawExcludeOrderNumber) > 0
+      ? Number(rawExcludeOrderNumber)
+      : null;
+
+    const data = await cartModel.getIngredientStockMap(codes, excludeOrderNumber);
     return res.status(200).json({ success: true, data });
   } catch (error) {
     console.error("Error fetching ingredient stocks:", error);

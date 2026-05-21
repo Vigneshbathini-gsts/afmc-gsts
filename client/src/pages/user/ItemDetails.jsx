@@ -115,6 +115,19 @@ export default function ItemDetails() {
                         details = prefillDetails;
                     }
 
+                    if (!isEditingCartItem && fromBuyFlow && buyOrderNumber) {
+                        try {
+                            const itemCodeKey = String(fetchedItem.ITEM_CODE ?? fetchedItem.ITEM_ID ?? id ?? "").trim();
+                            const overrideRaw = localStorage.getItem(`afmc-buyflow-custom:${buyOrderNumber}:${itemCodeKey}`);
+                            const overrideValue = overrideRaw ? JSON.parse(overrideRaw) : null;
+                            if (Array.isArray(overrideValue?.details) && overrideValue.details.length > 0) {
+                                details = overrideValue.details;
+                            }
+                        } catch (err) {
+                            console.warn("Could not load buyflow customization override:", err);
+                        }
+                    }
+
                     // For buy-flow edits, prefilled ingredients often don't carry live stock data.
                     // Enrich them using the cart stock endpoint so status matches cart flow.
                     if (!isEditingCartItem && fromBuyFlow && Array.isArray(details) && details.length > 0) {
@@ -123,7 +136,7 @@ export default function ItemDetails() {
                                 .map((detail) => Number(getDetailItemCode(detail)))
                                 .filter((code) => Number.isFinite(code) && code > 0);
                             if (codes.length > 0) {
-                                const stockRes = await cartAPI.getIngredientStocks(codes);
+                                const stockRes = await cartAPI.getIngredientStocks(codes, buyOrderNumber);
                                 const stockMap = stockRes?.data?.data || {};
                                 details = details.map((detail) => {
                                     const itemCode = Number(getDetailItemCode(detail));
@@ -567,14 +580,13 @@ export default function ItemDetails() {
                                     const stockQuantity = getDetailStockQuantity(detail);
                                     const requiredQuantity = getDetailRequiredQuantity(detail);
                                     const explicitStatus = getDetailStockStatus(detail);
+                                    const effectiveRequired = (!isEditingCartItem && fromBuyFlow)
+                                        ? Number(currentQty)
+                                        : (requiredQuantity != null ? Number(requiredQuantity) : Number(currentQty));
                                     const stockStatus = explicitStatus
                                         ? explicitStatus
                                         : stockQuantity != null
-                                            ? (
-                                                requiredQuantity != null
-                                                    ? (Number(stockQuantity) >= Number(requiredQuantity) ? "In Stock" : "Out Of Stock")
-                                                    : (Number(stockQuantity) >= Number(currentQty) ? "In Stock" : "Out Of Stock")
-                                            )
+                                            ? (Number(stockQuantity) >= effectiveRequired ? "In Stock" : "Out Of Stock")
                                             : "Unknown";
 
                                     return (

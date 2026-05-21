@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { CheckCircle2, ChevronLeft, Minus, Pencil, Plus, ShoppingCart, Trash2, XCircle } from "lucide-react";
 import Pubmenubuyservice from "../services/Pubmenubuyservice";
@@ -259,7 +259,7 @@ function ActionButton({ children, className = "", ...props }) {
   );
 }
 
-export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
+export default function Pubmenubuy({ backTo = "", afterConfirmTo = "", disableEdit = false }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
@@ -278,6 +278,14 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
     ? "/attendant"
     : "/user";
   const MAX_QTY = 99;
+
+  const getCocktailOverrideForItem = (row) => {
+    if (!row || !isCocktailOrMocktail(row)) return null;
+    const itemCode = String(row?.item_code || "").trim();
+    if (!itemCode) return null;
+    const override = cocktailOverrideIssues?.[itemCode];
+    return override?.hasOverride ? override : null;
+  };
 
   useEffect(() => {
     let ignore = false;
@@ -322,7 +330,7 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
       }
 
       try {
-        const stockRes = await cartAPI.getIngredientStocks([...allCodes]);
+        const stockRes = await cartAPI.getIngredientStocks([...allCodes], orderNumber);
         const stockMap = stockRes?.data?.data || {};
 
         const next = {};
@@ -337,8 +345,19 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
             .filter((d) => Number.isFinite(d.itemCode) && d.itemCode > 0 && d.pegs > 0);
 
           let issueMessage = "";
+          let hasUnknownStock = false;
           for (const ing of normalizedDetails) {
-            const available = Number(stockMap?.[String(ing.itemCode)] ?? 0);
+            const rawAvailable = stockMap?.[String(ing.itemCode)];
+            if (rawAvailable === undefined || rawAvailable === null || rawAvailable === "") {
+              // If backend didn't return stock for an ingredient code, treat as unknown (do not hard-block).
+              hasUnknownStock = true;
+              continue;
+            }
+            const available = Number(rawAvailable);
+            if (!Number.isFinite(available) || available < 0) {
+              hasUnknownStock = true;
+              continue;
+            }
             const required = ing.pegs * parentQty;
             if (required > available) {
               issueMessage = `Out of stock for ingredient ${ing.itemName || ing.itemCode}. Available quantity: ${available}`;
@@ -350,6 +369,7 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
             hasOverride: true,
             stockIssueMessage: issueMessage || null,
             isOutOfStock: Boolean(issueMessage),
+            hasUnknownStock,
           };
         }
 
@@ -439,6 +459,11 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
   };
 
   const handleEditCocktail = (item) => {
+    if (disableEdit) {
+      showToast("Editing is disabled on this page.", "error");
+      return;
+    }
+
     const rawItemId =
       item?.itemId ??
       item?.item_id ??
@@ -763,19 +788,36 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
       }
 
       const availableQty = targetItem.availableQuantity;
-      if (delta > 0 && String(targetItem.stockIssueMessage || "").trim().length > 0) {
-        validationMessage = String(targetItem.stockIssueMessage || "").trim();
-        return current;
+
+      const cocktailOverride = getCocktailOverrideForItem(targetItem);
+      if (delta > 0) {
+        if (cocktailOverride) {
+          if (cocktailOverride.isOutOfStock) {
+            validationMessage =
+              cocktailOverride.stockIssueMessage ||
+              "Out of stock for cocktail/mocktail ingredients. Please reduce quantity or update selection.";
+            return current;
+          }
+        } else if (String(targetItem.stockIssueMessage || "").trim().length > 0) {
+          validationMessage = String(targetItem.stockIssueMessage || "").trim();
+          return current;
+        }
       }
 
-      const stockValidation = validateNextQuantity(targetItem, nextQtyCandidate);
-      if (!stockValidation.ok) {
-        validationMessage =
-          stockValidation.message ||
-          (availableQty !== null && availableQty !== undefined
-            ? `Out of stock. Available quantity: ${availableQty}`
-            : "Out of stock.");
-        return current;
+      // Only validate "next qty" against stock when increasing quantity.
+      // Decreasing should always be allowed (down to 1), even if the item is currently marked OOS.
+      if (delta > 0) {
+        if (!(isCocktailOrMocktail(targetItem) && cocktailOverride && !cocktailOverride.isOutOfStock)) {
+          const stockValidation = validateNextQuantity(targetItem, nextQtyCandidate);
+          if (!stockValidation.ok) {
+            validationMessage =
+              stockValidation.message ||
+              (availableQty !== null && availableQty !== undefined
+                ? `Out of stock. Available quantity: ${availableQty}`
+                : "Out of stock.");
+            return current;
+          }
+        }
       }
 
       const expectedFreeQty = calculateFreeQuantity(
@@ -949,7 +991,62 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
     }
   };
 
-  const handleQtyClick = (item, delta) => {
+  const validateCocktailNextQuantity = async (row, nextQtyCandidate) => {
+    if (!row || !isCocktailOrMocktail(row) || !orderNumber) return { ok: true, message: "" };
+
+    const itemCode = String(row?.item_code || "").trim();
+    if (!itemCode) return { ok: true, message: "" };
+
+    const overridden = getBuyflowOverrideDetails(orderNumber, itemCode);
+    const details = overridden || cocktailDetailsByItemCode?.[itemCode] || null;
+    if (!Array.isArray(details) || details.length === 0) return { ok: true, message: "" };
+
+    const ingredients = details
+      .map((d) => ({
+        itemCode: Number(d?.ITEM_CODE ?? d?.itemCode),
+        itemName: String(d?.ITEM_NAME ?? d?.itemName ?? "").trim(),
+        pegs: Number(d?.PEGS ?? d?.pegs ?? d?.QUANTITY ?? d?.quantity ?? 0) || 0,
+      }))
+      .filter((d) => Number.isFinite(d.itemCode) && d.itemCode > 0 && d.pegs > 0);
+
+    if (ingredients.length === 0) return { ok: true, message: "" };
+
+    try {
+      const codes = [...new Set(ingredients.map((ing) => ing.itemCode))];
+      const stockRes = await cartAPI.getIngredientStocks(codes, orderNumber);
+      const stockMap = stockRes?.data?.data || {};
+
+      for (const ing of ingredients) {
+        const rawAvailable = stockMap?.[String(ing.itemCode)];
+        if (rawAvailable === undefined || rawAvailable === null || rawAvailable === "") {
+          // Missing stock data should not hard-block quantity updates.
+          continue;
+        }
+        const available = Number(rawAvailable);
+        if (!Number.isFinite(available) || available < 0) continue;
+
+        const required = ing.pegs * Number(nextQtyCandidate || 1);
+        if (required > available) {
+          return {
+            ok: false,
+            message: `Out of stock for ingredient ${ing.itemName || ing.itemCode}. Available quantity: ${available}`,
+          };
+        }
+      }
+
+      return { ok: true, message: "" };
+    } catch (err) {
+      console.warn("Could not validate cocktail ingredient stocks:", err);
+      return { ok: true, message: "" };
+    }
+  };
+
+  const handleQtyClick = async (item, delta) => {
+    if (disableEdit) {
+      showToast("Quantity changes are disabled on this page.", "error");
+      return;
+    }
+
     const lineId = Number(item?.orderLineId ?? item?.id);
     if (!Number.isFinite(lineId) || lineId <= 0) {
       showToast("Unable to identify order item for quantity update.", "error");
@@ -957,7 +1054,7 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
     }
 
     if (updatingLineId === lineId) {
-      showToast("Please wait… updating quantity.", "error");
+      showToast("Please waitΓÇª updating quantity.", "error");
       return;
     }
 
@@ -983,25 +1080,34 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
 
     // Cocktail/mocktail stock validation (mirrors CartPage behavior)
     if (delta > 0) {
-      const stockMessage = String(liveItem?.stockIssueMessage || "").trim();
-
-      // Backend may return ingredient-level stock issues via message only (often for cocktail/mocktail),
-      // without reliable subcategory/stockStatus in this screen's payload.
-      if (stockMessage) {
-        showToast(stockMessage, "error");
-        return;
+      if (isCocktailOrMocktail(liveItem)) {
+        const validation = await validateCocktailNextQuantity(liveItem, nextQtyCandidate);
+        if (!validation.ok) {
+          showToast(validation.message || "Out of stock for cocktail/mocktail ingredients.", "error");
+          return;
+        }
       }
 
-      // Fallback: cocktail/mocktail sometimes marks overall status as out-of-stock.
-      if (
-        isCocktailOrMocktail(liveItem) &&
-        String(liveItem?.stockStatus || "").toLowerCase() === "out of stock"
-      ) {
-        showToast(
-          "Out of stock for cocktail/mocktail ingredients. Please reduce quantity or update selection.",
-          "error"
-        );
-        return;
+      const cocktailOverride = getCocktailOverrideForItem(liveItem);
+      if (cocktailOverride) {
+        if (cocktailOverride.isOutOfStock) {
+          showToast(
+            cocktailOverride.stockIssueMessage ||
+              "Out of stock for cocktail/mocktail ingredients. Please reduce quantity or update selection.",
+            "error"
+          );
+          return;
+        }
+      } else {
+        const stockMessage = String(liveItem?.stockIssueMessage || "").trim();
+
+        // Backend may return ingredient-level stock issues via message only (often for cocktail/mocktail),
+        // without reliable subcategory/stockStatus in this screen's payload.
+        if (stockMessage) {
+          showToast(stockMessage, "error");
+          return;
+        }
+        // Do not hard-block on cocktail/mocktail `stockStatus` here; it is often stale/incorrect in buy-flow.
       }
     }
 
@@ -1014,6 +1120,7 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
 ) {
   if (nextQtyCandidate > Number(availableQty)) {
     showToast(`Out of stock. Available quantity: ${availableQty}`, "error");
+    return;
   }
 }
 
@@ -1064,6 +1171,11 @@ export default function Pubmenubuy({ backTo = "", afterConfirmTo = "" }) {
   };
 
 const removeItem = (id) => {
+  if (disableEdit) {
+    showToast("Editing is disabled on this page.", "error");
+    return;
+  }
+
   const confirmed = window.confirm(
     "Are you sure you want to delete this item?"
   );
@@ -1302,7 +1414,7 @@ const removeItem = (id) => {
                             <h3 className="line-clamp-1 text-base font-semibold text-stone-900">
                               {item.item_name}
                             </h3>
-                            {isCocktailOrMocktail(item) && !item.isFreeItem ? (
+                            {!disableEdit && isCocktailOrMocktail(item) && !item.isFreeItem ? (
                               <button
                                 type="button"
                                 onClick={() => handleEditCocktail(item)}
@@ -1371,12 +1483,12 @@ const removeItem = (id) => {
                                   ))}
                                 </ul>
                                 {details.length > 6 ? (
-                                  <p className="mt-1 text-[11px] text-stone-500">+{details.length - 6} more…</p>
+                                  <p className="mt-1 text-[11px] text-stone-500">+{details.length - 6} moreΓÇª</p>
                                 ) : null}
                               </div>
                             );
                           })()}
-                          {!isCocktailOrMocktail(item) && item.availableQuantity !== null && item.availableQuantity !== undefined && (
+                          {!isCocktailOrMocktail(item) && !item.isFreeItem && item.availableQuantity !== null && item.availableQuantity !== undefined && (
                             <p className="mt-1 text-xs text-stone-400">
                               Available: {item.availableQuantity}
                             </p>
@@ -1399,8 +1511,8 @@ const removeItem = (id) => {
                               <button
                                 type="button"
                                 onClick={() => handleQtyClick(item, -1)}
-                                aria-disabled={updatingLineId === Number(item.orderLineId ?? item.id) || item.quantity <= 1}
-                                disabled={updatingLineId === Number(item.orderLineId ?? item.id) || item.quantity <= 1}
+                                aria-disabled={disableEdit || updatingLineId === Number(item.orderLineId ?? item.id) || item.quantity <= 1}
+                                disabled={disableEdit || updatingLineId === Number(item.orderLineId ?? item.id) || item.quantity <= 1}
                                 className={`rounded-md bg-white p-1.5 text-stone-700 shadow-sm transition hover:bg-stone-100 ${updatingLineId === Number(item.orderLineId ?? item.id) || item.quantity <= 1
                                   ? "opacity-50"
                                   : ""
@@ -1417,10 +1529,15 @@ const removeItem = (id) => {
                                 type="button"
                                 onClick={() => handleQtyClick(item, 1)}
                                 aria-disabled={
+                                  disableEdit ||
                                   updatingLineId === Number(item.orderLineId ?? item.id) ||
-                                  String(item.stockIssueMessage || "").trim().length > 0 ||
-                                  isOutOfStock(item) ||
                                   (() => {
+                                    const override = getCocktailOverrideForItem(item);
+                                    if (override) return Boolean(override.isOutOfStock);
+                                    return String(item.stockIssueMessage || "").trim().length > 0 || isOutOfStock(item);
+                                  })() ||
+                                  (() => {
+                                    if (isCocktailOrMocktail(item)) return false;
                                     const maxAllowed = getMaxAllowedQuantity(item);
                                     return (
                                       Number.isFinite(Number(maxAllowed)) &&
@@ -1431,10 +1548,15 @@ const removeItem = (id) => {
                                   item.quantity >= MAX_QTY
                                 }
                                 disabled={
+                                  disableEdit ||
                                   updatingLineId === Number(item.orderLineId ?? item.id) ||
-                                  String(item.stockIssueMessage || "").trim().length > 0 ||
-                                  isOutOfStock(item) ||
                                   (() => {
+                                    const override = getCocktailOverrideForItem(item);
+                                    if (override) return Boolean(override.isOutOfStock);
+                                    return String(item.stockIssueMessage || "").trim().length > 0 || isOutOfStock(item);
+                                  })() ||
+                                  (() => {
+                                    if (isCocktailOrMocktail(item)) return false;
                                     const maxAllowed = getMaxAllowedQuantity(item);
                                     return (
                                       Number.isFinite(Number(maxAllowed)) &&
@@ -1445,9 +1567,13 @@ const removeItem = (id) => {
                                   item.quantity >= MAX_QTY
                                 }
                                 className={`rounded-md bg-afmc-maroon p-1.5 text-white transition hover:bg-afmc-maroon2 ${updatingLineId === Number(item.orderLineId ?? item.id) ||
-                                  String(item.stockIssueMessage || "").trim().length > 0 ||
-                                  isOutOfStock(item) ||
                                   (() => {
+                                    const override = getCocktailOverrideForItem(item);
+                                    if (override) return Boolean(override.isOutOfStock);
+                                    return String(item.stockIssueMessage || "").trim().length > 0 || isOutOfStock(item);
+                                  })() ||
+                                  (() => {
+                                    if (isCocktailOrMocktail(item)) return false;
                                     const maxAllowed = getMaxAllowedQuantity(item);
                                     return (
                                       Number.isFinite(Number(maxAllowed)) &&
@@ -1467,7 +1593,8 @@ const removeItem = (id) => {
                             <button
                               type="button"
                               onClick={() => removeItem(item.id)}
-                              className="rounded-md bg-red-50 p-1.5 text-red-600 transition hover:bg-red-100"
+                              disabled={disableEdit}
+                              className={`rounded-md bg-red-50 p-1.5 text-red-600 transition hover:bg-red-100 ${disableEdit ? "opacity-50 cursor-not-allowed" : ""}`}
                             >
                               <Trash2 className="h-4 w-4" />
                             </button>

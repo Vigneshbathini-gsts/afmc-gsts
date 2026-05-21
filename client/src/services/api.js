@@ -225,8 +225,18 @@ export const cartAPI = {
   getCocktailDetails: (cartId, params) => api.get(`/cart/cocktail/${cartId}`, { params }),
   updateCocktailIngredients: (cartId, data) => api.patch(`/cart/cocktail/${cartId}/ingredients`, data),
   customizeCocktail: (cartId, data) => api.put(`/cart/customize/${cartId}`, data),
-  getIngredientStocks: (codes) =>
-    api.get("/cart/ingredient-stocks", { params: { codes: Array.isArray(codes) ? codes.join(",") : codes } }),
+  // When editing an existing buy-flow order, pass the current order number so the backend
+  // can exclude that order from reserved stock calculations.
+  // Backwards compatible with legacy `excludeOrderNumber` param.
+  getIngredientStocks: (codes, orderNumber, buyOrderNumber) =>
+    api.get("/cart/ingredient-stocks", {
+      params: {
+        codes: Array.isArray(codes) ? codes.join(",") : codes,
+        orderNumber: orderNumber || undefined,
+        buyOrderNumber: buyOrderNumber || undefined,
+        excludeOrderNumber: orderNumber || buyOrderNumber || undefined,
+      },
+    }),
   updateQuantity: (cartId, quantity) => api.patch(`/cart/${cartId}`, { quantity }),
   deleteItem: (cartId) => api.delete(`/cart/${cartId}`),
   confirmOrder: (data) => api.post("/cart/confirm-order", data),

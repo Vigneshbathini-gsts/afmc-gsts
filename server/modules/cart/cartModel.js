@@ -1123,7 +1123,7 @@ const getLovIngredients = async (subCategory) => {
   }
 };
 
-const getIngredientStockMap = async (itemCodes) => {
+const getIngredientStockMap = async (itemCodes, excludeOrderNumber = null) => {
   let connection;
 
   const normalizedCodes = [...new Set((Array.isArray(itemCodes) ? itemCodes : [])
@@ -1133,6 +1133,10 @@ const getIngredientStockMap = async (itemCodes) => {
   if (normalizedCodes.length === 0) {
     return {};
   }
+
+  const skipOrderNumber = Number.isFinite(Number(excludeOrderNumber)) && Number(excludeOrderNumber) > 0
+    ? Number(excludeOrderNumber)
+    : null;
 
   try {
     connection = await db.getConnection();
@@ -1158,13 +1162,16 @@ const getIngredientStockMap = async (itemCodes) => {
         WHERE xod.order_status IS NULL
           AND xod.price IS NULL
           AND inv.order_num IS NULL
+          ${skipOrderNumber ? "AND xod.order_id != ?" : ""}
         GROUP BY xod.item_id
       ) reserved_summary
         ON reserved_summary.item_code = xi.item_code
       WHERE xi.item_code IN (${placeholders})
     `;
 
-    const [rows] = await connection.query(query, normalizedCodes);
+    const queryParams = skipOrderNumber ? [skipOrderNumber, ...normalizedCodes] : [...normalizedCodes];
+
+    const [rows] = await connection.query(query, queryParams);
 
     return rows.reduce((acc, row) => {
       acc[String(row.itemCode)] = Number(row.stockQuantity || 0);
