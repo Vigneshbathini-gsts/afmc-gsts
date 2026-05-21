@@ -659,9 +659,11 @@ exports.confirmOrder = async (req, res) => {
       const unitPrice = cartPriceRaw ?? null;
       const lineSubtotal = cartTotalRaw ?? null;
       const subCategory = cartSubcategoryRaw ?? null;
+      const loginType = String(req.user?.loginType || "").trim().toUpperCase();
       const roleId = Number(req.user?.roleId || 0);
-      const profit = roleId === 20 ? Number(cartItem.profit || 0) : Number(cartItem.non_member_profit || 0);
-      const foodPrCharges = roleId === 20 ? Number(cartItem.food_pr_charges || 0) : Number(cartItem.pr_charges || 0);
+      const isNonMember = loginType ? loginType === "NON MEMBER" : roleId !== 20;
+      const profit = isNonMember ? Number(cartItem.non_member_profit || 0) : Number(cartItem.profit || 0);
+      const foodPrCharges = isNonMember ? Number(cartItem.pr_charges || 0) : Number(cartItem.food_pr_charges || 0);
       const parentCodeRaw = cartItem?.parent_code ?? cartItem?.PARENT_CODE ?? null;
       const parentCode = parentCodeRaw === null || parentCodeRaw === undefined || parentCodeRaw === "" ? null : String(parentCodeRaw);
 

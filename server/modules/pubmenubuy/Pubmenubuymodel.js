@@ -1208,7 +1208,7 @@ async function createOrder(payload = {}, authUser = {}) {
 
     const [userRows] = await connection.execute(
       `
-        SELECT user_id, role_id
+        SELECT user_id, role_id, login_type
         FROM xxafmc_users
         WHERE UPPER(user_name) = UPPER(?)
         LIMIT 1
@@ -1223,7 +1223,8 @@ async function createOrder(payload = {}, authUser = {}) {
     }
 
     const userId = userRows[0].user_id;
-    const roleId = Number(userRows[0].role_id || 0);
+    const loginType = String(userRows[0].login_type || "").trim().toUpperCase();
+    const isNonMember = loginType === "NON MEMBER";
 
     const inventoryItem = await getInventoryItem(connection, itemCode);
 
@@ -1235,14 +1236,12 @@ async function createOrder(payload = {}, authUser = {}) {
     const resolvedCategoryId = Number.isFinite(categoryId) ? categoryId : Number(inventoryItem.category_id);
     const subCategory = Number(inventoryItem.sub_category ?? 0);
     const isMocktailItem = Number(resolvedCategoryId) === 10 && [14, 15].includes(subCategory);
-    const profit =
-      roleId === 20
-        ? Number(inventoryItem.profit || 0)
-        : Number(inventoryItem.non_member_profit || 0);
-    const foodPrCharges =
-      roleId === 20
-        ? Number(inventoryItem.food_pr_charges || 0)
-        : Number(inventoryItem.pr_charges || 0);
+    const profit = isNonMember
+      ? Number(inventoryItem.non_member_profit || 0)
+      : Number(inventoryItem.profit || 0);
+    const foodPrCharges = isNonMember
+      ? Number(inventoryItem.pr_charges || 0)
+      : Number(inventoryItem.food_pr_charges || 0);
 
     const unitPrice = Number(inventoryItem.unit_price || 0);
     const subtotal = Number((unitPrice * quantity).toFixed(2));
