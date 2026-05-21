@@ -164,148 +164,135 @@ const PaymentPage = () => {
                             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">Items</p>
                             <p className="mt-1 text-lg font-semibold text-stone-900">{orderItems?.length || 0}</p>
                         </div>
-                        <div className="rounded-2xl border border-afmc-gold/25 bg-gradient-to-br from-white to-afmc-gold/5 px-4 py-3">
+                        {/* <div className="rounded-2xl border border-afmc-gold/25 bg-gradient-to-br from-white to-afmc-gold/5 px-4 py-3">
                             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">Status</p>
                             <p className="mt-1 text-lg font-semibold text-afmc-maroon">
                                 {paymentMode === "CREDIT" ? "Un Paid" : "Paid"}
                             </p>
+                        </div> */}
+                    </div>
+                </div>
+
+                
+
+
+
+                <div className="overflow-hidden rounded-[28px] border border-stone-200 bg-white shadow-[0_10px_30px_rgba(15,23,42,0.08)]">
+                    <div className="border-b border-stone-200 bg-stone-50 px-6 py-4">
+                        <h2 className="text-base font-semibold text-afmc-maroon">Payment Panel</h2>
+                    </div>
+
+                    <div className="space-y-5 p-6">
+                        <div>
+                            <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
+                                Payment Mode
+                            </label>
+
+                            <select
+                                value={paymentMode}
+                                onChange={(e) =>
+                                    handlePaymentModeChange(e.target.value)
+                                }
+                                className="h-12 w-full rounded-2xl border border-stone-300 bg-white px-4 text-sm font-medium text-stone-800 outline-none transition focus:border-afmc-maroon focus:ring-2 focus:ring-afmc-maroon/15"
+                            >
+                                {allowedPaymentModes.map((mode) => (
+                                    <option key={mode} value={mode}>
+                                        {mode === "IMMEDIATE" ? "Immediate" : "Credit"}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {paymentMode === "IMMEDIATE" && (
+                            <div>
+                                <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
+                                    Payment Reference
+                                </label>
+
+                                <input
+                                    type="text"
+                                    value={paymentReference}
+                                    onChange={(e) =>
+                                        setPaymentReference(
+                                            e.target.value
+                                        )
+                                    }
+                                    placeholder="Enter Transaction ID"
+                                    className="h-12 w-full rounded-2xl border border-stone-300 bg-white px-4 text-sm font-medium text-stone-800 outline-none transition focus:border-afmc-maroon focus:ring-2 focus:ring-afmc-maroon/15"
+                                />
+                            </div>
+                        )}
+
+                        {paymentMode === "CREDIT" && (
+                            <div>
+                                <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
+                                    Payment Status
+                                </label>
+
+                                <input
+                                    type="text"
+                                    value={paymentStatus}
+                                    disabled
+                                    className="h-12 w-full rounded-2xl border border-stone-300 bg-stone-100 px-4 text-sm font-medium text-stone-700 outline-none"
+                                />
+                            </div>
+                        )}
+
+                        <div className="flex flex-wrap justify-end gap-3 pt-2">
+                            <button
+                                type="button"
+                                onClick={() => navigate(-1)}
+                                className="rounded-full bg-white px-7 py-3 text-sm font-semibold text-stone-700 shadow-sm ring-1 ring-stone-300 transition hover:bg-stone-50"
+                            >
+                                Back
+                            </button>
+                            <button
+                                onClick={handleCompletePayment}
+                                className="rounded-full bg-afmc-maroon px-7 py-3 text-sm font-semibold text-white shadow-sm ring-1 ring-afmc-gold/25 transition hover:bg-afmc-maroon/90"
+                            >
+                                Complete
+                            </button>
                         </div>
                     </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-6 mb-8">
-                    <div>
-                        <p className="text-gray-500 text-sm">
-                            Order Number
-                        </p>
-
-                        <p className="font-semibold text-lg">
-                            {orderNumber}
-                        </p>
+                <div className="overflow-hidden rounded-[28px] border border-stone-200 bg-white shadow-[0_10px_30px_rgba(15,23,42,0.08)]">
+                    <div className="border-b border-stone-200 bg-stone-50 px-6 py-4">
+                        <h2 className="text-base font-semibold text-afmc-maroon">Order Items</h2>
                     </div>
 
-                    <div>
-                        <p className="text-gray-500 text-sm">
-                            Items
-                        </p>
+                    <div className="overflow-x-auto p-6">
+                        <table className="w-full overflow-hidden rounded-2xl border border-stone-200">
+                            <thead className="bg-stone-50 text-stone-600">
+                                <tr>
+                                    <th className="px-4 py-3 text-left text-xs font-bold tracking-wider text-afmc-maroon">Item</th>
+                                    <th className="px-4 py-3 text-center text-xs font-bold tracking-wider text-afmc-maroon">Quantity</th>
+                                </tr>
+                            </thead>
 
-                        <p className="font-semibold text-lg">
-                            {orderItems?.length || 0}
-                        </p>
-                    </div>
-                </div>
-
-
-
-                <div className="mb-6">
-                    <label className="block mb-2 font-medium">
-                        Payment Mode
-                    </label>
-
-                    <select
-                        value={paymentMode}
-                        onChange={(e) =>
-                            handlePaymentModeChange(e.target.value)
-                        }
-                        className="w-full border rounded-xl px-4 py-3"
-                    >
-                        {allowedPaymentModes.map((mode) => (
-                            <option key={mode} value={mode}>
-                                {mode === "IMMEDIATE" ? "Immediate" : "Credit"}
-                            </option>
-                        ))}
-                    </select>
-                </div>
-
-                {paymentMode === "IMMEDIATE" && (
-                    <div className="mb-6">
-                        <label className="block mb-2 font-medium">
-                            Payment Reference
-                        </label>
-
-                        <input
-                            type="text"
-                            value={paymentReference}
-                            onChange={(e) =>
-                                setPaymentReference(
-                                    e.target.value
-                                )
-                            }
-                            placeholder="Enter Transaction ID"
-                            className="w-full border rounded-xl px-4 py-3"
-                        />
-                    </div>
-                )}
-
-                {paymentMode === "CREDIT" && (
-                    <div className="mb-10">
-                        <label className="block mb-2 font-medium">
-                            Payment Status
-                        </label>
-
-                        <input
-                            type="text"
-                            value={paymentStatus}
-                            disabled
-                            className="w-full border rounded-xl px-4 py-3 bg-gray-100"
-                        />
-                    </div>
-                )}
-                <div className="flex items-center justify-end gap-4">
-                    <button
-                        type="button"
-                        onClick={() => navigate(-1)}
-                        className="border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 px-8 py-3 rounded-xl"
-                    >
-                        Back
-                    </button>
-                    <button
-                        onClick={handleCompletePayment}
-                        className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl"
-                    >
-                        Complete Payment
-                    </button>
-                </div>
-                <div className="mb-8 overflow-x-auto">
-                    <h2 className="text-xl font-semibold mb-4 text-gray-700 border-b pb-2">Order Items</h2>
-                    <table className="w-full border-collapse border border-gray-200 shadow-sm">
-                        <thead className="bg-gray-50 text-gray-600">
-                            <tr>
-                                <th className="border border-gray-200 px-4 py-3 text-left text-xs font-bold   tracking-wider">Item</th>
-                                <th className="border border-gray-200 px-4 py-3 text-center text-xs font-bold   tracking-wider">Quantity</th>
-                                <th className="border border-gray-200 px-4 py-3 text-right text-xs font-bold   tracking-wider">Price</th>
-                                <th className="border border-gray-200 px-4 py-3 text-right text-xs font-bold   tracking-wider">Total</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200 bg-white">
-                            {orderItems && orderItems.length > 0 ? (
-                                orderItems.map((item, index) => (
-                                    <tr key={index} className="hover:bg-gray-50 transition-colors">
-                                        <td className="border border-gray-200 px-4 py-3 text-sm text-gray-700">
-                                            {item.ITEM_NAME || item.item_name || "-"}
-                                        </td>
-                                        <td className="border border-gray-200 px-4 py-3 text-center text-sm text-gray-700">
-                                            {item.QUANTITY || item.quantity || 0}
-                                        </td>
-                                        <td className="border border-gray-200 px-4 py-3 text-right text-sm text-gray-700">
-                                            ₹ {Number(item.PRICE || item.price || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                        </td>
-                                        <td className="border border-gray-200 px-4 py-3 text-right text-sm text-gray-900 font-semibold">
-                                            ₹ {Number(item.SUBTOTAL || item.subtotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            <tbody className="divide-y divide-stone-200 bg-white">
+                                {orderItems && orderItems.length > 0 ? (
+                                    orderItems.map((item, index) => (
+                                        <tr key={index} className="transition-colors hover:bg-afmc-gold/5">
+                                            <td className="px-4 py-3 text-sm text-stone-700">
+                                                {item.ITEM_NAME || item.item_name || "-"}
+                                            </td>
+                                            <td className="px-4 py-3 text-center text-sm font-semibold text-stone-800">
+                                                {item.QUANTITY || item.quantity || 0}
+                                            </td>
+                                        </tr>
+                                    ))
+                                ) : (
+                                    <tr>
+                                        <td colSpan="2" className="px-4 py-10 text-center text-stone-400 italic text-sm bg-stone-50">
+                                            No item details available for this order.
                                         </td>
                                     </tr>
-                                ))
-                            ) : (
-                                <tr>
-                                    <td colSpan="4" className="border border-gray-200 px-4 py-10 text-center text-gray-400 italic text-sm bg-gray-50">
-                                        No item details available for this order.
-                                    </td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>            </div>
 
         </div>
     );
