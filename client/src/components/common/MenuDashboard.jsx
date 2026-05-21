@@ -1,6 +1,6 @@
 ﻿import React, { useEffect, useMemo, useState } from "react";
 import { FaTimes } from "react-icons/fa";
-import { ChevronsLeft, Flame } from "lucide-react";
+import { ChevronsLeft, Flame, Coffee, Utensils } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useAuth } from "../../context/AuthContext";
@@ -742,42 +742,64 @@ function ScrollTabs({ items, activeKey, onChange }) {
   );
 }
 
-function SegmentedTabs({ items, activeKey, onChange }) {
-  const cols =
-    items.length === 1
-      ? "grid-cols-1"
-      : items.length === 2
-        ? "grid-cols-2"
-        : items.length === 3
-          ? "grid-cols-3"
-          : "grid-cols-4";
+function MainTabsBar({ activeKey, onChange }) {
+  const items = [
+    { key: "drinks", label: "Drinks", Icon: Coffee },
+    { key: "snacks", label: "Snacks", Icon: Utensils },
+  ];
 
   return (
-    <div className="w-full rounded-2xl border border-gray-200 bg-white shadow-sm">
-      <div className={`grid ${cols}`}>
-        {items.map((it, idx) => {
+    <div className="w-full rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+      <div className="grid grid-cols-2">
+        {items.map(({ key, label, Icon }) => {
+          const active = activeKey === key;
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={() => onChange(key)}
+              className={`relative flex items-center justify-center gap-2 px-4 py-3 text-sm font-extrabold transition ${
+                active
+                  ? "bg-gradient-to-r from-afmc-maroon to-afmc-maroon/90 text-white"
+                  : "bg-white text-gray-700 hover:bg-gray-50"
+              }`}
+              aria-current={active ? "page" : undefined}
+            >
+              <Icon className={`h-4 w-4 ${active ? "text-white" : "text-gray-500"}`} />
+              {label}
+              {active ? (
+                <span
+                  aria-hidden="true"
+                  className="absolute bottom-0 left-1/2 h-1 w-12 -translate-x-1/2 rounded-full bg-afmc-gold"
+                />
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function SubTabsPills({ items, activeKey, onChange }) {
+  return (
+    <div className="w-full">
+      <div className="flex flex-wrap items-center gap-3">
+        {items.map((it) => {
           const active = activeKey === it.key;
           return (
             <button
               key={it.key}
               type="button"
               onClick={() => onChange(it.key)}
-              className={`group relative min-w-0 overflow-hidden px-3 py-3 text-center text-sm font-bold transition sm:px-4 sm:py-4 ${
-                idx === 0 ? "rounded-l-2xl" : ""
-              } ${idx === items.length - 1 ? "rounded-r-2xl" : ""} ${
+              className={`rounded-full px-5 py-2 text-sm font-extrabold transition ${
                 active
-                  ? "bg-gray-50 text-gray-900"
-                  : "bg-white text-gray-700 hover:bg-gray-50 hover:text-afmc-maroon"
+                  ? "bg-gradient-to-r from-afmc-maroon to-afmc-maroon/85 text-white shadow-sm"
+                  : "bg-transparent text-gray-700 hover:text-afmc-maroon"
               }`}
               aria-current={active ? "page" : undefined}
             >
-              <span className="relative z-10 block truncate whitespace-nowrap">{it.label}</span>
-              <span
-                aria-hidden="true"
-                className={`pointer-events-none absolute left-6 right-6 bottom-2 h-[2px] rounded-full transition ${
-                  active ? "bg-afmc-maroon" : "bg-transparent group-hover:bg-afmc-maroon/30"
-                }`}
-              />
+              {it.label}
             </button>
           );
         })}
@@ -1431,27 +1453,27 @@ function MenuDashboard() {
 
         {/* Tabs */}
         <div className="space-y-4">
-          <SegmentedTabs
-            items={Object.entries(menuConfig).map(([key, tab]) => ({ key, label: tab.label }))}
-            activeKey={mainTab}
-            onChange={handleMainTabChange}
-          />
+          <MainTabsBar activeKey={mainTab} onChange={handleMainTabChange} />
 
-          <SegmentedTabs
-            items={Object.entries(menuConfig[mainTab].sections).map(([key, section]) => ({ key, label: section.label }))}
-            activeKey={currentSectionKey}
-            onChange={(sectionKey) =>
-              mainTab === "drinks" ? handleDrinkSectionChange(sectionKey) : setSnackSection(sectionKey)
-            }
-          />
-
-          {currentSection.categories.length > 0 && (
-            <ScrollTabs
-              items={currentSection.categories.map((c) => ({ key: c.key, label: c.label }))}
-              activeKey={softDrinkCategory}
-              onChange={setSoftDrinkCategory}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <SubTabsPills
+              items={Object.entries(menuConfig[mainTab].sections).map(([key, section]) => ({ key, label: section.label }))}
+              activeKey={currentSectionKey}
+              onChange={(sectionKey) =>
+                mainTab === "drinks" ? handleDrinkSectionChange(sectionKey) : setSnackSection(sectionKey)
+              }
             />
-          )}
+
+            {currentSection.categories.length > 0 ? (
+              <div className="sm:max-w-[520px] sm:justify-end">
+                <ScrollTabs
+                  items={currentSection.categories.map((c) => ({ key: c.key, label: c.label }))}
+                  activeKey={softDrinkCategory}
+                  onChange={setSoftDrinkCategory}
+                />
+              </div>
+            ) : null}
+          </div>
         </div>
 
         {/* Content Area */}
