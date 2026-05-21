@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FaArrowLeft, FaChevronDown, FaPlus, FaSearch, FaPen, FaTrash,FaCamera } from "react-icons/fa";
+import { FaArrowLeft, FaChevronDown, FaSearch, FaPen, FaTrash, FaCamera } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import BarcodeScanner from "../../components/common/BarcodeScanner";
 import { API_BASE_URL, inventoryAPI } from "../../services/api";
@@ -95,7 +95,7 @@ export default function Inventory() {
     categoryId: "",
     subCategory: "",
     acUnit: "Nos",
-    prepCharges: "N",
+    prepCharges: "",
     image: null,
   });
   const [saving, setSaving] = useState(false);
@@ -123,7 +123,7 @@ export default function Inventory() {
     volume: "",
     barcode: "",
     batchId: "",
-    prepCharges: "N",
+    prepCharges: "",
   });
   const [stockRows, setStockRows] = useState([]);
   const [stockRowSearch, setStockRowSearch] = useState("");
@@ -398,7 +398,7 @@ export default function Inventory() {
       categoryId: "",
       subCategory: "",
       acUnit: "Nos",
-      prepCharges: "N",
+      prepCharges: "",
       image: null,
     });
     setIsAddCategoryDropdownOpen(false);
@@ -500,7 +500,7 @@ export default function Inventory() {
       volume: "",
       barcode: "",
       batchId: "",
-      prepCharges: "N",
+      prepCharges: "",
     });
     setShowStockModal(true);
   };
@@ -634,9 +634,24 @@ export default function Inventory() {
     setStockError("");
   };
 
+  const handleStockPrepChargesChange = (value) => {
+    setStockForm((prev) => ({ ...prev, prepCharges: value }));
+    setStockRows((current) =>
+      current.map((row) => ({
+        ...row,
+        prepCharges: row.prepCharges || value,
+      }))
+    );
+  };
+
   const handleAddStock = async () => {
     if (stockRows.length === 0) {
       setStockError("Add at least one stock row before saving.");
+      return;
+    }
+
+    if (!stockForm.prepCharges && stockRows.some((row) => !row.prepCharges)) {
+      window.alert("Preparation charges selection is required.");
       return;
     }
 
@@ -651,7 +666,7 @@ export default function Inventory() {
           volume: row.volume,
           barcode: row.barcode,
           rate: row.rate,
-          prepCharges: row.prepCharges,
+          prepCharges: row.prepCharges || stockForm.prepCharges,
           acUnit: row.acUnit,
           createdBy: currentLoggedInUser,
         })),
@@ -1233,12 +1248,7 @@ export default function Inventory() {
                     name="stockPrep"
                     value="N"
                     checked={stockForm.prepCharges === "N"}
-                    onChange={(e) =>
-                      setStockForm((prev) => ({
-                        ...prev,
-                        prepCharges: e.target.value,
-                      }))
-                    }
+                    onChange={(e) => handleStockPrepChargesChange(e.target.value)}
                   />
                   No
                 </label>
@@ -1248,12 +1258,7 @@ export default function Inventory() {
                     name="stockPrep"
                     value="Y"
                     checked={stockForm.prepCharges === "Y"}
-                    onChange={(e) =>
-                      setStockForm((prev) => ({
-                        ...prev,
-                        prepCharges: e.target.value,
-                      }))
-                    }
+                    onChange={(e) => handleStockPrepChargesChange(e.target.value)}
                   />
                   Yes
                 </label>

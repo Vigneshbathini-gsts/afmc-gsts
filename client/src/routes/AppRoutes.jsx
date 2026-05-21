@@ -263,7 +263,7 @@ export default function AppRoutes() {
       <Route
         path="/storekeeper/dashboard"
         element={
-          <ProtectedRoute allowedRoles={["STOREKEEPER", 50]}>
+          <ProtectedRoute allowedRoles={[80, "STKP", "STOREKEEPER"]}>
             <StorekeeperDashboard />
           </ProtectedRoute>
         }
@@ -271,7 +271,7 @@ export default function AppRoutes() {
       <Route
         path="/storekeeper/inventory"
         element={
-          <ProtectedRoute allowedRoles={["STOREKEEPER", 50]}>
+          <ProtectedRoute allowedRoles={[80, "STKP", "STOREKEEPER"]}>
             <StorekeeperInventory />
           </ProtectedRoute>
         }
@@ -279,7 +279,7 @@ export default function AppRoutes() {
       <Route
         path="/storekeeper/add-item"
         element={
-          <ProtectedRoute allowedRoles={["STOREKEEPER", 50]}>
+          <ProtectedRoute allowedRoles={[80, "STKP", "STOREKEEPER"]}>
             <StorekeeperAddItem />
           </ProtectedRoute>
         }
@@ -287,7 +287,7 @@ export default function AppRoutes() {
       <Route
         path="/storekeeper/edit-item"
         element={
-          <ProtectedRoute allowedRoles={["STOREKEEPER", 50]}>
+          <ProtectedRoute allowedRoles={[80, "STKP", "STOREKEEPER"]}>
             <StorekeeperEditItem />
           </ProtectedRoute>
         }
