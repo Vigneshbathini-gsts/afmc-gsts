@@ -175,6 +175,7 @@ export default function AppRoutes() {
         <Route path="confirm-order-page" element={<ConfirmOrderpage />} />
         <Route path="payment" element={<AttendantPayment />} />
         <Route path="invoice" element={<AttendantInvoice />} />
+        <Route path="invoice-report" element={<UserInvoiceReport />} />
         <Route path="Buyflowinvoicereport" element={<AttendantBuyflowinvoicereport />} />
         <Route path="active-orders" element={<AttendantActiveOrders />} />
         <Route path="order-status" element={<AttendantOrderStatus />} />
