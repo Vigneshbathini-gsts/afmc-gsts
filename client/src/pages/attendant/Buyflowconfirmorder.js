@@ -35,6 +35,28 @@ export default function Buyflowconfirmorder() {
     : "/user";
 
   useEffect(() => {
+    // Ensure browser Back from confirm order does not return to /menudash/buy (stale buy screen).
+    const handler = () => {
+      navigate(`${currentBasePath}/menudash`, { replace: true });
+    };
+
+    try {
+      window.history.pushState({ afmcConfirmTrap: true }, "", window.location.href);
+      window.addEventListener("popstate", handler);
+    } catch (_) {
+      // ignore
+    }
+
+    return () => {
+      try {
+        window.removeEventListener("popstate", handler);
+      } catch (_) {
+        // ignore
+      }
+    };
+  }, [currentBasePath, navigate]);
+
+  useEffect(() => {
     let ignore = false;
 
     const fetchConfirmedOrder = async () => {
@@ -120,7 +142,14 @@ return (
 
           <button
             type="button"
-            onClick={() => navigate(`${currentBasePath}/menudash`)}
+            onClick={() => {
+              try {
+                sessionStorage.setItem("afmc:guardBack:menudash", "1");
+              } catch (_) {
+                // ignore
+              }
+              navigate(`${currentBasePath}/menudash`, { replace: true });
+            }}
             className="inline-flex items-center gap-2 rounded-full bg-[#6b0f1a] px-5 py-2 text-sm font-medium text-white transition hover:bg-[#58101a]"
           >
             <ChevronsLeft className="h-4 w-4" />

@@ -1290,10 +1290,12 @@ const removeItem = (id) => {
       });
       if (afterConfirmTo) {
         navigate(`${afterConfirmTo}?orderNumber=${encodeURIComponent(orderNumber)}`, {
+          replace: true,
           state: { orderNumber },
         });
       } else {
         navigate(`${currentBasePath}/Buyflowconfirmorder?orderNumber=${encodeURIComponent(orderNumber)}`, {
+          replace: true,
           state: { orderNumber },
         });
       }

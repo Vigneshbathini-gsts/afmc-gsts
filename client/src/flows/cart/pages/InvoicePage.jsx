@@ -39,6 +39,29 @@ export default function InvoicePage() {
   const isCreditPayment = normalizedPaymentMode === "CREDIT";
 
   useEffect(() => {
+    // Ensure browser Back from invoice returns to menu dashboard (not stale payment/order pages).
+    // We push a trap state and intercept the next back navigation.
+    const handler = () => {
+      navigate(`${currentBasePath}/menudash`, { replace: true });
+    };
+
+    try {
+      window.history.pushState({ afmcInvoiceTrap: true }, "", window.location.href);
+      window.addEventListener("popstate", handler);
+    } catch (_) {
+      // ignore
+    }
+
+    return () => {
+      try {
+        window.removeEventListener("popstate", handler);
+      } catch (_) {
+        // ignore
+      }
+    };
+  }, [currentBasePath, navigate]);
+
+  useEffect(() => {
     let ignore = false;
 
     const fetchInvoiceOrder = async () => {
@@ -142,7 +165,15 @@ export default function InvoicePage() {
           <div className="flex items-center justify-between px-4 pt-4">
             <button
               type="button"
-              onClick={() => navigate(`${currentBasePath}/menudash`, { replace: true })}
+              onClick={() => {
+                try {
+                  sessionStorage.setItem("afmc:historyTrap:menudash", "1");
+                  sessionStorage.setItem("afmc:guardBack:menudash", "1");
+                } catch (_) {
+                  // ignore
+                }
+                navigate(`${currentBasePath}/menudash`, { replace: true });
+              }}
               className="inline-flex items-center gap-2 rounded-full border border-stone-300 bg-white px-5 py-2 text-sm font-medium text-[#6b0f1a] transition hover:bg-stone-100"
             >
               <ChevronLeft className="h-4 w-4" />

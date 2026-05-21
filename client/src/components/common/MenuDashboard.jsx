@@ -1627,6 +1627,50 @@ function MenuDashboard() {
   const [offers, setOffers] = useState([]);
   const [offersLoading, setOffersLoading] = useState(false);
 
+  useEffect(() => {
+    // Prevent stale invoice/order pages from reappearing via browser Back after returning to menu.
+    try {
+      const trap = sessionStorage.getItem("afmc:historyTrap:menudash");
+      if (trap === "1") {
+        sessionStorage.removeItem("afmc:historyTrap:menudash");
+        window.history.pushState({ afmcTrap: true }, "", window.location.href);
+      }
+    } catch (_) {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    // If user presses browser Back immediately after landing on menu from invoice-like pages,
+    // keep them on menu instead of going back to the stale invoice route.
+    const onPopState = () => {
+      try {
+        const guard = sessionStorage.getItem("afmc:guardBack:menudash");
+        if (guard === "1") {
+          // stay on menu; add an entry back so the URL doesn't change.
+          window.history.pushState({ afmcGuard: true }, "", window.location.href);
+          sessionStorage.removeItem("afmc:guardBack:menudash");
+        }
+      } catch (_) {
+        // ignore
+      }
+    };
+
+    try {
+      window.addEventListener("popstate", onPopState);
+    } catch (_) {
+      // ignore
+    }
+
+    return () => {
+      try {
+        window.removeEventListener("popstate", onPopState);
+      } catch (_) {
+        // ignore
+      }
+    };
+  }, []);
+
   const handleBuy = async (item, qty, remarks, selectedType) => {
     try {
       const typeForBackend = selectedType || null;

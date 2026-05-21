@@ -42,6 +42,28 @@ export default function InvoiceReport() {
   );
 
   useEffect(() => {
+    // Ensure browser Back from invoice report returns to menu dashboard.
+    const handler = () => {
+      navigate(`${currentBasePath}/menudash`, { replace: true });
+    };
+
+    try {
+      window.history.pushState({ afmcInvoiceReportTrap: true }, "", window.location.href);
+      window.addEventListener("popstate", handler);
+    } catch (_) {
+      // ignore
+    }
+
+    return () => {
+      try {
+        window.removeEventListener("popstate", handler);
+      } catch (_) {
+        // ignore
+      }
+    };
+  }, [currentBasePath, navigate]);
+
+  useEffect(() => {
     let ignore = false;
 
     const fetchInvoiceReport = async () => {
@@ -85,7 +107,15 @@ export default function InvoiceReport() {
           <div className="flex justify-end px-4 pt-4">
             <button
               type="button"
-              onClick={() => navigate(`${currentBasePath}/menudash`, { replace: true })}
+              onClick={() => {
+                try {
+                  sessionStorage.setItem("afmc:historyTrap:menudash", "1");
+                  sessionStorage.setItem("afmc:guardBack:menudash", "1");
+                } catch (_) {
+                  // ignore
+                }
+                navigate(`${currentBasePath}/menudash`, { replace: true });
+              }}
               className="inline-flex items-center gap-2 rounded-full bg-[#6b0f1a] px-5 py-2 text-sm font-medium text-white transition hover:bg-[#58101a]"
             >
               <ChevronsLeft className="h-4 w-4" />
