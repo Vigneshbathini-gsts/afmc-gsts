@@ -39,7 +39,7 @@ export default function CancelledOrders() {
   const [rowsPerPage] = useState(10);
 
   const openOrderDetails = (orderNumber) => {
-    console.log("Opening details for order:", orderNumber);
+    // console.log("Opening details for order:", orderNumber);
     setSelectedOrderNumber(orderNumber);
     setIsModalOpen(true);
   };

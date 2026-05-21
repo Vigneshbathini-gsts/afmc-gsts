@@ -410,8 +410,8 @@ export default function OutletOrderDetails() {
 
   // Complete order
   const handleCompleteOrder = async () => {
-    const totalOrderedQty = items.reduce(
-      (sum, item) => sum + Number(item.quantity || 0),
+    const totalRequiredScans = items.reduce(
+      (sum, item) => sum + (Number(item.quantity || 0) * Number(item.ingredientsPerUnit || 1)),
       0
     );
 
@@ -420,9 +420,9 @@ export default function OutletOrderDetails() {
       0
     );
 
-    if (totalScannedQty < totalOrderedQty) {
+    if (totalScannedQty < totalRequiredScans) {
       alert(
-        `Cannot complete order. Only ${totalScannedQty} of ${totalOrderedQty} items scanned.`
+        `Cannot complete order. Only ${totalScannedQty} of ${totalRequiredScans} required scans completed.`
       );
       return;
     }
@@ -499,9 +499,14 @@ export default function OutletOrderDetails() {
     }
   };
 
-  const totalOrderedQty = items.reduce((sum, item) => sum + (item.quantity || 0), 0);
+  const totalRequiredScans = items.reduce(
+    (sum, item) => sum + (Number(item.quantity || 0) * Number(item.ingredientsPerUnit || 1)),
+    0
+  );
   const totalScannedQty = scannedItems.reduce((sum, item) => sum + Number(item.scanQuantity || 0), 0);
-  const isComplete = totalScannedQty >= totalOrderedQty && totalOrderedQty > 0;
+  const isComplete = totalScannedQty >= totalRequiredScans && totalRequiredScans > 0;
+  // console.log("Render:", { totalOrderedQty, totalScannedQty, isComplete });
+  const totalOrderedUnits = items.reduce((sum, item) => sum + (item.quantity || 0), 0);
 
   if (!orderData) {
     return (
@@ -556,13 +561,13 @@ export default function OutletOrderDetails() {
             <div>
               <label className="block text-xs font-medium text-gray-500   tracking-wider">Quantity</label>
               <div className="text-gray-800">
-                {totalOrderedQty} {totalScannedQty > 0 && `(Scanned: ${totalScannedQty})`}
+                {totalOrderedUnits} unit(s) {totalScannedQty > 0 && `(Scans: ${totalScannedQty}/${totalRequiredScans})`}
               </div>
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-500   tracking-wider">Status</label>
               <div className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${isComplete ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>
-                {isComplete ? "Ready to Complete" : `${totalOrderedQty - totalScannedQty} item(s) remaining`}
+                {isComplete ? "Ready to Complete" : `${totalRequiredScans - totalScannedQty} scan(s) remaining`}
               </div>
             </div>
           </div>

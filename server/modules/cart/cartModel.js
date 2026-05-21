@@ -35,16 +35,28 @@ const getStockQuantity = async (conn, itemCode) => {
 
 const getOrderReservedQuantity = async (conn, itemCode) => {
   const [rows] = await conn.execute(
-    `SELECT IFNULL(SUM(xod.quantity), 0) AS reserved
-     FROM xxafmc_order_details xod
-     LEFT JOIN xxafmc_order_header xoh ON xod.order_id = xoh.order_num
-     LEFT JOIN xxafmc_invoices xi ON xi.order_num = xod.order_id
-     WHERE xod.item_id = ?
-       AND xod.order_status IS NULL
-       AND xod.price IS NULL
-       AND xi.order_num IS NULL`,
+    `
+    SELECT IFNULL(SUM(xod.quantity), 0) AS reserved
+    FROM xxafmc_order_details xod
+    LEFT JOIN xxafmc_order_header xoh
+      ON xod.order_id = xoh.order_num
+    LEFT JOIN xxafmc_invoices xi
+      ON xi.order_num = xod.order_id
+
+    WHERE xod.item_id = ?
+      AND xi.order_num IS NULL
+      AND (
+        xod.order_status IS NULL
+        OR xod.order_status IN ('Pending', 'Placed', 'Processing')
+      )
+    `,
     [itemCode]
   );
+
+  console.log("RESERVED DEBUG", {
+    itemCode,
+    reserved: rows[0]?.reserved
+  });
 
   return Number(rows[0]?.reserved || 0);
 };
@@ -484,6 +496,7 @@ const addCartItem = async (userId, itemData) => {
     }
 
     await conn.beginTransaction();
+  
 
     // -------------------------------
     // 1. VALIDATE MAIN ITEM STOCK
@@ -507,6 +520,15 @@ const addCartItem = async (userId, itemData) => {
 
     // For cocktails/mocktails, allow adding to cart even if ingredients are out of stock.
     // Users can adjust ingredients later via the cart edit flow, and stock will be validated at purchase time.
+  console.log("STOCK DEBUG", {
+  item_id,
+  stockQty,
+  existingCartQty,
+  quantity,
+  orderReservedQty,
+  finalCheck:
+    existingCartQty + quantity + orderReservedQty > stockQty
+});
 
     if (!isCocktailOrMocktail && existingCartQty + quantity + orderReservedQty > stockQty) {
       const availableQty = Math.max(0, stockQty - orderReservedQty - existingCartQty);

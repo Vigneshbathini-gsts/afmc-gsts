@@ -557,6 +557,18 @@ exports.processBarcodeScan = async (req, res) => {
 
     const parentItem = forcedParentItem || (parentRows.length > 0 ? parentRows[0].inventory_item_code : String(scanItemCode));
 
+    // Fetch the order_line_id for the parent item (cocktail/mocktail) from xxafmc_order_details
+    let parentOrderLineId = null;
+    if (parentItem) {
+      const [parentOrderLineRows] = await connection.query(
+        `SELECT order_line_id FROM xxafmc_order_details WHERE order_id = ? AND item_id = ? AND (order_status IS NULL OR order_status = '') LIMIT 1`,
+        [ORDERNUMBER, parentItem]
+      );
+      if (parentOrderLineRows.length > 0) {
+        parentOrderLineId = parentOrderLineRows[0].order_line_id;
+      }
+    }
+
     // Get role
     const [userRows] = await connection.query(
       `SELECT DISTINCT xu.ROLE_ID FROM xxafmc_users xu JOIN xxafmc_kitchen_notification xkn ON xu.USER_ID = xkn.USER_NAME 
@@ -864,7 +876,7 @@ exports.processBarcodeScan = async (req, res) => {
         scanQuantity: qtyToAdd,
         itemPrice: finalPrice,
         barcode: BARCODE,
-        orderLineId: comp.order_line_id,
+        orderLineId: comp.Mix === 'MO' ? parentOrderLineId : comp.order_line_id, // Use parent's order_line_id for ingredients
         scannedAt: new Date().toISOString(),
         parentItem: comp.inventory_item_code,
         categoryId,
@@ -1478,19 +1490,24 @@ exports.getOrderHistoryItemDetails = async (req, res) => {
 
         xo.subtotal,
         (xo.price - IFNULL(xo.food_pr_charges, 0)) AS price,
-        CASE
-          WHEN xo.order_status IS NULL THEN IFNULL(xo.food_pr_charges, 0)
-          ELSE 0
-        END AS pr_charges,
+        IFNULL(xo.food_pr_charges, 0) AS pr_charges,
 
         xo.created_by,
         xo.creation_date,
         xo.last_updated_date,
         xo.last_updated_by,
 
-        COALESCE(NULLIF(xo.order_status, ''), MAX(xxkn.status), 'Pending') AS status
+        COALESCE(
+          NULLIF(xo.order_status, ''), 
+          MAX(xxkn.status), 
+          NULLIF(oh.order_status, ''), 
+          'Received'
+        ) AS status
 
       FROM xxafmc_order_details xo
+
+      LEFT JOIN xxafmc_order_header oh
+        ON oh.order_num = xo.order_id
 
       JOIN (${inventorySummarySql}) xi
         ON xo.item_id = xi.item_code
@@ -1498,7 +1515,7 @@ exports.getOrderHistoryItemDetails = async (req, res) => {
       --   critical join (same as APEX)
       LEFT JOIN xxafmc_kitchen_notification xxkn 
         ON xxkn.ordernumber = xo.order_id
-       AND xxkn.item_id = xo.item_id
+       AND TRIM(xxkn.item_id) = TRIM(xo.item_id)
 
       WHERE xo.order_id = ?
         AND xi.category_id = ?
@@ -1517,7 +1534,8 @@ exports.getOrderHistoryItemDetails = async (req, res) => {
         xo.created_by,
         xo.creation_date,
         xo.last_updated_date,
-        xo.last_updated_by
+        xo.last_updated_by,
+        oh.order_status
       ORDER BY xo.order_line_id
     `;
 
