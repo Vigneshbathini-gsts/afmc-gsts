@@ -44,6 +44,8 @@ const getStatusClassName = (status) => {
       return "font-semibold text-red-600";
     case "RECEIVED":
       return "font-semibold text-blue-600";
+    case "PENDING":
+      return "font-semibold text-amber-600";
     default:
       return "font-semibold text-amber-600";
   }
@@ -595,7 +597,7 @@ export default function OrderHistory() {
                               <td className="px-4 py-3">{item?.item_name || "-"}</td>
                               <td className="px-4 py-3">{item?.quantity ?? "-"}</td>
                               <td className={`px-4 py-3 ${getStatusClassName(item?.status)}`}>
-                                {item?.status || "Pending"}
+                                {item?.status || "Received"}
                               </td>
                               <td className="px-4 py-3">{item?.type || "NA"}</td>
                               <td className="px-4 py-3">{formatCurrency(item?.price)}</td>

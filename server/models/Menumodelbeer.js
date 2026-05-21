@@ -48,44 +48,11 @@ ORDER BY
     item_id ASC`;
 
     const [rows] = await pool.execute(query, [itemCode, subCategory]);
+    // console.log("Inventory Data:", rows);
     return rows;
 };
 
-//      SELECT
-//     inv.item_code,
-//     inv.item_name,
-//     inv.image,
-//     inv.item_id,
 
-//     (
-//         SELECT
-//             CASE
-//                 WHEN IFNULL(SUM(xso.stock_quantity), 0) = 0 THEN 'Out Of Stock'
-//                 ELSE NULL
-//             END
-//         FROM xxafmc_stock_out xso
-//         WHERE xso.item_code = inv.item_code
-//         GROUP BY xso.item_code
-//     ) AS stock_status
-
-// FROM xxafmc_inventory inv
-
-// WHERE
-//     inv.item_code IN (
-//         SELECT DISTINCT item_code
-//         FROM xxafmc_stock_out
-//         WHERE item_code = inv.item_code
-//     )
-
-//     AND inv.category_id = 10
-//     AND inv.sub_category IN (4, 6, 9, 18)
-
-//     -- Replace with actual values or NULL
-//     AND (inv.item_code = IFNULL(NULL, inv.item_code))
-//     AND (inv.sub_category = IFNULL(NULL, inv.sub_category))
-
-// ORDER BY
-//     inv.item_id ASC
 
 exports.fetchMocktail = async (itemcode) => {
     const query = `

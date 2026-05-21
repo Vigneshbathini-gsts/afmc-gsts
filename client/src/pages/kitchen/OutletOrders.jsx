@@ -11,6 +11,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { barOrdersAPI } from "../../services/api";
 import { toInitCap } from "../../utils/textFormat";
+import {formatDisplayDate} from "../../utils/dateUtils";
 
 /* THEME */
 const MAROON = "#6B1A4F";
@@ -307,7 +308,7 @@ export default function OutletOrders({ kitchenType = "Bar" }) {
                       </span>
                     </td>
 
-                    <td style={td}>{o.CREATION_DATE}</td>
+                    <td style={td}>{formatDisplayDate(o.CREATION_DATE)}</td>
                     <td style={td}>{toInitCap(o.Handled_by_bar || "")}</td>
                     <td style={td}>{toInitCap(o.Handled_by_kitchen || "")}</td>
 

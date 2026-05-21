@@ -502,7 +502,7 @@ END AS is_paid,
   const cleanUser = appUser?.trim() || null;
   const params = [cleanUser, fromDate || null, toDate || null];
   const [rows] = await db.execute(query, params);
- 
+//  console.log("User Order History Params:", rows);
   return rows;
 }
 

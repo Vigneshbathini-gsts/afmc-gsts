@@ -22,6 +22,7 @@ const getStatusClassName = (status) => {
   if (normalizedStatus === "completed") return "text-green-600";
   if (normalizedStatus === "received") return "text-blue-600";
   if (normalizedStatus === "preparing") return "text-amber-500";
+  if (normalizedStatus === "pending") return "text-amber-600";
   return "text-gray-500";
 };
 

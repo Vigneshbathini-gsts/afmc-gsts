@@ -313,6 +313,7 @@ function MenuGrid({ items, showStockStatus = false, ignoreStockStatus = false, o
             <div className="space-y-2 p-3">
               <div className="line-clamp-2 text-sm font-semibold text-gray-900 leading-tight">
                 {item.item_name}
+                {/* <p> {item.stock_status} </p> */}
               </div>
 
               {outOfStock ? (
@@ -894,7 +895,6 @@ function EnduserOtherSection({ onItemClick }) {
       try {
         const result = await authFetchJson(`${API_BASE_URL}/menubar`);
         setData(result?.data || []);
-        console.log(result?.data)
       } catch (fetchError) {
         setError(fetchError.message);
       } finally {
