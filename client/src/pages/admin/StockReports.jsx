@@ -93,7 +93,7 @@ export default function StockReports() {
             row.item_code,
             row.item_name,
             row.batch_id || "-",
-            formatReportDate(row.creation_date),
+            formatReportDate(row.transaction_date || row.creation_date),
             row.ac_unit || "Nos",
             row.stock,
             row.total_price ?? row.totalprice ?? 0,
@@ -272,7 +272,7 @@ export default function StockReports() {
                         <td className="px-4 py-3">{row.batch_id || "-"}</td>
                       )} */}
                       <td className="px-4 py-3">
-                        {formatDisplayDate(row.creation_date)}
+                        {formatDisplayDate(row.transaction_date || row.creation_date)}
                       </td>
                       <td className="px-4 py-3">{row.ac_unit || "Nos"}</td>
                       <td className="px-4 py-3">{row.stock}</td>

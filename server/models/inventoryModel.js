@@ -788,6 +788,7 @@ const getStockInReport = async ({ fromDate, toDate }) => {
       COALESCE(NULLIF(XI.\`A/C_UNIT\`, ''), 'Nos') AS ac_unit,
       SUM(XIT.STOCK) AS stock,
       ROUND(SUM(IFNULL(XIT.RATE, 0) * IFNULL(XIT.STOCK, 0)), 2) AS total_price,
+      MIN(XIT.TRANSACTION_DATE) AS transaction_date,
       MIN(XIT.CREATION_DATE) AS creation_date
     FROM xxafmc_items_transactions XIT
     JOIN xxafmc_inventory XI ON XIT.ITEM_CODE = XI.ITEM_CODE
@@ -795,7 +796,7 @@ const getStockInReport = async ({ fromDate, toDate }) => {
       AND XIT.FLAG = 'IN'
       AND XI.SUB_CATEGORY NOT IN (14, 15)
     GROUP BY XIT.ITEM_CODE, XI.ITEM_NAME, XIT.BATCH_ID, XI.\`A/C_UNIT\`
-    ORDER BY creation_date DESC
+    ORDER BY transaction_date DESC
   `;
   const [rows] = await db.execute(sql, [start, end]);
   return rows;
