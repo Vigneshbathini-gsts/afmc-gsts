@@ -18,6 +18,9 @@ export default function FilterDropdown({
   labelClassName = "",
   valueClassName = "",
   usePortal = false,
+  onMenuScroll,
+  hasMore = false,
+  loadingMore = false,
 }) {
   const dropdownRef = useRef(null);
   const buttonRef = useRef(null);
@@ -159,7 +162,20 @@ export default function FilterDropdown({
         </div>
       </div>
 
-      <div className="max-h-60 overflow-y-auto py-2">
+      <div
+        className="max-h-60 overflow-y-auto py-2"
+        onScroll={(event) => {
+          const { scrollTop, clientHeight, scrollHeight } = event.currentTarget;
+          if (
+            onMenuScroll &&
+            hasMore &&
+            !loadingMore &&
+            scrollTop + clientHeight >= scrollHeight - 40
+          ) {
+            onMenuScroll(event);
+          }
+        }}
+      >
         <button
           type="button"
           onClick={() => {
@@ -197,6 +213,11 @@ export default function FilterDropdown({
                <span className="capitalize">{formatLabel(opt.label)}</span>
             </button>
           ))
+        )}
+        {loadingMore && (
+          <div className="px-4 py-3 text-sm text-gray-500">
+            Loading more...
+          </div>
         )}
       </div>
     </div>

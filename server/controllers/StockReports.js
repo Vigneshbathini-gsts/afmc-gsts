@@ -8,7 +8,7 @@ exports.getStockReport = async (req, res) => {
     const parsedOffset = parseInt(offset, 10);
     const limitNum = Number.isFinite(parsedLimit) && parsedLimit > 0
       ? parsedLimit
-      : 15;
+      : 20;
     const offsetNum = Number.isFinite(parsedOffset) && parsedOffset >= 0
       ? parsedOffset
       : 0;

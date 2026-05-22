@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { FaDownload, FaSearch } from "react-icons/fa";
 import { FaArrowLeft } from "react-icons/fa";
 import api from "../../../services/api";
@@ -63,6 +63,8 @@ const normalizeDropdownOptions = (options) => {
     .filter(Boolean);
 };
 
+const REPORT_PAGE_SIZE = 20;
+
 export default function OrderTransactionUI() {
   const navigate = useNavigate();
   const today = useMemo(() => toInputDate(new Date()), []);
@@ -82,8 +84,12 @@ export default function OrderTransactionUI() {
   const [appliedFilters, setAppliedFilters] = useState(initialFilters);
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
   const [hasSearched, setHasSearched] = useState(false);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const requestInFlight = useRef(false);
   const [filterOptions, setFilterOptions] = useState({
     itemNames: [],
     userNames: [],
@@ -139,12 +145,19 @@ export default function OrderTransactionUI() {
     fetchFilterOptions();
   }, []); // Empty dependency array - fetch only once on mount
 
-  const fetchData = async (activeFilters) => {
-    setLoading(true);
+  const fetchData = async (activeFilters, { reset = true, nextPage = 0 } = {}) => {
+    if (requestInFlight.current) return;
+    requestInFlight.current = true;
+    if (reset) setLoading(true);
+    else setLoadingMore(true);
     setError("");
 
     try {
-      const queryParams = buildQueryParams(activeFilters);
+      const queryParams = {
+        ...buildQueryParams(activeFilters),
+        limit: REPORT_PAGE_SIZE,
+        offset: nextPage * REPORT_PAGE_SIZE,
+      };
       const { data: response } = await api.get("/reports/ordertransaction", {
         params: queryParams,
       });
@@ -154,14 +167,17 @@ export default function OrderTransactionUI() {
         // on the client so filtered/search results always show correct totals.
         const responseRows = Array.isArray(response.data) ? response.data : [];
         const detailRows = responseRows.filter((row) => row?.ORD !== 2);
-        setData(detailRows);
+        setData((current) => (reset ? detailRows : [...current, ...detailRows]));
+        setPage(nextPage + 1);
+        setHasMore(detailRows.length === REPORT_PAGE_SIZE);
         
         // if (detailRows.length === 0) {
         //   setError("No records found for the selected filters.");
         // }
       } else {
         setError(response.message || "Unable to fetch order transactions.");
-        setData([]);
+        if (reset) setData([]);
+        setHasMore(false);
       }
     } catch (requestError) {
       console.error("API Error:", requestError);
@@ -169,9 +185,12 @@ export default function OrderTransactionUI() {
         requestError.response?.data?.message ||
           "Unable to fetch order transactions. Please try again."
       );
-      setData([]);
+      if (reset) setData([]);
+      setHasMore(false);
     } finally {
+      requestInFlight.current = false;
       setLoading(false);
+      setLoadingMore(false);
     }
   };
 
@@ -200,13 +219,34 @@ export default function OrderTransactionUI() {
     setAppliedFilters(nextFilters);
     setHasSearched(true);
     setError("");
-    await fetchData(nextFilters);
+    setPage(0);
+    setHasMore(true);
+    await fetchData(nextFilters, { reset: true, nextPage: 0 });
   };
 
-  const exportPdf = () => {
+  const exportPdf = async () => {
     if (!data.length) return;
 
-    const totals = data.reduce(
+    const exportRows = [];
+    let offsetPage = 0;
+
+    while (true) {
+      const { data: response } = await api.get("/reports/ordertransaction", {
+        params: {
+          ...buildQueryParams(appliedFilters),
+          limit: REPORT_PAGE_SIZE,
+          offset: offsetPage * REPORT_PAGE_SIZE,
+        },
+      });
+      const chunk = (Array.isArray(response.data) ? response.data : []).filter(
+        (row) => row?.ORD !== 2
+      );
+      exportRows.push(...chunk);
+      if (chunk.length < REPORT_PAGE_SIZE) break;
+      offsetPage += 1;
+    }
+
+    const totals = exportRows.reduce(
       (acc, row) => ({
         quantity: acc.quantity + parseNumber(row.QUANTITY),
         totalProfit: acc.totalProfit + parseNumber(row.TOTAL_PROFIT),
@@ -238,7 +278,7 @@ export default function OrderTransactionUI() {
         "Subtotal",
       ],
       rows: [
-        ...data.map((row) => [
+        ...exportRows.map((row) => [
           row.ORDER_NUM || "-",
           row.FIRST_NAME || "-",
           row.PUBMED_NAME || "-",
@@ -279,6 +319,19 @@ export default function OrderTransactionUI() {
   const formatMoney = (value) => {
     if (!Number.isFinite(value)) return "0.00";
     return value.toFixed(2);
+  };
+
+  const handleTableScroll = (event) => {
+    const { scrollTop, clientHeight, scrollHeight } = event.currentTarget;
+
+    if (
+      scrollTop + clientHeight >= scrollHeight - 80 &&
+      !loading &&
+      !loadingMore &&
+      hasMore
+    ) {
+      fetchData(appliedFilters, { reset: false, nextPage: page });
+    }
   };
 
   return (
@@ -442,7 +495,8 @@ export default function OrderTransactionUI() {
             </div>
           ) : (
             <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
-              <div className="overflow-x-auto">
+              <div className="max-h-[70vh] overflow-auto" onScroll={handleTableScroll}>
+                <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50 text-gray-600">
                     <tr>
@@ -545,6 +599,17 @@ export default function OrderTransactionUI() {
                     )}
                   </tbody>
                 </table>
+                </div>
+                {loadingMore && (
+                  <p className="px-4 py-4 text-center text-gray-500">
+                    Loading more data...
+                  </p>
+                )}
+                {!loading && !loadingMore && data.length > 0 && !hasMore && (
+                  <p className="px-4 py-4 text-center text-gray-500">
+                    No more data
+                  </p>
+                )}
               </div>
               {!loading && data.length > 0 && (
                 <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 text-sm text-gray-600">

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ChevronsLeft,
@@ -9,34 +9,53 @@ import {
 import api from "../../services/api";
 import { toInitCap } from "../../utils/textFormat";
 
+const COCKTAIL_PAGE_SIZE = 20;
+
 export default function CocktailManagement() {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
+  const [activeSearch, setActiveSearch] = useState("");
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const requestInFlight = useRef(false);
 
-  const fetchItems = useCallback(async (searchValue = "") => {
+  const fetchItems = useCallback(async (searchValue = "", { reset = true, nextPage = 0 } = {}) => {
+    if (requestInFlight.current) return;
+    requestInFlight.current = true;
     try {
-      setLoading(true);
+      if (reset) setLoading(true);
+      else setLoadingMore(true);
       setError("");
       const response = await api.get("/cocktails", {
         params: {
           search: searchValue.trim(),
+          limit: COCKTAIL_PAGE_SIZE,
+          offset: nextPage * COCKTAIL_PAGE_SIZE,
         },
       });
 
       if (response.data.success) {
-        setItems(response.data.data || []);
+        const rows = response.data.data || [];
+        setItems((current) => (reset ? rows : [...current, ...rows]));
+        setPage(nextPage + 1);
+        setHasMore(rows.length === COCKTAIL_PAGE_SIZE);
       } else {
-        setItems([]);
+        if (reset) setItems([]);
+        setHasMore(false);
       }
     } catch (error) {
       console.error("Cocktail fetch failed:", error);
       setError("Failed to load cocktail items.");
-      setItems([]);
+      if (reset) setItems([]);
+      setHasMore(false);
     } finally {
+      requestInFlight.current = false;
       setLoading(false);
+      setLoadingMore(false);
     }
   }, []);
 
@@ -45,7 +64,24 @@ export default function CocktailManagement() {
   }, [fetchItems]);
 
   const handleSearch = () => {
-    fetchItems(search);
+    const nextSearch = search.trim();
+    setActiveSearch(nextSearch);
+    setPage(0);
+    setHasMore(true);
+    fetchItems(nextSearch, { reset: true, nextPage: 0 });
+  };
+
+  const handleTableScroll = (event) => {
+    const { scrollTop, clientHeight, scrollHeight } = event.currentTarget;
+
+    if (
+      scrollTop + clientHeight >= scrollHeight - 80 &&
+      !loading &&
+      !loadingMore &&
+      hasMore
+    ) {
+      fetchItems(activeSearch, { reset: false, nextPage: page });
+    }
   };
 
   return (
@@ -117,6 +153,7 @@ export default function CocktailManagement() {
           )}
 
           <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
+            <div className="max-h-[70vh] overflow-auto" onScroll={handleTableScroll}>
             <table className="w-full text-sm">
               <thead className="bg-gray-50 text-gray-600">
                 <tr>
@@ -167,6 +204,17 @@ export default function CocktailManagement() {
                 )}
               </tbody>
             </table>
+            {loadingMore && (
+              <p className="px-4 py-4 text-center text-gray-500">
+                Loading more cocktail items...
+              </p>
+            )}
+            {!loading && !loadingMore && items.length > 0 && !hasMore && (
+              <p className="px-4 py-4 text-center text-gray-500">
+                No more data
+              </p>
+            )}
+            </div>
           </div>
         </div>
       </div>

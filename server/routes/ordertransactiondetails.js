@@ -45,6 +45,16 @@ const buildDateValues = (fromDate, toDate) => {
   return [];
 };
 
+const parsePagination = (query) => {
+  const parsedLimit = parseInt(query.limit, 10);
+  const parsedOffset = parseInt(query.offset, 10);
+
+  return {
+    limit: Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedLimit : 20,
+    offset: Number.isFinite(parsedOffset) && parsedOffset >= 0 ? parsedOffset : 0,
+  };
+};
+
 const getOrderTransactionDetails = async (req, res) => {
   try {
     const fromDate = normalizeDateParam(req.query.fromDate);
@@ -53,6 +63,7 @@ const getOrderTransactionDetails = async (req, res) => {
     const userNameExact = normalizeExactParam(req.query.userName);
     const kitchenNameExact = normalizeExactParam(req.query.kitchenName);
     const itemNameExact = normalizeExactParam(req.query.itemNames);
+    const { limit, offset } = parsePagination(req.query);
 
     console.log("Received filters:", {
       fromDate,
@@ -157,6 +168,8 @@ const getOrderTransactionDetails = async (req, res) => {
       LEFT JOIN xxafmc_pubmed XP ON XP.PUBMED_ID = OH.PUBMED
       LEFT JOIN xxafmc_non_members XNM ON XNM.ID = OH.MEMBER_ID
       ${baseWhere}
+      ORDER BY OH.ORDER_NUM DESC, OD.ORDER_LINE_ID DESC
+      LIMIT ${limit} OFFSET ${offset}
     `;
 
     const summaryQuery = `
@@ -195,9 +208,9 @@ const getOrderTransactionDetails = async (req, res) => {
 
     const finalQuery = `
       SELECT * FROM (
-        ${detailQuery}
+        (${detailQuery})
         UNION ALL
-        ${summaryQuery}
+        (${summaryQuery})
       ) final
       ORDER BY ORD ASC, ORDER_NUM DESC
     `;

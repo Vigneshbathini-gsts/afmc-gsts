@@ -15,7 +15,10 @@ const getAuditUserName = (req) =>
 
 const getCocktails = async (req, res) => {
   try {
-    const rows = await getCocktailItems(req.query.search);
+    const rows = await getCocktailItems(req.query.search, {
+      limit: req.query.limit,
+      offset: req.query.offset,
+    });
 
     res.json({
       success: true,
@@ -68,7 +71,10 @@ const getCocktailById = async (req, res) => {
 
 const getCocktailIngredients = async (req, res) => {
   try {
-    const rows = await getCocktailIngredientOptions(req.query.search);
+    const rows = await getCocktailIngredientOptions(req.query.search, {
+      limit: req.query.limit,
+      offset: req.query.offset,
+    });
 
     return res.json({
       success: true,

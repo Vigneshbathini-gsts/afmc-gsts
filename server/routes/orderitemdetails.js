@@ -51,6 +51,16 @@ const buildDateValues = (fromDate, toDate) => {
   return [];
 };
 
+const parsePagination = (query) => {
+  const parsedLimit = parseInt(query.limit, 10);
+  const parsedOffset = parseInt(query.offset, 10);
+
+  return {
+    limit: Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedLimit : 20,
+    offset: Number.isFinite(parsedOffset) && parsedOffset >= 0 ? parsedOffset : 0,
+  };
+};
+
 // ------------------ Controller ------------------
 const getOrderItemDetails = async (req, res) => {
   const fromDate = normalizeDateParam(req.query.fromDate);
@@ -58,6 +68,7 @@ const getOrderItemDetails = async (req, res) => {
   const userName = normalizeParam(req.query.userName);
   const kitchenName = normalizeParam(req.query.kitchenName);
   const itemNames = normalizeItemNames(req.query.itemNames);
+  const { limit, offset } = parsePagination(req.query);
 
   const itemFilterClause = itemNames.length
     ? `AND UPPER(xi.item_name) IN (${buildInClause(itemNames)})`
@@ -154,7 +165,13 @@ const getOrderItemDetails = async (req, res) => {
     FROM (${baseQuery}) a
   `;
 
-  const finalQuery = `${baseQuery} UNION ALL ${totalQuery}`;
+  const pagedBaseQuery = `
+    ${baseQuery}
+    ORDER BY order_date DESC, item_id DESC
+    LIMIT ${limit} OFFSET ${offset}
+  `;
+
+  const finalQuery = `(${pagedBaseQuery}) UNION ALL (${totalQuery})`;
 
   // ------------------ Values ------------------
   const dateValues = buildDateValues(fromDate, toDate);

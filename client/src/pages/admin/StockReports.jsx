@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import { FaSearch, FaArrowLeft, FaDownload } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { inventoryAPI } from "../../services/api";
@@ -30,41 +30,77 @@ const formatReportDate = (value) => {
   return `${mm}/${dd}/${yyyy}`;
 };
 
+const REPORT_PAGE_SIZE = 20;
+
 export default function StockReports() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("in");
   const [fromDate, setFromDate] = useState(toInputDate(new Date()));
   const [toDate, setToDate] = useState(toInputDate(new Date()));
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
   const [stockInRows, setStockInRows] = useState([]);
   const [stockOutRows, setStockOutRows] = useState([]);
+  const [stockInPage, setStockInPage] = useState(0);
+  const [stockOutPage, setStockOutPage] = useState(0);
+  const [stockInHasMore, setStockInHasMore] = useState(true);
+  const [stockOutHasMore, setStockOutHasMore] = useState(true);
+  const requestInFlight = useRef(false);
 
-  const fetchStockIn = useCallback(async (queryParams) => {
-    setLoading(true);
+  const fetchStockIn = useCallback(async (queryParams, { reset = true, nextPage = 0 } = {}) => {
+    if (requestInFlight.current) return;
+    requestInFlight.current = true;
+    if (reset) setLoading(true);
+    else setLoadingMore(true);
     setError("");
     try {
-      const response = await inventoryAPI.getStockInReport(queryParams);
-      setStockInRows(response.data.data || []);
+      const response = await inventoryAPI.getStockInReport({
+        ...queryParams,
+        limit: REPORT_PAGE_SIZE,
+        offset: nextPage * REPORT_PAGE_SIZE,
+      });
+      const rows = response.data.data || [];
+      setStockInRows((current) => (reset ? rows : [...current, ...rows]));
+      setStockInPage(nextPage + 1);
+      setStockInHasMore(rows.length === REPORT_PAGE_SIZE);
     } catch (err) {
       console.error("Failed to load stock-in report:", err);
       setError("Failed to load stock-in report.");
+      if (reset) setStockInRows([]);
+      setStockInHasMore(false);
     } finally {
+      requestInFlight.current = false;
       setLoading(false);
+      setLoadingMore(false);
     }
   }, []);
 
-  const fetchStockOut = useCallback(async (queryParams) => {
-    setLoading(true);
+  const fetchStockOut = useCallback(async (queryParams, { reset = true, nextPage = 0 } = {}) => {
+    if (requestInFlight.current) return;
+    requestInFlight.current = true;
+    if (reset) setLoading(true);
+    else setLoadingMore(true);
     setError("");
     try {
-      const response = await inventoryAPI.getStockOutReport(queryParams);
-      setStockOutRows(response.data.data || []);
+      const response = await inventoryAPI.getStockOutReport({
+        ...queryParams,
+        limit: REPORT_PAGE_SIZE,
+        offset: nextPage * REPORT_PAGE_SIZE,
+      });
+      const rows = response.data.data || [];
+      setStockOutRows((current) => (reset ? rows : [...current, ...rows]));
+      setStockOutPage(nextPage + 1);
+      setStockOutHasMore(rows.length === REPORT_PAGE_SIZE);
     } catch (err) {
       console.error("Failed to load stock-out report:", err);
       setError("Failed to load stock-out report.");
+      if (reset) setStockOutRows([]);
+      setStockOutHasMore(false);
     } finally {
+      requestInFlight.current = false;
       setLoading(false);
+      setLoadingMore(false);
     }
   }, []);
 
@@ -75,19 +111,63 @@ export default function StockReports() {
     };
 
     if (activeTab === "in") {
-      await fetchStockIn(queryParams);
+      await fetchStockIn(queryParams, { reset: true, nextPage: 0 });
     } else {
-      await fetchStockOut(queryParams);
+      await fetchStockOut(queryParams, { reset: true, nextPage: 0 });
     }
   }, [activeTab, fromDate, toDate, fetchStockIn, fetchStockOut]);
 
   const rows = activeTab === "in" ? stockInRows : stockOutRows;
+  const hasMore = activeTab === "in" ? stockInHasMore : stockOutHasMore;
 
-  const downloadPdf = () => {
+  const handleReportScroll = (event) => {
+    const { scrollTop, clientHeight, scrollHeight } = event.currentTarget;
+    if (scrollTop + clientHeight < scrollHeight - 80 || loading || loadingMore || !hasMore) {
+      return;
+    }
+
+    const queryParams = {
+      fromDate: fromDate || undefined,
+      toDate: toDate || undefined,
+    };
+
+    if (activeTab === "in") {
+      fetchStockIn(queryParams, { reset: false, nextPage: stockInPage });
+    } else {
+      fetchStockOut(queryParams, { reset: false, nextPage: stockOutPage });
+    }
+  };
+
+  const downloadPdf = async () => {
     if (!rows || rows.length === 0) return;
 
     const isStockIn = activeTab === "in";
-    const tableRows = rows.map((row) =>
+    const reportRows = [];
+    let offsetPage = 0;
+    const queryParams = {
+      fromDate: fromDate || undefined,
+      toDate: toDate || undefined,
+    };
+
+    while (true) {
+      const response = isStockIn
+        ? await inventoryAPI.getStockInReport({
+            ...queryParams,
+            limit: REPORT_PAGE_SIZE,
+            offset: offsetPage * REPORT_PAGE_SIZE,
+          })
+        : await inventoryAPI.getStockOutReport({
+            ...queryParams,
+            limit: REPORT_PAGE_SIZE,
+            offset: offsetPage * REPORT_PAGE_SIZE,
+          });
+      const chunk = response.data.data || [];
+      reportRows.push(...chunk);
+      if (chunk.length < REPORT_PAGE_SIZE) break;
+      offsetPage += 1;
+    }
+
+    const tableRows = reportRows.map((row) =>
       isStockIn
         ? [
             row.item_code,
@@ -234,6 +314,7 @@ export default function StockReports() {
           )}
 
           <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
+            <div className="max-h-[70vh] overflow-auto" onScroll={handleReportScroll}>
             <table className="w-full text-sm">
               <thead className="bg-gray-50 text-gray-600">
                 <tr>
@@ -284,6 +365,17 @@ export default function StockReports() {
                 )}
               </tbody>
             </table>
+            {loadingMore && (
+              <p className="px-4 py-4 text-center text-gray-500">
+                Loading more report data...
+              </p>
+            )}
+            {!loading && !loadingMore && rows.length > 0 && !hasMore && (
+              <p className="px-4 py-4 text-center text-gray-500">
+                No more data
+              </p>
+            )}
+            </div>
           </div>
         </div>
       </div>

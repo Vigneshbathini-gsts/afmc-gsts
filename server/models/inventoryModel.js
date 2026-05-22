@@ -56,7 +56,12 @@ const buildInventoryQuery = ({ categoryId, itemCode, search }) => {
 
 const getInventoryList = async (filters) => {
   const { sql, params } = buildInventoryQuery(filters);
-  const [rows] = await db.execute(sql, params);
+  const limit = Number(filters?.limit);
+  const offset = Number(filters?.offset);
+  const hasPagination =
+    Number.isInteger(limit) && limit > 0 && Number.isInteger(offset) && offset >= 0;
+  const pagedSql = hasPagination ? `${sql} LIMIT ${limit} OFFSET ${offset}` : sql;
+  const [rows] = await db.execute(pagedSql, params);
   return rows;
 };
 
@@ -777,9 +782,16 @@ const addStockOutTransactions = async (payload) => {
   }
 };
 
-const getStockInReport = async ({ fromDate, toDate }) => {
+const getStockInReport = async ({ fromDate, toDate, limit, offset }) => {
   const start = getStartOfDay(fromDate);
   const end = getEndOfDay(toDate);
+  const limitNumber = Number(limit);
+  const offsetNumber = Number(offset);
+  const hasPagination =
+    Number.isInteger(limitNumber) &&
+    limitNumber > 0 &&
+    Number.isInteger(offsetNumber) &&
+    offsetNumber >= 0;
   const sql = `
     SELECT
       XIT.ITEM_CODE AS item_code,
@@ -797,14 +809,22 @@ const getStockInReport = async ({ fromDate, toDate }) => {
       AND XI.SUB_CATEGORY NOT IN (14, 15)
     GROUP BY XIT.ITEM_CODE, XI.ITEM_NAME, XIT.BATCH_ID, XI.\`A/C_UNIT\`
     ORDER BY transaction_date DESC
+    ${hasPagination ? `LIMIT ${limitNumber} OFFSET ${offsetNumber}` : ""}
   `;
   const [rows] = await db.execute(sql, [start, end]);
   return rows;
 };
 
-const getStockOutReport = async ({ fromDate, toDate }) => {
+const getStockOutReport = async ({ fromDate, toDate, limit, offset }) => {
   const start = getStartOfDay(fromDate);
   const end = getEndOfDay(toDate);
+  const limitNumber = Number(limit);
+  const offsetNumber = Number(offset);
+  const hasPagination =
+    Number.isInteger(limitNumber) &&
+    limitNumber > 0 &&
+    Number.isInteger(offsetNumber) &&
+    offsetNumber >= 0;
   const sql = `
     SELECT
       XSO.ITEM_CODE AS item_code,
@@ -818,6 +838,7 @@ const getStockOutReport = async ({ fromDate, toDate }) => {
     WHERE XSO.CREATION_DATE >= ? AND XSO.CREATION_DATE <= ?
     GROUP BY XSO.ITEM_NAME, XSO.ITEM_CODE, XI.\`A/C_UNIT\`
     ORDER BY creation_date DESC
+    ${hasPagination ? `LIMIT ${limitNumber} OFFSET ${offsetNumber}` : ""}
   `;
   const [rows] = await db.execute(sql, [start, end]);
   return rows;

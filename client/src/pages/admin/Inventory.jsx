@@ -7,6 +7,7 @@ import { useAuth } from "../../context/AuthContext";
 
 
 const requiresVolume = (acUnit) => String(acUnit || "").trim().toUpperCase() !== "NOS";
+const INVENTORY_PAGE_SIZE = 20;
 
 const isValidBarcode = (value) => /^\d{4,32}$/.test(String(value || "").trim());
 
@@ -79,6 +80,9 @@ export default function Inventory() {
   const [isItemDropdownOpen, setIsItemDropdownOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState("");
   const [addItemError, setAddItemError] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
@@ -134,6 +138,7 @@ export default function Inventory() {
   const subCategoryDropdownRef = useRef(null);
   const acUnitDropdownRef = useRef(null);
   const searchRef = useRef("");
+  const requestInFlightRef = useRef(false);
 
   const fetchCategories = async () => {
     try {
@@ -167,13 +172,25 @@ export default function Inventory() {
   };
 
   const fetchInventory = useCallback(async (options = {}) => {
-    setLoading(true);
+    if (requestInFlightRef.current) return;
+
+    const reset = options.reset !== false;
+    const nextPage = reset ? 0 : options.nextPage ?? 0;
+
+    requestInFlightRef.current = true;
+    if (reset) {
+      setLoading(true);
+    } else {
+      setLoadingMore(true);
+    }
     setError("");
     try {
       const params = {
         categoryId: (options.categoryId ?? categoryId) || undefined,
         itemCode: (options.itemCode ?? itemCode) || undefined,
         q: (options.search ?? searchRef.current) || undefined,
+        limit: INVENTORY_PAGE_SIZE,
+        offset: nextPage * INVENTORY_PAGE_SIZE,
       };
       const response = await inventoryAPI.getAll(params);
       const rows = response.data.data || [];
@@ -182,8 +199,9 @@ export default function Inventory() {
         return ![14, 15].includes(Number(row.sub_category));
       });
 
-      const groupedByItemCode = new Map();
-      cleanedRows.forEach((row) => {
+      const groupRows = (sourceRows) => {
+        const groupedByItemCode = new Map();
+        sourceRows.forEach((row) => {
         const key = String(row?.item_code || row?.item_id || "").trim();
         if (!key) return;
 
@@ -202,12 +220,28 @@ export default function Inventory() {
         });
       });
 
-      setInventory(Array.from(groupedByItemCode.values()));
+        return Array.from(groupedByItemCode.values());
+      };
+
+      if (reset) {
+        setInventory(groupRows(cleanedRows));
+        setPage(1);
+      } else {
+        setInventory((current) => groupRows([...current, ...cleanedRows]));
+        setPage(nextPage + 1);
+      }
+      setHasMore(rows.length === INVENTORY_PAGE_SIZE);
     } catch (err) {
       console.error("Failed to load inventory:", err);
       setError("Failed to load inventory.");
+      if (reset) {
+        setInventory([]);
+      }
+      setHasMore(false);
     } finally {
+      requestInFlightRef.current = false;
       setLoading(false);
+      setLoadingMore(false);
     }
   }, [categoryId, itemCode]);
 
@@ -235,6 +269,19 @@ export default function Inventory() {
   useEffect(() => {
     searchRef.current = search;
   }, [search]);
+
+  const handleInventoryScroll = (event) => {
+    const { scrollTop, clientHeight, scrollHeight } = event.currentTarget;
+
+    if (
+      scrollTop + clientHeight >= scrollHeight - 80 &&
+      !loading &&
+      !loadingMore &&
+      hasMore
+    ) {
+      fetchInventory({ reset: false, nextPage: page });
+    }
+  };
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -1032,6 +1079,7 @@ export default function Inventory() {
             )}
 
             <div className="overflow-hidden rounded-2xl border border-afmc-gold/25 bg-white">
+              <div className="max-h-[70vh] overflow-auto" onScroll={handleInventoryScroll}>
               <table className="w-full text-sm">
                 <thead className="bg-afmc-maroon/5 text-afmc-maroon">
                   <tr>
@@ -1091,6 +1139,17 @@ export default function Inventory() {
                   )}
                 </tbody>
               </table>
+              {loadingMore && (
+                <p className="px-4 py-4 text-center text-gray-500">
+                  Loading more inventory...
+                </p>
+              )}
+              {!loading && !loadingMore && inventory.length > 0 && !hasMore && (
+                <p className="px-4 py-4 text-center text-gray-500">
+                  No more data
+                </p>
+              )}
+              </div>
             </div>
           </div>
         </div>

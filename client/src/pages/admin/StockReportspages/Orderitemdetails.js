@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { FaDownload, FaSearch } from "react-icons/fa";
 import { FaArrowLeft } from "react-icons/fa";
 import api from "../../../services/api";
@@ -38,6 +38,8 @@ const formatQuantity = (value) => {
   return Number(value);
 };
 
+const REPORT_PAGE_SIZE = 20;
+
 export default function Orderitemdetails() {
   const navigate = useNavigate();
   const today = toInputDate(new Date());
@@ -52,9 +54,14 @@ export default function Orderitemdetails() {
   const [filters, setFilters] = useState(initialFilters);
   const [appliedFilters, setAppliedFilters] = useState(initialFilters);
   const [data, setData] = useState([]);
+  const [summaryRow, setSummaryRow] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [error, setError] = useState("");
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const requestInFlight = useRef(false);
   const [filterOptions, setFilterOptions] = useState({
     itemNames: [],
     userNames: [],
@@ -102,24 +109,43 @@ export default function Orderitemdetails() {
     fetchFilterOptions();
   }, [filters.fromDate, filters.toDate]);
 
-  const fetchData = async (activeFilters) => {
-    setLoading(true);
+  const fetchData = async (activeFilters, { reset = true, nextPage = 0 } = {}) => {
+    if (requestInFlight.current) return;
+    requestInFlight.current = true;
+    if (reset) setLoading(true);
+    else setLoadingMore(true);
     setError("");
     try {
       const res = await api.get("/reports/orderitem", {
-        params: buildQueryParams(activeFilters),
+        params: {
+          ...buildQueryParams(activeFilters),
+          limit: REPORT_PAGE_SIZE,
+          offset: nextPage * REPORT_PAGE_SIZE,
+        },
       });
       if (res.data.success) {
-        setData(res.data.data || []);
+        const rows = res.data.data || [];
+        const detailRows = rows.filter((row) => row?.item_id);
+        const totalRow = rows.find((row) => !row?.item_id) || null;
+        setData((current) => (reset ? detailRows : [...current, ...detailRows]));
+        setSummaryRow(totalRow);
+        setPage(nextPage + 1);
+        setHasMore(detailRows.length === REPORT_PAGE_SIZE);
       }
     } catch (err) {
       console.error(err);
       setError(
         err.response?.data?.message || "Unable to fetch item details report."
       );
-      setData([]);
+      if (reset) {
+        setData([]);
+        setSummaryRow(null);
+      }
+      setHasMore(false);
     } finally {
+      requestInFlight.current = false;
       setLoading(false);
+      setLoadingMore(false);
     }
   };
 
@@ -127,6 +153,7 @@ export default function Orderitemdetails() {
     if (!filters.fromDate || !filters.toDate) {
       setHasSearched(false);
       setData([]);
+      setSummaryRow(null);
       setError("Please select both From Date and To Date before searching.");
       return;
     }
@@ -135,11 +162,50 @@ export default function Orderitemdetails() {
     setAppliedFilters(nextFilters);
     setHasSearched(true);
     setError("");
-    await fetchData(nextFilters);
+    setPage(0);
+    setHasMore(true);
+    await fetchData(nextFilters, { reset: true, nextPage: 0 });
   };
 
-  const exportPdf = () => {
+  const displayRows = summaryRow ? [...data, summaryRow] : data;
+
+  const handleTableScroll = (event) => {
+    const { scrollTop, clientHeight, scrollHeight } = event.currentTarget;
+
+    if (
+      scrollTop + clientHeight >= scrollHeight - 80 &&
+      !loading &&
+      !loadingMore &&
+      hasMore
+    ) {
+      fetchData(appliedFilters, { reset: false, nextPage: page });
+    }
+  };
+
+  const exportPdf = async () => {
     if (!data.length) return;
+
+    const exportRows = [];
+    let exportSummary = null;
+    let offsetPage = 0;
+
+    while (true) {
+      const res = await api.get("/reports/orderitem", {
+        params: {
+          ...buildQueryParams(appliedFilters),
+          limit: REPORT_PAGE_SIZE,
+          offset: offsetPage * REPORT_PAGE_SIZE,
+        },
+      });
+      const rows = res.data.data || [];
+      const detailRows = rows.filter((row) => row?.item_id);
+      exportSummary = rows.find((row) => !row?.item_id) || exportSummary;
+      exportRows.push(...detailRows);
+      if (detailRows.length < REPORT_PAGE_SIZE) break;
+      offsetPage += 1;
+    }
+
+    const pdfRows = exportSummary ? [...exportRows, exportSummary] : exportRows;
 
     exportTableToPdf({
       title: "Order Item Details Report",
@@ -157,7 +223,7 @@ export default function Orderitemdetails() {
         "Profit %",
         "Total",
       ],
-      rows: data.map((row) => [
+      rows: pdfRows.map((row) => [
         row.item_name || "-",
         String(formatQuantity(row.quantity)),
         row.price ? formatNumber(row.price) : "-",
@@ -308,7 +374,8 @@ export default function Orderitemdetails() {
             </div>
           ) : (
             <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
-              <div className="overflow-x-auto">
+              <div className="max-h-[70vh] overflow-auto" onScroll={handleTableScroll}>
+                <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50 text-gray-600">
                     <tr>
@@ -330,8 +397,8 @@ export default function Orderitemdetails() {
                     </tr>
                   </thead>
                   <tbody>
-                    {data.length ? (
-                      data.map((row, i) => (
+                    {displayRows.length ? (
+                      displayRows.map((row, i) => (
                         <tr
                           key={row.item_id || `${row.item_name || "row"}-${i}`}
                           className={`border-t border-gray-100 hover:bg-gray-50 ${
@@ -369,6 +436,17 @@ export default function Orderitemdetails() {
                     )}
                   </tbody>
                 </table>
+                </div>
+                {loadingMore && (
+                  <p className="px-4 py-4 text-center text-gray-500">
+                    Loading more data...
+                  </p>
+                )}
+                {!loading && !loadingMore && data.length > 0 && !hasMore && (
+                  <p className="px-4 py-4 text-center text-gray-500">
+                    No more data
+                  </p>
+                )}
               </div>
             </div>
           )}

@@ -365,9 +365,9 @@ export const profitAPI = {
 export const cocktailAPI = {
   getAll: (params) => api.get("/cocktails", { params }),
   getById: (id) => api.get(`/cocktails/${id}`),
-  getIngredientOptions: (search = "") =>
+  getIngredientOptions: (search = "", params = {}) =>
     api.get("/cocktails/ingredients/options", {
-      params: search ? { search } : undefined,
+      params: { ...params, ...(search ? { search } : {}) },
     }),
   getIngredientPrice: (itemCode, pegs) =>
     api.get("/cocktails/ingredients/price", {

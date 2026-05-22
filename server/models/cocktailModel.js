@@ -141,9 +141,13 @@ const ensureCocktailNameIsUnique = async (itemName, excludeItemId = null, connec
   }
 };
 
-const getCocktailItems = async (search = "") => {
+const getCocktailItems = async (search = "", pagination = {}) => {
   const normalizedSearch =
     typeof search === "string" && search.trim() !== "" ? search.trim() : null;
+  const limit = Number(pagination.limit);
+  const offset = Number(pagination.offset);
+  const hasPagination =
+    Number.isInteger(limit) && limit > 0 && Number.isInteger(offset) && offset >= 0;
 
   const query = `
     SELECT
@@ -174,6 +178,7 @@ const getCocktailItems = async (search = "") => {
         OR CAST(ITEM_CODE AS CHAR) LIKE CONCAT('%', ?, '%')
       )
     ORDER BY ITEM_ID DESC
+    ${hasPagination ? `LIMIT ${limit} OFFSET ${offset}` : ""}
   `;
 
   const [rows] = await db.execute(query, [
@@ -185,9 +190,13 @@ const getCocktailItems = async (search = "") => {
   return rows;
 };
 
-const getCocktailIngredientOptions = async (search = "") => {
+const getCocktailIngredientOptions = async (search = "", pagination = {}) => {
   const normalizedSearch =
     typeof search === "string" && search.trim() !== "" ? search.trim() : null;
+  const limit = Number(pagination.limit);
+  const offset = Number(pagination.offset);
+  const hasPagination =
+    Number.isInteger(limit) && limit > 0 && Number.isInteger(offset) && offset >= 0;
 
   const query = `
     SELECT DISTINCT
@@ -204,7 +213,7 @@ const getCocktailIngredientOptions = async (search = "") => {
         OR CAST(ITEM_CODE AS CHAR) LIKE CONCAT('%', ?, '%')
       )
     ORDER BY ITEM_NAME ASC, ITEM_CODE ASC
-    LIMIT 200
+    LIMIT ${hasPagination ? limit : 20} OFFSET ${hasPagination ? offset : 0}
   `;
 
   const [rows] = await db.execute(query, [

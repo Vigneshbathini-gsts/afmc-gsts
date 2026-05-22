@@ -8,7 +8,7 @@ import { exportTableToPdf } from "../../../utils/pdfExport";
 
 export default function BarstockReports() {
   const navigate = useNavigate();
-  const rowsPerPage = 15;
+  const rowsPerPage = 20;
   const requestInFlight = useRef(false);
   const [searchParams] = useSearchParams();
 

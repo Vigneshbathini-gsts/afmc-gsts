@@ -6,11 +6,13 @@ const upload = require("../utils/uploadMiddleware");
 
 exports.getInventory = async (req, res) => {
   try {
-    const { categoryId, itemCode, q } = req.query;
+    const { categoryId, itemCode, q, limit, offset } = req.query;
     const items = await inventoryModel.getInventoryList({
       categoryId,
       itemCode,
       search: q,
+      limit,
+      offset,
     });
     res.status(200).json({ success: true, data: items });
   } catch (error) {
@@ -224,8 +226,8 @@ exports.updateItemImage = async (req, res) => {
 
 exports.getStockInReport = async (req, res) => {
   try {
-    const { fromDate, toDate } = req.query;
-    const rows = await inventoryModel.getStockInReport({ fromDate, toDate });
+    const { fromDate, toDate, limit, offset } = req.query;
+    const rows = await inventoryModel.getStockInReport({ fromDate, toDate, limit, offset });
     res.status(200).json({ success: true, data: rows });
   } catch (error) {
     console.error("Error fetching stock-in report:", error);
@@ -235,8 +237,8 @@ exports.getStockInReport = async (req, res) => {
 
 exports.getStockOutReport = async (req, res) => {
   try {
-    const { fromDate, toDate } = req.query;
-    const rows = await inventoryModel.getStockOutReport({ fromDate, toDate });
+    const { fromDate, toDate, limit, offset } = req.query;
+    const rows = await inventoryModel.getStockOutReport({ fromDate, toDate, limit, offset });
     res.status(200).json({ success: true, data: rows });
   } catch (error) {
     console.error("Error fetching stock-out report:", error);

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Save, Search } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { cocktailAPI } from "../../services/api";
@@ -16,6 +16,7 @@ const createEmptyRow = () => ({
 });
 
 const normalizeItemCode = (value) => String(value ?? "").trim();
+const INGREDIENT_PAGE_SIZE = 20;
 
 export default function CocktailEdit() {
   const navigate = useNavigate();
@@ -26,6 +27,10 @@ export default function CocktailEdit() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [ingredientOptions, setIngredientOptions] = useState([]);
+  const [ingredientPage, setIngredientPage] = useState(0);
+  const [ingredientHasMore, setIngredientHasMore] = useState(true);
+  const [ingredientsLoadingMore, setIngredientsLoadingMore] = useState(false);
+  const ingredientRequestInFlight = useRef(false);
   const [form, setForm] = useState({
     itemName: "",
     subCategory: "",
@@ -39,18 +44,35 @@ export default function CocktailEdit() {
   });
   const [rows, setRows] = useState([createEmptyRow()]);
 
-  useEffect(() => {
-    const fetchIngredientOptions = async () => {
+  const fetchIngredientOptions = useCallback(async ({ reset = true, nextPage = 0 } = {}) => {
+      if (ingredientRequestInFlight.current) return;
+      ingredientRequestInFlight.current = true;
       try {
-        const response = await cocktailAPI.getIngredientOptions();
-        setIngredientOptions(response.data?.data || []);
+        if (!reset) setIngredientsLoadingMore(true);
+        const response = await cocktailAPI.getIngredientOptions("", {
+          limit: INGREDIENT_PAGE_SIZE,
+          offset: nextPage * INGREDIENT_PAGE_SIZE,
+        });
+        const rows = response.data?.data || [];
+        setIngredientOptions((current) => (reset ? rows : [...current, ...rows]));
+        setIngredientPage(nextPage + 1);
+        setIngredientHasMore(rows.length === INGREDIENT_PAGE_SIZE);
       } catch (fetchError) {
         console.error(fetchError);
+        setIngredientHasMore(false);
+      } finally {
+        ingredientRequestInFlight.current = false;
+        setIngredientsLoadingMore(false);
       }
-    };
+    }, []);
 
-    fetchIngredientOptions();
-  }, []);
+  useEffect(() => {
+    fetchIngredientOptions({ reset: true, nextPage: 0 });
+  }, [fetchIngredientOptions]);
+
+  const handleIngredientMenuScroll = useCallback(() => {
+    fetchIngredientOptions({ reset: false, nextPage: ingredientPage });
+  }, [fetchIngredientOptions, ingredientPage]);
 
   const updateField = (field, value) => {
     setForm((current) => ({ ...current, [field]: value }));
@@ -274,8 +296,7 @@ export default function CocktailEdit() {
 
   const getIngredientDropdownOptions = (currentRow) => {
     const currentItemCode = normalizeItemCode(currentRow?.itemCode);
-
-    return ingredientOptions
+    const options = ingredientOptions
       .filter((opt) => {
         const optionItemCode = normalizeItemCode(opt.ITEM_CODE);
         return (
@@ -291,6 +312,22 @@ export default function CocktailEdit() {
           label: `${itemCode} - ${toInitCap(opt.ITEM_NAME)}`,
         };
       });
+
+    if (
+      currentItemCode &&
+      currentRow?.itemName &&
+      !options.some((option) => String(option.value) === currentItemCode)
+    ) {
+      return [
+        {
+          value: currentItemCode,
+          label: `${currentItemCode} - ${toInitCap(currentRow.itemName)}`,
+        },
+        ...options,
+      ];
+    }
+
+    return options;
   };
 
   const formatIngredientLabel = (label) => {
@@ -545,6 +582,9 @@ export default function CocktailEdit() {
                             valueClassName="normal-case"
                             menuClassName="text-left"
                             usePortal
+                            onMenuScroll={handleIngredientMenuScroll}
+                            hasMore={ingredientHasMore}
+                            loadingMore={ingredientsLoadingMore}
                           />
                         </td>
                         <td className="border-r border-gray-100 px-2 py-3">
