@@ -156,7 +156,7 @@ export default function Login() {
         password,
         outletType,
       });
-      console.log("Login response:", response.data);
+      // console.log("Login response:", response.data);
       if (response.data?.success) {
         // Handle remember me
         if (rememberMe) {

@@ -186,6 +186,7 @@ async function getAdminOrderHistory({
   ];
 
   const [rows] = await db.execute(query, params);
+  console.log("Admin Order History Params:", params);
   return rows;
 }
 
@@ -305,7 +306,22 @@ async function getOrderDetails(orderNumber) {
   od.price,
   od.subtotal,
   COALESCE(NULLIF(xi.type, ''), NULLIF(od.type, ''), 'NA') AS type,
-  COALESCE(NULLIF(od.order_status, ''), 'Pending') AS status,
+  COALESCE(
+    NULLIF(od.order_status, ''),
+    (
+      SELECT 
+        CASE 
+          WHEN kn.status = 'Completed' THEN 'Completed'
+          WHEN kn.status = 'Preparing' THEN 'Preparing'
+          ELSE 'Received'
+        END
+      FROM xxafmc_kitchen_notification kn
+      WHERE kn.ordernumber = od.order_id
+        AND TRIM(CAST(kn.item_id AS CHAR)) = TRIM(CAST(od.item_id AS CHAR))
+      LIMIT 1
+    ),
+    'Received'
+  ) AS status,
   od.barcode AS barcode,
   od.FREE_ITEM_CODE AS free_item_code,
   od.FREE_ITEM_QUANTITY AS free_item_quantity

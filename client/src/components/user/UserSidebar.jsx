@@ -22,7 +22,7 @@ export default function UserSidebar({ isOpen, onClose }) {
           isOpen ? "opacity-100 visible" : "opacity-0 invisible"
         }`}
         onClick={onClose}
-      ></div>
+      />
 
       <aside
         className={`fixed top-0 left-0 h-screen w-72 bg-white shadow-2xl z-50 transform transition-transform duration-300 ${
@@ -30,11 +30,13 @@ export default function UserSidebar({ isOpen, onClose }) {
         }`}
       >
         <div className="h-1 w-full bg-gradient-to-r from-afmc-maroon via-afmc-gold to-afmc-maroon2" />
+
         <div className="flex items-center justify-between px-5 py-4 border-b">
           <h2 className="text-xl font-bold text-afmc-maroon">AFMC Service</h2>
           <button
             onClick={onClose}
             className="text-2xl text-gray-600 hover:text-red-500 transition"
+            aria-label="Close navigation menu"
           >
             <FaTimes />
           </button>

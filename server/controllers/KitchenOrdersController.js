@@ -52,8 +52,6 @@ exports.getOrders = async (req, res) => {
     const appUser = getRequestUsername(req);
     const { categoryId, handledByField } = getKitchenConfig(req.query.kitchen);
 
-    // console.log(`Fetching ${kitchen} orders for user: ${appUser}`);
-
     const query = `
       SELECT * FROM (
         SELECT
@@ -109,10 +107,10 @@ exports.getOrders = async (req, res) => {
           MAX(a.handled_by_bar) AS Handled_by_bar,
           MAX(a.handled_by_kitchen) AS Handled_by_kitchen,
 
-          CASE
-            WHEN SUM(CASE WHEN a.STATUS IN ('Received','Preparing') THEN 1 ELSE 0 END) > 0 THEN 'Y'
-            ELSE 'N'
-          END AS CAN_CANCEL,
+         CASE
+  WHEN SUM(CASE WHEN a.STATUS = 'Received' THEN 1 ELSE 0 END) > 0 THEN 'Y'
+  ELSE 'N'
+END AS CAN_CANCEL,
 
           CASE
             WHEN SUM(CASE WHEN a.STATUS IN ('Received','Preparing') THEN 1 ELSE 0 END) > 0 THEN 'Y'
@@ -359,7 +357,6 @@ exports.getOrderItems = async (req, res) => {
     if (!ORDERNUMBER) {
       return res.status(400).json({ success: false, message: "ORDERNUMBER is required" });
     }
-
     const { categoryId } = getKitchenConfig(KITCHEN);
 
     const query = `
@@ -967,86 +964,7 @@ exports.clearScannedItemsFromSession = async (req, res) => {
   }
 };
 
-exports.cancelBarOrderItem = async (req, res) => {
-  try {
-    const { ORDER_LINE_ID, ORDERNUMBER, KITCHEN = "Bar" } = req.body;
-    const { categoryId } = getKitchenConfig(KITCHEN);
 
-    if (ORDERNUMBER) {
-      const [updateResult] = await pool.query(
-        `
-        UPDATE xxafmc_order_details xod
-        JOIN (${inventorySummarySql}) inv ON inv.item_code = xod.item_id
-        SET xod.ORDER_STATUS = 'CANCELLED'
-        WHERE xod.ORDER_ID = ?
-          AND inv.category_id = ?
-          AND (xod.ORDER_STATUS IS NULL OR TRIM(xod.ORDER_STATUS) = '')
-        `,
-        [ORDERNUMBER, categoryId]
-      );
-
-      await pool.query(
-        `
-        UPDATE xxafmc_kitchen_notification kn
-        JOIN (${inventorySummarySql}) inv ON inv.item_code = kn.item_id
-        SET kn.status = 'Cancelled'
-        WHERE kn.ordernumber = ?
-          AND inv.category_id = ?
-          AND kn.status IN ('Received', 'Preparing')
-        `,
-        [ORDERNUMBER, categoryId]
-      );
-
-      return res.status(200).json({
-        success: true,
-        message: updateResult.affectedRows > 0
-          ? "Order cancelled successfully"
-          : "No cancellable order items found",
-      });
-    }
-
-    if (!ORDER_LINE_ID) {
-      return res.status(400).json({
-        success: false,
-        message: "Order line ID or order number is required",
-      });
-    }
-
-    const [updateResult] = await pool.query(
-      `UPDATE xxafmc_order_details SET ORDER_STATUS = 'CANCELLED' WHERE ORDER_LINE_ID = ?`,
-      [ORDER_LINE_ID]
-    );
-
-    if (updateResult.affectedRows === 0) {
-      return res.status(404).json({
-        success: false,
-        message: "Order item not found",
-      });
-    }
-
-    await pool.query(
-      `UPDATE xxafmc_kitchen_notification kn
-       SET kn.status = 'Cancelled'
-       WHERE EXISTS (
-         SELECT 1 FROM xxafmc_order_details od
-         WHERE od.order_line_id = ? AND od.order_id = kn.ordernumber AND od.item_id = kn.item_id
-       )`,
-      [ORDER_LINE_ID]
-    );
-
-    return res.status(200).json({
-      success: true,
-      message: "Order item cancelled successfully",
-    });
-  } catch (error) {
-    console.error("Error cancelling bar order item:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to cancel order item",
-      error: error.message,
-    });
-  }
-};
 
 
 exports.getActiveBarOrders = async (req, res) => {
@@ -1235,7 +1153,6 @@ exports.getCancelledOrders = async (req, res) => {
     let { fromDate, toDate, kitchen = "Bar" } = req.query;
     const { categoryId } = getKitchenConfig(kitchen);
 
-    // console.log("Fetching cancelled orders from", fromDate, "to", toDate);
 
     //   Normalize input dates (important)
     const from = getStartOfDay(fromDate);
@@ -1285,12 +1202,13 @@ exports.getCancelledOrders = async (req, res) => {
       WHERE xod.order_id = xxkn.order_num
         AND inv.category_id = ?
       GROUP BY xod.order_id
-      HAVING COUNT(*) = COUNT(
-          CASE 
-              WHEN TRIM(UPPER(IFNULL(xod.order_status, ''))) = 'CANCELLED' 
-              THEN 1 
-          END
-      )
+     HAVING SUM(
+    CASE
+        WHEN TRIM(UPPER(IFNULL(xod.order_status,''))) NOT IN ('', 'CANCELLED')
+        THEN 1
+        ELSE 0
+    END
+) = 0
   )
 
   AND ${dateExpression} 
@@ -1306,7 +1224,6 @@ exports.getCancelledOrders = async (req, res) => {
       to || null
     ]);
 
-
     res.json({
       success: true,
       count: rows.length,
@@ -1321,6 +1238,87 @@ exports.getCancelledOrders = async (req, res) => {
       message: err.message || "Failed to fetch cancelled orders",
     });
 
+  }
+};
+
+exports.cancelBarOrderItem = async (req, res) => {
+  try {
+    const { ORDER_LINE_ID, ORDERNUMBER, KITCHEN = "Bar" } = req.body;
+    const { categoryId } = getKitchenConfig(KITCHEN);
+console.log("Cancel request received with:", { ORDER_LINE_ID, ORDERNUMBER, KITCHEN, categoryId });
+    if (ORDERNUMBER) {
+      const [updateResult] = await pool.query(
+        `
+        UPDATE xxafmc_order_details xod
+        JOIN (${inventorySummarySql}) inv ON inv.item_code = xod.item_id
+        SET xod.ORDER_STATUS = 'CANCELLED'
+        WHERE xod.ORDER_ID = ?
+          AND inv.category_id = ?
+          AND (xod.ORDER_STATUS IS NULL OR TRIM(xod.ORDER_STATUS) = '')
+        `,
+        [ORDERNUMBER, categoryId]
+      );
+
+      await pool.query(
+        `
+        UPDATE xxafmc_kitchen_notification kn
+        JOIN (${inventorySummarySql}) inv ON inv.item_code = kn.item_id
+        SET kn.status = 'Cancelled'
+        WHERE kn.ordernumber = ?
+          AND inv.category_id = ?
+          AND kn.status IN ('Received', 'Preparing')
+        `,
+        [ORDERNUMBER, categoryId]
+      );
+
+      return res.status(200).json({
+        success: true,
+        message: updateResult.affectedRows > 0
+          ? "Order cancelled successfully"
+          : "No cancellable order items found",
+      });
+    }
+
+    if (!ORDER_LINE_ID) {
+      return res.status(400).json({
+        success: false,
+        message: "Order line ID or order number is required",
+      });
+    }
+
+    const [updateResult] = await pool.query(
+      `UPDATE xxafmc_order_details SET ORDER_STATUS = 'CANCELLED' WHERE ORDER_LINE_ID = ?`,
+      [ORDER_LINE_ID]
+    );
+
+    if (updateResult.affectedRows === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Order item not found",
+      });
+    }
+
+    await pool.query(
+      `UPDATE xxafmc_kitchen_notification kn
+       SET kn.status = 'Cancelled'
+       WHERE EXISTS (
+         SELECT 1 FROM xxafmc_order_details od
+         WHERE od.order_line_id = ? AND od.order_id = kn.ordernumber AND od.item_id = kn.item_id
+       )`,
+      [ORDER_LINE_ID]
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Order item cancelled successfully",
+    });
+  } catch (error) {
+    console.error("Error cancelling bar order item:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to cancel order item",
+      error: error.message,
+    });
   }
 };
 
@@ -1499,7 +1497,12 @@ exports.getOrderHistoryItemDetails = async (req, res) => {
 
         COALESCE(
           NULLIF(xo.order_status, ''), 
-          MAX(xxkn.status), 
+          MAX(
+            CASE 
+              WHEN xxkn.status = 'Completed' THEN '3-Completed'
+              WHEN xxkn.status = 'Preparing' THEN '2-Preparing'
+              ELSE '1-Received'
+            END), 
           NULLIF(oh.order_status, ''), 
           'Received'
         ) AS status
@@ -1515,7 +1518,7 @@ exports.getOrderHistoryItemDetails = async (req, res) => {
       --   critical join (same as APEX)
       LEFT JOIN xxafmc_kitchen_notification xxkn 
         ON xxkn.ordernumber = xo.order_id
-       AND TRIM(xxkn.item_id) = TRIM(xo.item_id)
+       AND TRIM(CAST(xxkn.item_id AS CHAR)) = TRIM(CAST(xo.item_id AS CHAR))
 
       WHERE xo.order_id = ?
         AND xi.category_id = ?
@@ -1553,12 +1556,18 @@ exports.getOrderHistoryItemDetails = async (req, res) => {
     const [items] = await pool.execute(itemsQuery, [orderNumber, categoryId]);
     const [totalResult] = await pool.execute(totalQuery, [orderNumber, categoryId]);
 
+    // Clean up the status string if it used the priority prefix
+    const formattedItems = items.map(item => ({
+      ...item,
+      status: item.status.replace(/^\d-/, '')
+    }));
+
     const totalAmount = totalResult[0]?.total_amount || 0;
     res.json({
       success: true,
       data: {
         orderNumber,
-        items,
+        items: formattedItems,
         summary: {
           totalAmount
         }
@@ -1583,7 +1592,7 @@ exports.getOrderDetailsByOrderNumber = async (req, res) => {
     const { orderNumber } = req.params;
     const { kitchen = "Bar" } = req.query;
     const { categoryId } = getKitchenConfig(kitchen);
-
+console.log("Fetching order details for order number:", orderNumber, "and kitchen:", kitchen);
     if (!orderNumber) {
       return res.status(400).json({
         success: false,
@@ -1599,29 +1608,43 @@ exports.getOrderDetailsByOrderNumber = async (req, res) => {
       SELECT 
         xod.item_id,
         inv.item_name,
-        xkn.status AS item_kitchen_status,
         xod.quantity,
         COALESCE(xod.type, 'NA') AS type,
-        xod.order_status AS status,
-        xkn.status AS kitchen_status
+        COALESCE(
+          NULLIF(xod.order_status, ''), 
+          MAX(
+            CASE 
+              WHEN xkn.status = 'Completed' THEN '3-Completed'
+              WHEN xkn.status = 'Preparing' THEN '2-Preparing'
+              ELSE '1-Received'
+            END), 
+          'Received'
+        ) AS status
       FROM xxafmc_order_details xod
       LEFT JOIN (${inventorySummarySql}) inv
         ON inv.item_code = xod.item_id
       LEFT JOIN xxafmc_kitchen_notification xkn 
         ON xod.order_id = xkn.ordernumber 
-        AND xod.item_id = xkn.item_id
+        AND TRIM(CAST(xkn.item_id AS CHAR)) = TRIM(CAST(xod.item_id AS CHAR))
       WHERE xod.order_id = ?
         AND inv.category_id = ?
-        AND TRIM(UPPER(IFNULL(xod.order_status, ''))) = 'CANCELLED'
+      GROUP BY xod.item_id, xod.quantity, xod.type, xod.order_status, inv.item_name
     `;
 
     const [rows] = await connection.execute(sql, [orderNumber, categoryId]);
 
+    // Clean up status prefix if priority logic was used
+    const formattedRows = rows.map(row => ({
+      ...row,
+      status: row.status ? String(row.status).replace(/^\d-/, '') : 'Received'
+    }));
+
+    console.log("Fetched order details:", formattedRows.length, "items");
 
     res.json({
       success: true,
-      count: rows.length,
-      data: rows
+      count: formattedRows.length,
+      data: formattedRows
     });
 
   } catch (err) {
