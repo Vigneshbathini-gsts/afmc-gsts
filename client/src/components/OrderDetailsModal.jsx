@@ -140,7 +140,7 @@ export default function OrderDetailsModal({ isOpen, onClose, orderNumber }) {
                       </td>
                       <td className="px-4 py-3">
                         <span className={`font-semibold ${getStatusClassName(item.status)}`}>
-                          {toInitCap(item.status || "Received")}
+                          {toInitCap(item.status && item.status !== 'Pending' ? item.status : "Received")}
                         </span>
                       </td>
                       <td className="px-4 py-3">{item.quantity || item.QUANTITY || 0}</td>

@@ -1497,7 +1497,12 @@ exports.getOrderHistoryItemDetails = async (req, res) => {
 
         COALESCE(
           NULLIF(xo.order_status, ''), 
-          MAX(xxkn.status), 
+          MAX(
+            CASE 
+              WHEN xxkn.status = 'Completed' THEN '3-Completed'
+              WHEN xxkn.status = 'Preparing' THEN '2-Preparing'
+              ELSE '1-Received'
+            END), 
           NULLIF(oh.order_status, ''), 
           'Received'
         ) AS status
@@ -1513,7 +1518,7 @@ exports.getOrderHistoryItemDetails = async (req, res) => {
       --   critical join (same as APEX)
       LEFT JOIN xxafmc_kitchen_notification xxkn 
         ON xxkn.ordernumber = xo.order_id
-       AND TRIM(xxkn.item_id) = TRIM(xo.item_id)
+       AND TRIM(CAST(xxkn.item_id AS CHAR)) = TRIM(CAST(xo.item_id AS CHAR))
 
       WHERE xo.order_id = ?
         AND xi.category_id = ?
@@ -1551,12 +1556,18 @@ exports.getOrderHistoryItemDetails = async (req, res) => {
     const [items] = await pool.execute(itemsQuery, [orderNumber, categoryId]);
     const [totalResult] = await pool.execute(totalQuery, [orderNumber, categoryId]);
 
+    // Clean up the status string if it used the priority prefix
+    const formattedItems = items.map(item => ({
+      ...item,
+      status: item.status.replace(/^\d-/, '')
+    }));
+
     const totalAmount = totalResult[0]?.total_amount || 0;
     res.json({
       success: true,
       data: {
         orderNumber,
-        items,
+        items: formattedItems,
         summary: {
           totalAmount
         }
@@ -1597,28 +1608,43 @@ console.log("Fetching order details for order number:", orderNumber, "and kitche
       SELECT 
         xod.item_id,
         inv.item_name,
-        xkn.status AS item_kitchen_status,
         xod.quantity,
         COALESCE(xod.type, 'NA') AS type,
-        xod.order_status AS status,
-        xkn.status AS kitchen_status
+        COALESCE(
+          NULLIF(xod.order_status, ''), 
+          MAX(
+            CASE 
+              WHEN xkn.status = 'Completed' THEN '3-Completed'
+              WHEN xkn.status = 'Preparing' THEN '2-Preparing'
+              ELSE '1-Received'
+            END), 
+          'Received'
+        ) AS status
       FROM xxafmc_order_details xod
       LEFT JOIN (${inventorySummarySql}) inv
         ON inv.item_code = xod.item_id
       LEFT JOIN xxafmc_kitchen_notification xkn 
         ON xod.order_id = xkn.ordernumber 
-        AND xod.item_id = xkn.item_id
+        AND TRIM(CAST(xkn.item_id AS CHAR)) = TRIM(CAST(xod.item_id AS CHAR))
       WHERE xod.order_id = ?
         AND inv.category_id = ?
-        AND TRIM(UPPER(IFNULL(xod.order_status, ''))) = 'CANCELLED'
+      GROUP BY xod.item_id, xod.quantity, xod.type, xod.order_status, inv.item_name
     `;
 
     const [rows] = await connection.execute(sql, [orderNumber, categoryId]);
-console.log(rows)
+
+    // Clean up status prefix if priority logic was used
+    const formattedRows = rows.map(row => ({
+      ...row,
+      status: row.status ? String(row.status).replace(/^\d-/, '') : 'Received'
+    }));
+
+    console.log("Fetched order details:", formattedRows.length, "items");
+
     res.json({
       success: true,
-      count: rows.length,
-      data: rows
+      count: formattedRows.length,
+      data: formattedRows
     });
 
   } catch (err) {
