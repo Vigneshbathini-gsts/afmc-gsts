@@ -51,7 +51,7 @@ const KitchenCancelledOrder = () => {
             if (endDate) params.toDate = endDate;
             params.kitchen = kitchenType;
 
-            console.log("Fetching cancelled orders with params:", params);
+            // console.log("Fetching cancelled orders with params:", params);
 
             const response = await barOrdersAPI.getCancelledOrders(params);
             const ordersData = response.data?.data || [];
