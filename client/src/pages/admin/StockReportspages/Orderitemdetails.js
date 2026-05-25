@@ -32,6 +32,20 @@ const formatNumber = (value, digits = 2) => {
   return num.toFixed(digits);
 };
 
+const getRowValue = (row, ...keys) => {
+  for (const key of keys) {
+    if (row?.[key] !== undefined && row?.[key] !== null && row?.[key] !== "") {
+      return row[key];
+    }
+  }
+  return null;
+};
+
+const formatRowNumber = (row, keys, digits = 2) => {
+  const value = getRowValue(row, ...keys);
+  return value === null ? "-" : formatNumber(value, digits);
+};
+
 const formatQuantity = (value) => {
   if (!value) return "-";
   if (String(value).toUpperCase() === "TOTAL") return "Total";
@@ -149,6 +163,13 @@ export default function Orderitemdetails() {
     }
   };
 
+  useEffect(() => {
+    setAppliedFilters(initialFilters);
+    setHasSearched(true);
+    fetchData(initialFilters, { reset: true, nextPage: 0 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleSearch = async () => {
     if (!filters.fromDate || !filters.toDate) {
       setHasSearched(false);
@@ -224,14 +245,16 @@ export default function Orderitemdetails() {
         "Total",
       ],
       rows: pdfRows.map((row) => [
-        row.item_name || "-",
-        String(formatQuantity(row.quantity)),
-        row.price ? formatNumber(row.price) : "-",
-        row.total_profit ? formatNumber(row.total_profit) : "-",
-        row.unit_profit ? formatNumber(row.unit_profit) : "-",
-        row.food_pr_charges ? formatNumber(row.food_pr_charges) : "-",
-        row.totalprofit ? `${formatNumber(row.totalprofit, 0)}%` : "-",
-        row.subtotal ? formatNumber(row.subtotal) : "-",
+        getRowValue(row, "item_name", "ITEM_NAME") || "-",
+        String(formatQuantity(getRowValue(row, "quantity", "QUANTITY"))),
+        formatRowNumber(row, ["price", "PRICE"]),
+        formatRowNumber(row, ["total_profit", "TOTAL_PROFIT", "totalProfit"]),
+        formatRowNumber(row, ["unit_profit", "UNIT_PROFIT", "unitProfit"]),
+        formatRowNumber(row, ["food_pr_charges", "FOOD_PR_CHARGES", "foodPrCharges"]),
+        getRowValue(row, "totalprofit", "TOTALPROFIT") !== null
+          ? `${formatRowNumber(row, ["totalprofit", "TOTALPROFIT"], 0)}%`
+          : "-",
+        formatRowNumber(row, ["subtotal", "SUBTOTAL", "total", "TOTAL"]),
       ]),
     });
   };
@@ -406,21 +429,19 @@ export default function Orderitemdetails() {
                           }`}
                         >
                           <td className="px-4 py-3 whitespace-nowrap capitalize">
-                            {toInitCap(row.item_name || "-")}
+                            {toInitCap(getRowValue(row, "item_name", "ITEM_NAME") || "-")}
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
-                            {formatQuantity(row.quantity)}
+                            {formatQuantity(getRowValue(row, "quantity", "QUANTITY"))}
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
-                            {row.total_profit ? formatNumber(row.total_profit) : "-"}
+                            {formatRowNumber(row, ["total_profit", "TOTAL_PROFIT", "totalProfit"])}
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
-                            {row.food_pr_charges
-                              ? formatNumber(row.food_pr_charges)
-                              : "-"}
+                            {formatRowNumber(row, ["food_pr_charges", "FOOD_PR_CHARGES", "foodPrCharges"])}
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
-                            {row.subtotal ? formatNumber(row.subtotal) : "-"}
+                            {formatRowNumber(row, ["subtotal", "SUBTOTAL", "total", "TOTAL"])}
                           </td>
                         </tr>
                       ))

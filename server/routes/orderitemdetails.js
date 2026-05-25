@@ -150,28 +150,26 @@ const getOrderItemDetails = async (req, res) => {
         xi.item_name
   `;
 
-  const totalQuery = `
-    SELECT 
-        NULL AS item_id,
-        'Total' AS quantity,
-        SUM(subtotal) AS subtotal,
-        NULL AS price,
-        SUM(food_pr_charges) AS food_pr_charges,
-        SUM(totalprofit) AS totalprofit,
-        SUM(total_profit) AS total_profit,
-        NULL AS unit_profit,
-        NULL AS order_date,
-        NULL AS item_name
-    FROM (${baseQuery}) a
-  `;
-
   const pagedBaseQuery = `
     ${baseQuery}
     ORDER BY order_date DESC, item_id DESC
     LIMIT ${limit} OFFSET ${offset}
   `;
 
-  const finalQuery = `(${pagedBaseQuery}) UNION ALL (${totalQuery})`;
+  const totalQuery = `
+    SELECT 
+        NULL AS item_id,
+        'Total' AS quantity,
+        ROUND(SUM(subtotal), 2) AS subtotal,
+        NULL AS price,
+        ROUND(SUM(food_pr_charges), 2) AS food_pr_charges,
+        ROUND(SUM(totalprofit), 2) AS totalprofit,
+        ROUND(SUM(total_profit), 2) AS total_profit,
+        NULL AS unit_profit,
+        NULL AS order_date,
+        NULL AS item_name
+    FROM (${baseQuery}) a
+  `;
 
   // ------------------ Values ------------------
   const dateValues = buildDateValues(fromDate, toDate);
@@ -185,10 +183,13 @@ const getOrderItemDetails = async (req, res) => {
     ...itemNames,
   ];
 
-  const values = [...baseValues, ...baseValues];
-
   try {
-    const [results] = await db.execute(finalQuery, values);
+    const [[detailRows], [totalRows]] = await Promise.all([
+      db.execute(pagedBaseQuery, baseValues),
+      db.execute(totalQuery, baseValues),
+    ]);
+    const totalRow = totalRows?.[0] || null;
+    const results = totalRow ? [...detailRows, totalRow] : detailRows;
 
     return res.json({
       success: true,

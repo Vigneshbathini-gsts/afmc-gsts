@@ -24,44 +24,28 @@ exports.getStockReport = async (req, res) => {
 
     const query = `
       SELECT
-        inv.item_code,
-        inv.item_name,
-        ROUND(COALESCE(NULLIF(inv.unit_price, 0), latest_price.unit_price, 0), 2) AS unit_price,
-        ROUND(
-          COALESCE(NULLIF(inv.unit_price, 0), latest_price.unit_price, 0)
-          * IFNULL(inv.stock_quantity, 0),
-          2
-        ) AS total_price,
-        GREATEST(IFNULL(inv.stock_quantity, 0) - IFNULL(reserved_summary.reserved_stock, 0), 0) AS AVAILABLE_STOCK,
+        bar_stock.item_code,
+        bar_stock.item_name,
+        ROUND(IFNULL(bar_stock.unit_price, 0), 2) AS unit_price,
+        ROUND(IFNULL(bar_stock.unit_price, 0) * IFNULL(bar_stock.stock_quantity, 0), 2) AS total_price,
+        GREATEST(IFNULL(bar_stock.stock_quantity, 0) - IFNULL(reserved_summary.reserved_stock, 0), 0) AS AVAILABLE_STOCK,
         IFNULL(reserved_summary.reserved_stock, 0) AS RESERVED_STOCK,
-        COALESCE(NULLIF(inv.\`A/C_UNIT\`, ''), 'Nos') AS A_C_UNIT
+        COALESCE(NULLIF(bar_stock.\`A/C_UNIT\`, ''), 'Nos') AS A_C_UNIT
       FROM (
         SELECT
-          item_code AS item_code,
-          MAX(item_name) AS item_name,
-          MAX(unit_price) AS unit_price,
-          SUM(IFNULL(stock_quantity, 0)) AS stock_quantity,
-          MAX(\`A/C_UNIT\`) AS \`A/C_UNIT\`,
-          MAX(sub_category) AS sub_category,
-          MAX(creation_date) AS latest_created_date
-        FROM xxafmc_inventory
-        GROUP BY item_code
-      ) inv
-      LEFT JOIN (
-        SELECT
-          recent_rows.item_code,
-          ROUND(MAX(recent_rows.unit_price / IFNULL(NULLIF(recent_rows.pegs, 0), 1)), 2) AS unit_price
-        FROM xxafmc_stock_out recent_rows
-        INNER JOIN (
-          SELECT item_code, MAX(creation_date) AS latest_creation_date
-          FROM xxafmc_stock_out
-          GROUP BY item_code
-        ) latest_dates
-          ON latest_dates.item_code = recent_rows.item_code
-         AND latest_dates.latest_creation_date = recent_rows.creation_date
-        GROUP BY recent_rows.item_code
-      ) AS latest_price
-        ON latest_price.item_code = inv.item_code
+          xso.ITEM_CODE AS item_code,
+          MAX(COALESCE(NULLIF(xso.ITEM_NAME, ''), xi.ITEM_NAME)) AS item_name,
+          ROUND(MAX(xso.UNIT_PRICE / IFNULL(NULLIF(xso.PEGS, 0), 1)), 2) AS unit_price,
+          SUM(IFNULL(xso.STOCK_QUANTITY, 0)) AS stock_quantity,
+          COALESCE(NULLIF(MAX(xso.\`A/C_UNIT\`), ''), NULLIF(MAX(xi.\`A/C_UNIT\`), ''), 'Nos') AS \`A/C_UNIT\`,
+          MAX(xi.SUB_CATEGORY) AS sub_category,
+          MAX(xso.CREATION_DATE) AS latest_created_date
+        FROM xxafmc_stock_out xso
+        JOIN xxafmc_inventory xi
+          ON xi.ITEM_CODE = xso.ITEM_CODE
+        WHERE xso.ITEM_CODE IS NOT NULL
+        GROUP BY xso.ITEM_CODE
+      ) bar_stock
       LEFT JOIN (
         SELECT
           xod.item_id,
@@ -74,11 +58,11 @@ exports.getStockReport = async (req, res) => {
           AND xi.order_num IS NULL
         GROUP BY xod.item_id
       ) AS reserved_summary
-        ON reserved_summary.item_id = inv.item_code
-      WHERE inv.sub_category NOT IN (14, 15)
-        AND (? IS NULL OR UPPER(inv.item_name) LIKE CONCAT('%', UPPER(?), '%'))
-        AND (? IS NULL OR inv.item_code = ?)
-     ORDER BY inv.item_code DESC
+        ON reserved_summary.item_id = bar_stock.item_code
+      WHERE bar_stock.sub_category NOT IN (14, 15)
+        AND (? IS NULL OR UPPER(bar_stock.item_name) LIKE CONCAT('%', UPPER(?), '%'))
+        AND (? IS NULL OR bar_stock.item_code = ?)
+     ORDER BY bar_stock.item_code DESC
       LIMIT ${limitNum} OFFSET ${offsetNum}
     `;
 
