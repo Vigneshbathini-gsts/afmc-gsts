@@ -310,7 +310,7 @@ exports.clearCustomItemDetails = async (req, res) => {
 exports.addCartItem = async (req, res) => {
   try {
     const userId = req.user?.userId;
-    const { item_id, quantity, unit_price, remarks, ingredients } = req.body;
+    const { item_id, quantity, unit_price, remarks, ingredients, orderNumber } = req.body;
 
     if (!userId) {
       return res.status(400).json({ success: false, message: "User ID is required" });
@@ -328,7 +328,8 @@ exports.addCartItem = async (req, res) => {
       unit_price: Number(unit_price),
       remarks: remarks || "Din",
       loginType: req.user?.loginType,
-      customIngredients: ingredients
+      customIngredients: ingredients,
+      orderNumber,
     };
 
     const result = await cartModel.addCartItem(userId, itemData);

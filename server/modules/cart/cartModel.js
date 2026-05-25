@@ -33,10 +33,13 @@ const getStockQuantity = async (conn, itemCode) => {
   return Number(stockRow?.stock || 0);
 };
 
-const getOrderReservedQuantity = async (conn, itemCode) => {
+const getOrderReservedQuantity = async (conn, itemCode, excludeOrderNumber = null) => {
   // Reserved quantity should mirror the Pub menu buy flow, which only treats
   // draft/unpriced lines (order_status NULL + price NULL) as reserved.
   // Counting additional statuses here can massively overcount and block cart adds.
+  const normalizedExclude = Number(excludeOrderNumber);
+  const shouldExclude = Number.isFinite(normalizedExclude) && normalizedExclude > 0;
+
   const [rows] = await conn.execute(
     `
       SELECT IFNULL(SUM(xod.quantity), 0) AS reserved
@@ -47,8 +50,9 @@ const getOrderReservedQuantity = async (conn, itemCode) => {
         AND xod.order_status IS NULL
         AND xod.price IS NULL
         AND xi.order_num IS NULL
+        ${shouldExclude ? "AND xod.order_id != ?" : ""}
     `,
-    [itemCode]
+    shouldExclude ? [itemCode, normalizedExclude] : [itemCode]
   );
 
   return Number(rows[0]?.reserved || 0);
@@ -461,7 +465,7 @@ const updateCartCustomization = async (cartId, userId, updates) => {
 };
 
 const addCartItem = async (userId, itemData) => {
-  const { item_id, quantity = 1, unit_price = 0, remarks, loginType, customIngredients } = itemData;
+  const { item_id, quantity = 1, unit_price = 0, remarks, loginType, customIngredients, orderNumber } = itemData;
 
   const conn = await db.getConnection();
 
@@ -510,7 +514,7 @@ const addCartItem = async (userId, itemData) => {
     // -------------------------------
     // 1. VALIDATE MAIN ITEM STOCK
     // -------------------------------
-    const orderReservedQty = await getOrderReservedQuantity(conn, resolvedItemCode);
+    const orderReservedQty = await getOrderReservedQuantity(conn, resolvedItemCode, orderNumber);
     const existingCartQty = isCocktailOrMocktail ? 0 : await getCartQuantity(conn, userId, resolvedItemCode, false);
 
     let stockQty;
