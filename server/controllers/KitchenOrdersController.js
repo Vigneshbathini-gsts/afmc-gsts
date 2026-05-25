@@ -52,8 +52,6 @@ exports.getOrders = async (req, res) => {
     const appUser = getRequestUsername(req);
     const { categoryId, handledByField } = getKitchenConfig(req.query.kitchen);
 
-    // console.log(`Fetching ${kitchen} orders for user: ${appUser}`);
-
     const query = `
       SELECT * FROM (
         SELECT
@@ -109,10 +107,10 @@ exports.getOrders = async (req, res) => {
           MAX(a.handled_by_bar) AS Handled_by_bar,
           MAX(a.handled_by_kitchen) AS Handled_by_kitchen,
 
-          CASE
-            WHEN SUM(CASE WHEN a.STATUS IN ('Received','Preparing') THEN 1 ELSE 0 END) > 0 THEN 'Y'
-            ELSE 'N'
-          END AS CAN_CANCEL,
+         CASE
+  WHEN SUM(CASE WHEN a.STATUS = 'Received' THEN 1 ELSE 0 END) > 0 THEN 'Y'
+  ELSE 'N'
+END AS CAN_CANCEL,
 
           CASE
             WHEN SUM(CASE WHEN a.STATUS IN ('Received','Preparing') THEN 1 ELSE 0 END) > 0 THEN 'Y'
@@ -359,7 +357,6 @@ exports.getOrderItems = async (req, res) => {
     if (!ORDERNUMBER) {
       return res.status(400).json({ success: false, message: "ORDERNUMBER is required" });
     }
-
     const { categoryId } = getKitchenConfig(KITCHEN);
 
     const query = `
