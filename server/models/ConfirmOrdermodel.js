@@ -311,6 +311,16 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
   try {
     await connection.beginTransaction();
 
+    const lockInventoryItem = async (itemCode) => {
+      const normalized = Number(itemCode);
+      if (!Number.isFinite(normalized) || normalized <= 0) return;
+      // Serialize confirmation for the same item to avoid overselling under concurrent confirms.
+      await connection.execute(
+        `SELECT item_code FROM xxafmc_inventory WHERE item_code = ? LIMIT 1 FOR UPDATE`,
+        [normalized]
+      );
+    };
+
     const deductStockOutFifo = async (itemCode, requiredQuantity) => {
       const normalizedItemCode = Number(itemCode);
       let remaining = Number(requiredQuantity || 0);
@@ -561,6 +571,13 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
     const cocktailMaxMap = await getCocktailMaxQuantityMap(connection, normalizedOrderNumber, cocktailItemIds);
 
     if (itemCodes.length > 0) {
+      // Lock inventory rows for all items in this order to ensure reserved/available checks
+      // see a consistent view under concurrent confirmation attempts.
+      for (const code of itemCodes) {
+        // eslint-disable-next-line no-await-in-loop
+        await lockInventoryItem(code);
+      }
+
       const placeholders = itemCodes.map(() => "?").join(",");
       const [reservedRows] = await connection.execute(
         `
@@ -616,34 +633,42 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
       }
     }
 
-    // ====== APEX parity: deduct stock on confirmation + roll food prep into subtotal ======
-    // Oracle APEX Page 18 (Confirm Order) decrements `xxafmc_stock_out` FIFO and then adjusts subtotal.
+    // Add food preparation charges into subtotal at confirmation time (pricing parity with legacy flow).
+    // IMPORTANT: Do NOT deduct `xxafmc_stock_out` here. Bar/Kitchen stock must be deducted only when
+    // the item is actually scanned/processed; otherwise we "consume" a random FIFO barcode bucket
+    // before any scan happens (and the UI will show that barcode as out of stock).
+    //
+    // If you ever need the old behavior, set `DEDUCT_STOCK_ON_CONFIRM=1` (not recommended for Bar).
+    const shouldDeductOnConfirm = String(process.env.DEDUCT_STOCK_ON_CONFIRM || "").trim() === "1";
+
     for (const row of detailRows) {
       const itemId = Number(row.item_id || 0);
       const qty = Number(row.quantity || 0);
       if (!Number.isFinite(itemId) || itemId <= 0) continue;
       if (!Number.isFinite(qty) || qty <= 0) continue;
 
-      const isCocktailOrMocktail = [14, 15].includes(Number(row.sub_category));
+      if (shouldDeductOnConfirm) {
+        const isCocktailOrMocktail = [14, 15].includes(Number(row.sub_category));
 
-      if (!isCocktailOrMocktail) {
-        await deductStockOutFifo(itemId, qty);
-      } else {
-        const [ingredientRows] = await connection.execute(
-          `
-            SELECT item_code, pegs
-            FROM xxafmc_custom_cocktails_mocktails_details
-            WHERE order_number = ?
-              AND inventory_item_code = ?
-          `,
-          [normalizedOrderNumber, itemId]
-        );
+        if (!isCocktailOrMocktail) {
+          await deductStockOutFifo(itemId, qty);
+        } else {
+          const [ingredientRows] = await connection.execute(
+            `
+              SELECT item_code, pegs
+              FROM xxafmc_custom_cocktails_mocktails_details
+              WHERE order_number = ?
+                AND inventory_item_code = ?
+            `,
+            [normalizedOrderNumber, itemId]
+          );
 
-        for (const ingredient of ingredientRows) {
-          const ingredientCode = Number(ingredient.item_code || 0);
-          const pegsPerUnit = Number(ingredient.pegs || 0);
-          const requiredQty = pegsPerUnit * qty;
-          await deductStockOutFifo(ingredientCode, requiredQty);
+          for (const ingredient of ingredientRows) {
+            const ingredientCode = Number(ingredient.item_code || 0);
+            const pegsPerUnit = Number(ingredient.pegs || 0);
+            const requiredQty = pegsPerUnit * qty;
+            await deductStockOutFifo(ingredientCode, requiredQty);
+          }
         }
       }
 

@@ -259,7 +259,17 @@ exports.getTodayStockOutDetails = async (req, res) => {
 exports.addStockOut = async (req, res) => {
   try {
     const payload = req.body?.items ? req.body.items : req.body;
-    const result = await inventoryModel.addStockOutTransactions(payload);
+    const createdBy =
+      req.user?.username ||
+      req.user?.user_name ||
+      req.user?.email ||
+      "SYSTEM";
+
+    const normalizedPayload = Array.isArray(payload)
+      ? payload.map((item) => ({ ...item, createdBy: item?.createdBy || createdBy }))
+      : { ...payload, createdBy: payload?.createdBy || createdBy };
+
+    const result = await inventoryModel.addStockOutTransactions(normalizedPayload);
     res.status(201).json({ success: true, data: result });
   } catch (error) {
     console.error("Error adding stock-out:", error);

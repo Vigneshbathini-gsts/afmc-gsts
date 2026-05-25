@@ -369,15 +369,34 @@ exports.getOrderItems = async (req, res) => {
     SUM(xod.quantity) AS PARENT_QTY,
     SUM(CASE WHEN xod.price > 0 OR xod.price IS NULL THEN xod.quantity ELSE 0 END) AS PAID_QTY,
     SUM(CASE WHEN xod.price = 0 THEN xod.quantity ELSE 0 END) AS FREE_QTY,
-    COALESCE( /* Calculate total barcode scans required for this row */
-      (SELECT SUM(COALESCE(xccd.pegs, 1) * COALESCE(xccd.quantity, 0)) FROM xxafmc_custom_cocktails_mocktails_details xccd WHERE xccd.order_number = xod.ORDER_ID AND xccd.inventory_item_code = xod.ITEM_ID),
-      (SELECT SUM(COALESCE(xccdd.pegs, 1) * COALESCE(xccdd.quantity, 0)) FROM xxafmc_custom_cocktails_mocktails_details_dummy xccdd WHERE xccdd.order_number = xod.ORDER_ID AND xccdd.inventory_item_code = xod.ITEM_ID),
-      (SELECT SUM(COALESCE(xcmd.pegs, 1) * (SELECT SUM(xod_inner.quantity) FROM xxafmc_order_details xod_inner WHERE xod_inner.order_id = xod.ORDER_ID AND xod_inner.item_id = xod.ITEM_ID AND xod_inner.type = xod.TYPE))
-       FROM xxafmc_cocktails_mocktails_details xcmd
-       WHERE xcmd.inventory_item_code = xod.ITEM_ID
-       GROUP BY xcmd.inventory_item_code), /* Group by inventory_item_code to make SUM(xod_inner.quantity) valid in this context */
-      SUM(xod.quantity) /* For regular items, just sum the order quantity */
-    ) AS TOTAL_INGREDIENTS,
+     CASE
+       WHEN MAX(xi.SUB_CATEGORY) IN (14, 15) THEN
+         COALESCE( /* Cocktail/mocktail scans: sum ingredient pegs * ordered qty */
+           (SELECT SUM(COALESCE(xccd.pegs, 1) * COALESCE(xccd.quantity, 0))
+            FROM xxafmc_custom_cocktails_mocktails_details xccd
+            WHERE xccd.order_number = xod.ORDER_ID
+              AND xccd.inventory_item_code = xod.ITEM_ID),
+           (SELECT SUM(COALESCE(xccdd.pegs, 1) * COALESCE(xccdd.quantity, 0))
+            FROM xxafmc_custom_cocktails_mocktails_details_dummy xccdd
+            WHERE xccdd.order_number = xod.ORDER_ID
+              AND xccdd.inventory_item_code = xod.ITEM_ID),
+           (SELECT SUM(
+              COALESCE(xcmd.pegs, 1) * (
+                SELECT SUM(xod_inner.quantity)
+                FROM xxafmc_order_details xod_inner
+                WHERE xod_inner.order_id = xod.ORDER_ID
+                  AND xod_inner.item_id = xod.ITEM_ID
+                  AND xod_inner.type = xod.TYPE
+              )
+            )
+            FROM xxafmc_cocktails_mocktails_details xcmd
+            WHERE xcmd.inventory_item_code = xod.ITEM_ID
+            GROUP BY xcmd.inventory_item_code),
+           0
+         )
+       ELSE
+         SUM(xod.quantity) /* Regular items: 1 scan per ordered unit */
+     END AS TOTAL_INGREDIENTS,
     MAX(xi.ITEM_NAME) AS ITEM_NAME,
     COALESCE(xod.TYPE, 'NA') AS TYPE,
 
