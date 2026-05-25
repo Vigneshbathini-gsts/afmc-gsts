@@ -173,7 +173,7 @@ const PaymentPage = () => {
                     </div>
                 </div>
 
-                
+
 
 
 
@@ -267,6 +267,8 @@ const PaymentPage = () => {
                                 <tr>
                                     <th className="px-4 py-3 text-left text-xs font-bold tracking-wider text-afmc-maroon">Item</th>
                                     <th className="px-4 py-3 text-center text-xs font-bold tracking-wider text-afmc-maroon">Quantity</th>
+                                    <th className="px-4 py-3 text-center text-xs font-bold tracking-wider text-afmc-maroon">Price</th>
+                                    <th className="px-4 py-3 text-center text-xs font-bold tracking-wider text-afmc-maroon">Total</th>
                                 </tr>
                             </thead>
 
@@ -279,6 +281,12 @@ const PaymentPage = () => {
                                             </td>
                                             <td className="px-4 py-3 text-center text-sm font-semibold text-stone-800">
                                                 {item.QUANTITY || item.quantity || 0}
+                                            </td>
+                                            <td className="px-4 py-3 text-center text-sm font-semibold text-stone-800">
+                                                ₹ {Number(item.PRICE || item.price || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            </td>
+                                            <td className="px-4 py-3 text-center text-sm font-semibold text-stone-800">
+                                                ₹ {Number(item.SUBTOTAL || item.subtotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                             </td>
                                         </tr>
                                     ))

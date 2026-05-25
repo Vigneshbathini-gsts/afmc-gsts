@@ -142,7 +142,7 @@ export default function InvoiceReport() {
 
         <div className="overflow-hidden rounded-[28px] border border-stone-200 bg-white shadow-[0_10px_30px_rgba(15,23,42,0.08)]">
           <div className="border-b border-stone-200 bg-[#4f7f7b] px-5 py-4">
-            <h2 className="inline-block bg-white px-2 text-lg font-semibold text-[#143235]">
+            <h2 className="inline-block px-2 text-lg font-semibold text-white">
               Invoice Report
             </h2>
           </div>

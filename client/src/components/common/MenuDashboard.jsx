@@ -84,6 +84,15 @@ function getStockQuantity(item) {
   return Number.isFinite(numericValue) ? numericValue : null;
 }
 
+function formatPrice(value) {
+  const numericValue = Number(value);
+  if (Number.isNaN(numericValue)) {
+    return "0.00";
+  }
+
+  return numericValue.toFixed(2);
+}
+
 function isOutOfStock(item) {
   const stockQuantity = getStockQuantity(item);
   if (stockQuantity !== null) return stockQuantity <= 0;
@@ -187,6 +196,7 @@ function MenuPopup({ item, loading, onClose }) {
                   </div>
 
                   <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
+                     
                     <div className="flex items-center justify-between gap-3">
                       <div className="text-xs font-bold uppercase tracking-wider text-gray-500">Unit</div>
                       <div className="text-sm font-bold text-gray-900">{item?.ac_unit || "Nos"}</div>
@@ -518,8 +528,15 @@ function MenuPopupCompact({ item, loading, onClose, onBuy }) {
                   <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
                     <div className="text-[14px] font-semibold leading-5 text-stone-600">Item Name</div>
                     <h2 className="text-[18px] font-bold uppercase leading-6 text-stone-900">
-                      {item?.item_name || "-"}
+                      {item?.item_name || "-"} 
                     </h2>
+
+                    
+                      <div className="text-[14px] font-semibold leading-5 text-stone-600">Price</div>
+                      <div className="text-[18px] font-extrabold text-afmc-maroon">
+                        ₹{formatPrice(item?.unit_price)}
+                      </div>
+                    
 
                     <div className="text-[14px] font-semibold leading-5 text-stone-600">A/C Unit</div>
                     <div>
