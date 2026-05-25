@@ -1232,7 +1232,7 @@ exports.getCancelledOrders = async (req, res) => {
     let { fromDate, toDate, kitchen = "Bar" } = req.query;
     const { categoryId } = getKitchenConfig(kitchen);
 
-    // console.log("Fetching cancelled orders from", fromDate, "to", toDate);
+    console.log("Fetching cancelled orders from", fromDate, "to", toDate);
 
     //   Normalize input dates (important)
     const from = getStartOfDay(fromDate);
@@ -1282,12 +1282,13 @@ exports.getCancelledOrders = async (req, res) => {
       WHERE xod.order_id = xxkn.order_num
         AND inv.category_id = ?
       GROUP BY xod.order_id
-      HAVING COUNT(*) = COUNT(
-          CASE 
-              WHEN TRIM(UPPER(IFNULL(xod.order_status, ''))) = 'CANCELLED' 
-              THEN 1 
-          END
-      )
+     HAVING SUM(
+    CASE
+        WHEN TRIM(UPPER(IFNULL(xod.order_status,''))) NOT IN ('', 'CANCELLED')
+        THEN 1
+        ELSE 0
+    END
+) = 0
   )
 
   AND ${dateExpression} 
@@ -1302,7 +1303,6 @@ exports.getCancelledOrders = async (req, res) => {
       from || null,
       to || null
     ]);
-
 
     res.json({
       success: true,
