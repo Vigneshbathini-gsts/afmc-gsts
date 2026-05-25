@@ -18,6 +18,15 @@ const createEmptyRow = () => ({
 const normalizeItemCode = (value) => String(value ?? "").trim();
 const INGREDIENT_PAGE_SIZE = 20;
 
+const getDetailValue = (row, ...keys) => {
+  for (const key of keys) {
+    if (row?.[key] !== undefined && row?.[key] !== null) {
+      return row[key];
+    }
+  }
+  return "";
+};
+
 export default function CocktailEdit() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -232,7 +241,6 @@ export default function CocktailEdit() {
         const response = await cocktailAPI.getById(itemId);
         const item = response.data.data;
         const detailRows = Array.isArray(item.details) ? item.details : [];
-
         setForm({
           itemName: item.ITEM_NAME || "",
           subCategory: item.SUB_CATEGORY != null ? String(item.SUB_CATEGORY) : "",
@@ -253,15 +261,19 @@ export default function CocktailEdit() {
         setRows(
           detailRows.length
             ? detailRows.map((row, index) => ({
-                id: row.MOC_ID || Date.now() + index,
-                itemCode: row.ITEM_CODE != null ? String(row.ITEM_CODE) : "",
-                itemName: row.ITEM_NAME || "",
-                pegs: row.PEGS != null ? String(row.PEGS) : "",
-                memberPrice: row.PRICE != null ? String(row.PRICE) : "",
-                nonMemberPrice:
-                  row.NON_MEMBER_PRICE != null
-                    ? String(row.NON_MEMBER_PRICE)
-                    : "",
+                id: getDetailValue(row, "MOC_ID", "mocId") || Date.now() + index,
+                itemCode: String(getDetailValue(row, "ITEM_CODE", "itemCode")),
+                itemName: getDetailValue(row, "ITEM_NAME", "itemName"),
+                pegs: String(getDetailValue(row, "PEGS", "pegs")),
+                memberPrice: String(getDetailValue(row, "PRICE", "price", "memberPrice")),
+                nonMemberPrice: String(
+                  getDetailValue(
+                    row,
+                    "NON_MEMBER_PRICE",
+                    "non_member_price",
+                    "nonMemberPrice"
+                  )
+                ),
               }))
             : [createEmptyRow()]
         );

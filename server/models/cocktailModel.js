@@ -322,6 +322,15 @@ const getCocktailDetailRows = async (inventoryItemCode, connection = db) => {
 
   const [rows] = await connection.execute(query, [inventoryItemCode]);
   return rows.map((row) => ({
+    MOC_ID: row.MOC_ID,
+    ITEM_CODE: row.ITEM_CODE,
+    ITEM_NAME: row.ITEM_NAME,
+    PRICE: row.PRICE,
+    PEGS: row.PEGS,
+    INVENTORY_ITEM_CODE: row.INVENTORY_ITEM_CODE,
+    NON_MEMBER_PRICE: row.NON_MEMBER_PRICE,
+    CATEGORY_ID: row.CATEGORY_ID,
+    SUBCATEGORY_ID: row.SUBCATEGORY_ID,
     mocId: row.MOC_ID,
     itemCode: row.ITEM_CODE,
     itemName: row.ITEM_NAME,
