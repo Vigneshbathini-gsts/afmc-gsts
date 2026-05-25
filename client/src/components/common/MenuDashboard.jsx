@@ -384,7 +384,9 @@ function MenuPopupCompact({ item, loading, onClose, onBuy }) {
     try {
       setIsSubmitting(true);
       const cartData = {
-        item_id: item?.item_id || item?.item_code,
+        // Server cart module expects inventory ITEM_CODE in `item_id`.
+        // Menu popup also has `item_id` (inventory ITEM_ID), which would break stock lookup.
+        item_id: item?.item_code ?? item?.item_id,
         item_name: item?.item_name,
         quantity: parseInt(qty, 10) || 1,
         unit_price: item?.unit_price,

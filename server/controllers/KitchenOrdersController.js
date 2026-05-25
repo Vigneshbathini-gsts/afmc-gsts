@@ -454,14 +454,16 @@ exports.processBarcodeScan = async (req, res) => {
 
     // STEP 1: Get item details
     const [itemRows] = await connection.query(`
-      SELECT xso.ITEM_CODE, xso.STOCK_QUANTITY, xso.UNIT_PRICE, xso.\`A/C_UNIT\` AS ac_unit,
-             xso.PEGS, xi.category_id AS CATEGORY_ID, xi.item_name AS ITEM_NAME,
-             xi.sub_category AS SUB_CATEGORY, xi.profit AS PROFIT,
-             xi.non_member_profit AS NON_MEMBER_PROFIT, xi.pr_charges AS PR_CHARGES,
-             xi.food_pr_charges AS FOOD_PR_CHARGES
-      FROM xxafmc_stock_out xso
-      LEFT JOIN (${inventorySummarySql}) xi ON xso.ITEM_CODE = xi.item_code
-      WHERE xso.BARCODE = ? LIMIT 1`, [BARCODE]);
+       SELECT xso.ITEM_CODE, xso.STOCK_QUANTITY, xso.UNIT_PRICE, xso.\`A/C_UNIT\` AS ac_unit,
+              xso.PEGS, xi.category_id AS CATEGORY_ID, xi.item_name AS ITEM_NAME,
+              xi.sub_category AS SUB_CATEGORY, xi.profit AS PROFIT,
+              xi.non_member_profit AS NON_MEMBER_PROFIT, xi.pr_charges AS PR_CHARGES,
+              xi.food_pr_charges AS FOOD_PR_CHARGES
+       FROM xxafmc_stock_out xso
+       LEFT JOIN (${inventorySummarySql}) xi ON xso.ITEM_CODE = xi.item_code
+       WHERE xso.BARCODE = ?
+       ORDER BY IFNULL(xso.STOCK_QUANTITY, 0) DESC, xso.CREATION_DATE DESC
+       LIMIT 1`, [BARCODE]);
 
     if (itemRows.length === 0) {
       await connection.rollback();
@@ -485,8 +487,26 @@ exports.processBarcodeScan = async (req, res) => {
     }
 
     if (stockQuantity <= 0) {
+      const [altRows] = await connection.query(
+        `
+          SELECT BARCODE AS barcode, STOCK_QUANTITY AS stock_quantity
+          FROM xxafmc_stock_out
+          WHERE ITEM_CODE = ?
+            AND IFNULL(STOCK_QUANTITY, 0) > 0
+          ORDER BY CREATION_DATE ASC
+          LIMIT 5
+        `,
+        [scanItemCode]
+      );
+      const alternatives = (altRows || []).map((r) => String(r.barcode)).filter(Boolean);
+
       await connection.rollback();
-      return res.status(400).json({ success: false, message: `Scanned Barcode ${BARCODE} has no stock` });
+      return res.status(400).json({
+        success: false,
+        message:
+          `Scanned Barcode ${BARCODE} has no stock` +
+          (alternatives.length ? `. Try another barcode for this item: ${alternatives.join(", ")}` : ""),
+      });
     }
 
     // Get parent item (cocktail/mocktail item code)

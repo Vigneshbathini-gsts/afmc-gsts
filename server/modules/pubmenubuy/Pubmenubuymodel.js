@@ -1256,7 +1256,7 @@ async function createOrder(payload = {}, authUser = {}) {
         getReservedOrderQuantity(connection, itemCode),
       ]);
 
-      if (quantity + reservedQty > stockQty) {
+      if (quantity + reservedQty >stockQty) {
         const availableQty = Math.max(0, stockQty - reservedQty);
         throw createValidationError(`Out of stock. Available quantity: ${availableQty}`);
       }
