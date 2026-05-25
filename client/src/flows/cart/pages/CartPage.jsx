@@ -4,6 +4,7 @@ import { useAuth } from "../../../context/AuthContext";
 import { cartAPI } from "../../../services/api";
 import { Trash2, Minus, Plus, X, Pencil } from "lucide-react";
 import { getMaxAllowedQuantity, isOutOfStock } from "../../../utils/stockValidation";
+import { toInitCap } from "../../../utils/textFormat";
 
 const BASEAPI = "https://afmc.globalsparkteksolutions.com/AFMCIMAGES/";
 
@@ -56,13 +57,13 @@ const ConfirmModal = ({ isOpen, onClose, onConfirm, title, message, confirmLabel
                             onClick={onClose}
                             className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition"
                         >
-                            Cancel
+                            {toInitCap("Cancel")}
                         </button>
                         <button
                             onClick={onConfirm}
                             className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
                         >
-                            {confirmLabel}
+                            {toInitCap(confirmLabel)}
                         </button>
                     </div>
                 </div>
@@ -227,31 +228,33 @@ export default function CartPage({ isAttendant = false }) {
                 isOpen={confirmModal.isOpen}
                 onClose={() => setConfirmModal({ isOpen: false, cartId: null })}
                 onConfirm={handleRemoveItem}
-                title="Remove Item"
-                message="Are you sure you want to remove this item from your cart?"
-                confirmLabel="Remove"
+                title={toInitCap("Remove Item")}
+                message={toInitCap("Are you sure you want to remove this item from your cart?")}
+                confirmLabel={toInitCap("Remove")}
             />
 
             <ConfirmModal
                 isOpen={proceedConfirmOpen}
                 onClose={() => setProceedConfirmOpen(false)}
                 onConfirm={handleProceedConfirm}
-                title="Confirm Purchase"
-                message="Are you sure you want to proceed to buy?"
-                confirmLabel="Yes, proceed"
+                title={toInitCap("Confirm Purchase")}
+                message={toInitCap("Are you sure you want to proceed to buy?")}
+                confirmLabel={toInitCap("Yes, proceed")}
             />
 
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold">{isAttendant ? "Attendant Cart" : "Your Cart"}</h1>
-                    <p className="text-sm text-gray-500">Review cart items before checkout.</p>
+                    <h1 className="text-2xl font-bold">
+                        {toInitCap(isAttendant ? "Attendant Cart" : "Your Cart")}
+                    </h1>
+                    <p className="text-sm text-gray-500">{toInitCap("Review cart items before checkout.")}</p>
                 </div>
                 <div className="flex gap-3">
                     <button
                         onClick={handleGoToMenu}
                         className="flex items-center gap-2 rounded-full border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
                     >
-                        Go to Menu
+                        {toInitCap("Go to menu")}
                     </button>
                     <button
                         onClick={handleProceedToBuy}
@@ -261,7 +264,7 @@ export default function CartPage({ isAttendant = false }) {
                                 : "bg-red-700 hover:bg-red-800"
                             }`}
                     >
-                        Proceed to Buy
+                        {toInitCap("Proceed to buy")}
                     </button>
                 </div>
             </div>
@@ -280,7 +283,7 @@ export default function CartPage({ isAttendant = false }) {
 
             {!loading && cartItems.length === 0 && (
                 <div className="rounded-lg border border-gray-200 bg-white p-6 text-center text-gray-600">
-                    No items in the cart.
+                    {toInitCap("No items in the cart.")}
                 </div>
             )}
 
@@ -322,7 +325,7 @@ export default function CartPage({ isAttendant = false }) {
                                             type="button"
                                             onClick={() => confirmRemove(item.cartId)}
                                             className="rounded-full bg-white/90 p-1.5 text-red-600 shadow-md transition hover:bg-red-50"
-                                            title="Remove item"
+                                            title={toInitCap("Remove item")}
                                         >
                                             <Trash2 size={14} />
                                         </button>
@@ -334,7 +337,7 @@ export default function CartPage({ isAttendant = false }) {
                         {/* Details */}
                         <div className="flex-1">
                             <h2 className="text-sm font-semibold text-gray-900 overflow-hidden text-ellipsis whitespace-nowrap">
-                                {item.itemName || "Unnamed Item"}
+                                {toInitCap(item.itemName) || toInitCap("Unnamed Item")}
                             </h2>
 
                             <p
@@ -343,7 +346,7 @@ export default function CartPage({ isAttendant = false }) {
                                     : "text-green-600"
                                     }`}
                             >
-                                {item.stockStatus || "Checking Stock"}
+                                {toInitCap(item.stockStatus) || toInitCap("Checking Stock")}
                             </p>
                         </div>
 
@@ -382,7 +385,7 @@ export default function CartPage({ isAttendant = false }) {
                                 </div>
                             ) : (
                                 <div className="text-xs text-gray-600">
-                                    Qty: {item.quantity || 1} (Free)
+                                    {toInitCap("Qty")}: {item.quantity || 1} ({toInitCap("Free")})
                                 </div>
                             )}
                         </div>

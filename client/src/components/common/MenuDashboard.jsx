@@ -8,6 +8,7 @@ import { API_BASE_URL, authFetchJson, cartAPI, offersAPI } from "../../services/
 import Pubmenubuyservice from "../../flows/buy/services/Pubmenubuyservice";
 import FilterDropdown from "./FilterDropdown";
 import OffersMarquee from "./OffersMarquee";
+import { toInitCap } from "../../utils/textFormat";
 
 const BASEAPI = "https://afmc.globalsparkteksolutions.com/AFMCIMAGES/";
 
@@ -68,7 +69,7 @@ function CategoryButton({ active, label, onClick }) {
           : "bg-white text-gray-700 ring-2 ring-gray-200 hover:ring-afmc-maroon/30 hover:text-afmc-maroon hover:shadow-md"
       }`}
     >
-      {label}
+      {toInitCap(label)}
     </button>
   );
 }
@@ -184,12 +185,12 @@ function MenuPopup({ item, loading, onClose }) {
                 <div className="flex flex-col gap-2 sm:gap-2.5">
                   <div className="text-center sm:text-left">
                     <h2 className="text-lg sm:text-xl font-extrabold text-gray-900 leading-tight break-words">
-                      {item?.item_name || "-"}
+                      {toInitCap(item?.item_name) || "-"}
                     </h2>
                     {!isCocktailOrMocktailItem(item) && item.stock_status ? (
                       <div className="mt-2">
                         <span className="inline-flex items-center rounded-full bg-red-50 px-3 py-1 text-[11px] font-bold text-red-700 ring-1 ring-red-200">
-                          {item.stock_status}
+                          {toInitCap(item.stock_status)}
                         </span>
                       </div>
                     ) : null}
@@ -199,7 +200,9 @@ function MenuPopup({ item, loading, onClose }) {
                      
                     <div className="flex items-center justify-between gap-3">
                       <div className="text-xs font-bold uppercase tracking-wider text-gray-500">Unit</div>
-                      <div className="text-sm font-bold text-gray-900">{item?.ac_unit || "Nos"}</div>
+                      <div className="text-sm font-bold text-gray-900">
+                        {toInitCap(item?.ac_unit) || "Nos"}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -245,8 +248,8 @@ function MenuPopup({ item, loading, onClose }) {
                   onChange={(e) => setRemarks(e.target.value)}
                   className="h-11 w-full rounded-xl border border-gray-300 bg-white px-3 text-sm font-bold text-gray-800 outline-none transition focus:border-afmc-maroon focus:ring-2 focus:ring-afmc-maroon/20"
                 >
-                  <option value="Din">Dine In</option>
-                  <option value="Take Away">Take Away</option>
+                  <option value="Din">{toInitCap("Dine In")}</option>
+                  <option value="Take Away">{toInitCap("Take Away")}</option>
                 </select>
               </div>
             </div>
@@ -260,14 +263,14 @@ function MenuPopup({ item, loading, onClose }) {
                 type="button"
                 className="w-full rounded-lg bg-afmc-maroon px-4 py-3 font-bold text-white transition-all hover:bg-afmc-maroon/90 active:scale-[0.99]"
               >
-                Add to Cart
+                {toInitCap("Add to cart")}
               </button>
               <button
                 type="button"
                 onClick={onClose}
                 className="w-full rounded-lg border border-gray-300 px-4 py-2 font-semibold text-gray-700 hover:bg-gray-50"
               >
-                Cancel
+                {toInitCap("Cancel")}
               </button>
             </div>
           </div>
@@ -314,7 +317,7 @@ function MenuGrid({ items, showStockStatus = false, ignoreStockStatus = false, o
               {/* Stock Status Badge */}
               {!shouldIgnoreStock && (outOfStock || (showStockStatus && item.stock_status)) && (
                 <div className="absolute left-2 top-2 rounded-md bg-red-600 text-white px-2 py-1 text-xs font-bold shadow">
-                  {stockStatus}
+                  {toInitCap(stockStatus)}
                 </div>
               )}
             </div>
@@ -322,13 +325,13 @@ function MenuGrid({ items, showStockStatus = false, ignoreStockStatus = false, o
             {/* Content */}
             <div className="space-y-2 p-3">
               <div className="line-clamp-2 text-sm font-semibold text-gray-900 leading-tight">
-                {item.item_name}
+                {toInitCap(item.item_name)}
                 {/* <p> {item.stock_status} </p> */}
               </div>
 
               {outOfStock ? (
                 <div className="rounded-md bg-red-50 px-2 py-1 text-xs font-bold text-red-700 ring-1 ring-red-200">
-                  Out Of Stock
+                  {toInitCap("Out Of Stock")}
                 </div>
               ) : null}
 
@@ -468,6 +471,7 @@ function MenuPopupCompact({ item, loading, onClose, onBuy }) {
   const imageSrc = `${BASEAPI}${item?.image || "default.jpg"}`;
   const acUnit = item?.ac_unit || item?.["A/C_UNIT"] || "Nos";
   const isPegsUnit = String(acUnit).trim().toLowerCase() === "pegs";
+  const itemName = toInitCap(item?.item_name) || "-";
 
   return (
     <div
@@ -525,27 +529,40 @@ function MenuPopupCompact({ item, loading, onClose, onBuy }) {
 
               <div className="min-w-0 space-y-5">
                 <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_140px] md:items-start">
-                  <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
-                    <div className="text-[14px] font-semibold leading-5 text-stone-600">Item Name</div>
-                    <h2 className="text-[18px] font-bold uppercase leading-6 text-stone-900">
-                      {item?.item_name || "-"} 
-                    </h2>
-
-                    
-                      <div className="text-[14px] font-semibold leading-5 text-stone-600">Price</div>
-                      <div className="text-[18px] font-extrabold text-afmc-maroon">
-                        ₹{formatPrice(item?.unit_price)}
+                  <div className="space-y-4">
+                    <div className="flex flex-wrap items-start justify-between gap-4">
+                      <div className="min-w-0">
+                        <div className="text-[14px] font-semibold leading-5 text-stone-600">
+                          {toInitCap("Item Name")}
+                        </div>
+                        <h2 className="mt-1 text-[18px] font-bold leading-6 text-stone-900 break-words">
+                          {itemName}
+                        </h2>
                       </div>
-                    
 
-                    <div className="text-[14px] font-semibold leading-5 text-stone-600">A/C Unit</div>
-                    <div>
-                      <div className="h-11 w-full rounded border border-stone-300 bg-white px-3 text-[15px] font-medium text-stone-700">
-                        <span className="flex h-full items-center">{acUnit}</span>
+                      <div className="shrink-0 text-right">
+                        <div className="text-[14px] font-semibold leading-5 text-stone-600">
+                          {toInitCap("Price")}
+                        </div>
+                        <div className="mt-1 text-[18px] font-extrabold leading-6 text-afmc-maroon">
+                          ₹{formatPrice(item?.unit_price)}
+                        </div>
                       </div>
                     </div>
 
-                    <div className="text-[14px] font-semibold leading-5 text-stone-600">Qty</div>
+                    <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
+                    <div className="text-[14px] font-semibold leading-5 text-stone-600">
+                      {toInitCap("A/C Unit")}
+                    </div>
+                    <div>
+                      <div className="h-11 w-full rounded border border-stone-300 bg-white px-3 text-[15px] font-medium text-stone-700">
+                        <span className="flex h-full items-center">{toInitCap(acUnit) || "Nos"}</span>
+                      </div>
+                    </div>
+
+                    <div className="text-[14px] font-semibold leading-5 text-stone-600">
+                      {toInitCap("Qty")}
+                    </div>
                     <div>
                       <input
                         type="number"
@@ -559,39 +576,48 @@ function MenuPopupCompact({ item, loading, onClose, onBuy }) {
 
                     {isPegsUnit ? (
                       <>
-                        <div className="text-[14px] font-semibold leading-5 text-stone-600">Type</div>
+                        <div className="text-[14px] font-semibold leading-5 text-stone-600">
+                          {toInitCap("Type")}
+                        </div>
                         <div>
                           <select
                             value={pegType}
                             onChange={(e) => setPegType(e.target.value)}
                             className="h-11 w-full rounded border border-stone-300 bg-white px-3 text-[15px] font-medium text-stone-800 outline-none transition focus:border-afmc-maroon focus:ring-2 focus:ring-afmc-maroon/20"
                           >
-                            <option value="">Select type</option>
-                            <option value="Small">Small</option>
-                            <option value="Large">Large</option>
+                            <option value="">{toInitCap("Select type")}</option>
+                            <option value="Small">{toInitCap("Small")}</option>
+                            <option value="Large">{toInitCap("Large")}</option>
                           </select>
                         </div>
                       </>
                     ) : null}
 
-                    <div className="text-[14px] font-semibold leading-5 text-stone-600">Remarks</div>
+                    <div className="text-[14px] font-semibold leading-5 text-stone-600">
+                      {toInitCap("Remarks")}
+                    </div>
                     <div>
                       <select
                         value={remarks}
                         onChange={(e) => setRemarks(e.target.value)}
                         className="h-11 w-full rounded border border-stone-300 bg-white px-3 text-[15px] font-medium text-stone-800 outline-none transition focus:border-afmc-maroon focus:ring-2 focus:ring-afmc-maroon/20"
                       >
-                        <option value="Din">Dine In</option>
-                        <option value="Take Away">Take Away</option>
+                        <option value="Din">{toInitCap("Dine In")}</option>
+                        <option value="Take Away">{toInitCap("Take Away")}</option>
                       </select>
                     </div>
+                  </div>
                   </div>
 
                   <div className="grid grid-cols-[auto_auto] items-start justify-start gap-x-4 gap-y-1 md:justify-end">
                     {!isMocktailItem && item?.stock_status ? (
                       <>
-                        <div className="text-[14px] font-semibold leading-5 text-stone-600">Status</div>
-                        <div className="text-[14px] font-medium text-red-600">{item.stock_status}</div>
+                        <div className="text-[14px] font-semibold leading-5 text-stone-600">
+                          {toInitCap("Status")}
+                        </div>
+                        <div className="text-[14px] font-medium text-red-600">
+                          {toInitCap(item.stock_status)}
+                        </div>
                       </>
                     ) : null}
                   </div>
@@ -604,21 +630,21 @@ function MenuPopupCompact({ item, loading, onClose, onBuy }) {
                     disabled={isSubmitting}
                     className="min-w-[170px] rounded-full bg-afmc-maroon px-8 py-3 text-sm font-semibold text-white shadow-sm ring-1 ring-afmc-gold/25 transition hover:bg-afmc-maroon/90 disabled:cursor-not-allowed disabled:opacity-70"
                   >
-                    {isSubmitting ? "Adding..." : "Add to cart"}
+                    {isSubmitting ? toInitCap("Adding...") : toInitCap("Add to cart")}
                   </button>
                   <button
                     type="button"
                     onClick={handleBuyNow}
                     className="min-w-[90px] rounded-full bg-white px-8 py-3 text-sm font-semibold text-afmc-maroon shadow-sm ring-1 ring-afmc-gold/35 transition hover:bg-afmc-gold/5"
                   >
-                    Buy
+                    {toInitCap("Buy")}
                   </button>
                   <button
                     type="button"
                     onClick={onClose}
                     className="min-w-[130px] rounded-full bg-white px-8 py-3 text-sm font-semibold text-stone-700 shadow-sm ring-1 ring-stone-300 transition hover:bg-stone-50"
                   >
-                    Cancel
+                    {toInitCap("Cancel")}
                   </button>
                 </div>
               </div>

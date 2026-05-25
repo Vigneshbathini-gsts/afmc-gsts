@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronsLeft } from "lucide-react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import ConfirmOrderservice from "../../services/ConfirmOrderservice";
+import { toInitCap } from "../../utils/textFormat";
 
 function formatDate(value) {
   const date = value ? new Date(value) : new Date();
@@ -153,7 +154,7 @@ return (
             className="inline-flex items-center gap-2 rounded-full bg-[#6b0f1a] px-5 py-2 text-sm font-medium text-white transition hover:bg-[#58101a]"
           >
             <ChevronsLeft className="h-4 w-4" />
-            Back
+            {toInitCap("Back")}
           </button>
         </div>
 
@@ -167,29 +168,30 @@ return (
           </div>
 
           <h1 className="mt-5 text-3xl font-bold tracking-tight text-[#6b0f1a]">
-            Thank You for Your Order
+            {toInitCap("Thank You for Your Order")}
           </h1>
 
           <p className="mt-2 text-sm text-stone-500">
-            Your order has been received successfully.
+            {toInitCap("Your order has been received successfully.")}
           </p>
 
           <div className="mt-4 rounded-2xl border border-stone-200 bg-[#fff4f0] px-4 py-4 text-left text-sm text-stone-700">
             {orderStatus === "Completed" && paymentStatus === "Paid" ? (
               <p>
-                Payment has been completed. Here is your invoice.
+                {toInitCap("Payment has been completed. Here is your invoice.")}
               </p>
             ) : orderStatus === "Completed" ? (
               <p>
-                Kitchen has completed all items. You can now proceed to payment.
+                {toInitCap("Kitchen has completed all items. You can now proceed to payment.")}
               </p>
             ) : orderStatus === "Cancelled" ? (
               <p>
-                The order has been cancelled by the kitchen. Please contact support for details.
+                {toInitCap("The order has been cancelled by the kitchen. Please contact support for details.")}
               </p>
             ) : (
               <p>
-                Kitchen status is currently <strong>{orderStatus}</strong>. Payment will be available once all items are completed.
+                {toInitCap("Kitchen status is currently")} <strong>{toInitCap(orderStatus)}</strong>.{" "}
+                {toInitCap("Payment will be available once all items are completed.")}
               </p>
             )}
           </div>
@@ -224,7 +226,7 @@ return (
             <span className="hidden text-stone-300 md:block">|</span>
 
             <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700">
-              {orderStatus}
+              {toInitCap(orderStatus)}
             </span>
           </div>
         </div>
@@ -235,17 +237,17 @@ return (
         {/* Header */}
         <div className="flex items-center justify-between border-b border-stone-200 bg-gradient-to-r from-[#6b0f1a] to-[#8b1e2d] px-5 py-4">
           <h2 className="text-lg font-semibold text-[#f4d28c]">
-            Invoice Report
+            {toInitCap("Invoice Report")}
           </h2>
 
           <div className="text-sm text-[#f8e7bd]/90">
-            Items : {items.length}
+            {toInitCap("Items")} : {items.length}
           </div>
         </div>
 
         {loading ? (
           <div className="py-16 text-center text-stone-500">
-            Loading confirmed order...
+            {toInitCap("Loading confirmed order...")}
           </div>
         ) : error ? (
           <div className="p-5">
@@ -261,21 +263,21 @@ return (
                 <thead className="bg-[#faf7f2]">
                   <tr>
                     <th className="px-5 py-3 text-left text-sm font-semibold text-[#6b0f1a]">
-                      Item Name
+                      {toInitCap("Item Name")}
                     </th>
 
                     <th className="px-5 py-3 text-left text-sm font-semibold text-[#6b0f1a]">
-                      Quantity
+                      {toInitCap("Quantity")}
                     </th>
 
                     {isPaymentDone && (
                       <th className="px-5 py-3 text-left text-sm font-semibold text-[#6b0f1a]">
-                        Subtotal
+                        {toInitCap("Subtotal")}
                       </th>
                     )}
 
                     <th className="px-5 py-3 text-left text-sm font-semibold text-[#6b0f1a]">
-                      Status
+                      {toInitCap("Status")}
                     </th>
                   </tr>
                 </thead>
@@ -287,7 +289,7 @@ return (
                       className="transition hover:bg-[#fffdf9]"
                     >
                       <td className="px-5 py-4 text-sm font-medium text-stone-800">
-                        {item.item_name}
+                        {toInitCap(item.item_name)}
                       </td>
 
                       <td className="px-5 py-4 text-sm text-stone-700">
@@ -302,7 +304,7 @@ return (
 
                       <td className="px-5 py-4">
                         <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700">
-                          {item.status}
+                          {toInitCap(item.status)}
                         </span>
                       </td>
                     </tr>
@@ -315,14 +317,14 @@ return (
             <div className="mt-5 flex flex-col gap-3 rounded-2xl bg-[#faf7f2] px-5 py-4 text-sm md:flex-row md:items-center md:justify-between">
               <div className="flex items-center gap-5 text-stone-600">
                 <span>
-                  Total Items :
+                  {toInitCap("Total Items")} :
                   <span className="ml-1 font-semibold text-stone-900">
                     {items.length}
                   </span>
                 </span>
 
                 <span>
-                  Quantity :
+                  {toInitCap("Quantity")} :
                   <span className="ml-1 font-semibold text-stone-900">
                     {totalQuantity}
                   </span>
@@ -330,7 +332,7 @@ return (
 
                 {isPaymentDone && (
                   <span>
-                    Total Amount :
+                    {toInitCap("Total Amount")} :
                     <span className="ml-1 font-semibold text-stone-900">
                       ₹{totalAmount.toFixed(2)}
                     </span>
@@ -344,7 +346,7 @@ return (
                 className="inline-flex items-center gap-2 rounded-full border border-stone-300 bg-white px-5 py-2 text-sm font-medium text-[#6b0f1a] transition hover:bg-stone-100"
               >
                 <ChevronLeft className="h-4 w-4" />
-                Go Back
+                {toInitCap("Go Back")}
               </button>
             </div>
           </div>

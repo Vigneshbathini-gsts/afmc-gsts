@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import orderService from "../../../services/orderService";
+import { toInitCap } from "../../../utils/textFormat";
 
 const PaymentPage = () => {
     const [searchParams] = useSearchParams();
@@ -134,7 +135,7 @@ const PaymentPage = () => {
     if (loading) {
         return (
             <div className="p-10 text-center">
-                Loading...
+                {toInitCap("Loading...")}
             </div>
         );
     }
@@ -152,16 +153,16 @@ const PaymentPage = () => {
             <div className="max-w-4xl mx-auto space-y-5">
                 <div className="overflow-hidden rounded-[28px] border border-stone-200 bg-white shadow-[0_10px_30px_rgba(15,23,42,0.08)]">
                     <div className="bg-gradient-to-r from-afmc-maroon to-afmc-maroon/85 px-6 py-5 text-white">
-                        <h1 className="text-2xl font-bold tracking-tight">Payment Details</h1>
-                        <p className="mt-1 text-sm text-white/80">Complete your payment information.</p>
+                        <h1 className="text-2xl font-bold tracking-tight">{toInitCap("Payment Details")}</h1>
+                        <p className="mt-1 text-sm text-white/80">{toInitCap("Complete your payment information.")}</p>
                     </div>
                     <div className="grid gap-3 border-t border-stone-200 bg-white p-5 md:grid-cols-3">
                         <div className="rounded-2xl border border-stone-200 bg-white px-4 py-3">
-                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">Order Number</p>
+                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">{toInitCap("Order Number")}</p>
                             <p className="mt-1 text-lg font-semibold text-stone-900">{orderNumber}</p>
                         </div>
                         <div className="rounded-2xl border border-stone-200 bg-white px-4 py-3">
-                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">Items</p>
+                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">{toInitCap("Items")}</p>
                             <p className="mt-1 text-lg font-semibold text-stone-900">{orderItems?.length || 0}</p>
                         </div>
                         {/* <div className="rounded-2xl border border-afmc-gold/25 bg-gradient-to-br from-white to-afmc-gold/5 px-4 py-3">
@@ -179,13 +180,13 @@ const PaymentPage = () => {
 
                 <div className="overflow-hidden rounded-[28px] border border-stone-200 bg-white shadow-[0_10px_30px_rgba(15,23,42,0.08)]">
                     <div className="border-b border-stone-200 bg-stone-50 px-6 py-4">
-                        <h2 className="text-base font-semibold text-afmc-maroon">Payment Panel</h2>
+                        <h2 className="text-base font-semibold text-afmc-maroon">{toInitCap("Payment Panel")}</h2>
                     </div>
 
                     <div className="space-y-5 p-6">
                         <div>
                             <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
-                                Payment Mode
+                                {toInitCap("Payment Mode")}
                             </label>
 
                             <select
@@ -197,7 +198,7 @@ const PaymentPage = () => {
                             >
                                 {allowedPaymentModes.map((mode) => (
                                     <option key={mode} value={mode}>
-                                        {mode === "IMMEDIATE" ? "Immediate" : "Credit"}
+                                        {toInitCap(mode === "IMMEDIATE" ? "Immediate" : "Credit")}
                                     </option>
                                 ))}
                             </select>
@@ -206,7 +207,7 @@ const PaymentPage = () => {
                         {paymentMode === "IMMEDIATE" && (
                             <div>
                                 <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
-                                    Payment Reference
+                                    {toInitCap("Payment Reference")}
                                 </label>
 
                                 <input
@@ -217,7 +218,7 @@ const PaymentPage = () => {
                                             e.target.value
                                         )
                                     }
-                                    placeholder="Enter Transaction ID"
+                                    placeholder={toInitCap("Enter Transaction Id")}
                                     className="h-12 w-full rounded-2xl border border-stone-300 bg-white px-4 text-sm font-medium text-stone-800 outline-none transition focus:border-afmc-maroon focus:ring-2 focus:ring-afmc-maroon/15"
                                 />
                             </div>
@@ -226,7 +227,7 @@ const PaymentPage = () => {
                         {paymentMode === "CREDIT" && (
                             <div>
                                 <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
-                                    Payment Status
+                                    {toInitCap("Payment Status")}
                                 </label>
 
                                 <input
@@ -244,13 +245,13 @@ const PaymentPage = () => {
                                 onClick={() => navigate(-1)}
                                 className="rounded-full bg-white px-7 py-3 text-sm font-semibold text-stone-700 shadow-sm ring-1 ring-stone-300 transition hover:bg-stone-50"
                             >
-                                Back
+                                {toInitCap("Back")}
                             </button>
                             <button
                                 onClick={handleCompletePayment}
                                 className="rounded-full bg-afmc-maroon px-7 py-3 text-sm font-semibold text-white shadow-sm ring-1 ring-afmc-gold/25 transition hover:bg-afmc-maroon/90"
                             >
-                                Complete
+                                {toInitCap("Complete")}
                             </button>
                         </div>
                     </div>
@@ -258,17 +259,17 @@ const PaymentPage = () => {
 
                 <div className="overflow-hidden rounded-[28px] border border-stone-200 bg-white shadow-[0_10px_30px_rgba(15,23,42,0.08)]">
                     <div className="border-b border-stone-200 bg-stone-50 px-6 py-4">
-                        <h2 className="text-base font-semibold text-afmc-maroon">Order Items</h2>
+                        <h2 className="text-base font-semibold text-afmc-maroon">{toInitCap("Order Items")}</h2>
                     </div>
 
                     <div className="overflow-x-auto p-6">
                         <table className="w-full overflow-hidden rounded-2xl border border-stone-200">
                             <thead className="bg-stone-50 text-stone-600">
                                 <tr>
-                                    <th className="px-4 py-3 text-left text-xs font-bold tracking-wider text-afmc-maroon">Item</th>
-                                    <th className="px-4 py-3 text-center text-xs font-bold tracking-wider text-afmc-maroon">Quantity</th>
-                                    <th className="px-4 py-3 text-center text-xs font-bold tracking-wider text-afmc-maroon">Price</th>
-                                    <th className="px-4 py-3 text-center text-xs font-bold tracking-wider text-afmc-maroon">Total</th>
+                                    <th className="px-4 py-3 text-left text-xs font-bold tracking-wider text-afmc-maroon">{toInitCap("Item")}</th>
+                                    <th className="px-4 py-3 text-center text-xs font-bold tracking-wider text-afmc-maroon">{toInitCap("Quantity")}</th>
+                                    <th className="px-4 py-3 text-center text-xs font-bold tracking-wider text-afmc-maroon">{toInitCap("Price")}</th>
+                                    <th className="px-4 py-3 text-center text-xs font-bold tracking-wider text-afmc-maroon">{toInitCap("Total")}</th>
                                 </tr>
                             </thead>
 
@@ -277,7 +278,7 @@ const PaymentPage = () => {
                                     orderItems.map((item, index) => (
                                         <tr key={index} className="transition-colors hover:bg-afmc-gold/5">
                                             <td className="px-4 py-3 text-sm text-stone-700">
-                                                {item.ITEM_NAME || item.item_name || "-"}
+                                                {toInitCap(item.ITEM_NAME || item.item_name) || "-"}
                                             </td>
                                             <td className="px-4 py-3 text-center text-sm font-semibold text-stone-800">
                                                 {item.QUANTITY || item.quantity || 0}
@@ -293,7 +294,7 @@ const PaymentPage = () => {
                                 ) : (
                                     <tr>
                                         <td colSpan="2" className="px-4 py-10 text-center text-stone-400 italic text-sm bg-stone-50">
-                                            No item details available for this order.
+                                            {toInitCap("No item details available for this order.")}
                                         </td>
                                     </tr>
                                 )}

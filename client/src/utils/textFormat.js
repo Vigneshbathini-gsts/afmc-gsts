@@ -1,29 +1,41 @@
-export const toInitCap = (value) => {
-  const input = String(value ?? "").trim();
-  if (!input) return "";
+export function toInitCap(value) {
+  if (value === null || value === undefined) return "";
+  const text = String(value).trim();
+  if (!text) return "";
 
-  const upperUnits = new Set(["ml", "l", "kg", "g", "gm", "mg", "pcs"]);
-  const preserveAcronyms = new Set(["GST", "VAT", "CGST", "SGST", "IGST", "UPI", "POS"]);
+  const upperTokens = new Set(["ml", "l", "kg", "g", "gm", "nos", "pcs"]);
 
-  return input
-    .split(/\s+/)
-    .map((word) => {
-      // Preserve common acronyms/units (already uppercase) and code-like tokens.
-      // Examples: "ML", "KG", "GST", "NO", "250ML", "ITEM-01"
-      const hasDigit = /\d/.test(word);
-      const hasHyphenOrUnderscore = /[-_]/.test(word);
-      const isAllCaps = /^[^a-z]*[A-Z][^a-z]*$/.test(word); // contains uppercase and no lowercase
+  const normalizeToken = (token) => {
+    const raw = String(token || "");
+    if (!raw) return "";
 
-      if (upperUnits.has(word.toLowerCase())) return word.toUpperCase();
-      if (hasDigit || hasHyphenOrUnderscore) return word;
-      if (isAllCaps && preserveAcronyms.has(word)) return word;
+    const lower = raw.toLowerCase();
+    if (upperTokens.has(lower)) return lower.toUpperCase();
 
-      const lower = word.toLowerCase();
-      return lower.charAt(0).toUpperCase() + lower.slice(1);
-    })
+    const isAllCaps = raw === raw.toUpperCase() && /[A-Z]/.test(raw);
+    const hasSeparator = /[\/&]/.test(raw);
+    const isNumberLike = /^[0-9]+([.,][0-9]+)?$/.test(raw);
+    const isShortAcronym = raw.length <= 3;
+
+    if (isNumberLike) return raw;
+    if (hasSeparator) return raw;
+    if (isAllCaps && isShortAcronym) return raw;
+
+    return raw
+      .toLowerCase()
+      .split("-")
+      .map((part) => (part ? `${part[0].toUpperCase()}${part.slice(1)}` : ""))
+      .join("-");
+  };
+
+  return text
+    .replace(/\s+/g, " ")
+    .split(" ")
+    .map((token) => normalizeToken(token))
     .join(" ");
-};
+}
 
-export const stripHtml = (value) =>
-  typeof value === "string" ? value.replace(/<[^>]*>/g, "") : value;
-
+export function stripHtml(value) {
+  if (value === null || value === undefined) return "";
+  return String(value).replace(/<[^>]*>/g, "").trim();
+}
