@@ -1316,7 +1316,10 @@ const removeItem = (id) => {
       // Include latest item quantities in the payload so backend can persist updates
       const itemsPayload = (Array.isArray(items) ? items : [])
         .map((it) => ({
-          item_id: Number(it.itemId || it.item_id || it.id || it.item_code || 0) || 0,
+          item_id: Number(it.itemId || it.item_id || it.item_code || it.id || 0) || 0,
+          order_line_id: Number(it.orderLineId || it.order_line_id || 0) || 0,
+          barcode: it.parentCode || it.barcode || null,
+          is_free_item: Boolean(it.isFreeItem),
           quantity: Number(it.quantity || 0),
         }))
         .filter((x) => Number.isFinite(x.item_id) && x.item_id > 0);
