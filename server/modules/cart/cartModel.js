@@ -33,12 +33,39 @@ const getStockQuantity = async (conn, itemCode) => {
   return Number(stockRow?.stock || 0);
 };
 
+const getReservedTotalsQuantities = async (conn, itemCodes) => {
+  const normalizedCodes = [...new Set((Array.isArray(itemCodes) ? itemCodes : [])
+    .map((code) => Number(code))
+    .filter((code) => Number.isFinite(code) && code > 0))];
+
+  if (normalizedCodes.length === 0) return new Map();
+
+  const placeholders = normalizedCodes.map(() => "?").join(",");
+  const [rows] = await conn.execute(
+    `
+      SELECT item_code, IFNULL(reserved_qty, 0) AS reserved_qty
+      FROM xxafmc_stock_reservation_totals
+      WHERE item_code IN (${placeholders})
+    `,
+    normalizedCodes
+  );
+
+  return rows.reduce((map, row) => {
+    map.set(String(row.item_code), Number(row.reserved_qty || 0));
+    return map;
+  }, new Map());
+};
+
 const getOrderReservedQuantity = async (conn, itemCode, excludeOrderNumber = null) => {
-  // Reserved quantity should mirror the Pub menu buy flow, which only treats
-  // draft/unpriced lines (order_status NULL + price NULL) as reserved.
-  // Counting additional statuses here can massively overcount and block cart adds.
   const normalizedExclude = Number(excludeOrderNumber);
   const shouldExclude = Number.isFinite(normalizedExclude) && normalizedExclude > 0;
+
+  if (!shouldExclude) {
+    const reservedTotals = await getReservedTotalsQuantities(conn, [itemCode]);
+    if (reservedTotals.has(String(itemCode))) {
+      return reservedTotals.get(String(itemCode)) || 0;
+    }
+  }
 
   const [rows] = await conn.execute(
     `
@@ -322,24 +349,38 @@ const getIngredientReservedQuantities = async (conn, itemCodes) => {
 
   if (normalizedCodes.length === 0) return {};
 
-  const placeholders = normalizedCodes.map(() => "?").join(",");
-  const [rows] = await conn.execute(
-    `SELECT xod.item_id AS item_code, IFNULL(SUM(xod.quantity), 0) AS reserved
-     FROM xxafmc_order_details xod
-     LEFT JOIN xxafmc_order_header xoh ON xod.order_id = xoh.order_num
-     LEFT JOIN xxafmc_invoices xi ON xi.order_num = xod.order_id
-     WHERE xod.item_id IN (${placeholders})
-       AND xod.order_status IS NULL
-       AND xod.price IS NULL
-       AND xi.order_num IS NULL
-     GROUP BY xod.item_id`,
-    normalizedCodes
-  );
-
-  return rows.reduce((map, row) => {
-    map[String(row.item_code)] = Number(row.reserved || 0);
+  const reservedTotals = await getReservedTotalsQuantities(conn, normalizedCodes);
+  const missingCodes = normalizedCodes.filter((code) => !reservedTotals.has(String(code)));
+  const reservedMap = missingCodes.reduce((map, code) => {
+    map[String(code)] = 0;
     return map;
   }, {});
+
+  if (missingCodes.length > 0) {
+    const placeholders = missingCodes.map(() => "?").join(",");
+    const [rows] = await conn.execute(
+      `SELECT xod.item_id AS item_code, IFNULL(SUM(xod.quantity), 0) AS reserved
+       FROM xxafmc_order_details xod
+       LEFT JOIN xxafmc_order_header xoh ON xod.order_id = xoh.order_num
+       LEFT JOIN xxafmc_invoices xi ON xi.order_num = xod.order_id
+       WHERE xod.item_id IN (${placeholders})
+         AND xod.order_status IS NULL
+         AND xod.price IS NULL
+         AND xi.order_num IS NULL
+       GROUP BY xod.item_id`,
+      missingCodes
+    );
+
+    for (const row of rows) {
+      reservedMap[String(row.item_code)] = Number(row.reserved || 0);
+    }
+  }
+
+  for (const [code, reservedQty] of reservedTotals.entries()) {
+    reservedMap[String(code)] = Number(reservedQty || 0);
+  }
+
+  return reservedMap;
 };
 
 const getCartCustomization = async (cartId, userId) => {
@@ -746,26 +787,35 @@ const getCartItemsByUser = async (userId) => {
 
   const reservedMap = new Map();
   if (itemCodes.length > 0) {
-    const placeholders = itemCodes.map(() => "?").join(",");
-    const [reservedRows] = await db.execute(
-      `
-        SELECT
-          xod.item_id AS item_code,
-          IFNULL(SUM(xod.quantity), 0) AS reserved
-        FROM xxafmc_order_details xod
-        LEFT JOIN xxafmc_invoices xi
-          ON xi.order_num = xod.order_id
-        WHERE xod.item_id IN (${placeholders})
-          AND xod.order_status IS NULL
-          AND xod.price IS NULL
-          AND xi.order_num IS NULL
-        GROUP BY xod.item_id
-      `,
-      itemCodes
-    );
+    const totalsMap = await getReservedTotalsQuantities(db, itemCodes);
+    const missingCodes = itemCodes.filter((code) => !totalsMap.has(String(code)));
 
-    for (const row of reservedRows) {
-      reservedMap.set(String(row.item_code), Number(row.reserved || 0));
+    for (const [code, reservedQty] of totalsMap.entries()) {
+      reservedMap.set(String(code), Number(reservedQty || 0));
+    }
+
+    if (missingCodes.length > 0) {
+      const placeholders = missingCodes.map(() => "?").join(",");
+      const [reservedRows] = await db.execute(
+        `
+          SELECT
+            xod.item_id AS item_code,
+            IFNULL(SUM(xod.quantity), 0) AS reserved
+          FROM xxafmc_order_details xod
+          LEFT JOIN xxafmc_invoices xi
+            ON xi.order_num = xod.order_id
+          WHERE xod.item_id IN (${placeholders})
+            AND xod.order_status IS NULL
+            AND xod.price IS NULL
+            AND xi.order_num IS NULL
+          GROUP BY xod.item_id
+        `,
+        missingCodes
+      );
+
+      for (const row of reservedRows) {
+        reservedMap.set(String(row.item_code), Number(row.reserved || 0));
+      }
     }
   }
 
@@ -1204,7 +1254,11 @@ const getIngredientStockMap = async (itemCodes, excludeOrderNumber = null) => {
 
     const placeholders = normalizedCodes.map(() => "?").join(",");
 
-    const query = `
+    let query;
+  let queryParams;
+
+  if (skipOrderNumber) {
+    query = `
       SELECT
         xi.item_code AS itemCode,
         GREATEST(IFNULL(stock_summary.stock_quantity, 0) - IFNULL(reserved_summary.reserved_quantity, 0), 0) AS stockQuantity
@@ -1223,14 +1277,34 @@ const getIngredientStockMap = async (itemCodes, excludeOrderNumber = null) => {
         WHERE xod.order_status IS NULL
           AND xod.price IS NULL
           AND inv.order_num IS NULL
-          ${skipOrderNumber ? "AND xod.order_id != ?" : ""}
+          AND xod.order_id != ?
         GROUP BY xod.item_id
       ) reserved_summary
         ON reserved_summary.item_code = xi.item_code
       WHERE xi.item_code IN (${placeholders})
     `;
-
-    const queryParams = skipOrderNumber ? [skipOrderNumber, ...normalizedCodes] : [...normalizedCodes];
+    queryParams = [skipOrderNumber, ...normalizedCodes];
+  } else {
+    query = `
+      SELECT
+        xi.item_code AS itemCode,
+        GREATEST(IFNULL(stock_summary.stock_quantity, 0) - IFNULL(reserved_summary.reserved_quantity, 0), 0) AS stockQuantity
+      FROM xxafmc_inventory xi
+      LEFT JOIN (
+        SELECT item_code, IFNULL(SUM(stock_quantity), 0) AS stock_quantity
+        FROM xxafmc_stock_out
+        GROUP BY item_code
+      ) stock_summary
+        ON stock_summary.item_code = xi.item_code
+      LEFT JOIN (
+        SELECT item_code, IFNULL(reserved_qty, 0) AS reserved_quantity
+        FROM xxafmc_stock_reservation_totals
+      ) reserved_summary
+        ON reserved_summary.item_code = xi.item_code
+      WHERE xi.item_code IN (${placeholders})
+    `;
+    queryParams = [...normalizedCodes];
+  }
 
     const [rows] = await connection.query(query, queryParams);
 

@@ -501,15 +501,36 @@ exports.confirmOrder = async (req, res) => {
         return Number(row?.stock_quantity || 0);
       }
 
-      const [[row]] = await connection.execute(
+      const [[invRow]] = await connection.execute(
         `SELECT IFNULL(STOCK_QUANTITY, 0) AS stock_quantity FROM xxafmc_inventory WHERE item_code = ? LIMIT 1`,
         [itemCode]
       );
+      const inventoryStock = Number(invRow?.stock_quantity || 0);
+      if (inventoryStock > 0) {
+        return inventoryStock;
+      }
 
-      return Number(row?.stock_quantity || 0);
+      const [[stockOutRow]] = await connection.execute(
+        `
+          SELECT IFNULL(SUM(so.stock_quantity), 0) AS stock_quantity
+          FROM xxafmc_stock_out so
+          WHERE so.item_code = ?
+        `,
+        [itemCode]
+      );
+      return Number(stockOutRow?.stock_quantity || 0);
     };
 
     const getReservedOrderQuantity = async (itemCode, excludingOrderNumber) => {
+      const [[totalsRow]] = await connection.execute(
+        `SELECT IFNULL(reserved_qty, 0) AS reserved_qty FROM xxafmc_stock_reservation_totals WHERE item_code = ? LIMIT 1`,
+        [itemCode]
+      );
+
+      if (totalsRow && totalsRow.reserved_qty != null) {
+        return Number(totalsRow.reserved_qty || 0);
+      }
+
       const [[row]] = await connection.execute(
         `
           SELECT IFNULL(SUM(xod.quantity), 0) AS reserved
