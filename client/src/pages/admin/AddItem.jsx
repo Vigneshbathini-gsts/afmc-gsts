@@ -78,6 +78,12 @@ export default function AddItem() {
         const response = await inventoryAPI.getStockOutItemByBarcode(normalizedBarcode);
         const item = response.data.data;
 
+        const availableQuantity = Number(item.available_quantity || 0);
+        if (availableQuantity <= 0) {
+          setError(`Scanned barcode ${normalizedBarcode} has no stock.`);
+          return;
+        }
+
         setRows((current) => {
           if (current.some((row) => String(row.barcode) === normalizedBarcode)) {
             return current;
@@ -97,7 +103,7 @@ export default function AddItem() {
               acUnit: item.ac_unit || "Nos",
               pegs: Number(item.pegs || 0),
               availableStock: Number(item.available_stock || 0),
-              availableQuantity: Number(item.available_quantity || 0),
+              availableQuantity,
             },
           ];
         });

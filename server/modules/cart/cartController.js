@@ -310,7 +310,7 @@ exports.clearCustomItemDetails = async (req, res) => {
 exports.addCartItem = async (req, res) => {
   try {
     const userId = req.user?.userId;
-    const { item_id, quantity, unit_price, remarks, ingredients } = req.body;
+    const { item_id, quantity, unit_price, remarks, ingredients, orderNumber } = req.body;
 
     if (!userId) {
       return res.status(400).json({ success: false, message: "User ID is required" });
@@ -328,7 +328,8 @@ exports.addCartItem = async (req, res) => {
       unit_price: Number(unit_price),
       remarks: remarks || "Din",
       loginType: req.user?.loginType,
-      customIngredients: ingredients
+      customIngredients: ingredients,
+      orderNumber,
     };
 
     const result = await cartModel.addCartItem(userId, itemData);
@@ -473,29 +474,63 @@ exports.confirmOrder = async (req, res) => {
   try {
     await connection.beginTransaction();
 
-    const getStockQuantity = async (itemCode) => {
-      const [[row]] = await connection.execute(
+    const lockInventoryItem = async (itemCode) => {
+      const normalized = Number(itemCode);
+      if (!Number.isFinite(normalized) || normalized <= 0) return;
+      // Serialize confirm-order for the same item to avoid concurrent overselling.
+      await connection.execute(
+        `SELECT item_code FROM xxafmc_inventory WHERE item_code = ? LIMIT 1 FOR UPDATE`,
+        [normalized]
+      );
+    };
+
+    const getStockQuantity = async (itemCode, categoryId = null) => {
+      const normalizedCategory = categoryId == null ? null : Number(categoryId);
+
+      // For Bar items (category 10) scanning/decrement happens in `xxafmc_stock_out` (barcode buckets),
+      // so the available stock for ordering must be based on stock_out, not the inventory master total.
+      if (normalizedCategory === 10) {
+        const [[row]] = await connection.execute(
+          `
+            SELECT IFNULL(SUM(so.stock_quantity), 0) AS stock_quantity
+            FROM xxafmc_stock_out so
+            WHERE so.item_code = ?
+          `,
+          [itemCode]
+        );
+        return Number(row?.stock_quantity || 0);
+      }
+
+      const [[invRow]] = await connection.execute(
+        `SELECT IFNULL(STOCK_QUANTITY, 0) AS stock_quantity FROM xxafmc_inventory WHERE item_code = ? LIMIT 1`,
+        [itemCode]
+      );
+      const inventoryStock = Number(invRow?.stock_quantity || 0);
+      if (inventoryStock > 0) {
+        return inventoryStock;
+      }
+
+      const [[stockOutRow]] = await connection.execute(
         `
-          SELECT COALESCE(
-            NULLIF(xi.stock_quantity, 0),
-            (
-              SELECT IFNULL(SUM(so.stock_quantity), 0)
-              FROM xxafmc_stock_out so
-              WHERE so.item_code = xi.item_code
-            ),
-            0
-          ) AS stock_quantity
-          FROM xxafmc_inventory xi
-          WHERE xi.item_code = ?
-          LIMIT 1
+          SELECT IFNULL(SUM(so.stock_quantity), 0) AS stock_quantity
+          FROM xxafmc_stock_out so
+          WHERE so.item_code = ?
         `,
         [itemCode]
       );
-
-      return Number(row?.stock_quantity || 0);
+      return Number(stockOutRow?.stock_quantity || 0);
     };
 
     const getReservedOrderQuantity = async (itemCode, excludingOrderNumber) => {
+      const [[totalsRow]] = await connection.execute(
+        `SELECT IFNULL(reserved_qty, 0) AS reserved_qty FROM xxafmc_stock_reservation_totals WHERE item_code = ? LIMIT 1`,
+        [itemCode]
+      );
+
+      if (totalsRow && totalsRow.reserved_qty != null) {
+        return Number(totalsRow.reserved_qty || 0);
+      }
+
       const [[row]] = await connection.execute(
         `
           SELECT IFNULL(SUM(xod.quantity), 0) AS reserved
@@ -544,8 +579,11 @@ exports.confirmOrder = async (req, res) => {
         const requiredQty = perUnitQty * Number(cartQuantity || 1);
         if (!ingredientCode || requiredQty <= 0) continue;
 
+        await lockInventoryItem(ingredientCode);
+
         const [stockQty, reservedQty] = await Promise.all([
-          getStockQuantity(ingredientCode),
+          // Ingredients are always drawn from bar stock buckets.
+          getStockQuantity(ingredientCode, 10),
           getReservedOrderQuantity(ingredientCode, excludingOrderNumber),
         ]);
 
@@ -642,9 +680,10 @@ exports.confirmOrder = async (req, res) => {
         const cartId = cartItem?.cart_id ?? cartItem?.CART_ID ?? null;
         await validateCocktailIngredientsStock(cartId, stockCheckQty, orderNumber);
       } else {
+        await lockInventoryItem(itemId);
         // 2. Validate stock for non-cocktail items
         const [stockQty, reservedQty] = await Promise.all([
-          getStockQuantity(itemId),
+          getStockQuantity(itemId, cartCategoryIdRaw),
           getReservedOrderQuantity(itemId, orderNumber),
         ]);
         const availableQty = Math.max(0, stockQty - reservedQty);
@@ -656,7 +695,7 @@ exports.confirmOrder = async (req, res) => {
       // 3. Insert into Order Details (aligned to existing schema; no `description` column)
       const orderLineId = await getNextOrderLineId();
       const quantity = Number(cartQtyRaw ?? 0);
-      const unitPrice = cartPriceRaw ?? null;
+      const rawUnitPrice = cartPriceRaw ?? null;
       const lineSubtotal = cartTotalRaw ?? null;
       const subCategory = cartSubcategoryRaw ?? null;
       const loginType = String(req.user?.loginType || "").trim().toUpperCase();
@@ -667,7 +706,9 @@ exports.confirmOrder = async (req, res) => {
       const parentCodeRaw = cartItem?.parent_code ?? cartItem?.PARENT_CODE ?? null;
       const parentCode = parentCodeRaw === null || parentCodeRaw === undefined || parentCodeRaw === "" ? null : String(parentCodeRaw);
 
-      const isFreeRow = Number(unitPrice || 0) === 0 && Number(lineSubtotal || 0) === 0;
+      const isFreeRow = Number(rawUnitPrice || 0) === 0 && Number(lineSubtotal || 0) === 0;
+      // Reserve stock on confirm: paid rows keep PRICE NULL + ORDER_STATUS NULL until kitchen scan completes.
+      const unitPrice = isFreeRow ? rawUnitPrice : null;
       const parentItemIdForFree = parentCode ? Number(parentCode) : Number.NaN;
       const parentQtyForFree =
         Number.isFinite(parentItemIdForFree) && paidQtyByItemId.has(parentItemIdForFree)
@@ -725,25 +766,23 @@ exports.confirmOrder = async (req, res) => {
         );
       }
 
-      // 3. Create Kitchen Notification (skip free offer lines)
-      if (isFreeRow) {
-        continue;
+      // After inserting reserved lines (PRICE NULL), re-check that we didn't oversell under concurrent load.
+      // Lock + check ensures later transactions see this reservation only after commit.
+      if (!isFreeRow) {
+        const [stockQty, reservedQty] = await Promise.all([
+          getStockQuantity(itemId, cartCategoryIdRaw),
+          getReservedOrderQuantity(itemId, orderNumber),
+        ]);
+        const availableQty = Math.max(0, stockQty - reservedQty);
+        if (stockCheckQty > availableQty) {
+          throw new Error(`Insufficient stock for ${cartItemName || itemId}. Only ${availableQty} left.`);
+        }
       }
-      const kType = kitchenType || (Number(cartItem.category_id) === 10 ? "Bar" : "Kitchen");
-      await connection.execute(
-        `INSERT INTO xxafmc_kitchen_notification
-          (ordernumber, user_name, item_id, item_name, quantity, created_by, creation_date, msg_read, status, kitchen_type)
-         VALUES (?, ?, ?, ?, ?, ?, NOW(), 'N', 'Received', ?)`,
-        [
-          orderNumber,
-          userId,
-          itemId,
-          cartItem.item_name ?? null,
-          Number(cartItem.quantity ?? 0),
-          userId,
-          kType ?? "Kitchen",
-        ]
-      );
+
+      // Kitchen notifications for cart-confirm are intentionally omitted here to match
+      // the Pub menu buy-flow behavior. Notifications will be created by the
+      // dedicated buy/confirm flow (Pubmenubuy) when appropriate, which allows
+      // the order to be cancellable immediately after confirmation from the cart.
     }
 
     // 4. Migrate Customizations from cart to order
@@ -791,7 +830,14 @@ exports.confirmOrder = async (req, res) => {
   } catch (error) {
     console.error("Error confirming order:", error);
     await connection.rollback();
-    return res.status(500).json({ success: false, message: error.message });
+    const message = error?.message || "Failed to confirm order";
+    const status =
+      error?.statusCode ||
+      error?.status ||
+      (message.toLowerCase().includes("insufficient stock") || message.toLowerCase().includes("out of stock")
+        ? 400
+        : 500);
+    return res.status(status).json({ success: false, message });
   } finally {
     connection.release();
   }

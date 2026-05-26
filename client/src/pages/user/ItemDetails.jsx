@@ -457,6 +457,60 @@ export default function ItemDetails() {
         };
 
         try {
+            // Reservation/stock checks before adding/customizing
+            try {
+                const desiredQty = Number(payload.quantity || item?.cartItemQuantity || 1) || 1;
+
+                // If customizing or selecting ingredients, validate ingredient stocks
+                if (selectedIngredients && selectedIngredients.length > 0) {
+                    const codes = [...new Set(selectedIngredients.map((d) => Number(d.itemCode)).filter((c) => Number.isFinite(c) && c > 0))];
+                    if (codes.length > 0) {
+                        try {
+                            const stockRes = await cartAPI.getIngredientStocks(codes, buyOrderNumber);
+                            const stockMap = stockRes?.data?.data || {};
+                            for (const ing of selectedIngredients) {
+                                const code = Number(ing.itemCode);
+                                if (!Number.isFinite(code) || code <= 0) continue;
+                                const rawAvailable = stockMap?.[String(code)];
+                                if (rawAvailable === undefined || rawAvailable === null || rawAvailable === "") continue;
+                                const available = Number(rawAvailable);
+                                if (!Number.isFinite(available) || available < 0) continue;
+                                const required = Number(ing.quantity || 0) * desiredQty;
+                                if (required > available) {
+                                    toast.error(`${ing.itemName || code} available quantity: ${available}`);
+                                    return;
+                                }
+                            }
+                        } catch (err) {
+                            // ignore stock check failure
+                        }
+                    }
+                }
+
+                // Check parent item stock (non-cocktail)
+                const parentCode = Number(item?.ITEM_CODE ?? item?.ITEM_ID ?? id) || null;
+                if (!selectedIngredients || selectedIngredients.length === 0) {
+                    if (Number.isFinite(parentCode) && parentCode > 0) {
+                        try {
+                            const stockRes = await cartAPI.getIngredientStocks([parentCode], buyOrderNumber);
+                            const stockMap = stockRes?.data?.data || {};
+                            const rawAvailable = stockMap?.[String(parentCode)];
+                            if (rawAvailable !== undefined && rawAvailable !== null && rawAvailable !== "") {
+                                const available = Number(rawAvailable);
+                                if (Number.isFinite(available) && available >= 0 && desiredQty > available) {
+                                    toast.error(`Out of stock. Available quantity: ${available}`);
+                                    return;
+                                }
+                            }
+                        } catch (err) {
+                            // ignore
+                        }
+                    }
+                }
+            } catch (err) {
+                // ignore reservation check errors
+            }
+
             const response = isEditingCartItem
                 ? await cartAPI.customizeCocktail(cartId, { ingredients: selectedIngredients })
                 : await cartAPI.addNewItem(payload);

@@ -62,24 +62,16 @@ async function getIngredientReservedQuantitiesExcludingOrder(connection, ingredi
     .map((code) => Number(code))
     .filter((code) => Number.isFinite(code) && code > 0))];
 
-  const normalizedOrderNumber = Number(orderNumber);
   if (normalizedCodes.length === 0) return {};
 
   const placeholders = normalizedCodes.map(() => "?").join(",");
   const [rows] = await connection.execute(
     `
-      SELECT xod.item_id AS item_code, IFNULL(SUM(xod.quantity), 0) AS reserved_quantity
-      FROM xxafmc_order_details xod
-      LEFT JOIN xxafmc_order_header xoh ON xod.order_id = xoh.order_num
-      LEFT JOIN xxafmc_invoices xi ON xi.order_num = xod.order_id
-      WHERE xod.item_id IN (${placeholders})
-        AND xod.order_status IS NULL
-        AND xod.price IS NULL
-        AND xi.order_num IS NULL
-        AND xod.order_id != ?
-      GROUP BY xod.item_id
+      SELECT item_code, IFNULL(reserved_qty, 0) AS reserved_quantity
+      FROM xxafmc_stock_reservation_totals
+      WHERE item_code IN (${placeholders})
     `,
-    [...normalizedCodes, normalizedOrderNumber]
+    normalizedCodes
   );
 
   return rows.reduce((acc, row) => {
@@ -310,6 +302,35 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
 
   try {
     await connection.beginTransaction();
+
+    const lockReservationTotal = async (itemCode) => {
+      const normalized = Number(itemCode);
+      if (!Number.isFinite(normalized) || normalized <= 0) return;
+      await connection.execute(
+        `INSERT IGNORE INTO xxafmc_stock_reservation_totals (item_code, reserved_qty) VALUES (?, 0)`,
+        [normalized]
+      );
+      await connection.execute(
+        `SELECT item_code FROM xxafmc_stock_reservation_totals WHERE item_code = ? LIMIT 1 FOR UPDATE`,
+        [normalized]
+      );
+    };
+
+    const reserveTotalsQty = async (itemCode, quantity) => {
+      const normalized = Number(itemCode);
+      const qty = Number(quantity || 0);
+      if (!Number.isFinite(normalized) || normalized <= 0) return;
+      if (!Number.isFinite(qty) || qty <= 0) return;
+      await connection.execute(
+        `
+          UPDATE xxafmc_stock_reservation_totals
+          SET reserved_qty = IFNULL(reserved_qty, 0) + ?
+          WHERE item_code = ?
+          LIMIT 1
+        `,
+        [qty, normalized]
+      );
+    };
 
     const deductStockOutFifo = async (itemCode, requiredQuantity) => {
       const normalizedItemCode = Number(itemCode);
@@ -561,21 +582,21 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
     const cocktailMaxMap = await getCocktailMaxQuantityMap(connection, normalizedOrderNumber, cocktailItemIds);
 
     if (itemCodes.length > 0) {
+      // Lock inventory rows for all items in this order to ensure reserved/available checks
+      // see a consistent view under concurrent confirmation attempts.
+      for (const code of itemCodes) {
+        // eslint-disable-next-line no-await-in-loop
+        await lockReservationTotal(code);
+      }
+
       const placeholders = itemCodes.map(() => "?").join(",");
       const [reservedRows] = await connection.execute(
         `
-          SELECT xod.item_id AS item_code, IFNULL(SUM(xod.quantity), 0) AS reserved
-          FROM xxafmc_order_details xod
-          LEFT JOIN xxafmc_order_header xoh ON xod.order_id = xoh.order_num
-          LEFT JOIN xxafmc_invoices xi ON xi.order_num = xod.order_id
-          WHERE xod.item_id IN (${placeholders})
-            AND xod.order_status IS NULL
-            AND xod.price IS NULL
-            AND xi.order_num IS NULL
-            AND xod.order_id != ?
-          GROUP BY xod.item_id
+          SELECT item_code, IFNULL(reserved_qty, 0) AS reserved
+          FROM xxafmc_stock_reservation_totals
+          WHERE item_code IN (${placeholders})
         `,
-        [...itemCodes, normalizedOrderNumber]
+        itemCodes
       );
 
       const reservedMap = reservedRows.reduce((map, row) => {
@@ -614,21 +635,21 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
         error.statusCode = 400;
         throw error;
       }
-    }
 
-    // ====== APEX parity: deduct stock on confirmation + roll food prep into subtotal ======
-    // Oracle APEX Page 18 (Confirm Order) decrements `xxafmc_stock_out` FIFO and then adjusts subtotal.
-    for (const row of detailRows) {
-      const itemId = Number(row.item_id || 0);
-      const qty = Number(row.quantity || 0);
-      if (!Number.isFinite(itemId) || itemId <= 0) continue;
-      if (!Number.isFinite(qty) || qty <= 0) continue;
+      // Reserve quantities now (confirmed orders only)
+      for (const row of detailRows) {
+        const itemId = Number(row.item_id || 0);
+        const qty = Number(row.quantity || 0);
+        if (!Number.isFinite(itemId) || itemId <= 0) continue;
+        if (!Number.isFinite(qty) || qty <= 0) continue;
 
-      const isCocktailOrMocktail = [14, 15].includes(Number(row.sub_category));
+        const isCocktailOrMocktail = [14, 15].includes(Number(row.sub_category));
+        if (!isCocktailOrMocktail) {
+          // eslint-disable-next-line no-await-in-loop
+          await reserveTotalsQty(itemId, qty);
+          continue;
+        }
 
-      if (!isCocktailOrMocktail) {
-        await deductStockOutFifo(itemId, qty);
-      } else {
         const [ingredientRows] = await connection.execute(
           `
             SELECT item_code, pegs
@@ -643,7 +664,51 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
           const ingredientCode = Number(ingredient.item_code || 0);
           const pegsPerUnit = Number(ingredient.pegs || 0);
           const requiredQty = pegsPerUnit * qty;
-          await deductStockOutFifo(ingredientCode, requiredQty);
+          if (!Number.isFinite(requiredQty) || requiredQty <= 0) continue;
+          // eslint-disable-next-line no-await-in-loop
+          await lockReservationTotal(ingredientCode);
+          // eslint-disable-next-line no-await-in-loop
+          await reserveTotalsQty(ingredientCode, requiredQty);
+        }
+      }
+    }
+
+    // Add food preparation charges into subtotal at confirmation time (pricing parity with legacy flow).
+    // IMPORTANT: Do NOT deduct `xxafmc_stock_out` here. Bar/Kitchen stock must be deducted only when
+    // the item is actually scanned/processed; otherwise we "consume" a random FIFO barcode bucket
+    // before any scan happens (and the UI will show that barcode as out of stock).
+    //
+    // If you ever need the old behavior, set `DEDUCT_STOCK_ON_CONFIRM=1` (not recommended for Bar).
+    const shouldDeductOnConfirm = String(process.env.DEDUCT_STOCK_ON_CONFIRM || "").trim() === "1";
+
+    for (const row of detailRows) {
+      const itemId = Number(row.item_id || 0);
+      const qty = Number(row.quantity || 0);
+      if (!Number.isFinite(itemId) || itemId <= 0) continue;
+      if (!Number.isFinite(qty) || qty <= 0) continue;
+
+      if (shouldDeductOnConfirm) {
+        const isCocktailOrMocktail = [14, 15].includes(Number(row.sub_category));
+
+        if (!isCocktailOrMocktail) {
+          await deductStockOutFifo(itemId, qty);
+        } else {
+          const [ingredientRows] = await connection.execute(
+            `
+              SELECT item_code, pegs
+              FROM xxafmc_custom_cocktails_mocktails_details
+              WHERE order_number = ?
+                AND inventory_item_code = ?
+            `,
+            [normalizedOrderNumber, itemId]
+          );
+
+          for (const ingredient of ingredientRows) {
+            const ingredientCode = Number(ingredient.item_code || 0);
+            const pegsPerUnit = Number(ingredient.pegs || 0);
+            const requiredQty = pegsPerUnit * qty;
+            await deductStockOutFifo(ingredientCode, requiredQty);
+          }
         }
       }
 

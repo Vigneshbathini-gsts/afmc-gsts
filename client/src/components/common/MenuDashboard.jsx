@@ -4,7 +4,7 @@ import { ChevronsLeft, Flame, Coffee, Utensils } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useAuth } from "../../context/AuthContext";
-import { API_BASE_URL, authFetchJson, cartAPI, offersAPI } from "../../services/api";
+import { API_BASE_URL, authFetchJson, cartAPI, offersAPI, barOrdersAPI } from "../../services/api";
 import Pubmenubuyservice from "../../flows/buy/services/Pubmenubuyservice";
 import FilterDropdown from "./FilterDropdown";
 import OffersMarquee from "./OffersMarquee";
@@ -384,12 +384,76 @@ function MenuPopupCompact({ item, loading, onClose, onBuy }) {
     try {
       setIsSubmitting(true);
       const cartData = {
-        item_id: item?.item_id || item?.item_code,
+        // Server cart module expects inventory ITEM_CODE in `item_id`.
+        // Menu popup also has `item_id` (inventory ITEM_ID), which would break stock lookup.
+        item_id: item?.item_code ?? item?.item_id,
         item_name: item?.item_name,
         quantity: parseInt(qty, 10) || 1,
         unit_price: item?.unit_price,
         remarks,
       };
+
+      // Reservation/stock checks before adding to cart
+      try {
+        const desiredQty = Number(cartData.quantity || 1) || 1;
+        const itemCode = Number(item?.item_code ?? item?.item_id) || null;
+
+        if (isMocktailItem && Number.isFinite(itemCode) && itemCode > 0) {
+          // For cocktails/mocktails, validate ingredient stocks
+          try {
+            const res = await barOrdersAPI.getCocktailDetailsById(itemCode);
+            const details = res?.data?.data?.details || [];
+            const ingredients = (details || [])
+              .map((d) => ({
+                itemCode: Number(d?.ITEM_CODE ?? d?.itemCode),
+                pegs: Number(d?.PEGS ?? d?.pegs ?? d?.QUANTITY ?? d?.quantity ?? 0) || 0,
+                itemName: String(d?.ITEM_NAME ?? d?.itemName ?? "").trim(),
+              }))
+              .filter((x) => Number.isFinite(x.itemCode) && x.itemCode > 0 && x.pegs > 0);
+
+            if (ingredients.length > 0) {
+              const codes = [...new Set(ingredients.map((ing) => ing.itemCode))];
+              const stockRes = await cartAPI.getIngredientStocks(codes);
+              const stockMap = stockRes?.data?.data || {};
+
+              for (const ing of ingredients) {
+                const rawAvailable = stockMap?.[String(ing.itemCode)];
+                if (rawAvailable === undefined || rawAvailable === null || rawAvailable === "") continue;
+                const available = Number(rawAvailable);
+                if (!Number.isFinite(available) || available < 0) continue;
+                const required = ing.pegs * desiredQty;
+                if (required > available) {
+                  const msg = `Out of stock for ingredient ${ing.itemName || ing.itemCode}. Available quantity: ${available}`;
+                  toast.error(msg);
+                  setIsSubmitting(false);
+                  return;
+                }
+              }
+            }
+          } catch (err) {
+            // ignore ingredient check failures — do not hard-block
+          }
+        } else if (Number.isFinite(itemCode) && itemCode > 0) {
+          // For regular items, check available quantity (reservation-aware via API)
+          try {
+            const stockRes = await cartAPI.getIngredientStocks([itemCode]);
+            const stockMap = stockRes?.data?.data || {};
+            const rawAvailable = stockMap?.[String(itemCode)];
+            if (rawAvailable !== undefined && rawAvailable !== null && rawAvailable !== "") {
+              const available = Number(rawAvailable);
+              if (Number.isFinite(available) && available >= 0 && desiredQty > available) {
+                toast.error(`Out of stock. Available quantity: ${available}`);
+                setIsSubmitting(false);
+                return;
+              }
+            }
+          } catch (err) {
+            // ignore stock check failure
+          }
+        }
+      } catch (err) {
+        // ignore reservation check errors
+      }
 
       const response = await cartAPI.addItem(cartData);
       toast.success("Item added to cart!");

@@ -3,7 +3,10 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../../context/AuthContext";
 import { cartAPI } from "../../../services/api";
 import { Trash2, Minus, Plus, X, Pencil } from "lucide-react";
-import { getMaxAllowedQuantity, isOutOfStock } from "../../../utils/stockValidation";
+import { getMaxAllowedQuantity, isOutOfStock, isCocktailOrMocktail } from "../../../utils/stockValidation";
+
+// Cache cocktail details per cart item
+// so we can validate ingredient-level stock before quantity changes.
 import { toInitCap } from "../../../utils/textFormat";
 
 const BASEAPI = "https://afmc.globalsparkteksolutions.com/AFMCIMAGES/";
@@ -80,6 +83,7 @@ export default function CartPage({ isAttendant = false }) {
     const [error, setError] = useState(null);
     const [updatingItemId, setUpdatingItemId] = useState(null);
     const [toast, setToast] = useState(null);
+    const [cocktailDetailsByCartId, setCocktailDetailsByCartId] = useState({});
     const [confirmModal, setConfirmModal] = useState({ isOpen: false, cartId: null });
     const [proceedConfirmOpen, setProceedConfirmOpen] = useState(false);
 
@@ -99,6 +103,25 @@ export default function CartPage({ isAttendant = false }) {
             const items = response.data.data || [];
             setCartItems(items);
             setCartCount(items.length);
+            // Pre-fetch cocktail details for cocktail/mocktail items
+            try {
+                const cocktailMap = {};
+                await Promise.all(
+                    (items || [])
+                        .filter((it) => isCocktailOrMocktail(it))
+                        .map(async (it) => {
+                            try {
+                                const res = await cartAPI.getCocktailDetails(it.cartId);
+                                cocktailMap[String(it.cartId)] = res?.data?.data?.details || [];
+                            } catch (_) {
+                                cocktailMap[String(it.cartId)] = [];
+                            }
+                        })
+                );
+                setCocktailDetailsByCartId(cocktailMap);
+            } catch (_) {
+                // ignore
+            }
         } catch (err) {
             setError(err?.response?.data?.message || "Unable to load cart items");
             showToast("Failed to load cart items", 'error');
@@ -120,7 +143,69 @@ export default function CartPage({ isAttendant = false }) {
 
         setUpdatingItemId(cartId);
 
+        // Validate cocktail/mocktail ingredient stocks before updating
         try {
+            const currentItem = cartItems.find((c) => Number(c.cartId) === Number(cartId));
+            if (currentItem && isCocktailOrMocktail(currentItem)) {
+                // get cocktail ingredient details (cached or fetch)
+                let details = cocktailDetailsByCartId[String(cartId)];
+                if (!Array.isArray(details)) {
+                    try {
+                        const res = await cartAPI.getCocktailDetails(cartId);
+                        details = res?.data?.data?.details || [];
+                        setCocktailDetailsByCartId((m) => ({ ...m, [String(cartId)]: details }));
+                    } catch (e) {
+                        details = [];
+                    }
+                }
+
+                const ingredients = (details || [])
+                    .map((d) => ({
+                        itemCode: Number(d?.ITEM_CODE ?? d?.itemCode),
+                        pegs: Number(d?.PEGS ?? d?.pegs ?? d?.QUANTITY ?? d?.quantity ?? 0) || 0,
+                        itemName: String(d?.ITEM_NAME ?? d?.itemName ?? "").trim(),
+                    }))
+                    .filter((x) => Number.isFinite(x.itemCode) && x.itemCode > 0 && x.pegs > 0);
+
+                if (ingredients.length > 0) {
+                    try {
+                        const codes = [...new Set(ingredients.map((ing) => ing.itemCode))];
+                        const stockRes = await cartAPI.getIngredientStocks(codes);
+                        const stockMap = stockRes?.data?.data || {};
+
+                        for (const ing of ingredients) {
+                            const rawAvailable = stockMap?.[String(ing.itemCode)];
+                            if (rawAvailable === undefined || rawAvailable === null || rawAvailable === "") continue;
+                            const available = Number(rawAvailable);
+                            if (!Number.isFinite(available) || available < 0) continue;
+                            const required = ing.pegs * Number(newQuantity || 1);
+                            if (required > available) {
+                                const msg = `Out of stock for ingredient ${ing.itemName || ing.itemCode}. Available quantity: ${available}`;
+                                setError(msg);
+                                showToast(msg, 'error');
+                                setUpdatingItemId(null);
+                                return;
+                            }
+                        }
+                    } catch (err) {
+                        // ignore stock check failure — do not hard block
+                    }
+                }
+            }
+
+            // Non-cocktail stock checks (respect max allowed)
+            const currentItemForMax = cartItems.find((c) => Number(c.cartId) === Number(cartId));
+            if (currentItemForMax && !isCocktailOrMocktail(currentItemForMax)) {
+                const maxAllowed = getMaxAllowedQuantity(currentItemForMax);
+                if (Number.isFinite(Number(maxAllowed)) && Number(maxAllowed) >= 0 && Number(newQuantity) > Number(maxAllowed)) {
+                    const msg = `Out of stock. Available quantity: ${maxAllowed}`;
+                    setError(msg);
+                    showToast(msg, 'error');
+                    setUpdatingItemId(null);
+                    return;
+                }
+            }
+
             const response = await cartAPI.updateQuantity(cartId, newQuantity);
             const items = response.data.data || [];
             setCartItems(items);
@@ -132,7 +217,7 @@ export default function CartPage({ isAttendant = false }) {
         } finally {
             setUpdatingItemId(null);
         }
-    }, [setCartCount]);
+    }, [cartItems, cocktailDetailsByCartId, setCocktailDetailsByCartId, setCartItems, setCartCount, showToast]);
 
     const handleRemoveItem = useCallback(async () => {
         const { cartId } = confirmModal;
