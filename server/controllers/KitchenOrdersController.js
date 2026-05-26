@@ -260,15 +260,37 @@ exports.updateBarOrderStatus = async (req, res) => {
               [qty, item.barcode]
             );
 
-            // Decrement the master inventory total for this item
-            if (physicalItemCode) {
-              await connection.query(
-                `UPDATE xxafmc_inventory SET STOCK_QUANTITY = GREATEST(0, STOCK_QUANTITY - ?) WHERE ITEM_CODE = ?`,
-                [qty, physicalItemCode]
-              );
+             // Decrement the master inventory total for this item
+             if (physicalItemCode) {
+                await connection.query(
+                 `
+                   UPDATE xxafmc_inventory
+                   SET
+                    STOCK_QUANTITY = GREATEST(0, IFNULL(STOCK_QUANTITY, 0) - ?)
+                   WHERE ITEM_CODE = ?
+                 `,
+                 [qty, physicalItemCode]
+                );
+              }
+
+              // Decrement reserved totals for this item (does not touch stock_out buckets)
+              if (physicalItemCode) {
+                await connection.query(
+                  `INSERT IGNORE INTO xxafmc_stock_reservation_totals (item_code, reserved_qty) VALUES (?, 0)`,
+                  [physicalItemCode]
+                );
+                await connection.query(
+                  `
+                    UPDATE xxafmc_stock_reservation_totals
+                    SET reserved_qty = GREATEST(0, IFNULL(reserved_qty, 0) - ?)
+                    WHERE item_code = ?
+                    LIMIT 1
+                  `,
+                  [qty, physicalItemCode]
+                );
+              }
             }
           }
-        }
 
         // Update prices specifically by order_line_id for standard items
         const linePrices = new Map();
