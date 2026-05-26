@@ -20,6 +20,8 @@ export default function UserNavbar({ onMenuClick }) {
     "/user/invoice",
     "/user/active-orders",
     "/user/order-status",
+    "/user/cart/buy",
+    "/user/Buyflowconfirmorder",
   ];
 
   const hideCartIcon =
