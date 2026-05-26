@@ -129,6 +129,10 @@ function normalizeItem(item, fallbackIndex = 0) {
   const rawOfferQuantity = item.offer_quantity ?? item.OFFER_QUANTITY ?? item.offerQuantity ?? null;
   const rawFreeItemQuantity = item.free_item_quantity ?? item.FREE_ITEM_QUANTITY ?? item.freeItemQuantity ?? null;
   const rawFreeItemCode = item.free_item_code ?? item.FREE_ITEM_CODE ?? item.freeItemCode ?? null;
+  const rawFreeItemName = item.free_item_name ?? item.FREE_ITEM_NAME ?? item.freeItemName ?? null;
+  const rawFreeItemImage = item.free_item_image ?? item.FREE_ITEM_IMAGE ?? item.freeItemImage ?? null;
+  const rawFreeItemAvailableQuantity =
+    item.free_item_available_quantity ?? item.FREE_ITEM_AVAILABLE_QUANTITY ?? item.freeItemAvailableQuantity ?? null;
   const rawComputedFreeItemQuantity =
     item.computed_free_item_quantity ?? item.COMPUTED_FREE_ITEM_QUANTITY ?? item.computedFreeItemQuantity ?? null;
   const offer_quantity =
@@ -222,6 +226,14 @@ function normalizeItem(item, fallbackIndex = 0) {
     offer_quantity: Number.isFinite(offer_quantity) ? offer_quantity : null,
     free_item_quantity: Number.isFinite(free_item_quantity) ? free_item_quantity : null,
     free_item_code: Number.isFinite(free_item_code) ? free_item_code : null,
+    free_item_name: rawFreeItemName ? String(rawFreeItemName) : null,
+    free_item_image: rawFreeItemImage ? String(rawFreeItemImage) : null,
+    free_item_available_quantity:
+      rawFreeItemAvailableQuantity === null ||
+        rawFreeItemAvailableQuantity === undefined ||
+        rawFreeItemAvailableQuantity === ""
+        ? null
+        : Number(rawFreeItemAvailableQuantity),
     computed_free_item_quantity: Number.isFinite(computed_free_item_quantity) ? computed_free_item_quantity : null,
     subcategory: Number.isFinite(subcategory) ? subcategory : null,
     stockStatus,
@@ -650,6 +662,15 @@ export default function Pubmenubuy({
       }
 
       const freeItemCode = Number(parent?.free_item_code || 0);
+      const freeItemName = String(parent?.free_item_name || "Free item").trim() || "Free item";
+      const freeItemImage = String(parent?.free_item_image || "").trim();
+      const rawFreeItemAvailableQuantity = parent?.free_item_available_quantity;
+      const freeItemAvailableQuantity =
+        rawFreeItemAvailableQuantity === null ||
+          rawFreeItemAvailableQuantity === undefined ||
+          rawFreeItemAvailableQuantity === ""
+          ? null
+          : Number(rawFreeItemAvailableQuantity);
 
       if (!Number.isFinite(freeItemCode) || freeItemCode <= 0) {
         continue;
@@ -664,13 +685,13 @@ export default function Pubmenubuy({
         id: placeholderId,
         orderLineId: placeholderId,
         item_code: String(freeItemCode),
-        item_name: "Free item",
+        item_name: freeItemName,
         quantity: expectedFreeQty,
         unitPrice: 0,
         subtotal: 0,
-        image: "",
-        card_text: `Name: Free item Quantity: ${expectedFreeQty}`,
-        availableQuantity: null,
+        image: freeItemImage,
+        card_text: `Name: ${freeItemName} Quantity: ${expectedFreeQty}`,
+        availableQuantity: Number.isFinite(freeItemAvailableQuantity) ? freeItemAvailableQuantity : null,
         parentCode,
         isFreeItem: true,
         offer_quantity: null,
@@ -833,6 +854,7 @@ export default function Pubmenubuy({
         )
         : [];
 
+      let freeAvailableQty = null;
       for (const freeItem of linkedFreeItems) {
         // Ignore stale/placeholder/generated free rows
         if (
@@ -842,24 +864,31 @@ export default function Pubmenubuy({
           continue;
         }
 
-        const freeAvailableQty = freeItem?.availableQuantity;
-
-        // Ignore invalid backend stock responses for free items
+        const candidateAvailableQty = freeItem?.availableQuantity;
         if (
-          freeAvailableQty === null ||
-          freeAvailableQty === undefined ||
-          Number(freeAvailableQty) <= 0
+          candidateAvailableQty !== null &&
+          candidateAvailableQty !== undefined &&
+          Number.isFinite(Number(candidateAvailableQty))
         ) {
-          continue;
+          freeAvailableQty = Number(candidateAvailableQty);
+          break;
         }
+      }
 
-        if (expectedFreeQty > Number(freeAvailableQty)) {
-          showToast(
-            `Out of stock for free item. Available quantity: ${freeAvailableQty}`,
-            "error"
-          );
-          return;
-        }
+      const parentFreeAvailableQty = targetItem.free_item_available_quantity;
+      if (
+        freeAvailableQty === null &&
+        parentFreeAvailableQty !== null &&
+        parentFreeAvailableQty !== undefined &&
+        parentFreeAvailableQty !== "" &&
+        Number.isFinite(Number(parentFreeAvailableQty))
+      ) {
+        freeAvailableQty = Number(parentFreeAvailableQty);
+      }
+
+      if (freeAvailableQty !== null && expectedFreeQty > Number(freeAvailableQty)) {
+        validationMessage = `Out of stock for free item. Available quantity: ${freeAvailableQty}`;
+        return current;
       }
 
       nextQuantity = nextQtyCandidate;
@@ -906,6 +935,15 @@ export default function Pubmenubuy({
       // Optimistically create a placeholder free row so the UI updates immediately; it will be
       // replaced by the backend response after `updateLineQuantity`.
       const freeItemCode = Number(targetItem.free_item_code || 0);
+      const freeItemName = String(targetItem.free_item_name || "Free item").trim() || "Free item";
+      const freeItemImage = String(targetItem.free_item_image || "").trim();
+      const rawFreeItemAvailableQuantity = targetItem.free_item_available_quantity;
+      const freeItemAvailableQuantity =
+        rawFreeItemAvailableQuantity === null ||
+          rawFreeItemAvailableQuantity === undefined ||
+          rawFreeItemAvailableQuantity === ""
+          ? null
+          : Number(rawFreeItemAvailableQuantity);
       if (
         expectedFreeQty > 0 &&
         linkedFreeItems.length === 0 &&
@@ -918,13 +956,13 @@ export default function Pubmenubuy({
           id: placeholderId,
           orderLineId: placeholderId,
           item_code: String(freeItemCode),
-          item_name: "Free item",
+          item_name: freeItemName,
           quantity: expectedFreeQty,
           unitPrice: 0,
           subtotal: 0,
-          image: "",
-          card_text: `Name: Free item Quantity: ${expectedFreeQty}`,
-          availableQuantity: null,
+          image: freeItemImage,
+          card_text: `Name: ${freeItemName} Quantity: ${expectedFreeQty}`,
+          availableQuantity: Number.isFinite(freeItemAvailableQuantity) ? freeItemAvailableQuantity : null,
           parentCode: targetCode,
           isFreeItem: true,
           offer_quantity: null,
@@ -1137,6 +1175,7 @@ export default function Pubmenubuy({
         (row) => row?.isFreeItem && String(row?.parentCode || "").trim() === parentCode
       );
 
+      let freeAvailableQty = null;
       for (const freeItem of linkedFreeItems) {
         // Ignore stale/placeholder/generated free rows
         if (
@@ -1146,24 +1185,34 @@ export default function Pubmenubuy({
           continue;
         }
 
-        const freeAvailableQty = freeItem?.availableQuantity;
-
-        // Ignore invalid backend stock responses for free items
+        const candidateAvailableQty = freeItem?.availableQuantity;
         if (
-          freeAvailableQty === null ||
-          freeAvailableQty === undefined ||
-          Number(freeAvailableQty) <= 0
+          candidateAvailableQty !== null &&
+          candidateAvailableQty !== undefined &&
+          Number.isFinite(Number(candidateAvailableQty))
         ) {
-          continue;
+          freeAvailableQty = Number(candidateAvailableQty);
+          break;
         }
+      }
 
-        if (expectedFreeQty > Number(freeAvailableQty)) {
-          showToast(
-            `Out of stock for free item. Available quantity: ${freeAvailableQty}`,
-            "error"
-          );
-          return;
-        }
+      const parentFreeAvailableQty = liveItem?.free_item_available_quantity;
+      if (
+        freeAvailableQty === null &&
+        parentFreeAvailableQty !== null &&
+        parentFreeAvailableQty !== undefined &&
+        parentFreeAvailableQty !== "" &&
+        Number.isFinite(Number(parentFreeAvailableQty))
+      ) {
+        freeAvailableQty = Number(parentFreeAvailableQty);
+      }
+
+      if (freeAvailableQty !== null && expectedFreeQty > Number(freeAvailableQty)) {
+        showToast(
+          `Out of stock for free item. Available quantity: ${freeAvailableQty}`,
+          "error"
+        );
+        return;
       }
     }
 
@@ -1267,7 +1316,10 @@ const removeItem = (id) => {
       // Include latest item quantities in the payload so backend can persist updates
       const itemsPayload = (Array.isArray(items) ? items : [])
         .map((it) => ({
-          item_id: Number(it.itemId || it.item_id || it.id || it.item_code || 0) || 0,
+          item_id: Number(it.itemId || it.item_id || it.item_code || it.id || 0) || 0,
+          order_line_id: Number(it.orderLineId || it.order_line_id || 0) || 0,
+          barcode: it.parentCode || it.barcode || null,
+          is_free_item: Boolean(it.isFreeItem),
           quantity: Number(it.quantity || 0),
         }))
         .filter((x) => Number.isFinite(x.item_id) && x.item_id > 0);

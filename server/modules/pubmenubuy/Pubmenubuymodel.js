@@ -182,6 +182,31 @@ function pickBestOffer(offerRows, quantity) {
   return best;
 }
 
+function pickUpcomingOffer(offerRows = []) {
+  if (!Array.isArray(offerRows) || offerRows.length === 0) {
+    return null;
+  }
+
+  let best = null;
+
+  for (const offer of offerRows) {
+    const offerQty = Number(offer?.offer_quantity || 0);
+    const freePer = Number(offer?.free_item_quantity || 0);
+    const freeItemCode = Number(offer?.free_item_code || 0);
+
+    if (!Number.isFinite(offerQty) || offerQty <= 0) continue;
+    if (!Number.isFinite(freePer) || freePer <= 0) continue;
+    if (!Number.isFinite(freeItemCode) || freeItemCode <= 0) continue;
+
+    const currentBestOfferQty = Number(best?.offer_quantity || 0);
+    if (!best || offerQty < currentBestOfferQty) {
+      best = offer;
+    }
+  }
+
+  return best;
+}
+
 function computeFreeQtyForOffer(offer, quantity) {
   const qty = Number(quantity || 0);
   const offerQty = Number(offer?.offer_quantity || 0);
@@ -868,18 +893,22 @@ async function getOrderSummary(orderNumber) {
     ? (await db.execute(
         `
           SELECT
-            item_code,
-            offer_quantity,
-            free_item_quantity,
-            free_item_code
-          FROM xxafmc_offers
-          WHERE item_code IN (${itemCodes.map(() => "?").join(",")})
+            ofr.item_code,
+            ofr.offer_quantity,
+            ofr.free_item_quantity,
+            ofr.free_item_code,
+            freeinv.item_name AS free_item_name,
+            freeinv.image AS free_item_image
+          FROM xxafmc_offers ofr
+          LEFT JOIN xxafmc_inventory freeinv
+            ON ofr.free_item_code = freeinv.item_code
+          WHERE ofr.item_code IN (${itemCodes.map(() => "?").join(",")})
             AND (
-              (END_DATE IS NULL AND CURDATE() >= DATE(OFFER_DATE))
-              OR (CURDATE() BETWEEN DATE(OFFER_DATE) AND END_DATE)
+              (ofr.END_DATE IS NULL AND CURDATE() >= DATE(ofr.OFFER_DATE))
+              OR (CURDATE() BETWEEN DATE(ofr.OFFER_DATE) AND ofr.END_DATE)
             )
-            AND (status IS NULL OR UPPER(status) = UPPER('Active'))
-          ORDER BY item_code, offer_quantity DESC
+            AND (ofr.status IS NULL OR UPPER(ofr.status) = UPPER('Active'))
+          ORDER BY ofr.item_code, ofr.offer_quantity DESC
         `,
         itemCodes
       ))[0]
@@ -893,6 +922,14 @@ async function getOrderSummary(orderNumber) {
     if (!offersByItemCode.has(code)) offersByItemCode.set(code, []);
     offersByItemCode.get(code).push(offer);
   }
+
+  const freeItemCodes = [...new Set(
+    offerRows
+      .map((offer) => Number(offer?.free_item_code))
+      .filter((code) => Number.isFinite(code) && code > 0)
+  )];
+  const freeStockMap = await getIngredientStockQuantities(db, freeItemCodes);
+  const freeReservedMap = await getReservedQuantitiesExcludingOrder(db, freeItemCodes, normalizedOrderNumber);
 
   const enrichedItems = itemRows.map((row) => {
     const subcategory = Number(row.subcategory || 0);
@@ -919,8 +956,18 @@ async function getOrderSummary(orderNumber) {
     // Do not attach "parent item" offers to free rows; these lines represent the free item itself.
     const isFreeRow = Number(row.price || 0) === 0 && Number(row.subtotal || 0) === 0;
     const offer = !isFreeRow
-      ? pickBestOffer(offersByItemCode.get(Number(row.item_code)) || [], Number(row.quantity || 0))
+      ? (
+          pickBestOffer(offersByItemCode.get(Number(row.item_code)) || [], Number(row.quantity || 0)) ||
+          pickUpcomingOffer(offersByItemCode.get(Number(row.item_code)) || [])
+        )
       : null;
+    const freeItemCode = Number(offer?.free_item_code || 0);
+    const freeStockQuantity = Number(freeStockMap[String(freeItemCode)] || 0);
+    const freeReservedQuantity = Number(freeReservedMap.get(String(freeItemCode)) || 0);
+    const freeAvailableQuantity =
+      Number.isFinite(freeItemCode) && freeItemCode > 0
+        ? Math.max(0, freeStockQuantity - freeReservedQuantity)
+        : null;
     const computedFreeQty = offer ? computeFreeQtyForOffer(offer, Number(row.quantity || 0)) : 0;
     return {
       ...row,
@@ -931,6 +978,9 @@ async function getOrderSummary(orderNumber) {
       offer_quantity: offer?.offer_quantity || null,
       free_item_quantity: offer?.free_item_quantity || null,
       free_item_code: offer?.free_item_code || null,
+      free_item_name: offer?.free_item_name || null,
+      free_item_image: offer?.free_item_image || null,
+      free_item_available_quantity: freeAvailableQuantity,
       computed_free_item_quantity: computedFreeQty,
     };
   });
@@ -2002,7 +2052,6 @@ async function updateOrderLineQuantity(orderNumber, orderLineId, userId, quantit
           offer_quantity
         FROM xxafmc_offers
         WHERE item_code = ?
-          AND offer_quantity <= ?
           AND (
             (END_DATE IS NULL AND CURDATE() >= DATE(OFFER_DATE))
             OR
@@ -2011,7 +2060,7 @@ async function updateOrderLineQuantity(orderNumber, orderLineId, userId, quantit
           AND (status IS NULL OR UPPER(status) = UPPER('Active'))
         ORDER BY offer_id DESC
       `,
-      [itemId, normalizedQuantity]
+      [itemId]
     );
 
     const offer = pickBestOffer(offerRows, normalizedQuantity);
@@ -2082,6 +2131,51 @@ async function updateOrderLineQuantity(orderNumber, orderLineId, userId, quantit
         );
       }
 
+      if (
+        computedFreeQty > 0 &&
+        Number.isFinite(freeItemCode) &&
+        freeItemCode > 0
+      ) {
+        const [[freeInvRow]] = await connection.execute(
+          `
+            SELECT
+              IFNULL(stock_quantity, 0) AS stock_quantity
+            FROM xxafmc_inventory
+            WHERE item_code = ?
+            LIMIT 1
+          `,
+          [freeItemCode]
+        );
+
+        const freeStockQuantity = Number(
+          freeInvRow?.stock_quantity || 0
+        );
+
+        const freeReservedMap =
+          await getReservedQuantitiesExcludingOrder(
+            connection,
+            [freeItemCode],
+            normalizedOrderNumber
+          );
+
+        const freeReservedQuantity = Number(
+          freeReservedMap.get(String(freeItemCode)) || 0
+        );
+
+        const freeAvailableQuantity = Math.max(
+          0,
+          freeStockQuantity - freeReservedQuantity
+        );
+
+        if (computedFreeQty > freeAvailableQuantity) {
+          const error = new Error(
+            `Out of stock for free item. Available quantity: ${freeAvailableQuantity}`
+          );
+
+          error.statusCode = 400;
+          throw error;
+        }
+      }
       const currentFreeQty = Number(canonicalFreeLine?.quantity || 0);
 
       const freeQtyDelta = computedFreeQty - currentFreeQty;
@@ -2171,6 +2265,17 @@ async function updateOrderLineQuantity(orderNumber, orderLineId, userId, quantit
           ]
         );
       }
+    } else {
+      await connection.execute(
+        `
+          DELETE FROM xxafmc_order_details
+          WHERE order_id = ?
+            AND barcode = ?
+            AND IFNULL(price, 0) = 0
+            AND IFNULL(subtotal, 0) = 0
+        `,
+        [normalizedOrderNumber, String(itemId)]
+      );
     }
 
     const deltaQty = normalizedQuantity - currentQty;

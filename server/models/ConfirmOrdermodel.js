@@ -195,6 +195,199 @@ function normalizeCocktailCustomizations(payload) {
     .filter(Boolean);
 }
 
+function pickBestOfferForQuantity(offers, quantity) {
+  const qty = Number(quantity || 0);
+  if (!Number.isFinite(qty) || qty <= 0) return null;
+
+  return (Array.isArray(offers) ? offers : [])
+    .filter((offer) => {
+      const offerQty = Number(offer?.offer_quantity || 0);
+      const freeQty = Number(offer?.free_item_quantity || 0);
+      const freeCode = Number(offer?.free_item_code || 0);
+      return offerQty > 0 && offerQty <= qty && freeQty > 0 && freeCode > 0;
+    })
+    .sort((a, b) => Number(b.offer_quantity || 0) - Number(a.offer_quantity || 0))[0] || null;
+}
+
+async function getNextOrderLineId(connection) {
+  const [[row]] = await connection.execute(
+    `SELECT COALESCE(MAX(order_line_id), 0) + 1 AS nextId FROM xxafmc_order_details`
+  );
+  return Number(row?.nextId || 1);
+}
+
+async function syncOfferFreeItemsForOrder(connection, orderNumber, createdBy) {
+  const [paidRows] = await connection.execute(
+    `
+      SELECT
+        od.order_line_id,
+        od.item_id,
+        od.quantity,
+        od.subcategory,
+        od.created_by,
+        xi.sub_category
+      FROM xxafmc_order_details od
+      JOIN xxafmc_inventory xi
+        ON xi.item_code = od.item_id
+      WHERE od.order_id = ?
+        AND NOT (IFNULL(od.price, 0) = 0 AND IFNULL(od.subtotal, 0) = 0)
+      ORDER BY od.order_line_id ASC
+    `,
+    [orderNumber]
+  );
+
+  const parentCodes = [...new Set(
+    paidRows
+      .filter((row) => ![14, 15].includes(Number(row.sub_category ?? row.subcategory)))
+      .map((row) => Number(row.item_id))
+      .filter((code) => Number.isFinite(code) && code > 0)
+  )];
+
+  if (parentCodes.length === 0) return;
+
+  const [offerRows] = await connection.execute(
+    `
+      SELECT item_code, offer_quantity, free_item_quantity, free_item_code
+      FROM xxafmc_offers
+      WHERE item_code IN (${parentCodes.map(() => "?").join(",")})
+        AND (
+          (end_date IS NULL AND CURDATE() >= DATE(offer_date))
+          OR (CURDATE() BETWEEN DATE(offer_date) AND end_date)
+        )
+        AND (status IS NULL OR UPPER(status) = 'ACTIVE')
+      ORDER BY item_code, offer_quantity DESC
+    `,
+    parentCodes
+  );
+
+  const offersByItemCode = new Map();
+  for (const offer of offerRows) {
+    const code = Number(offer?.item_code || 0);
+    if (!Number.isFinite(code) || code <= 0) continue;
+    if (!offersByItemCode.has(code)) offersByItemCode.set(code, []);
+    offersByItemCode.get(code).push(offer);
+  }
+
+  for (const parent of paidRows) {
+    const parentCode = Number(parent.item_id || 0);
+    if (!Number.isFinite(parentCode) || parentCode <= 0) continue;
+    if ([14, 15].includes(Number(parent.sub_category ?? parent.subcategory))) continue;
+
+    const offer = pickBestOfferForQuantity(
+      offersByItemCode.get(parentCode) || [],
+      Number(parent.quantity || 0)
+    );
+
+    if (!offer) {
+      await connection.execute(
+        `
+          DELETE FROM xxafmc_order_details
+          WHERE order_id = ?
+            AND barcode = ?
+            AND IFNULL(price, 0) = 0
+            AND IFNULL(subtotal, 0) = 0
+        `,
+        [orderNumber, String(parentCode)]
+      );
+      continue;
+    }
+
+    const offerQty = Number(offer.offer_quantity || 0);
+    const freeQty = Number(offer.free_item_quantity || 0);
+    const freeItemCode = Number(offer.free_item_code || 0);
+    const computedFreeQty = offerQty > 0 ? Math.floor(Number(parent.quantity || 0) / offerQty) * freeQty : 0;
+
+    const [freeRows] = await connection.execute(
+      `
+        SELECT order_line_id, quantity
+        FROM xxafmc_order_details
+        WHERE order_id = ?
+          AND item_id = ?
+          AND barcode = ?
+          AND IFNULL(price, 0) = 0
+          AND IFNULL(subtotal, 0) = 0
+        ORDER BY order_line_id ASC
+      `,
+      [orderNumber, freeItemCode, String(parentCode)]
+    );
+
+    const canonicalFreeRow = freeRows[0] || null;
+    const duplicateFreeRows = freeRows.slice(1);
+
+    if (duplicateFreeRows.length > 0) {
+      await connection.execute(
+        `
+          DELETE FROM xxafmc_order_details
+          WHERE order_id = ?
+            AND order_line_id IN (${duplicateFreeRows.map(() => "?").join(",")})
+        `,
+        [orderNumber, ...duplicateFreeRows.map((row) => Number(row.order_line_id))]
+      );
+    }
+
+    if (computedFreeQty <= 0) {
+      if (canonicalFreeRow?.order_line_id) {
+        await connection.execute(
+          `DELETE FROM xxafmc_order_details WHERE order_id = ? AND order_line_id = ?`,
+          [orderNumber, Number(canonicalFreeRow.order_line_id)]
+        );
+      }
+      continue;
+    }
+
+    if (canonicalFreeRow?.order_line_id) {
+      await connection.execute(
+        `
+          UPDATE xxafmc_order_details
+          SET quantity = ?,
+              total_quantity = ?
+          WHERE order_id = ?
+            AND order_line_id = ?
+        `,
+        [computedFreeQty, Number(parent.quantity || 0), orderNumber, Number(canonicalFreeRow.order_line_id)]
+      );
+      continue;
+    }
+
+    const [[freeInventoryRow]] = await connection.execute(
+      `SELECT sub_category FROM xxafmc_inventory WHERE item_code = ? LIMIT 1`,
+      [freeItemCode]
+    );
+    const freeOrderLineId = await getNextOrderLineId(connection);
+
+    await connection.execute(
+      `
+        INSERT INTO xxafmc_order_details
+          (
+            order_line_id,
+            order_id,
+            item_id,
+            quantity,
+            subtotal,
+            price,
+            total_quantity,
+            created_by,
+            creation_date,
+            subcategory,
+            barcode
+          )
+        VALUES
+          (?, ?, ?, ?, 0, 0, ?, ?, NOW(), ?, ?)
+      `,
+      [
+        freeOrderLineId,
+        orderNumber,
+        freeItemCode,
+        computedFreeQty,
+        Number(parent.quantity || 0),
+        parent.created_by || createdBy,
+        freeInventoryRow?.sub_category ?? parent.subcategory ?? null,
+        String(parentCode),
+      ]
+    );
+  }
+}
+
 async function applyCocktailCustomizations(connection, {
   orderNumber,
   userId,
@@ -457,13 +650,29 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
         if (payloadItems.length > 0) {
           for (const p of payloadItems) {
             const iid = Number(p?.item_id ?? p?.itemId ?? p?.ITEM_ID);
+            const orderLineId = Number(p?.order_line_id ?? p?.orderLineId ?? p?.ORDER_LINE_ID);
+            const isFreePayloadItem = Boolean(p?.is_free_item ?? p?.isFreeItem);
             const qty = Number(p?.quantity ?? p?.QUANTITY ?? p?.qty ?? 0);
             if (!Number.isFinite(iid) || iid <= 0) continue;
             if (!Number.isFinite(qty) || qty < 0) continue;
-            await connection.execute(
-              `UPDATE xxafmc_order_details SET quantity = ? WHERE order_id = ? AND item_id = ?`,
-              [qty, normalizedOrderNumber, iid]
-            );
+            if (isFreePayloadItem) continue;
+            if (Number.isFinite(orderLineId) && orderLineId > 0) {
+              await connection.execute(
+                `UPDATE xxafmc_order_details SET quantity = ? WHERE order_id = ? AND order_line_id = ?`,
+                [qty, normalizedOrderNumber, orderLineId]
+              );
+            } else {
+              await connection.execute(
+                `
+                  UPDATE xxafmc_order_details
+                  SET quantity = ?
+                  WHERE order_id = ?
+                    AND item_id = ?
+                    AND NOT (IFNULL(price, 0) = 0 AND IFNULL(subtotal, 0) = 0)
+                `,
+                [qty, normalizedOrderNumber, iid]
+              );
+            }
           }
 
           // Refresh detailRows to reflect updated quantities
@@ -523,6 +732,51 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
       );
 
       // Refresh details after cleanup.
+      const [refreshedRows] = await connection.execute(
+        `
+          SELECT
+            od.item_id,
+            od.quantity,
+            od.price,
+            od.subtotal,
+            od.barcode,
+            od.type_id,
+            xi.item_name,
+            xi.description,
+            xi.sub_category,
+            c.category_name,
+            COALESCE(
+              NULLIF(xi.stock_quantity, 0),
+              (
+                SELECT IFNULL(SUM(stock_quantity), 0)
+                FROM xxafmc_stock_out so
+                WHERE so.item_code = xi.item_code
+              ),
+              0
+            ) AS stock_quantity
+          FROM xxafmc_order_details od
+          JOIN xxafmc_inventory xi
+            ON od.item_id = xi.item_code
+          LEFT JOIN xxafmc_categories c
+            ON xi.category_id = c.category_id
+          WHERE od.order_id = ?
+          ORDER BY od.order_line_id ASC
+        `,
+        [normalizedOrderNumber]
+      );
+
+      detailRows.splice(0, detailRows.length, ...refreshedRows);
+
+      if (!detailRows.length) {
+        const error = new Error("No order items found");
+        error.statusCode = 404;
+        throw error;
+      }
+    }
+
+    await syncOfferFreeItemsForOrder(connection, normalizedOrderNumber, createdBy);
+
+    {
       const [refreshedRows] = await connection.execute(
         `
           SELECT
@@ -732,9 +986,10 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
           FROM xxafmc_kitchen_notification
           WHERE ordernumber = ?
             AND item_id = ?
+            AND (barcode <=> ?)
             AND status IN ('Received', 'Preparing', 'Completed')
         `,
-        [normalizedOrderNumber, item.item_id]
+        [normalizedOrderNumber, item.item_id, item.barcode || null]
       );
 
       const existingCount = Number(existingRows[0]?.existingCount || 0);
@@ -843,6 +1098,7 @@ async function getConfirmedOrderDetails(orderNumber) {
       LEFT JOIN xxafmc_kitchen_notification kn
         ON kn.ordernumber = od.order_id
         AND kn.item_id = od.item_id
+        AND (kn.barcode <=> od.barcode)
       LEFT JOIN xxafmc_invoices inv
         ON inv.order_num = oh.order_num
       WHERE oh.order_num = ?
@@ -864,6 +1120,7 @@ async function getConfirmedOrderDetails(orderNumber) {
         od.item_id,
         xi.item_name,
         od.quantity,
+        od.barcode,
         ROUND(MAX(IFNULL(od.subtotal, 0)), 2) AS subtotal,
         CASE
           WHEN COUNT(od.order_line_id) - SUM(CASE WHEN COALESCE(kn.status, '') = 'Cancelled' THEN 1 ELSE 0 END) > 0
@@ -882,8 +1139,9 @@ async function getConfirmedOrderDetails(orderNumber) {
       LEFT JOIN xxafmc_kitchen_notification kn
         ON kn.ordernumber = od.order_id
         AND kn.item_id = od.item_id
+        AND (kn.barcode <=> od.barcode)
       WHERE od.order_id = ?
-      GROUP BY od.order_line_id, od.item_id, xi.item_name, od.quantity
+      GROUP BY od.order_line_id, od.item_id, xi.item_name, od.quantity, od.barcode
       ORDER BY od.order_line_id ASC
     `,
     [normalizedOrderNumber]
