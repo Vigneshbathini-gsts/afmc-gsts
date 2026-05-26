@@ -336,9 +336,13 @@ async function syncFreeItemForOrderItem(connection, { orderNumber, itemCode, qua
   const freeItemCode = Number(offer.free_item_code || 0);
   const currentExistingQty = Number(existingFreeRow?.quantity || 0);
   const freeQtyDelta = computedFreeQty - currentExistingQty;
-  // No reservation adjustments here; reservation happens only on confirm.
-  void freeItemCode;
-  void freeQtyDelta;
+  if (Number.isFinite(freeItemCode) && freeItemCode > 0) {
+    if (freeQtyDelta > 0) {
+      await reserveInventoryQty(connection, freeItemCode, freeQtyDelta);
+    } else if (freeQtyDelta < 0) {
+      await releaseInventoryQty(connection, freeItemCode, Math.abs(freeQtyDelta));
+    }
+  }
 
   if (existingFreeRow) {
     await connection.execute(
@@ -1196,20 +1200,7 @@ async function updateOrderItemQuantity(orderNumber, itemCode, delta, authUser = 
 
     if (!isMocktailItem) {
       if (normalizedDelta > 0) {
-        const [[stockRow]] = await connection.execute(
-          `SELECT IFNULL(SUM(STOCK_QUANTITY), 0) AS stock_qty FROM xxafmc_stock_out WHERE item_code = ?`,
-          [normalizedItemCode]
-        );
-        const [[resRow]] = await connection.execute(
-          `SELECT IFNULL(reserved_qty, 0) AS reserved_qty FROM xxafmc_stock_reservation_totals WHERE item_code = ? LIMIT 1`,
-          [normalizedItemCode]
-        );
-        const stockQty = Number(stockRow?.stock_qty || 0);
-        const reservedQty = Number(resRow?.reserved_qty || 0);
-        const availableQty = Math.max(0, stockQty - reservedQty);
-        if (nextQty > availableQty) {
-          throw createValidationError(`Out of stock. Available quantity: ${availableQty}`);
-        }
+        await reserveInventoryQty(connection, normalizedItemCode, normalizedDelta);
       }
     }
 
@@ -1997,22 +1988,7 @@ async function updateOrderLineQuantity(orderNumber, orderLineId, userId, quantit
     } else {
       const deltaQty = normalizedQuantity - currentQty;
       if (deltaQty > 0) {
-        const [[stockRow]] = await connection.execute(
-          `SELECT IFNULL(SUM(STOCK_QUANTITY), 0) AS stock_qty FROM xxafmc_stock_out WHERE item_code = ?`,
-          [itemId]
-        );
-        const [[resRow]] = await connection.execute(
-          `SELECT IFNULL(reserved_qty, 0) AS reserved_qty FROM xxafmc_stock_reservation_totals WHERE item_code = ? LIMIT 1`,
-          [itemId]
-        );
-        const stockQty = Number(stockRow?.stock_qty || 0);
-        const reservedQty = Number(resRow?.reserved_qty || 0);
-        const availableQty = Math.max(0, stockQty - reservedQty);
-        if (normalizedQuantity > availableQty) {
-          const error = new Error(`Out of stock. Available quantity: ${availableQty}`);
-          error.statusCode = 400;
-          throw error;
-        }
+        await reserveInventoryQty(connection, itemId, deltaQty);
       }
     }
 
@@ -2179,8 +2155,16 @@ async function updateOrderLineQuantity(orderNumber, orderLineId, userId, quantit
       const currentFreeQty = Number(canonicalFreeLine?.quantity || 0);
 
       const freeQtyDelta = computedFreeQty - currentFreeQty;
-      // No reservation adjustments here; reservation happens only on confirm.
-      void freeQtyDelta;
+      if (
+        Number.isFinite(freeItemCode) &&
+        freeItemCode > 0
+      ) {
+        if (freeQtyDelta > 0) {
+          await reserveInventoryQty(connection, freeItemCode, freeQtyDelta);
+        } else if (freeQtyDelta < 0) {
+          await releaseInventoryQty(connection, freeItemCode, Math.abs(freeQtyDelta));
+        }
+      }
 
       // -------------------------------------------------------
       // Remove free line if no qty needed
