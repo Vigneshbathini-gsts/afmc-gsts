@@ -27,17 +27,21 @@ export default function AttendantNavbar({ onMenuClick }) {
     location.pathname.startsWith("/attendant/invoice/") ||
     location.pathname.startsWith("/attendant/payment/");
 
+  const showMenuIcon = location.pathname !== "/attendant/register-member";
+
   return (
     <header className="bg-white shadow-md sticky top-0 z-30 border-b border-afmc-maroon/10">
       <div className="flex items-center justify-between px-4 md:px-6 py-4">
         <div className="flex items-center gap-4">
-          <button
-            onClick={onMenuClick}
-            className="p-2 rounded-lg hover:bg-afmc-maroon/10 text-2xl text-gray-700 hover:text-afmc-maroon transition"
-            aria-label="Open navigation menu"
-          >
-            <FaBars />
-          </button>
+          {showMenuIcon && (
+            <button
+              onClick={onMenuClick}
+              className="p-2 rounded-lg hover:bg-afmc-maroon/10 text-2xl text-gray-700 hover:text-afmc-maroon transition"
+              aria-label="Open navigation menu"
+            >
+              <FaBars />
+            </button>
+          )}
 
           <div className="flex items-center gap-3 min-w-0">
             <div className="rounded-xl">
