@@ -779,25 +779,10 @@ exports.confirmOrder = async (req, res) => {
         }
       }
 
-      // 3. Create Kitchen Notification (skip free offer lines)
-      if (isFreeRow) {
-        continue;
-      }
-      const kType = kitchenType || (Number(cartItem.category_id) === 10 ? "Bar" : "Kitchen");
-      await connection.execute(
-        `INSERT INTO xxafmc_kitchen_notification
-          (ordernumber, user_name, item_id, item_name, quantity, created_by, creation_date, msg_read, status, kitchen_type)
-         VALUES (?, ?, ?, ?, ?, ?, NOW(), 'N', 'Received', ?)`,
-        [
-          orderNumber,
-          userId,
-          itemId,
-          cartItem.item_name ?? null,
-          Number(cartItem.quantity ?? 0),
-          userId,
-          kType ?? "Kitchen",
-        ]
-      );
+      // Kitchen notifications for cart-confirm are intentionally omitted here to match
+      // the Pub menu buy-flow behavior. Notifications will be created by the
+      // dedicated buy/confirm flow (Pubmenubuy) when appropriate, which allows
+      // the order to be cancellable immediately after confirmation from the cart.
     }
 
     // 4. Migrate Customizations from cart to order
