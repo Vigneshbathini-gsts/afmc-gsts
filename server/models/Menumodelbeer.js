@@ -2,40 +2,39 @@ const pool = require("../config/db");
 
 exports.getInventory = async (itemCode, subCategory) => {
     const query = `
-SELECT
-    inv.item_code,
-    inv.item_name,
-    inv.image,
-    inv.sub_category,
-    sc.SUB_CATEGORY_NAME AS sub_category_name,
-    MIN(inv.item_id) AS item_id,
-
-    (
-        SELECT
-            CASE
-                WHEN SUM(IFNULL(xso.stock_quantity, 0)) = 0 THEN 'Out Of Stock'
-                ELSE NULL
-            END
-        FROM xxafmc_stock_out xso
-        WHERE xso.item_code = inv.item_code
-        GROUP BY xso.item_code
-    ) AS stock_status
-
-FROM xxafmc_inventory inv
-LEFT JOIN xxafmc_sub_categories sc
-  ON sc.SUB_CATEGORY_ID = inv.sub_category
-
-WHERE
-    inv.item_code IN (
-        SELECT DISTINCT item_code
-        FROM xxafmc_stock_out
-        WHERE item_code = inv.item_code
-    )
-
-    AND inv.category_id = 10
-    AND inv.sub_category IN (4, 6, 9, 18)
-    AND inv.item_code = IFNULL(?, inv.item_code)
-    AND inv.sub_category = IFNULL(?, inv.sub_category)
+ SELECT
+     inv.item_code,
+     inv.item_name,
+     inv.image,
+     inv.sub_category,
+     sc.SUB_CATEGORY_NAME AS sub_category_name,
+     MIN(inv.item_id) AS item_id,
+ 
+     (
+         SELECT
+             CASE
+                 WHEN COALESCE(NULLIF(inv.STOCK_QUANTITY, 0), SUM(IFNULL(xso.stock_quantity, 0)), 0) = 0 THEN 'Out Of Stock'
+                 ELSE NULL
+             END
+         FROM xxafmc_stock_out xso
+         WHERE xso.item_code = inv.item_code
+         GROUP BY xso.item_code
+     ) AS stock_status
+ 
+ FROM xxafmc_inventory inv
+ LEFT JOIN xxafmc_sub_categories sc
+   ON sc.SUB_CATEGORY_ID = inv.sub_category
+ 
+ WHERE
+     (
+       IFNULL(inv.STOCK_QUANTITY, 0) > 0
+       OR EXISTS (SELECT 1 FROM xxafmc_stock_out xso2 WHERE xso2.item_code = inv.item_code)
+     )
+ 
+     AND inv.category_id = 10
+     AND inv.sub_category IN (4, 6, 9, 18)
+     AND inv.item_code = IFNULL(?, inv.item_code)
+     AND inv.sub_category = IFNULL(?, inv.sub_category)
 
 GROUP BY
     inv.item_code,
@@ -71,7 +70,7 @@ exports.fetchMocktail = async (itemcode) => {
     (
         SELECT
             CASE
-                WHEN COALESCE(SUM(IFNULL(xso.stock_quantity, 0)), 0) = 0 THEN 'Out Of Stock'
+                WHEN COALESCE(NULLIF(inv.STOCK_QUANTITY, 0), COALESCE(SUM(IFNULL(xso.stock_quantity, 0)), 0), 0) = 0 THEN 'Out Of Stock'
                 ELSE NULL
             END
         FROM xxafmc_stock_out xso
@@ -97,23 +96,23 @@ exports.Snacksveg = async (itemcode, subcategory) => {
    inv.item_name,
    inv.image ,
    inv.item_id,
-     (SELECT
-        CASE
-            WHEN SUM(IFNULL(xso.stock_quantity, 0)) = 0 THEN 'Out Of Stock'
-            ELSE NULL
-        END AS stock_status
-    FROM xxafmc_stock_out xso
-    WHERE xso.item_code = inv.item_code
-    GROUP BY xso.item_code) AS stock_status
-from xxafmc_inventory inv
-where inv.item_code in
-(select xso.item_code
-from xxafmc_stock_out xso
- where xso.item_code =inv.item_code)
-and inv.category_id = 14
-and inv.sub_category = 10
-and inv.item_code =IFNULL(?,inv.item_code)
-order by inv.item_id asc;`;
+      (SELECT
+         CASE
+             WHEN COALESCE(NULLIF(inv.STOCK_QUANTITY, 0), SUM(IFNULL(xso.stock_quantity, 0)), 0) = 0 THEN 'Out Of Stock'
+             ELSE NULL
+         END AS stock_status
+     FROM xxafmc_stock_out xso
+     WHERE xso.item_code = inv.item_code
+     GROUP BY xso.item_code) AS stock_status
+ from xxafmc_inventory inv
+ where (
+   IFNULL(inv.STOCK_QUANTITY, 0) > 0
+   OR EXISTS (SELECT 1 FROM xxafmc_stock_out xso2 WHERE xso2.item_code = inv.item_code)
+ )
+ and inv.category_id = 14
+ and inv.sub_category = 10
+ and inv.item_code =IFNULL(?,inv.item_code)
+ order by inv.item_id asc;`;
 
     const [row] = await pool.execute(query, [itemcode, subcategory]);
     return row
