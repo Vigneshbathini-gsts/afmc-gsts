@@ -8,15 +8,25 @@ import {
 import { useLocation, useNavigate } from "react-router-dom";
 
 const defaultItems = [
-  { name: "Pubmed", color: "from-sky-600 to-cyan-500", icon: Wine, menu: true },
-  { name: "Synapse", color: "from-slate-600 to-slate-500", icon: Wine, menu: true },
-  { name: "Blue Room", color: "from-teal-600 to-emerald-500", icon: Wine, menu: true },
-  { name: "Silver Room", color: "from-green-600 to-green-500", icon: Wine, menu: true },
-  { name: "Grove", color: "from-lime-700 to-green-600", icon: Wine, menu: true },
-  { name: "Tapovan", color: "from-stone-600 to-stone-500", icon: Wine, menu: true },
-  { name: "Madhuban", color: "from-yellow-700 to-amber-600", icon: Wine, menu: true },
-  { name: "Lounge Room", color: "from-orange-700 to-orange-500", icon: Wine, menu: true },
-  { name: "Pizza", color: "from-red-600 to-red-500", icon: Wine, menu: true },
+  { name: "Pubmed", pubmedId: 10, color: "from-sky-600 to-cyan-500", icon: Wine, menu: true },
+  { name: "Synapse", pubmedId: 20, color: "from-slate-600 to-slate-500", icon: Wine, menu: true },
+  { name: "Blue Room", pubmedId: 30, color: "from-teal-600 to-emerald-500", icon: Wine, menu: true },
+  { name: "Silver Room", pubmedId: 40, color: "from-green-600 to-green-500", icon: Wine, menu: true },
+  { name: "Grove", pubmedId: 50, color: "from-lime-700 to-green-600", icon: Wine, menu: true },
+  { name: "Tapovan", pubmedId: 60, color: "from-stone-600 to-stone-500", icon: Wine, menu: true },
+  { name: "Madhuban", pubmedId: 70, color: "from-yellow-700 to-amber-600", icon: Wine, menu: true },
+  {
+    name: "Lounge Room",
+    color: "from-orange-700 to-orange-500",
+    icon: Wine,
+    pending: true,
+  },
+  {
+    name: "Pizza",
+    color: "from-red-600 to-red-500",
+    icon: Wine,
+    pending: true,
+  },
   {
     name: "Gym",
     color: "from-rose-700 to-pink-600",
@@ -39,7 +49,14 @@ function DashboardCard({ item, menuPath }) {
     const path = item.Path || (item.menu ? menuPath : null);
 
     if (path && !item.pending) {
-      navigate(path);
+      const pubmedValue = item.pubmedId ?? item.pubmedName ?? item.name;
+      const nextPath = item.menu
+        ? `${path}?pubmed=${encodeURIComponent(pubmedValue)}&pubmedName=${encodeURIComponent(item.name)}`
+        : path;
+
+      navigate(nextPath, {
+        state: item.menu ? { pubmed: pubmedValue, pubmedName: item.name } : undefined,
+      });
     }
   };
 

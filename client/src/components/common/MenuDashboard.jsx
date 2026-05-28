@@ -1398,6 +1398,15 @@ function MenuDashboard() {
   const handleBuy = async (item, qty, remarks, selectedType) => {
     try {
       const typeForBackend = selectedType || null;
+      const menuSearchParams = new URLSearchParams(location.search);
+      const selectedPubmed =
+        String(
+          location.state?.pubmed ||
+          menuSearchParams.get("pubmed") ||
+          location.state?.pubmedName ||
+          menuSearchParams.get("pubmedName") ||
+          ""
+        ).trim() || null;
 
       const response = await Pubmenubuyservice.createOrder({
         itemCode: item?.item_code,
@@ -1412,6 +1421,7 @@ function MenuDashboard() {
         userId: item?.user_id,
         subCategory: item?.sub_category,
         barcode: item?.barcode,
+        pubmed: selectedPubmed,
       });
 
       const orderNumber = response?.data?.data?.orderNumber;

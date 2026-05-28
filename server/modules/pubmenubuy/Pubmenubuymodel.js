@@ -1411,6 +1411,25 @@ async function createOrder(payload = {}, authUser = {}) {
       error.statusCode = 404;
       throw error;
     }
+    let resolvedPubmed = null;
+    if (pubmed !== null) {
+      const pubmedNumber = Number(pubmed);
+      if (Number.isFinite(pubmedNumber) && pubmedNumber > 0) {
+        resolvedPubmed = pubmedNumber;
+      } else {
+        const [pubmedRows] = await connection.execute(
+          `
+            SELECT pubmed_id
+            FROM xxafmc_pubmed
+            WHERE UPPER(TRIM(pubmed_name)) = UPPER(TRIM(?))
+            LIMIT 1
+          `,
+          [String(pubmed)]
+        );
+        resolvedPubmed = pubmedRows[0]?.pubmed_id || null;
+      }
+    }
+
     const resolvedCategoryId = Number.isFinite(categoryId) ? categoryId : Number(inventoryItem.category_id);
     const subCategory = Number(inventoryItem.sub_category ?? 0);
     const isMocktailItem = Number(resolvedCategoryId) === 10 && [14, 15].includes(subCategory);
@@ -1466,7 +1485,7 @@ async function createOrder(payload = {}, authUser = {}) {
         VALUES
           (?, NOW(), ?, ?, ?, NOW())
       `,
-      [userId, memberId, pubmed, appUser]
+      [userId, memberId, resolvedPubmed, appUser]
     );
 
     const orderNumber = headerResult.insertId;

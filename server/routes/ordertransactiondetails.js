@@ -9,11 +9,6 @@ const normalizeParam = (value) => {
   return trimmed ? trimmed : null;
 };
 
-const normalizeLikeParam = (value) => {
-  const normalized = normalizeParam(value);
-  return normalized ? `%${normalized.toUpperCase()}%` : null;
-};
-
 const normalizeExactParam = (value) => {
   const normalized = normalizeParam(value);
   return normalized ? normalized.toUpperCase() : null;
@@ -59,7 +54,7 @@ const getOrderTransactionDetails = async (req, res) => {
   try {
     const fromDate = normalizeDateParam(req.query.fromDate);
     const toDate = normalizeDateParam(req.query.toDate);
-    const orderNumberLike = normalizeLikeParam(req.query.orderNumber);
+    const orderNumberExact = normalizeParam(req.query.orderNumber);
     const userNameExact = normalizeExactParam(req.query.userName);
     const kitchenNameExact = normalizeExactParam(req.query.kitchenName);
     const itemNameExact = normalizeExactParam(req.query.itemNames);
@@ -68,7 +63,7 @@ const getOrderTransactionDetails = async (req, res) => {
     console.log("Received filters:", {
       fromDate,
       toDate,
-      orderNumberLike,
+      orderNumberExact,
       userNameExact,
       kitchenNameExact,
       itemNameExact,
@@ -86,14 +81,16 @@ const getOrderTransactionDetails = async (req, res) => {
     let baseWhere = `
       WHERE 
         TRIM(UPPER(OD.PAYMENT_STATUS)) = 'PAID'
+        AND XI.CATEGORY_ID IN (10, 14)
+        AND OD.ORDER_STATUS IS NULL
         ${dateFilterClause}
     `;
 
     // Add order number filter if provided
-    if (orderNumberLike) {
-      baseWhere += ` AND CAST(OD.ORDER_ID AS CHAR) LIKE ?`;
+    if (orderNumberExact) {
+      baseWhere += ` AND CAST(OD.ORDER_ID AS CHAR) = ?`;
     } else {
-      baseWhere += ` AND (? IS NULL OR CAST(OD.ORDER_ID AS CHAR) LIKE ?)`;
+      baseWhere += ` AND (? IS NULL OR CAST(OD.ORDER_ID AS CHAR) = ?)`;
     }
 
     // Add user name filter if provided
@@ -163,7 +160,7 @@ const getOrderTransactionDetails = async (req, res) => {
         1 AS ORD
       FROM xxafmc_order_details OD
       JOIN xxafmc_order_header OH ON OD.ORDER_ID = OH.ORDER_NUM
-      LEFT JOIN xxafmc_inventory XI ON XI.ITEM_CODE = OD.ITEM_ID
+      JOIN xxafmc_inventory XI ON XI.ITEM_CODE = OD.ITEM_ID
       LEFT JOIN xxafmc_users XU ON OH.USER_ID = XU.USER_ID
       LEFT JOIN xxafmc_pubmed XP ON XP.PUBMED_ID = OH.PUBMED
       LEFT JOIN xxafmc_non_members XNM ON XNM.ID = OH.MEMBER_ID
@@ -199,7 +196,7 @@ const getOrderTransactionDetails = async (req, res) => {
         2 AS ORD
       FROM xxafmc_order_details OD
       JOIN xxafmc_order_header OH ON OD.ORDER_ID = OH.ORDER_NUM
-      LEFT JOIN xxafmc_inventory XI ON XI.ITEM_CODE = OD.ITEM_ID
+      JOIN xxafmc_inventory XI ON XI.ITEM_CODE = OD.ITEM_ID
       LEFT JOIN xxafmc_users XU ON OH.USER_ID = XU.USER_ID
       LEFT JOIN xxafmc_pubmed XP ON XP.PUBMED_ID = OH.PUBMED
       LEFT JOIN xxafmc_non_members XNM ON XNM.ID = OH.MEMBER_ID
@@ -221,9 +218,9 @@ const getOrderTransactionDetails = async (req, res) => {
     // Add date parameters
     params.push(...dateValues);
 
-    // Add order number parameters (2 params for LIKE pattern)
-    if (orderNumberLike) {
-      params.push(orderNumberLike);
+    // Add order number parameters
+    if (orderNumberExact) {
+      params.push(orderNumberExact);
     } else {
       params.push(null, null);
     }
