@@ -310,7 +310,7 @@ exports.clearCustomItemDetails = async (req, res) => {
 exports.addCartItem = async (req, res) => {
   try {
     const userId = req.user?.userId;
-    const { item_id, quantity, unit_price, remarks, ingredients, orderNumber } = req.body;
+    const { item_id, quantity, unit_price, remarks, type, ingredients, orderNumber } = req.body;
 
     if (!userId) {
       return res.status(400).json({ success: false, message: "User ID is required" });
@@ -327,6 +327,7 @@ exports.addCartItem = async (req, res) => {
       quantity: Number(quantity) || 1,
       unit_price: Number(unit_price),
       remarks: remarks || "Din",
+      type: typeof type === "string" ? type.trim() : type,
       loginType: req.user?.loginType,
       customIngredients: ingredients,
       orderNumber,
