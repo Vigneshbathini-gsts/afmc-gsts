@@ -305,6 +305,7 @@ async function getOrderDetails(orderNumber) {
   od.quantity,
   ROUND(
     CASE
+      WHEN scanned_totals.unit_scanned_total > 0 THEN scanned_totals.unit_scanned_total
       WHEN custom_totals.unit_custom_total > 0 THEN custom_totals.unit_custom_total
       ELSE COALESCE(od.price, od.subtotal / NULLIF(od.quantity, 0), 0)
     END,
@@ -312,6 +313,7 @@ async function getOrderDetails(orderNumber) {
   ) AS price,
   ROUND(
     CASE
+      WHEN scanned_totals.scanned_total > 0 THEN scanned_totals.scanned_total
       WHEN custom_totals.unit_custom_total > 0 THEN custom_totals.unit_custom_total * od.quantity
       ELSE IFNULL(od.subtotal, 0)
     END,
@@ -338,6 +340,18 @@ async function getOrderDetails(orderNumber) {
   od.FREE_ITEM_CODE AS free_item_code,
   od.FREE_ITEM_QUANTITY AS free_item_quantity
 FROM xxafmc_order_details od
+LEFT JOIN (
+    SELECT
+      order_number,
+      inventory_item_code,
+      ROUND(SUM(IFNULL(scan_quantity, 0) * IFNULL(item_price, 0)), 2) AS scanned_total,
+      ROUND(SUM(IFNULL(scan_quantity, 0) * IFNULL(item_price, 0)) / NULLIF(SUM(IFNULL(scan_quantity, 0)), 0), 2) AS unit_scanned_total
+    FROM order_scan_collection
+    WHERE collection_name = 'S_COLLECTION'
+    GROUP BY order_number, inventory_item_code
+) scanned_totals
+  ON scanned_totals.order_number = od.order_id
+  AND scanned_totals.inventory_item_code = od.item_id
 LEFT JOIN (
     SELECT
       cm.order_number,
@@ -391,11 +405,23 @@ async function getOrderSummary(orderNumber) {
         COALESCE((
           SELECT SUM(
             CASE
+              WHEN scanned_totals.scanned_total > 0 THEN scanned_totals.scanned_total
               WHEN custom_totals.unit_custom_total > 0 THEN custom_totals.unit_custom_total * od.quantity
               ELSE COALESCE(od.subtotal, 0)
             END
           )
           FROM xxafmc_order_details od
+          LEFT JOIN (
+            SELECT
+              order_number,
+              inventory_item_code,
+              ROUND(SUM(IFNULL(scan_quantity, 0) * IFNULL(item_price, 0)), 2) AS scanned_total
+            FROM order_scan_collection
+            WHERE collection_name = 'S_COLLECTION'
+            GROUP BY order_number, inventory_item_code
+          ) scanned_totals
+            ON scanned_totals.order_number = od.order_id
+            AND scanned_totals.inventory_item_code = od.item_id
           LEFT JOIN (
             SELECT
               cm.order_number,
