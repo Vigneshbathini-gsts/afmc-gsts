@@ -660,13 +660,31 @@ exports.confirmOrder = async (req, res) => {
 
     // Calculate Order Total
     const orderTotal = cartRows.reduce((sum, item) => sum + getCartLineTotal(item), 0);
+    let resolvedPubmed = null;
+    if (pubmed !== undefined && pubmed !== null && pubmed !== "") {
+      const pubmedNumber = Number(pubmed);
+      if (Number.isFinite(pubmedNumber) && pubmedNumber > 0) {
+        resolvedPubmed = pubmedNumber;
+      } else {
+        const [pubmedRows] = await connection.execute(
+          `
+            SELECT pubmed_id
+            FROM xxafmc_pubmed
+            WHERE UPPER(TRIM(pubmed_name)) = UPPER(TRIM(?))
+            LIMIT 1
+          `,
+          [String(pubmed)]
+        );
+        resolvedPubmed = pubmedRows[0]?.pubmed_id || null;
+      }
+    }
 
     // 1. Create Order Header
     const [headerResult] = await connection.execute(
       `INSERT INTO xxafmc_order_header 
         (user_id, order_date, member_id, pubmed, created_by, creation_date, order_total)
        VALUES (?, NOW(), ?, ?, ?, NOW(), ?)`,
-      [userId, memberId || null, pubmed || null, req.user?.username || 'SYSTEM', orderTotal]
+      [userId, memberId || null, resolvedPubmed, req.user?.username || 'SYSTEM', orderTotal]
     );
     const orderNumber = headerResult.insertId;
 

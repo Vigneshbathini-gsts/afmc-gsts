@@ -261,7 +261,10 @@ export default function CartPage({ isAttendant = false }) {
             try {
                 setLoading(true);
                 setError(null);
-                const response = await cartAPI.confirmOrder({});
+                const selectedPubmed = sessionStorage.getItem("afmc:selectedPubmed") || "";
+                const response = await cartAPI.confirmOrder({
+                    ...(selectedPubmed ? { pubmed: selectedPubmed } : {}),
+                });
                 const orderNumber = response?.data?.data?.orderNumber;
                 if (!orderNumber) {
                     throw new Error("Order number not returned");

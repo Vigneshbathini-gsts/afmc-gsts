@@ -26,7 +26,10 @@ export default function CartBuy() {
         }
 
         // Legacy URL `/cart/buy` without orderNumber: create the order from cart now.
-        const response = await cartAPI.confirmOrder({});
+        const selectedPubmed = sessionStorage.getItem("afmc:selectedPubmed") || "";
+        const response = await cartAPI.confirmOrder({
+          ...(selectedPubmed ? { pubmed: selectedPubmed } : {}),
+        });
         const orderNumber = response?.data?.data?.orderNumber;
         if (!orderNumber) throw new Error("Order number not returned");
 

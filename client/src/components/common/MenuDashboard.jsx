@@ -388,6 +388,18 @@ function MenuPopupCompact({ item, loading, onClose, onBuy }) {
 
     try {
       setIsSubmitting(true);
+      const menuSearchParams = new URLSearchParams(window.location.search);
+      const selectedPubmed =
+        String(
+          window.history.state?.usr?.pubmed ||
+          menuSearchParams.get("pubmed") ||
+          window.history.state?.usr?.pubmedName ||
+          menuSearchParams.get("pubmedName") ||
+          ""
+        ).trim() || null;
+      if (selectedPubmed) {
+        sessionStorage.setItem("afmc:selectedPubmed", selectedPubmed);
+      }
       const cartData = {
         // Server cart module expects inventory ITEM_CODE in `item_id`.
         // Menu popup also has `item_id` (inventory ITEM_ID), which would break stock lookup.
@@ -1407,6 +1419,9 @@ function MenuDashboard() {
           menuSearchParams.get("pubmedName") ||
           ""
         ).trim() || null;
+      if (selectedPubmed) {
+        sessionStorage.setItem("afmc:selectedPubmed", selectedPubmed);
+      }
 
       const response = await Pubmenubuyservice.createOrder({
         itemCode: item?.item_code,

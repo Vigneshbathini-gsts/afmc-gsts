@@ -82,7 +82,7 @@ const getOrderTransactionDetails = async (req, res) => {
       WHERE 
         TRIM(UPPER(OD.PAYMENT_STATUS)) = 'PAID'
         AND XI.CATEGORY_ID IN (10, 14)
-        AND OD.ORDER_STATUS IS NULL
+        AND UPPER(IFNULL(OD.ORDER_STATUS, '')) <> 'CANCELLED'
         ${dateFilterClause}
     `;
 

@@ -14,7 +14,11 @@ export default function ConfirmOrder() {
   useEffect(() => {
     const confirmOrder = async () => {
       try {
-        await cartAPI.confirmOrder({ orderNumber });
+        const selectedPubmed = sessionStorage.getItem("afmc:selectedPubmed") || "";
+        await cartAPI.confirmOrder({
+          orderNumber,
+          ...(selectedPubmed ? { pubmed: selectedPubmed } : {}),
+        });
         setStatus("success");
         setMessage(`Order ${orderNumber} has been confirmed successfully.`);
       } catch (error) {
