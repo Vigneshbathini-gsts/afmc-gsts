@@ -22,19 +22,10 @@ const getStockQuantity = async (conn, itemCode, categoryId = null) => {
     return Number(stockRow?.stock || 0);
   }
 
-  // Two stock sources exist in this schema:
-  // - `xxafmc_inventory.stock_quantity` (used by inventory listing/transactions)
-  // - `xxafmc_stock_out.stock_quantity` (used for bar/ingredient stock buckets)
-  // Prefer inventory.stock_quantity when present, otherwise fall back to stock_out sum.
   const [[invRow]] = await conn.execute(
     `SELECT IFNULL(STOCK_QUANTITY, 0) AS stock FROM xxafmc_inventory WHERE item_code = ? LIMIT 1`,
     [itemCode]
   );
-
-  const inventoryStock = Number(invRow?.stock || 0);
-  if (inventoryStock > 0) {
-    return inventoryStock;
-  }
 
   const [[stockRow]] = await conn.execute(
     `SELECT IFNULL(SUM(STOCK_QUANTITY), 0) AS stock
@@ -43,7 +34,7 @@ const getStockQuantity = async (conn, itemCode, categoryId = null) => {
     [itemCode]
   );
 
-  return Number(stockRow?.stock || 0);
+  return Math.max(Number(invRow?.stock || 0), Number(stockRow?.stock || 0));
 };
 
 const getReservedTotalsQuantities = async (conn, itemCodes) => {
@@ -63,39 +54,20 @@ const getReservedTotalsQuantities = async (conn, itemCodes) => {
     normalizedCodes
   );
 
+  const reservedMap = normalizedCodes.reduce((map, code) => {
+    map.set(String(code), 0);
+    return map;
+  }, new Map());
+
   return rows.reduce((map, row) => {
     map.set(String(row.item_code), Number(row.reserved_qty || 0));
     return map;
-  }, new Map());
+  }, reservedMap);
 };
 
-const getOrderReservedQuantity = async (conn, itemCode, excludeOrderNumber = null) => {
-  const normalizedExclude = Number(excludeOrderNumber);
-  const shouldExclude = Number.isFinite(normalizedExclude) && normalizedExclude > 0;
-
-  if (!shouldExclude) {
-    const reservedTotals = await getReservedTotalsQuantities(conn, [itemCode]);
-    if (reservedTotals.has(String(itemCode))) {
-      return reservedTotals.get(String(itemCode)) || 0;
-    }
-  }
-
-  const [rows] = await conn.execute(
-    `
-      SELECT IFNULL(SUM(xod.quantity), 0) AS reserved
-      FROM xxafmc_order_details xod
-      LEFT JOIN xxafmc_invoices xi
-        ON xi.order_num = xod.order_id
-      WHERE xod.item_id = ?
-        AND xod.order_status IS NULL
-        AND xod.price IS NULL
-        AND xi.order_num IS NULL
-        ${shouldExclude ? "AND xod.order_id != ?" : ""}
-    `,
-    shouldExclude ? [itemCode, normalizedExclude] : [itemCode]
-  );
-
-  return Number(rows[0]?.reserved || 0);
+const getOrderReservedQuantity = async (conn, itemCode) => {
+  const reservedTotals = await getReservedTotalsQuantities(conn, [itemCode]);
+  return Number(reservedTotals.get(String(itemCode)) || 0);
 };
 
 const getCartQuantity = async (conn, userId, itemCode, priceZero = false, parentCode = null) => {
@@ -136,8 +108,6 @@ const ensureCustomizationTable = async (conn = db) => {
     )
   `);
 };
-
-const getIngredientStockQuantity = async (conn, itemCode) => getStockQuantity(conn, itemCode);
 
 const getIngredientMetaRows = async (conn, itemCodes) => {
   const normalizedCodes = [...new Set((Array.isArray(itemCodes) ? itemCodes : [])
@@ -204,14 +174,19 @@ const getDefaultCocktailIngredientRows = async (conn, parentItemCode, loginType 
 };
 
 const validateCustomizationStock = async (conn, ingredients, cartQuantity = 1) => {
-  // console.log("Validating customization stock for ingredients:", ingredients, "with cart quantity:", cartQuantity);
+  const ingredientCodes = [...new Set((Array.isArray(ingredients) ? ingredients : [])
+    .map((ingredient) => Number(ingredient?.itemCode))
+    .filter((code) => Number.isFinite(code) && code > 0))];
+  const stockMap = await getIngredientStockQuantities(conn, ingredientCodes);
+  const reservedMap = await getIngredientReservedQuantities(conn, ingredientCodes);
+
   for (const ingredient of ingredients) {
     const itemCode = Number(ingredient.itemCode);
     const requiredQty = Number(ingredient.quantity || 0) * Number(cartQuantity || 1);
     if (!itemCode || requiredQty <= 0) continue;
 
-    const stockQty = await getIngredientStockQuantity(conn, itemCode);
-    const reservedQty = await getOrderReservedQuantity(conn, itemCode);
+    const stockQty = Number(stockMap[String(itemCode)] || 0);
+    const reservedQty = Number(reservedMap[String(itemCode)] || 0);
 
     if (requiredQty + reservedQty > stockQty) {
       const availableQty = Math.max(0, stockQty - reservedQty);
@@ -363,37 +338,10 @@ const getIngredientReservedQuantities = async (conn, itemCodes) => {
   if (normalizedCodes.length === 0) return {};
 
   const reservedTotals = await getReservedTotalsQuantities(conn, normalizedCodes);
-  const missingCodes = normalizedCodes.filter((code) => !reservedTotals.has(String(code)));
-  const reservedMap = missingCodes.reduce((map, code) => {
-    map[String(code)] = 0;
+  return normalizedCodes.reduce((map, code) => {
+    map[String(code)] = Number(reservedTotals.get(String(code)) || 0);
     return map;
   }, {});
-
-  if (missingCodes.length > 0) {
-    const placeholders = missingCodes.map(() => "?").join(",");
-    const [rows] = await conn.execute(
-      `SELECT xod.item_id AS item_code, IFNULL(SUM(xod.quantity), 0) AS reserved
-       FROM xxafmc_order_details xod
-       LEFT JOIN xxafmc_order_header xoh ON xod.order_id = xoh.order_num
-       LEFT JOIN xxafmc_invoices xi ON xi.order_num = xod.order_id
-       WHERE xod.item_id IN (${placeholders})
-         AND xod.order_status IS NULL
-         AND xod.price IS NULL
-         AND xi.order_num IS NULL
-       GROUP BY xod.item_id`,
-      missingCodes
-    );
-
-    for (const row of rows) {
-      reservedMap[String(row.item_code)] = Number(row.reserved || 0);
-    }
-  }
-
-  for (const [code, reservedQty] of reservedTotals.entries()) {
-    reservedMap[String(code)] = Number(reservedQty || 0);
-  }
-
-  return reservedMap;
 };
 
 const getCartCustomization = async (cartId, userId) => {
@@ -519,7 +467,7 @@ const updateCartCustomization = async (cartId, userId, updates) => {
 };
 
 const addCartItem = async (userId, itemData) => {
-  const { item_id, quantity = 1, unit_price = 0, remarks, loginType, customIngredients, orderNumber } = itemData;
+  const { item_id, quantity = 1, unit_price = 0, remarks, loginType, customIngredients } = itemData;
 
   const conn = await db.getConnection();
 
@@ -568,7 +516,7 @@ const addCartItem = async (userId, itemData) => {
     // -------------------------------
     // 1. VALIDATE MAIN ITEM STOCK
     // -------------------------------
-    const orderReservedQty = await getOrderReservedQuantity(conn, resolvedItemCode, orderNumber);
+    const reservedQty = await getOrderReservedQuantity(conn, resolvedItemCode);
     const existingCartQty = isCocktailOrMocktail ? 0 : await getCartQuantity(conn, userId, resolvedItemCode, false);
 
     let stockQty;
@@ -587,10 +535,10 @@ const addCartItem = async (userId, itemData) => {
 
     // For cocktails/mocktails, allow adding to cart even if ingredients are out of stock.
     // Users can adjust ingredients later via the cart edit flow, and stock will be validated at purchase time.
-  if (!isCocktailOrMocktail && existingCartQty + quantity + orderReservedQty > stockQty) {
-    const availableQty = Math.max(0, stockQty - orderReservedQty - existingCartQty);
-    throw createValidationError(`Out of stock. Available quantity: ${availableQty}`);
-  }
+    if (!isCocktailOrMocktail && existingCartQty + quantity + reservedQty > stockQty) {
+      const availableQty = Math.max(0, stockQty - reservedQty - existingCartQty);
+      throw createValidationError(`Out of stock. Available quantity: ${availableQty}`);
+    }
 
     // -------------------------------
     // 2. CHECK EXISTING CART ITEM
@@ -659,7 +607,7 @@ const addCartItem = async (userId, itemData) => {
          OR (CURDATE() BETWEEN DATE(OFFER_DATE) AND END_DATE)
        )
        LIMIT 1`,
-      [item_id]
+      [resolvedItemCode]
     );
 
     if (offers.length === 0) {
@@ -693,12 +641,12 @@ const addCartItem = async (userId, itemData) => {
     const freeStockQty = await getStockQuantity(conn, freeItemCode);
     const freeReservedQty = await getOrderReservedQuantity(conn, freeItemCode);
     const existingFreeQtyGlobal = await getCartQuantity(conn, userId, freeItemCode, true);
-    const existingFreeQtyForParent = await getCartQuantity(conn, userId, freeItemCode, true, item_id);
+    const existingFreeQtyForParent = await getCartQuantity(conn, userId, freeItemCode, true, resolvedItemCode);
     const futureFreeQty = existingFreeQtyGlobal - existingFreeQtyForParent + totalFree;
 
     if (futureFreeQty + freeReservedQty > freeStockQty) {
       const availableFreeQty = Math.max(0, freeStockQty - freeReservedQty - (existingFreeQtyGlobal - existingFreeQtyForParent));
-      throw new Error(`Available stock for free item : ${availableFreeQty}`);
+      throw createValidationError(`Out of stock for free item. Available quantity: ${availableFreeQty}`);
     }
 
     // -------------------------------
@@ -707,10 +655,7 @@ const addCartItem = async (userId, itemData) => {
     const [freeExisting] = await conn.execute(
       `SELECT cart_id FROM xxafmc_cart_items
        WHERE user_id = ? AND item_id = ? AND price = 0 AND parent_code = ?`,
-
-
-
-      [userId, freeItemCode, item_id]
+      [userId, freeItemCode, resolvedItemCode]
     );
 
     if (freeExisting.length > 0) {
@@ -732,7 +677,7 @@ const addCartItem = async (userId, itemData) => {
           totalFree,
           "Free Item",
           userId,
-          item_id,
+          resolvedItemCode,
         ]
       );
     }
@@ -800,39 +745,7 @@ const getCartItemsByUser = async (userId) => {
     rows.map((r) => Number(r.item_code)).filter((code) => Number.isFinite(code) && code > 0)
   )];
 
-  const reservedMap = new Map();
-  if (itemCodes.length > 0) {
-    const totalsMap = await getReservedTotalsQuantities(db, itemCodes);
-    const missingCodes = itemCodes.filter((code) => !totalsMap.has(String(code)));
-
-    for (const [code, reservedQty] of totalsMap.entries()) {
-      reservedMap.set(String(code), Number(reservedQty || 0));
-    }
-
-    if (missingCodes.length > 0) {
-      const placeholders = missingCodes.map(() => "?").join(",");
-      const [reservedRows] = await db.execute(
-        `
-          SELECT
-            xod.item_id AS item_code,
-            IFNULL(SUM(xod.quantity), 0) AS reserved
-          FROM xxafmc_order_details xod
-          LEFT JOIN xxafmc_invoices xi
-            ON xi.order_num = xod.order_id
-          WHERE xod.item_id IN (${placeholders})
-            AND xod.order_status IS NULL
-            AND xod.price IS NULL
-            AND xi.order_num IS NULL
-          GROUP BY xod.item_id
-        `,
-        missingCodes
-      );
-
-      for (const row of reservedRows) {
-        reservedMap.set(String(row.item_code), Number(row.reserved || 0));
-      }
-    }
-  }
+  const reservedMap = await getReservedTotalsQuantities(db, itemCodes);
 
   const cocktailCartIds = rows
     .filter((row) => [14, 15].includes(Number(row.inventory_subcategory || 0)) && Number(row.price ?? row.inventory_price ?? 0) !== 0)
@@ -902,9 +815,7 @@ const getCartItemsByUser = async (userId) => {
     const stockOutStock = Number(row.stock_quantity || 0);
     const effectiveStockQty = categoryId === 10
       ? stockOutStock
-      : inventoryStock > 0
-        ? inventoryStock
-        : stockOutStock;
+      : Math.max(inventoryStock, stockOutStock);
     const reservedQty = Number(reservedMap.get(String(row.item_code)) || 0);
     const availableQuantity = isCocktailItem ? null : Math.max(0, effectiveStockQty - reservedQty);
 
@@ -970,7 +881,6 @@ const updateCartItemQuantity = async (cartId, userId, quantity) => {
     }
 
     const itemId = current[0].item_id;
-    const oldQty = current[0].quantity;
     const isCocktailOrMocktail = current[0].category_id === 10 && [14, 15].includes(current[0].sub_category);
 
     // -------------------------------
@@ -978,10 +888,10 @@ const updateCartItemQuantity = async (cartId, userId, quantity) => {
     // -------------------------------
     if (!isCocktailOrMocktail) {
       const stockQty = await getStockQuantity(conn, itemId, current[0].category_id);
-      const orderReservedQty = await getOrderReservedQuantity(conn, itemId);
+      const reservedQty = await getOrderReservedQuantity(conn, itemId);
 
-      if (quantity + orderReservedQty > stockQty) {
-        const availableQty = Math.max(0, stockQty - orderReservedQty);
+      if (quantity + reservedQty > stockQty) {
+        const availableQty = Math.max(0, stockQty - reservedQty);
         throw createValidationError(`Out of stock. Available quantity: ${availableQty}`);
       }
     }
@@ -1215,7 +1125,11 @@ const getLovIngredients = async (subCategory) => {
       SELECT
         xi.item_name AS d,
         xi.item_code AS r,
-        GREATEST(IFNULL(stock_summary.stock_quantity, 0) - IFNULL(reserved_summary.reserved_quantity, 0), 0) AS stockQuantity,
+        GREATEST(
+          GREATEST(IFNULL(xi.stock_quantity, 0), IFNULL(stock_summary.stock_quantity, 0))
+            - IFNULL(reserved_summary.reserved_quantity, 0),
+          0
+        ) AS stockQuantity,
         xi.unit_price AS unitPrice
       FROM xxafmc_inventory xi
       LEFT JOIN (
@@ -1225,19 +1139,17 @@ const getLovIngredients = async (subCategory) => {
       ) stock_summary
         ON stock_summary.item_code = xi.item_code
       LEFT JOIN (
-        SELECT xod.item_id AS item_code, IFNULL(SUM(xod.quantity), 0) AS reserved_quantity
-        FROM xxafmc_order_details xod
-        LEFT JOIN xxafmc_order_header xoh ON xod.order_id = xoh.order_num
-        LEFT JOIN xxafmc_invoices inv ON inv.order_num = xod.order_id
-        WHERE xod.order_status IS NULL
-          AND xod.price IS NULL
-          AND inv.order_num IS NULL
-        GROUP BY xod.item_id
+        SELECT item_code, IFNULL(reserved_qty, 0) AS reserved_quantity
+        FROM xxafmc_stock_reservation_totals
       ) reserved_summary
         ON reserved_summary.item_code = xi.item_code
       WHERE xi.sub_category IN (${placeholders})
         AND xi.\`A/C_UNIT\` <> 'Glass'
-        AND GREATEST(IFNULL(stock_summary.stock_quantity, 0) - IFNULL(reserved_summary.reserved_quantity, 0), 0) > 0
+        AND GREATEST(
+          GREATEST(IFNULL(xi.stock_quantity, 0), IFNULL(stock_summary.stock_quantity, 0))
+            - IFNULL(reserved_summary.reserved_quantity, 0),
+          0
+        ) > 0
       ORDER BY xi.item_name
     `;
 
@@ -1255,7 +1167,7 @@ const getLovIngredients = async (subCategory) => {
   }
 };
 
-const getIngredientStockMap = async (itemCodes, excludeOrderNumber = null) => {
+const getIngredientStockMap = async (itemCodes) => {
   let connection;
 
   const normalizedCodes = [...new Set((Array.isArray(itemCodes) ? itemCodes : [])
@@ -1266,50 +1178,18 @@ const getIngredientStockMap = async (itemCodes, excludeOrderNumber = null) => {
     return {};
   }
 
-  const skipOrderNumber = Number.isFinite(Number(excludeOrderNumber)) && Number(excludeOrderNumber) > 0
-    ? Number(excludeOrderNumber)
-    : null;
-
   try {
     connection = await db.getConnection();
 
     const placeholders = normalizedCodes.map(() => "?").join(",");
-
-    let query;
-  let queryParams;
-
-  if (skipOrderNumber) {
-    query = `
+    const query = `
       SELECT
         xi.item_code AS itemCode,
-        GREATEST(IFNULL(stock_summary.stock_quantity, 0) - IFNULL(reserved_summary.reserved_quantity, 0), 0) AS stockQuantity
-      FROM xxafmc_inventory xi
-      LEFT JOIN (
-        SELECT item_code, IFNULL(SUM(stock_quantity), 0) AS stock_quantity
-        FROM xxafmc_stock_out
-        GROUP BY item_code
-      ) stock_summary
-        ON stock_summary.item_code = xi.item_code
-      LEFT JOIN (
-        SELECT xod.item_id AS item_code, IFNULL(SUM(xod.quantity), 0) AS reserved_quantity
-        FROM xxafmc_order_details xod
-        LEFT JOIN xxafmc_order_header xoh ON xod.order_id = xoh.order_num
-        LEFT JOIN xxafmc_invoices inv ON inv.order_num = xod.order_id
-        WHERE xod.order_status IS NULL
-          AND xod.price IS NULL
-          AND inv.order_num IS NULL
-          AND xod.order_id != ?
-        GROUP BY xod.item_id
-      ) reserved_summary
-        ON reserved_summary.item_code = xi.item_code
-      WHERE xi.item_code IN (${placeholders})
-    `;
-    queryParams = [skipOrderNumber, ...normalizedCodes];
-  } else {
-    query = `
-      SELECT
-        xi.item_code AS itemCode,
-        GREATEST(IFNULL(stock_summary.stock_quantity, 0) - IFNULL(reserved_summary.reserved_quantity, 0), 0) AS stockQuantity
+        GREATEST(
+          GREATEST(IFNULL(xi.stock_quantity, 0), IFNULL(stock_summary.stock_quantity, 0))
+            - IFNULL(reserved_summary.reserved_quantity, 0),
+          0
+        ) AS stockQuantity
       FROM xxafmc_inventory xi
       LEFT JOIN (
         SELECT item_code, IFNULL(SUM(stock_quantity), 0) AS stock_quantity
@@ -1324,10 +1204,8 @@ const getIngredientStockMap = async (itemCodes, excludeOrderNumber = null) => {
         ON reserved_summary.item_code = xi.item_code
       WHERE xi.item_code IN (${placeholders})
     `;
-    queryParams = [...normalizedCodes];
-  }
 
-    const [rows] = await connection.query(query, queryParams);
+    const [rows] = await connection.query(query, normalizedCodes);
 
     return rows.reduce((acc, row) => {
       acc[String(row.itemCode)] = Number(row.stockQuantity || 0);

@@ -506,9 +506,6 @@ exports.confirmOrder = async (req, res) => {
         [itemCode]
       );
       const inventoryStock = Number(invRow?.stock_quantity || 0);
-      if (inventoryStock > 0) {
-        return inventoryStock;
-      }
 
       const [[stockOutRow]] = await connection.execute(
         `
@@ -518,38 +515,38 @@ exports.confirmOrder = async (req, res) => {
         `,
         [itemCode]
       );
-      return Number(stockOutRow?.stock_quantity || 0);
+      return Math.max(inventoryStock, Number(stockOutRow?.stock_quantity || 0));
     };
 
-    const getReservedOrderQuantity = async (itemCode, excludingOrderNumber) => {
+    const getReservedInventoryQty = async (itemCode) => {
       const [[totalsRow]] = await connection.execute(
         `SELECT IFNULL(reserved_qty, 0) AS reserved_qty FROM xxafmc_stock_reservation_totals WHERE item_code = ? LIMIT 1`,
         [itemCode]
       );
 
-      if (totalsRow && totalsRow.reserved_qty != null) {
-        return Number(totalsRow.reserved_qty || 0);
-      }
-
-      const [[row]] = await connection.execute(
-        `
-          SELECT IFNULL(SUM(xod.quantity), 0) AS reserved
-          FROM xxafmc_order_details xod
-          LEFT JOIN xxafmc_invoices xi
-            ON xi.order_num = xod.order_id
-          WHERE xod.item_id = ?
-            AND xod.order_status IS NULL
-            AND xod.price IS NULL
-            AND xi.order_num IS NULL
-            AND xod.order_id != ?
-        `,
-        [itemCode, excludingOrderNumber]
-      );
-
-      return Number(row?.reserved || 0);
+      return Number(totalsRow?.reserved_qty || 0);
     };
 
-    const validateCocktailIngredientsStock = async (cartId, cartQuantity, excludingOrderNumber) => {
+    const validateInventoryQty = async (itemCode, quantity, categoryId = null, itemName = null) => {
+      const normalizedItemCode = Number(itemCode);
+      const qty = Number(quantity || 0);
+      if (!Number.isFinite(normalizedItemCode) || normalizedItemCode <= 0 || !Number.isFinite(qty) || qty <= 0) {
+        return;
+      }
+
+      await lockInventoryItem(normalizedItemCode);
+      const stockQty = await getStockQuantity(normalizedItemCode, categoryId);
+      const reservedQty = await getReservedInventoryQty(normalizedItemCode);
+      const availableQty = Math.max(0, stockQty - reservedQty);
+
+      if (qty > availableQty) {
+        const error = new Error(`Insufficient stock for ${itemName || normalizedItemCode}. Only ${availableQty} left.`);
+        error.statusCode = 400;
+        throw error;
+      }
+    };
+
+    const validateCocktailIngredientsStock = async (cartId, cartQuantity) => {
       const normalizedCartId = Number(cartId);
       if (!Number.isFinite(normalizedCartId) || normalizedCartId <= 0) {
         const error = new Error("Invalid cart item selected");
@@ -579,12 +576,9 @@ exports.confirmOrder = async (req, res) => {
         const requiredQty = perUnitQty * Number(cartQuantity || 1);
         if (!ingredientCode || requiredQty <= 0) continue;
 
-        await lockInventoryItem(ingredientCode);
-
         const [stockQty, reservedQty] = await Promise.all([
-          // Ingredients are always drawn from bar stock buckets.
-          getStockQuantity(ingredientCode, 10),
-          getReservedOrderQuantity(ingredientCode, excludingOrderNumber),
+          getStockQuantity(ingredientCode),
+          getReservedInventoryQty(ingredientCode),
         ]);
 
         if (requiredQty + reservedQty > stockQty) {
@@ -721,18 +715,9 @@ exports.confirmOrder = async (req, res) => {
       const isCocktailOrMocktail = [14, 15].includes(Number(cartSubcategoryRaw || 0));
       if (isCocktailOrMocktail) {
         const cartId = cartItem?.cart_id ?? cartItem?.CART_ID ?? null;
-        await validateCocktailIngredientsStock(cartId, stockCheckQty, orderNumber);
+        await validateCocktailIngredientsStock(cartId, stockCheckQty);
       } else {
-        await lockInventoryItem(itemId);
-        // 2. Validate stock for non-cocktail items
-        const [stockQty, reservedQty] = await Promise.all([
-          getStockQuantity(itemId, cartCategoryIdRaw),
-          getReservedOrderQuantity(itemId, orderNumber),
-        ]);
-        const availableQty = Math.max(0, stockQty - reservedQty);
-        if (stockCheckQty > availableQty) {
-          throw new Error(`Insufficient stock for ${cartItemName || itemId}. Only ${availableQty} left.`);
-        }
+        await validateInventoryQty(itemId, stockCheckQty, cartCategoryIdRaw, cartItemName || itemId);
       }
 
       // 3. Insert into Order Details (aligned to existing schema; no `description` column)
@@ -807,19 +792,6 @@ exports.confirmOrder = async (req, res) => {
             isFreeRow ? parentCode : null,
           ]
         );
-      }
-
-      // After inserting reserved lines (PRICE NULL), re-check that we didn't oversell under concurrent load.
-      // Lock + check ensures later transactions see this reservation only after commit.
-      if (!isFreeRow && !isCocktailOrMocktail) {
-        const [stockQty, reservedQty] = await Promise.all([
-          getStockQuantity(itemId, cartCategoryIdRaw),
-          getReservedOrderQuantity(itemId, orderNumber),
-        ]);
-        const availableQty = Math.max(0, stockQty - reservedQty);
-        if (stockCheckQty > availableQty) {
-          throw new Error(`Insufficient stock for ${cartItemName || itemId}. Only ${availableQty} left.`);
-        }
       }
 
       // Kitchen notifications for cart-confirm are intentionally omitted here to match
