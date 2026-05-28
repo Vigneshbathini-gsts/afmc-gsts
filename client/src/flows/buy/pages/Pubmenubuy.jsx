@@ -81,6 +81,23 @@ function buildCocktailCustomizationPayload(orderNumber, items) {
     .filter(Boolean);
 }
 
+function getCocktailDetailsForItem(orderNumber, item, detailsByItemCode = {}) {
+  const itemCode = String(item?.item_code || item?.ITEM_CODE || "").trim();
+  if (!itemCode) return null;
+
+  const overrideDetails = getBuyflowOverrideDetails(orderNumber, itemCode);
+  if (Array.isArray(overrideDetails)) return overrideDetails;
+
+  const fetchedDetails = detailsByItemCode?.[itemCode];
+  return Array.isArray(fetchedDetails) ? fetchedDetails : null;
+}
+
+function hasMissingCocktailIngredients(orderNumber, item, detailsByItemCode = {}) {
+  if (!isCocktailOrMocktail(item)) return false;
+  const details = getCocktailDetailsForItem(orderNumber, item, detailsByItemCode);
+  return Array.isArray(details) && details.length === 0;
+}
+
 function Toast({ message, type = "success", onClose }) {
   const [isVisible, setIsVisible] = useState(true);
 
@@ -480,7 +497,16 @@ export default function Pubmenubuy({
     );
   }, [items, cocktailOverrideIssues]);
 
+  const missingCocktailIngredientItem = useMemo(() => {
+    return (
+      items.find((item) => hasMissingCocktailIngredients(orderNumber, item, cocktailDetailsByItemCode)) || null
+    );
+  }, [items, orderNumber, cocktailDetailsByItemCode]);
+
   const stockIssueMessage = useMemo(() => {
+    if (missingCocktailIngredientItem) {
+      return "Cocktail/mocktail ingredients are missing. Please edit the item before confirming.";
+    }
     if (!stockIssue && !cocktailStockIssue) return "";
     if (cocktailStockIssue) {
       const itemCode = String(cocktailStockIssue?.item_code || "").trim();
@@ -497,7 +523,7 @@ export default function Pubmenubuy({
     return stockIssue.isFreeItem
       ? `Out of stock for free item. Available quantity: ${available}`
       : `Out of stock. Available quantity: ${available}`;
-  }, [stockIssue, cocktailStockIssue, cocktailOverrideIssues]);
+  }, [stockIssue, cocktailStockIssue, cocktailOverrideIssues, missingCocktailIngredientItem]);
 
   const showToast = (message, type = "success") => {
     setToast({ message, type });
@@ -537,10 +563,11 @@ export default function Pubmenubuy({
     if (itemId > 0) {
       const itemCodeKey = String(item?.item_code || item?.ITEM_CODE || "").trim();
       const prefillDetails = itemCodeKey ? cocktailDetailsByItemCode[itemCodeKey] : null;
+      const ingredientsMissing = hasMissingCocktailIngredients(orderNumber, item, cocktailDetailsByItemCode);
 
-      if (Array.isArray(prefillDetails) && prefillDetails.length > 0) {
+      if ((Array.isArray(prefillDetails) && prefillDetails.length > 0) || ingredientsMissing) {
         navigate(`${currentBasePath}/item/${encodeURIComponent(itemId)}`, {
-          state: { prefillDetails, fromBuyFlow: true, orderNumber },
+          state: { prefillDetails: Array.isArray(prefillDetails) ? prefillDetails : [], fromBuyFlow: true, orderNumber },
         });
         return;
       }
@@ -1482,11 +1509,14 @@ const removeItem = (id) => {
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {items
                   .filter((item) => Number(item.quantity || 0) > 0)
-                  .map((item) => (
-                    <div
-                      key={item.orderLineId ?? item.id}
-                      className="group overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-afmc-gold/40 hover:shadow-md focus-within:ring-2 focus-within:ring-afmc-gold/40 focus-within:ring-offset-2 focus-within:ring-offset-stone-50"
-                    >
+                  .map((item) => {
+                    const missingCocktailIngredients = hasMissingCocktailIngredients(orderNumber, item, cocktailDetailsByItemCode);
+
+                    return (
+                      <div
+                        key={item.orderLineId ?? item.id}
+                        className="group overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-afmc-gold/40 hover:shadow-md focus-within:ring-2 focus-within:ring-afmc-gold/40 focus-within:ring-offset-2 focus-within:ring-offset-stone-50"
+                      >
                       {/* Image */}
                       <div className="flex h-40 items-center justify-center bg-stone-50 p-4">
                         <img
@@ -1503,7 +1533,7 @@ const removeItem = (id) => {
                             <h3 className="line-clamp-1 text-base font-semibold text-stone-900">
                               {toInitCap(item.item_name)}
                             </h3>
-                            {!disableEdit && !hideCocktailEdit && isCocktailOrMocktail(item) && !item.isFreeItem ? (
+                            {!disableEdit && !hideCocktailEdit && isCocktailOrMocktail(item) && (!item.isFreeItem || missingCocktailIngredients) ? (
                                 <button
                                   type="button"
                                   onClick={() => handleEditCocktail(item)}
@@ -1518,7 +1548,7 @@ const removeItem = (id) => {
 
                           <p className="mt-1 text-sm text-stone-500">
                             {toInitCap("Quantity")}: <span className="font-semibold text-stone-800">{item.quantity}</span>
-                            {item.isFreeItem ? (
+                            {item.isFreeItem && !missingCocktailIngredients ? (
                               <span className="ml-1 rounded-full bg-afmc-gold/10 px-2 py-0.5 text-[11px] font-semibold text-afmc-maroon">
                                 {toInitCap("Free")}
                               </span>
@@ -1531,7 +1561,7 @@ const removeItem = (id) => {
                               ? (override.isOutOfStock ? "Out Of Stock" : "In Stock")
                               : (item.stockStatus || "");
 
-                            if (!statusText) return null;
+                            if (!statusText || missingCocktailIngredients) return null;
 
                             return (
                               <p
@@ -1561,7 +1591,16 @@ const removeItem = (id) => {
                             const itemCode = String(item?.item_code || "").trim();
                             const overridden = getBuyflowOverrideDetails(orderNumber, itemCode);
                             const details = overridden || (itemCode ? cocktailDetailsByItemCode[itemCode] : null);
-                            if (!details || details.length === 0) return null;
+                            if (!details || details.length === 0) {
+                              if (missingCocktailIngredients) {
+                                return (
+                                  <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
+                                    Ingredients missing. Edit this item to add ingredients.
+                                  </div>
+                                );
+                              }
+                              return null;
+                            }
 
                             return (
                               <div className="mt-2 rounded-lg bg-stone-50 px-3 py-2 text-xs text-stone-700">
@@ -1693,14 +1732,15 @@ const removeItem = (id) => {
                               <Trash2 className="h-4 w-4" />
                             </button>
                           </div>
-                        ) : (
+                        ) : !missingCocktailIngredients ? (
                           <div className="rounded-xl bg-stone-50 px-3 py-2 text-xs font-medium text-stone-600">
                             Free item
                           </div>
-                        )}
+                        ) : null}
                       </div>
                     </div>
-                  ))}
+                  );
+                })}
               </div>
 
 
