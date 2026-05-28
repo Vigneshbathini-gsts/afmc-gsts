@@ -303,8 +303,20 @@ async function getOrderDetails(orderNumber) {
   od.item_id,
   COALESCE(xi.item_name, od.item_id) AS item_name,
   od.quantity,
-  ROUND(COALESCE(od.price, od.subtotal / NULLIF(od.quantity, 0), 0), 2) AS price,
-  ROUND(IFNULL(od.subtotal, 0), 2) AS subtotal,
+  ROUND(
+    CASE
+      WHEN custom_totals.unit_custom_total > 0 THEN custom_totals.unit_custom_total
+      ELSE COALESCE(od.price, od.subtotal / NULLIF(od.quantity, 0), 0)
+    END,
+    2
+  ) AS price,
+  ROUND(
+    CASE
+      WHEN custom_totals.unit_custom_total > 0 THEN custom_totals.unit_custom_total * od.quantity
+      ELSE IFNULL(od.subtotal, 0)
+    END,
+    2
+  ) AS subtotal,
   COALESCE(NULLIF(xi.type, ''), NULLIF(od.type, ''), 'NA') AS type,
   COALESCE(
     NULLIF(od.order_status, ''),
@@ -327,6 +339,34 @@ async function getOrderDetails(orderNumber) {
   od.FREE_ITEM_QUANTITY AS free_item_quantity
 FROM xxafmc_order_details od
 LEFT JOIN (
+    SELECT
+      cm.order_number,
+      cm.inventory_item_code,
+      ROUND(SUM(
+        IFNULL(cm.pegs, 0) *
+        (
+          IFNULL(stock_prices.base_peg_price, 0) * (1 + IFNULL(od_price.profit, 0) / 100) +
+          IFNULL(od_price.food_pr_charges, 0)
+        )
+      ), 2) AS unit_custom_total
+    FROM xxafmc_custom_cocktails_mocktails_details cm
+    JOIN xxafmc_order_details od_price
+      ON od_price.order_id = cm.order_number
+      AND od_price.item_id = cm.inventory_item_code
+    LEFT JOIN (
+      SELECT
+        item_code,
+        MAX(IFNULL(unit_price, 0) / IFNULL(NULLIF(pegs, 0), 1)) AS base_peg_price
+      FROM xxafmc_stock_out
+      WHERE IFNULL(stock_quantity, 0) > 0
+      GROUP BY item_code
+    ) stock_prices
+      ON stock_prices.item_code = cm.item_code
+    GROUP BY cm.order_number, cm.inventory_item_code
+) custom_totals
+  ON custom_totals.order_number = od.order_id
+  AND custom_totals.inventory_item_code = od.item_id
+LEFT JOIN (
     SELECT 
       item_code,
       MAX(item_name) AS item_name,
@@ -348,14 +388,44 @@ async function getOrderSummary(orderNumber) {
     SELECT
       xxoh.order_num,
       ROUND(
-        CASE 
-          WHEN COALESCE(xxoh.order_total, 0) > 0 THEN xxoh.order_total
-          ELSE COALESCE((
-            SELECT SUM(COALESCE(od.subtotal, 0))
-            FROM xxafmc_order_details od
-            WHERE od.order_id = xxoh.order_num
-          ), 0)
-        END,
+        COALESCE((
+          SELECT SUM(
+            CASE
+              WHEN custom_totals.unit_custom_total > 0 THEN custom_totals.unit_custom_total * od.quantity
+              ELSE COALESCE(od.subtotal, 0)
+            END
+          )
+          FROM xxafmc_order_details od
+          LEFT JOIN (
+            SELECT
+              cm.order_number,
+              cm.inventory_item_code,
+              ROUND(SUM(
+                IFNULL(cm.pegs, 0) *
+                (
+                  IFNULL(stock_prices.base_peg_price, 0) * (1 + IFNULL(od_price.profit, 0) / 100) +
+                  IFNULL(od_price.food_pr_charges, 0)
+                )
+              ), 2) AS unit_custom_total
+            FROM xxafmc_custom_cocktails_mocktails_details cm
+            JOIN xxafmc_order_details od_price
+              ON od_price.order_id = cm.order_number
+              AND od_price.item_id = cm.inventory_item_code
+            LEFT JOIN (
+              SELECT
+                item_code,
+                MAX(IFNULL(unit_price, 0) / IFNULL(NULLIF(pegs, 0), 1)) AS base_peg_price
+              FROM xxafmc_stock_out
+              WHERE IFNULL(stock_quantity, 0) > 0
+              GROUP BY item_code
+            ) stock_prices
+              ON stock_prices.item_code = cm.item_code
+            GROUP BY cm.order_number, cm.inventory_item_code
+          ) custom_totals
+            ON custom_totals.order_number = od.order_id
+            AND custom_totals.inventory_item_code = od.item_id
+          WHERE od.order_id = xxoh.order_num
+        ), xxoh.order_total, 0),
         2
       ) AS totalAmount,
       DATE_FORMAT(STR_TO_DATE(xxoh.order_date, '%m/%d/%Y'), '%c/%e/%Y') AS orderDate,

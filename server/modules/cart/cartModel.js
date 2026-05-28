@@ -591,7 +591,7 @@ const addCartItem = async (userId, itemData) => {
     let newQty = quantity;
     let insertId = null;
 
-    if (existing.length > 0 && !isCocktailOrMocktail) {
+    if (existing.length > 0) {
       newQty = existing[0].quantity + quantity;
 
       await conn.execute(
@@ -600,6 +600,7 @@ const addCartItem = async (userId, itemData) => {
          WHERE cart_id = ?`,
         [newQty, newQty, existing[0].cart_id]
       );
+      insertId = existing[0].cart_id;
     } else {
       const [insertResult] = await conn.execute(
         `INSERT INTO xxafmc_cart_items

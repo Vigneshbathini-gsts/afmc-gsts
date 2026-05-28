@@ -53,10 +53,10 @@ function buildCocktailCustomizationPayload(orderNumber, items) {
             : quantity > 0 && rawLinePrice != null && Number.isFinite(Number(rawLinePrice))
               ? Number(rawLinePrice) / quantity
               : undefined;
-          const lineTotal = rawLinePrice != null && Number.isFinite(Number(rawLinePrice))
-            ? Number(rawLinePrice)
-            : unitPrice != null
-              ? Number((unitPrice * quantity).toFixed(2))
+          const lineTotal = unitPrice != null
+            ? Number((unitPrice * quantity).toFixed(2))
+            : rawLinePrice != null && Number.isFinite(Number(rawLinePrice))
+              ? Number(rawLinePrice)
               : undefined;
 
           return {
