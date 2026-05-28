@@ -279,7 +279,7 @@ const createItem = async (payload) => {
       prCharges,
       formatToSql(new Date()),
       createdBy || "SYSTEM",
-      null,
+      fileName || null,
       mimeType || null,
       fileName || null,
     ];
@@ -403,10 +403,11 @@ const getItemImageInfo = async (itemCode) => {
 const updateItemImage = async ({ itemCode, fileName, mimeType }) => {
   const sql = `
     UPDATE xxafmc_inventory
-    SET FILE_NAME = ?, MIME_TYPE = ?
+    SET IMAGE = ?, FILE_NAME = ?, MIME_TYPE = ?
     WHERE ITEM_CODE = ?
   `;
   const [result] = await db.execute(sql, [
+    fileName || null,
     fileName || null,
     mimeType || null,
     Number(itemCode),
