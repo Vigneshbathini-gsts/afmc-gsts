@@ -519,7 +519,7 @@ const updateCartCustomization = async (cartId, userId, updates) => {
 };
 
 const addCartItem = async (userId, itemData) => {
-  const { item_id, quantity = 1, unit_price = 0, remarks, loginType, customIngredients, orderNumber } = itemData;
+  const { item_id, quantity = 1, unit_price = 0, remarks, type, loginType, customIngredients, orderNumber } = itemData;
 
   const conn = await db.getConnection();
 
@@ -595,11 +595,17 @@ const addCartItem = async (userId, itemData) => {
     // -------------------------------
     // 2. CHECK EXISTING CART ITEM
     // -------------------------------
-    const [existing] = await conn.execute(
-      `SELECT cart_id, quantity FROM xxafmc_cart_items 
-       WHERE user_id = ? AND item_id = ? AND price != 0`,
-      [userId, resolvedItemCode]
-    );
+    const selectedType = String(type || "").trim();
+    const cartDescription = selectedType || remarks || "Item";
+    const existingSql = selectedType
+      ? `SELECT cart_id, quantity FROM xxafmc_cart_items
+         WHERE user_id = ? AND item_id = ? AND price != 0 AND UPPER(description) = UPPER(?)`
+      : `SELECT cart_id, quantity FROM xxafmc_cart_items
+         WHERE user_id = ? AND item_id = ? AND price != 0`;
+    const existingParams = selectedType
+      ? [userId, resolvedItemCode, selectedType]
+      : [userId, resolvedItemCode];
+    const [existing] = await conn.execute(existingSql, existingParams);
 
     let newQty = quantity;
     let insertId = null;
@@ -625,7 +631,7 @@ const addCartItem = async (userId, itemData) => {
           quantity,
           unit_price,
           unit_price * quantity,
-          remarks || "Item",
+          cartDescription,
           selectedProfit,
           selectedCharges,
           userId,

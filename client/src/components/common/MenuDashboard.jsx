@@ -381,6 +381,11 @@ function MenuPopupCompact({ item, loading, onClose, onBuy }) {
   const handleAddToCart = async () => {
     if (!item) return;
 
+    if (isPegsUnit && !pegType) {
+      toast.error("Select the type");
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       const cartData = {
@@ -391,6 +396,7 @@ function MenuPopupCompact({ item, loading, onClose, onBuy }) {
         quantity: parseInt(qty, 10) || 1,
         unit_price: item?.unit_price,
         remarks,
+        type: isPegsUnit ? pegType : null,
       };
 
       // Reservation/stock checks before adding to cart
