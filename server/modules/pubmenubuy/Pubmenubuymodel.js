@@ -729,7 +729,7 @@ async function getCocktailStockStatusMap(connection, orderNumber, cocktailItemId
       if (failing) {
         statusMap.set(parentId, {
           status: "Out Of Stock",
-          message: `Out of stock for ingredient ${failing.itemName}. Available quantity: ${failing.availableQuantity}`,
+          message: `Insufficient stock for ingredient ${failing.itemName}. Available quantity: ${failing.availableQuantity}`,
           maxQuantity: Number.isFinite(maxPossibleQty) ? Math.max(0, maxPossibleQty) : null,
         });
       } else {

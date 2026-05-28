@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { inventoryAPI, cartAPI } from "../../services/api";
-import { FaArrowLeft, FaPlus, FaMinus, FaTrash, FaSearch } from "react-icons/fa";
+import { FaArrowLeft, FaPlus, FaMinus, FaTrash, FaSearch, FaSave } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { useAuth } from "../../context/AuthContext";
 
@@ -544,10 +544,10 @@ export default function ItemDetails() {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+            <div className="flex min-h-screen items-center justify-center bg-stone-50">
                 <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto"></div>
-                    <p className="mt-4 text-gray-600">Loading item details...</p>
+                    <div className="mx-auto h-12 w-12 animate-spin rounded-full border-2 border-afmc-gold/30 border-t-afmc-maroon"></div>
+                    <p className="mt-4 text-sm font-medium text-stone-600">Loading item details...</p>
                 </div>
             </div>
         );
@@ -555,14 +555,15 @@ export default function ItemDetails() {
 
     if (error || !item) {
         return (
-            <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-                <div className="text-center bg-white p-8 rounded-2xl shadow-lg">
-                    <h2 className="text-2xl font-semibold text-gray-800 mb-4">Item Not Found</h2>
-                    <p className="text-gray-600 mb-6">{error || "The requested item could not be found."}</p>
+            <div className="flex min-h-screen items-center justify-center bg-stone-50 px-4">
+                <div className="max-w-md rounded-2xl border border-stone-200 bg-white p-8 text-center shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
+                    <h2 className="mb-4 text-2xl font-semibold text-stone-900">Item Not Found</h2>
+                    <p className="mb-6 text-sm text-stone-600">{error || "The requested item could not be found."}</p>
                     <button
                         onClick={() => navigate(-1)}
-                        className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition"
+                        className="inline-flex items-center gap-2 rounded-full bg-afmc-maroon px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-afmc-maroon2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-afmc-gold/50 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
                     >
+                        <FaArrowLeft className="text-xs" />
                         Go Back
                     </button>
                 </div>
@@ -571,59 +572,77 @@ export default function ItemDetails() {
     }
 
     return (
-        <div className="min-h-screen bg-gray-100">
-            {/* Action Buttons - Reduced width */}
-            <div className="flex gap-3 mt-6 justify-end">
-                 <button
-                     onClick={handleAddToCart}
-                     className="bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-8 rounded-xl transition shadow-sm"
-                 >
-                    {isEditingCartItem ? "Save Customization" : fromBuyFlow ? "Save to Buy Flow" : "Add to cart"}
-                 </button>
-                <button
-                    onClick={handleAddIngredientsClick}
-                    className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-3 px-8 rounded-xl transition"
-                >
-                    Add Ingredients
-                </button>
-            </div>
-            <div className="max-w-6xl mx-auto px-4 py-6">
-                {/* Header with Back button and Go button */}
-                <div className="flex items-center justify-between mb-4">
-                    <button
-                        onClick={() => navigate(-1)}
-                        className="flex items-center gap-2 text-gray-600 hover:text-red-600 transition"
-                    >
-                        <FaArrowLeft />
-                        Back
-                    </button>
-
-                </div>
-
-                {/* Header Card */}
-                <div className="bg-white rounded-2xl shadow-sm overflow-hidden mb-4">
-                    <div className="p-5">
-                        <div className="flex justify-between items-start">
+        <div className="min-h-screen bg-stone-50 px-3 py-4 md:px-6">
+            <div className="mx-auto max-w-[1180px] space-y-4">
+                <div className="overflow-hidden rounded-2xl border border-afmc-gold/20 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
+                    <div className="bg-afmc-maroon px-5 py-5 text-white">
+                        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                             <div>
-                                <div className="text-sm text-gray-500 mb-1">Item Code {item.ITEM_CODE || '571'}</div>
-                                <h1 className="text-2xl font-bold text-gray-800">{item.ITEM_NAME}</h1>
+                                <p className="text-xs uppercase tracking-[0.18em] text-white/80">
+                                    Customize Ingredients
+                                </p>
+                                <h1 className="mt-1 text-2xl font-semibold leading-tight">{item.ITEM_NAME}</h1>
+                            </div>
+
+                            <div className="flex flex-wrap gap-2">
+                                <button
+                                    onClick={() => navigate(-1)}
+                                    className="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-white/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-afmc-gold/60 focus-visible:ring-offset-2 focus-visible:ring-offset-afmc-maroon"
+                                >
+                                    <FaArrowLeft className="text-xs" />
+                                    Back
+                                </button>
+                                <button
+                                    onClick={handleAddIngredientsClick}
+                                    className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-semibold text-white shadow-sm ring-1 ring-white/25 transition hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-afmc-gold/60 focus-visible:ring-offset-2 focus-visible:ring-offset-afmc-maroon"
+                                >
+                                    <FaPlus className="text-xs" />
+                                    Add Ingredients
+                                </button>
+                                <button
+                                    onClick={handleAddToCart}
+                                    className="inline-flex items-center gap-2 rounded-full bg-afmc-maroon px-4 py-2 text-sm font-semibold text-white shadow-sm ring-1 ring-afmc-gold/30 transition hover:bg-afmc-maroon/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-afmc-gold/60 focus-visible:ring-offset-2 focus-visible:ring-offset-afmc-maroon"
+                                >
+                                    <FaSave className="text-xs" />
+                                    {isEditingCartItem ? "Save Customization" : fromBuyFlow ? "Save Ingredients" : "Add to Cart"}
+                                </button>
                             </div>
                         </div>
                     </div>
+
+                    <div className="grid gap-3 border-t border-stone-200 bg-white p-4 md:grid-cols-3">
+                        <div className="rounded-xl border border-stone-200 bg-white p-3">
+                            <p className="text-xs text-stone-500">Item Code</p>
+                            <h3 className="mt-1 text-xl font-semibold text-stone-900">{item.ITEM_CODE || "571"}</h3>
+                        </div>
+                        <div className="rounded-xl border border-stone-200 bg-white p-3">
+                            <p className="text-xs text-stone-500">Ingredients</p>
+                            <h3 className="mt-1 text-xl font-semibold text-stone-900">{item.details?.length || 0}</h3>
+                        </div>
+                        {/* <div className="rounded-xl border border-afmc-gold/20 bg-gradient-to-br from-white to-afmc-gold/5 p-3">
+                            <p className="text-xs text-stone-500">Mode</p>
+                            <h3 className="mt-1 text-xl font-semibold text-afmc-maroon">
+                                {isEditingCartItem ? "Cart Edit" : fromBuyFlow ? "Buy Flow" : "Cart"}
+                            </h3>
+                        </div> */}
+                    </div>
                 </div>
 
-                {/* Ingredients Table - Wider */}
-                <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+                <div className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
+                    <div className="border-b border-stone-200 px-5 py-4">
+                        <h2 className="text-base font-semibold text-stone-900">Recipe Ingredients</h2>
+                        <p className="mt-1 text-sm text-stone-500">Adjust quantities or remove ingredients before saving.</p>
+                    </div>
                     <div className="overflow-x-auto">
                         <table className="w-full min-w-[800px]">
-                            <thead>
-                                <tr className="border-b border-gray-100">
-                                    <th className="text-left py-4 px-5 text-xs font-medium text-gray-500 uppercase tracking-wider">Item Code</th>
-                                    <th className="text-left py-4 px-5 text-xs font-medium text-gray-500 uppercase tracking-wider">Item Name</th>
-                                    <th className="text-left py-4 px-5 text-xs font-medium text-gray-500 uppercase tracking-wider">Pegs</th>
-                                    <th className="text-left py-4 px-5 text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
-                                    <th className="text-left py-4 px-5 text-xs font-medium text-gray-500 uppercase tracking-wider">Stock Status</th>
-                                    <th className="text-left py-4 px-5 text-xs font-medium text-gray-500 uppercase tracking-wider">Delete</th>
+                            <thead className="bg-stone-50">
+                                <tr className="border-b border-stone-200">
+                                    <th className="px-5 py-4 text-left text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">Item Code</th>
+                                    <th className="px-5 py-4 text-left text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">Item Name</th>
+                                    <th className="px-5 py-4 text-left text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">Pegs</th>
+                                    <th className="px-5 py-4 text-left text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">Quantity</th>
+                                    <th className="px-5 py-4 text-left text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">Stock Status</th>
+                                    <th className="px-5 py-4 text-left text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">Delete</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -644,43 +663,43 @@ export default function ItemDetails() {
                                             : "Unknown";
 
                                     return (
-                                        <tr key={index} className="border-b border-gray-50 hover:bg-gray-50 transition">
-                                            <td className="py-3 px-5 text-sm text-gray-600">{getDetailItemCode(detail) || '728'}</td>
-                                            <td className="py-3 px-5">
-                                                <span className="text-sm font-medium text-gray-800">{getDetailItemName(detail)}</span>
+                                        <tr key={index} className="border-b border-stone-100 transition last:border-b-0 hover:bg-afmc-gold/5">
+                                            <td className="px-5 py-3 text-sm text-stone-600">{getDetailItemCode(detail) || "728"}</td>
+                                            <td className="px-5 py-3">
+                                                <span className="text-sm font-semibold text-stone-900">{getDetailItemName(detail)}</span>
                                             </td>
-                                            <td className="py-3 px-5 text-sm text-gray-600">{pegs || 1}</td>
-                                            <td className="py-3 px-5">
+                                            <td className="px-5 py-3 text-sm text-stone-600">{pegs || 1}</td>
+                                            <td className="px-5 py-3">
                                                 {hasQuantity ? (
-                                                    <div className="flex items-center gap-2">
+                                                    <div className="inline-flex items-center gap-1 rounded-xl bg-stone-50 px-2 py-1">
                                                         <button
                                                             onClick={() => updateQuantity(index, -1)}
-                                                            className="w-7 h-7 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 flex items-center justify-center transition"
+                                                            className="flex h-7 w-7 items-center justify-center rounded-md bg-white text-stone-700 shadow-sm transition hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-afmc-gold/40 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-50"
                                                         >
                                                             <FaMinus className="text-xs" />
                                                         </button>
-                                                        <span className="w-8 text-center text-sm font-medium text-gray-800">{currentQty}</span>
+                                                        <span className="min-w-[32px] text-center text-sm font-semibold text-stone-900">{currentQty}</span>
                                                         <button
                                                             onClick={() => updateQuantity(index, 1)}
-                                                            className="w-7 h-7 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 flex items-center justify-center transition"
+                                                            className="flex h-7 w-7 items-center justify-center rounded-md bg-afmc-maroon text-white shadow-sm transition hover:bg-afmc-maroon2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-afmc-gold/50 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-50"
                                                         >
                                                             <FaPlus className="text-xs" />
                                                         </button>
                                                     </div>
                                                 ) : (
-                                                    <span className="text-sm text-gray-400">-</span>
+                                                    <span className="text-sm text-stone-400">-</span>
                                                 )}
                                             </td>
-                                            <td className="py-3 px-5">
-                                                <span className={`text-sm ${stockStatus === "Out Of Stock" ? "text-red-600" : stockStatus === "In Stock" ? "text-green-600" : "text-gray-500"}`}>
+                                            <td className="px-5 py-3">
+                                                <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${stockStatus === "Out Of Stock" ? "bg-red-50 text-red-600" : stockStatus === "In Stock" ? "bg-green-50 text-green-700" : "bg-stone-100 text-stone-500"}`}>
                                                     {stockStatus}
                                                 </span>
                                             </td>
-                                            <td className="py-3 px-5">
+                                            <td className="px-5 py-3">
                                                 {hasQuantity && (
                                                     <button
                                                         onClick={() => deleteIngredient(index)}
-                                                        className="w-8 h-8 rounded-full bg-red-50 hover:bg-red-100 text-red-500 flex items-center justify-center transition"
+                                                        className="flex h-8 w-8 items-center justify-center rounded-md bg-red-50 text-red-600 transition hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
                                                     >
                                                         <FaTrash className="text-sm" />
                                                     </button>
@@ -692,7 +711,7 @@ export default function ItemDetails() {
 
                                 {(!item.details || item.details.length === 0) && (
                                     <tr>
-                                        <td colSpan="6" className="py-8 text-center text-gray-400">
+                                        <td colSpan="6" className="py-12 text-center text-sm text-stone-500">
                                             No ingredients available
                                         </td>
                                     </tr>
@@ -704,18 +723,18 @@ export default function ItemDetails() {
 
                 {/* Add Ingredients Modal */}
                 {showModal && (
-                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                        <div className="bg-white rounded-2xl shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden">
-                            <div className="p-6 border-b border-gray-200">
-                                <h2 className="text-2xl font-bold text-gray-800">Add Ingredients</h2>
-                                <p className="text-sm text-gray-600 mt-1">Note: Only items that have stock are displayed here.</p>
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+                        <div className="max-h-[90vh] w-full max-w-4xl overflow-hidden rounded-2xl border border-afmc-gold/20 bg-white shadow-2xl">
+                            <div className="bg-afmc-maroon px-6 py-5 text-white">
+                                <h2 className="text-xl font-semibold">Add Ingredients</h2>
+                                <p className="mt-1 text-sm text-white/75">Only items that have stock are displayed here.</p>
                             </div>
 
                             <div className="p-6">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                                     {/* Left side - Item Name Input and Selected Ingredients */}
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        <label className="mb-2 block text-sm font-semibold text-stone-700">
                                             Item Name
                                         </label>
                                         <div className="relative mb-4">
@@ -724,30 +743,30 @@ export default function ItemDetails() {
                                                 placeholder="Search ingredients..."
                                                 value={searchTerm}
                                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                                                className="w-full rounded-xl border border-stone-200 py-2.5 pl-10 pr-4 text-sm text-stone-800 transition focus:border-afmc-gold/50 focus:outline-none focus:ring-2 focus:ring-afmc-gold/30"
                                             />
-                                            <FaSearch className="absolute left-3 top-3 text-gray-400" />
+                                            <FaSearch className="absolute left-3 top-3.5 text-stone-400" />
                                         </div>
 
                                         {/* Selected Ingredients */}
                                         <div className="mb-4">
-                                            <h3 className="text-sm font-medium text-gray-700 mb-2">
+                                            <h3 className="mb-2 text-sm font-semibold text-stone-700">
                                                 Selected Ingredients ({selectedIngredients.length}/3)
                                             </h3>
-                                            <div className="space-y-2 max-h-40 overflow-y-auto">
+                                            <div className="max-h-40 space-y-2 overflow-y-auto rounded-xl border border-stone-200 bg-stone-50 p-2">
                                                 {selectedIngredients.map((ingredient, index) => (
-                                                    <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded-lg">
-                                                        <span className="text-sm text-gray-800">{ingredient.d}</span>
+                                                    <div key={index} className="flex items-center justify-between rounded-lg bg-white p-2 shadow-sm">
+                                                        <span className="text-sm font-medium text-stone-800">{ingredient.d}</span>
                                                         <button
                                                             onClick={() => handleRemoveSelectedIngredient(index)}
-                                                            className="text-red-500 hover:text-red-700"
+                                                            className="rounded-md p-1 text-red-600 transition hover:bg-red-50"
                                                         >
                                                             <FaTrash className="text-sm" />
                                                         </button>
                                                     </div>
                                                 ))}
                                                 {selectedIngredients.length === 0 && (
-                                                    <p className="text-sm text-gray-400 italic">No ingredients selected</p>
+                                                    <p className="px-2 py-4 text-sm italic text-stone-400">No ingredients selected</p>
                                                 )}
                                             </div>
                                         </div>
@@ -755,17 +774,17 @@ export default function ItemDetails() {
 
                                     {/* Right side - LOV Dropdown */}
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        <label className="mb-2 block text-sm font-semibold text-stone-700">
                                             Available Ingredients
                                         </label>
-                                        <div className="border border-gray-300 rounded-lg max-h-60 overflow-y-auto">
+                                        <div className="max-h-60 overflow-y-auto rounded-xl border border-stone-200">
                                             {lovLoading ? (
-                                                <div className="p-4 text-center text-gray-500">
-                                                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-red-600 mx-auto mb-2"></div>
+                                                <div className="p-4 text-center text-sm text-stone-500">
+                                                    <div className="mx-auto mb-2 h-6 w-6 animate-spin rounded-full border-2 border-afmc-gold/30 border-t-afmc-maroon"></div>
                                                     Loading ingredients...
                                                 </div>
                                             ) : filteredLovData.length === 0 ? (
-                                                <div className="p-4 text-center text-gray-500">
+                                                <div className="p-4 text-center text-sm text-stone-500">
                                                     No ingredients found
                                                 </div>
                                             ) : (
@@ -773,9 +792,9 @@ export default function ItemDetails() {
                                                     <div
                                                         key={index}
                                                         onClick={() => handleIngredientSelect(ingredient)}
-                                                        className="p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                                                        className="cursor-pointer border-b border-stone-100 p-3 transition last:border-b-0 hover:bg-afmc-gold/5"
                                                     >
-                                                        <span className="text-sm text-gray-800">{ingredient.d}</span>
+                                                        <span className="text-sm font-medium text-stone-800">{ingredient.d}</span>
                                                     </div>
                                                 ))
                                             )}
@@ -784,17 +803,17 @@ export default function ItemDetails() {
                                 </div>
                             </div>
 
-                            <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
+                            <div className="flex justify-end gap-3 border-t border-stone-200 bg-stone-50 p-6">
                                 <button
                                     onClick={() => setShowModal(false)}
-                                    className="px-6 py-2 text-gray-600 hover:text-gray-800 transition"
+                                    className="rounded-full px-6 py-2 text-sm font-semibold text-stone-600 transition hover:bg-white hover:text-stone-900"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     onClick={handleAddIngredients}
                                     disabled={selectedIngredients.length === 0}
-                                    className="px-6 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg transition"
+                                    className="rounded-full bg-afmc-maroon px-6 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-afmc-maroon2 disabled:cursor-not-allowed disabled:bg-stone-300"
                                 >
                                     Add ({selectedIngredients.length})
                                 </button>
