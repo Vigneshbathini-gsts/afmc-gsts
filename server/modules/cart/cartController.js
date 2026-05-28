@@ -620,8 +620,51 @@ exports.confirmOrder = async (req, res) => {
       throw new Error("Cart is empty");
     }
 
+    const cocktailCartIds = cartRows
+      .filter((row) => [14, 15].includes(Number(row?.sub_category ?? row?.SUB_CATEGORY ?? 0)))
+      .map((row) => Number(row?.cart_id ?? row?.CART_ID))
+      .filter((cartId) => Number.isFinite(cartId) && cartId > 0);
+
+    const customizedTotalsByCartId = new Map();
+    if (cocktailCartIds.length > 0) {
+      const uniqueCartIds = [...new Set(cocktailCartIds)];
+      const placeholders = uniqueCartIds.map(() => "?").join(",");
+      const [customTotalRows] = await connection.execute(
+        `
+          SELECT
+            cart_id,
+            ROUND(SUM(IFNULL(line_total, 0)), 2) AS unit_custom_total
+          FROM xxafmc_cart_customization
+          WHERE cart_id IN (${placeholders})
+          GROUP BY cart_id
+        `,
+        uniqueCartIds
+      );
+
+      for (const row of customTotalRows) {
+        const cartId = Number(row.cart_id);
+        const unitCustomTotal = Number(row.unit_custom_total || 0);
+        if (Number.isFinite(cartId) && cartId > 0) {
+          customizedTotalsByCartId.set(cartId, unitCustomTotal);
+        }
+      }
+    }
+
+    const getCartLineTotal = (cartItem) => {
+      const quantity = Number(cartItem?.quantity ?? cartItem?.QUANTITY ?? 0);
+      const rawTotal = Number(cartItem?.total ?? cartItem?.TOTAL ?? 0);
+      const cartId = Number(cartItem?.cart_id ?? cartItem?.CART_ID ?? 0);
+      const customUnitTotal = customizedTotalsByCartId.get(cartId);
+
+      if (Number.isFinite(customUnitTotal) && customUnitTotal > 0 && quantity > 0) {
+        return Number((customUnitTotal * quantity).toFixed(2));
+      }
+
+      return rawTotal;
+    };
+
     // Calculate Order Total
-    const orderTotal = cartRows.reduce((sum, item) => sum + Number(item.total || 0), 0);
+    const orderTotal = cartRows.reduce((sum, item) => sum + getCartLineTotal(item), 0);
 
     // 1. Create Order Header
     const [headerResult] = await connection.execute(
@@ -667,7 +710,7 @@ exports.confirmOrder = async (req, res) => {
       // Cart rows come from MySQL; column keys can be uppercase (e.g. QUANTITY/PRICE/TOTAL).
       const cartQtyRaw = cartItem?.quantity ?? cartItem?.QUANTITY ?? null;
       const cartPriceRaw = cartItem?.price ?? cartItem?.PRICE ?? null;
-      const cartTotalRaw = cartItem?.total ?? cartItem?.TOTAL ?? null;
+      const cartTotalRaw = getCartLineTotal(cartItem);
       const cartDescriptionRaw = cartItem?.description ?? cartItem?.DESCRIPTION ?? null;
       const cartSubcategoryRaw =
         cartItem?.sub_category ?? cartItem?.SUB_CATEGORY ?? cartItem?.subCategory ?? cartItem?.SUBCATEGORY ?? null;
@@ -768,7 +811,7 @@ exports.confirmOrder = async (req, res) => {
 
       // After inserting reserved lines (PRICE NULL), re-check that we didn't oversell under concurrent load.
       // Lock + check ensures later transactions see this reservation only after commit.
-      if (!isFreeRow) {
+      if (!isFreeRow && !isCocktailOrMocktail) {
         const [stockQty, reservedQty] = await Promise.all([
           getStockQuantity(itemId, cartCategoryIdRaw),
           getReservedOrderQuantity(itemId, orderNumber),

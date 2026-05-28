@@ -303,8 +303,8 @@ async function getOrderDetails(orderNumber) {
   od.item_id,
   COALESCE(xi.item_name, od.item_id) AS item_name,
   od.quantity,
-  od.price,
-  od.subtotal,
+  ROUND(COALESCE(od.price, od.subtotal / NULLIF(od.quantity, 0), 0), 2) AS price,
+  ROUND(IFNULL(od.subtotal, 0), 2) AS subtotal,
   COALESCE(NULLIF(xi.type, ''), NULLIF(od.type, ''), 'NA') AS type,
   COALESCE(
     NULLIF(od.order_status, ''),

@@ -178,6 +178,14 @@ function normalizeCocktailCustomizations(payload) {
           itemCode: Number(ingredient?.itemCode ?? ingredient?.ITEM_CODE),
           itemName: String(ingredient?.itemName ?? ingredient?.ITEM_NAME ?? "").trim(),
           quantity: Number(ingredient?.quantity ?? ingredient?.QUANTITY ?? ingredient?.pegs ?? ingredient?.PEGS),
+          unitPrice:
+            ingredient?.unitPrice !== undefined && ingredient?.unitPrice !== null && ingredient?.unitPrice !== ""
+              ? Number(ingredient.unitPrice)
+              : null,
+          lineTotal:
+            ingredient?.lineTotal !== undefined && ingredient?.lineTotal !== null && ingredient?.lineTotal !== ""
+              ? Number(ingredient.lineTotal)
+              : null,
         }))
         .filter((ingredient) =>
           Number.isFinite(ingredient.itemCode) &&
@@ -477,6 +485,39 @@ async function applyCocktailCustomizations(connection, {
           Number(parentRow.quantity || 1),
           orderNumber,
           createdBy,
+        ]
+      );
+    }
+
+    const customUnitTotal = customization.ingredients.reduce((sum, ingredient) => {
+      const lineTotal = Number(ingredient.lineTotal);
+      if (Number.isFinite(lineTotal) && lineTotal >= 0) {
+        return sum + lineTotal;
+      }
+
+      const unitPrice = Number(ingredient.unitPrice);
+      if (Number.isFinite(unitPrice) && unitPrice >= 0) {
+        return sum + unitPrice * Number(ingredient.quantity || 0);
+      }
+
+      return sum;
+    }, 0);
+
+    if (customUnitTotal > 0) {
+      await connection.execute(
+        `
+          UPDATE xxafmc_order_details
+          SET price = ?,
+              subtotal = ROUND(? * quantity, 2)
+          WHERE order_id = ?
+            AND item_id = ?
+            AND NOT (IFNULL(price, 0) = 0 AND IFNULL(subtotal, 0) = 0)
+        `,
+        [
+          Number(customUnitTotal.toFixed(2)),
+          Number(customUnitTotal.toFixed(2)),
+          orderNumber,
+          customization.parentItemCode,
         ]
       );
     }

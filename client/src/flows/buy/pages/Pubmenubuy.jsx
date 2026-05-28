@@ -44,11 +44,29 @@ function buildCocktailCustomizationPayload(orderNumber, items) {
       }
 
       const ingredients = details
-        .map((detail) => ({
-          itemCode: Number(detail.ITEM_CODE ?? detail.itemCode),
-          itemName: detail.ITEM_NAME ?? detail.itemName ?? "",
-          quantity: Number(detail.PEGS ?? detail.pegs ?? detail.QUANTITY ?? detail.quantity ?? 0),
-        }))
+        .map((detail) => {
+          const quantity = Number(detail.PEGS ?? detail.pegs ?? detail.QUANTITY ?? detail.quantity ?? 0);
+          const rawUnitPrice = detail.UNIT_PRICE ?? detail.unitPrice;
+          const rawLinePrice = detail.PRICE ?? detail.memberPrice ?? detail.lineTotal;
+          const unitPrice = rawUnitPrice != null && Number.isFinite(Number(rawUnitPrice))
+            ? Number(rawUnitPrice)
+            : quantity > 0 && rawLinePrice != null && Number.isFinite(Number(rawLinePrice))
+              ? Number(rawLinePrice) / quantity
+              : undefined;
+          const lineTotal = rawLinePrice != null && Number.isFinite(Number(rawLinePrice))
+            ? Number(rawLinePrice)
+            : unitPrice != null
+              ? Number((unitPrice * quantity).toFixed(2))
+              : undefined;
+
+          return {
+            itemCode: Number(detail.ITEM_CODE ?? detail.itemCode),
+            itemName: detail.ITEM_NAME ?? detail.itemName ?? "",
+            quantity,
+            unitPrice,
+            lineTotal,
+          };
+        })
         .filter((ingredient) => Number.isFinite(ingredient.itemCode) && ingredient.itemCode > 0 && ingredient.quantity > 0);
 
       if (ingredients.length === 0) {
@@ -301,14 +319,13 @@ export default function Pubmenubuy({
     if (!row || !isCocktailOrMocktail(row)) return null;
     const itemCode = String(row?.item_code || "").trim();
     if (!itemCode) return null;
-    const override = cocktailOverrideIssues?.[itemCode];
-    return override?.hasOverride ? override : null;
+    return cocktailOverrideIssues?.[itemCode] || null;
   };
 
   useEffect(() => {
     let ignore = false;
 
-    const computeOverrideIssues = async () => {
+    const computeCocktailIssues = async () => {
       if (!orderNumber || items.length === 0) {
         if (!ignore) setCocktailOverrideIssues({});
         return;
@@ -320,22 +337,31 @@ export default function Pubmenubuy({
         return;
       }
 
-      const overrides = cocktailItems
+      const entries = cocktailItems
         .map((item) => {
           const itemCode = String(item?.item_code || "").trim();
-          const details = getBuyflowOverrideDetails(orderNumber, itemCode);
+          const overrideDetails = getBuyflowOverrideDetails(orderNumber, itemCode);
+          const fetchedDetails = itemCode ? cocktailDetailsByItemCode[itemCode] : null;
+          const details = Array.isArray(overrideDetails) && overrideDetails.length > 0
+            ? overrideDetails
+            : fetchedDetails;
           if (!itemCode || !Array.isArray(details) || details.length === 0) return null;
-          return { item, itemCode, details };
+          return {
+            item,
+            itemCode,
+            details,
+            hasOverride: Array.isArray(overrideDetails) && overrideDetails.length > 0,
+          };
         })
         .filter(Boolean);
 
-      if (overrides.length === 0) {
+      if (entries.length === 0) {
         if (!ignore) setCocktailOverrideIssues({});
         return;
       }
 
       const allCodes = new Set();
-      for (const entry of overrides) {
+      for (const entry of entries) {
         for (const d of entry.details) {
           const code = Number(d?.ITEM_CODE ?? d?.itemCode);
           if (Number.isFinite(code) && code > 0) allCodes.add(code);
@@ -352,7 +378,7 @@ export default function Pubmenubuy({
         const stockMap = stockRes?.data?.data || {};
 
         const next = {};
-        for (const entry of overrides) {
+        for (const entry of entries) {
           const parentQty = Number(entry.item?.quantity || 1) || 1;
           const normalizedDetails = entry.details
             .map((d) => ({
@@ -384,7 +410,8 @@ export default function Pubmenubuy({
           }
 
           next[entry.itemCode] = {
-            hasOverride: true,
+            hasDetails: true,
+            hasOverride: entry.hasOverride,
             stockIssueMessage: issueMessage || null,
             isOutOfStock: Boolean(issueMessage),
             hasUnknownStock,
@@ -398,12 +425,12 @@ export default function Pubmenubuy({
       }
     };
 
-    computeOverrideIssues();
+    computeCocktailIssues();
 
     return () => {
       ignore = true;
     };
-  }, [orderNumber, items]);
+  }, [orderNumber, items, cocktailDetailsByItemCode]);
   const stockIssue = useMemo(() => {
     return (
       items.find((item) => {
@@ -444,7 +471,7 @@ export default function Pubmenubuy({
           if (!isCocktailOrMocktail(item)) return false;
           const itemCode = String(item?.item_code || "").trim();
           const override = itemCode ? cocktailOverrideIssues?.[itemCode] : null;
-          if (override?.hasOverride) {
+          if (override?.hasDetails) {
             return Boolean(override.isOutOfStock);
           }
           return isOutOfStock(item);
@@ -458,7 +485,7 @@ export default function Pubmenubuy({
     if (cocktailStockIssue) {
       const itemCode = String(cocktailStockIssue?.item_code || "").trim();
       const override = itemCode ? cocktailOverrideIssues?.[itemCode] : null;
-      if (override?.hasOverride) {
+      if (override?.hasDetails) {
         return override.stockIssueMessage || "";
       }
       return (
@@ -470,7 +497,7 @@ export default function Pubmenubuy({
     return stockIssue.isFreeItem
       ? `Out of stock for free item. Available quantity: ${available}`
       : `Out of stock. Available quantity: ${available}`;
-  }, [stockIssue, cocktailStockIssue]);
+  }, [stockIssue, cocktailStockIssue, cocktailOverrideIssues]);
 
   const showToast = (message, type = "success") => {
     setToast({ message, type });
@@ -1500,7 +1527,7 @@ const removeItem = (id) => {
                           {isCocktailOrMocktail(item) && (() => {
                             const itemCode = String(item?.item_code || "").trim();
                             const override = itemCode ? cocktailOverrideIssues?.[itemCode] : null;
-                            const statusText = override?.hasOverride
+                            const statusText = override?.hasDetails
                               ? (override.isOutOfStock ? "Out Of Stock" : "In Stock")
                               : (item.stockStatus || "");
 
@@ -1517,7 +1544,7 @@ const removeItem = (id) => {
                           {isCocktailOrMocktail(item) && (() => {
                             const itemCode = String(item?.item_code || "").trim();
                             const override = itemCode ? cocktailOverrideIssues?.[itemCode] : null;
-                            const message = override?.hasOverride
+                            const message = override?.hasDetails
                               ? (override.stockIssueMessage || "")
                               : String(item.stockIssueMessage || "").trim();
 
