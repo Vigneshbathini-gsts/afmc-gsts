@@ -8,6 +8,7 @@ import { useAuth } from "../../context/AuthContext";
 
 const requiresVolume = (acUnit) => String(acUnit || "").trim().toUpperCase() !== "NOS";
 const INVENTORY_PAGE_SIZE = 20;
+const STOCK_TYPE_OPTIONS = ["Purchased", "Free"];
 
 const isValidBarcode = (value) => /^\d{4,32}$/.test(String(value || "").trim());
 
@@ -127,6 +128,7 @@ export default function Inventory() {
     volume: "",
     barcode: "",
     batchId: "",
+    stockType: "Purchased",
     prepCharges: "",
   });
   const [stockRows, setStockRows] = useState([]);
@@ -530,6 +532,7 @@ export default function Inventory() {
       volume: "",
       barcode: "",
       batchId: "",
+      stockType: "Purchased",
       prepCharges: "",
     });
     setShowStockModal(true);
@@ -570,6 +573,11 @@ export default function Inventory() {
 
     if (!Number.isInteger(Number(stockForm.quantity)) || Number(stockForm.quantity) <= 0) {
       setStockError("Quantity must be a whole number greater than 0.");
+      return;
+    }
+
+    if (!stockForm.stockType) {
+      setStockError("Type is required.");
       return;
     }
 
@@ -618,6 +626,7 @@ export default function Inventory() {
         displayTransactionDate: formatDisplayDate(stockForm.transactionDate),
         volume: stockForm.volume,
         acUnit: stockForm.acUnit,
+        stockType: stockForm.stockType,
         prepCharges: stockForm.prepCharges,
       },
     ]);
@@ -698,6 +707,7 @@ export default function Inventory() {
           rate: row.rate,
           prepCharges: row.prepCharges || stockForm.prepCharges,
           acUnit: row.acUnit,
+          stockType: row.stockType,
           createdBy: currentLoggedInUser,
         })),
       });
@@ -721,6 +731,7 @@ export default function Inventory() {
         row.batchName,
         row.volume,
         row.rate,
+        row.stockType,
         row.displayTransactionDate,
       ]
         .filter(Boolean)
@@ -1207,16 +1218,16 @@ export default function Inventory() {
                   Type
                 </label>
                 <select
-                  value={stockForm.acUnit}
+                  value={stockForm.stockType}
                   onChange={(e) =>
-                    setStockForm((prev) => ({ ...prev, acUnit: e.target.value }))
+                    setStockForm((prev) => ({ ...prev, stockType: e.target.value }))
                   }
                   className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-700"
                 >
                   <option value="">Select type</option>
-                  {allAcUnitOptions.map((unit) => (
-                    <option key={unit} value={unit}>
-                      {unit}
+                  {STOCK_TYPE_OPTIONS.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
                     </option>
                   ))}
                 </select>
@@ -1354,6 +1365,7 @@ export default function Inventory() {
                       <th className="px-4 py-3 text-left font-medium">Barcode</th>
                       <th className="px-4 py-3 text-left font-medium">Batchname</th>
                       <th className="px-4 py-3 text-left font-medium">Rate</th>
+                      <th className="px-4 py-3 text-left font-medium">Type</th>
                       <th className="px-4 py-3 text-left font-medium">Transaction Date</th>
                       <th className="px-4 py-3 text-left font-medium">Volume</th>
                       <th className="px-4 py-3 text-left font-medium">Delete</th>
@@ -1362,7 +1374,7 @@ export default function Inventory() {
                   <tbody>
                     {filteredStockRows.length === 0 ? (
                       <tr>
-                        <td colSpan="8" className="px-4 py-8 text-center text-gray-500">
+                        <td colSpan="9" className="px-4 py-8 text-center text-gray-500">
                           No staged stock rows yet.
                         </td>
                       </tr>
@@ -1374,6 +1386,7 @@ export default function Inventory() {
                           <td className="px-4 py-3">{row.barcode}</td>
                           <td className="px-4 py-3">{row.batchName}</td>
                           <td className="px-4 py-3">{row.rate}</td>
+                          <td className="px-4 py-3">{row.stockType}</td>
                           <td className="px-4 py-3">{row.displayTransactionDate}</td>
                           <td className="px-4 py-3">{row.volume}</td>
                           <td className="px-4 py-3">
