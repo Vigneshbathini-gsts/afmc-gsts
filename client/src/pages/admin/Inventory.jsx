@@ -514,34 +514,17 @@ export default function Inventory() {
     }
   };
 
-  const normalizeStockType = useCallback((value) => {
-    const key = String(value || "").trim().toLowerCase();
-    if (!key) return "";
-    if (key === "free") return "Free";
-    if (key === "purchase" || key === "purchased") return "Purchased";
-    return "";
-  }, []);
-
-  const barTypeOptions = useMemo(
-    () => [
-      { value: "Free", label: "Free" },
-      { value: "Purchased", label: "Purchased" },
-    ],
-    []
-  );
-
   const openStockModal = (row) => {
     setStockError("");
     setStockInfo("");
     setStockRows([]);
     setShowLowerSection(false);
     setStockRowSearch("");
-    const normalizedType = normalizeStockType(row.ac_unit);
     setStockForm({
       itemCode: row.item_code,
       itemName: row.item_name,
       transactionDate: formatDate(new Date()),
-      acUnit: normalizedType || "",
+      acUnit: row.ac_unit || "Nos",
       rate: "",
       quantity: 1,
       volume: "",
@@ -1132,7 +1115,7 @@ export default function Inventory() {
                         <td className="px-4 py-3 font-medium text-gray-800">
                           {row.item_name}
                         </td>
-                        <td className="px-4 py-3 text-gray-700">{row.ac_unit}</td>
+                        <td className="px-4 py-3 text-gray-700">Nos</td>
                         <td className="px-4 py-3 text-gray-700">{row.stock_quantity}</td>
                       </tr>
                     ))
@@ -1231,9 +1214,9 @@ export default function Inventory() {
                   className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-700"
                 >
                   <option value="">Select type</option>
-                  {barTypeOptions.map((type) => (
-                    <option key={type.value} value={type.value}>
-                      {type.label}
+                  {allAcUnitOptions.map((unit) => (
+                    <option key={unit} value={unit}>
+                      {unit}
                     </option>
                   ))}
                 </select>

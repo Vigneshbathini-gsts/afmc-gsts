@@ -72,6 +72,13 @@ exports.createItem = async (req, res) => {
       });
     }
 
+    if (!subCategory) {
+      return res.status(400).json({
+        success: false,
+        message: "Sub category is required",
+      });
+    }
+
     const file = req.file;
 
     const newItem = await inventoryModel.createItem({
@@ -89,6 +96,12 @@ exports.createItem = async (req, res) => {
     res.status(201).json({ success: true, data: newItem });
   } catch (error) {
     console.error("Error creating item:", error);
+    if (error.code === "INVALID_SUB_CATEGORY") {
+      return res.status(400).json({
+        success: false,
+        message: "Selected sub category does not belong to the selected category",
+      });
+    }
     res.status(500).json({ success: false, message: "Failed to create item" });
   }
 };

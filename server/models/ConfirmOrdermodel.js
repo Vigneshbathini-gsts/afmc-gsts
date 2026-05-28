@@ -662,17 +662,25 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
           od.type_id,
           xi.item_name,
           xi.description,
+          xi.category_id,
           xi.sub_category,
           c.category_name,
-          COALESCE(
-            NULLIF(xi.stock_quantity, 0),
-            (
+          CASE
+            WHEN xi.category_id = 10 THEN (
               SELECT IFNULL(SUM(stock_quantity), 0)
               FROM xxafmc_stock_out so
               WHERE so.item_code = xi.item_code
-            ),
-            0
-          ) AS stock_quantity
+            )
+            ELSE COALESCE(
+              NULLIF(xi.stock_quantity, 0),
+              (
+                SELECT IFNULL(SUM(stock_quantity), 0)
+                FROM xxafmc_stock_out so
+                WHERE so.item_code = xi.item_code
+              ),
+              0
+            )
+          END AS stock_quantity
         FROM xxafmc_order_details od
         JOIN xxafmc_inventory xi
           ON od.item_id = xi.item_code
@@ -728,17 +736,25 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
               od.type_id,
               xi.item_name,
               xi.description,
+              xi.category_id,
               xi.sub_category,
               c.category_name,
-              COALESCE(
-                NULLIF(xi.stock_quantity, 0),
-                (
+              CASE
+                WHEN xi.category_id = 10 THEN (
                   SELECT IFNULL(SUM(stock_quantity), 0)
                   FROM xxafmc_stock_out so
                   WHERE so.item_code = xi.item_code
-                ),
-                0
-              ) AS stock_quantity
+                )
+                ELSE COALESCE(
+                  NULLIF(xi.stock_quantity, 0),
+                  (
+                    SELECT IFNULL(SUM(stock_quantity), 0)
+                    FROM xxafmc_stock_out so
+                    WHERE so.item_code = xi.item_code
+                  ),
+                  0
+                )
+              END AS stock_quantity
             FROM xxafmc_order_details od
             JOIN xxafmc_inventory xi
               ON od.item_id = xi.item_code
@@ -784,17 +800,25 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
             od.type_id,
             xi.item_name,
             xi.description,
+            xi.category_id,
             xi.sub_category,
             c.category_name,
-            COALESCE(
-              NULLIF(xi.stock_quantity, 0),
-              (
+            CASE
+              WHEN xi.category_id = 10 THEN (
                 SELECT IFNULL(SUM(stock_quantity), 0)
                 FROM xxafmc_stock_out so
                 WHERE so.item_code = xi.item_code
-              ),
-              0
-            ) AS stock_quantity
+              )
+              ELSE COALESCE(
+                NULLIF(xi.stock_quantity, 0),
+                (
+                  SELECT IFNULL(SUM(stock_quantity), 0)
+                  FROM xxafmc_stock_out so
+                  WHERE so.item_code = xi.item_code
+                ),
+                0
+              )
+            END AS stock_quantity
           FROM xxafmc_order_details od
           JOIN xxafmc_inventory xi
             ON od.item_id = xi.item_code
@@ -829,17 +853,25 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
             od.type_id,
             xi.item_name,
             xi.description,
+            xi.category_id,
             xi.sub_category,
             c.category_name,
-            COALESCE(
-              NULLIF(xi.stock_quantity, 0),
-              (
+            CASE
+              WHEN xi.category_id = 10 THEN (
                 SELECT IFNULL(SUM(stock_quantity), 0)
                 FROM xxafmc_stock_out so
                 WHERE so.item_code = xi.item_code
-              ),
-              0
-            ) AS stock_quantity
+              )
+              ELSE COALESCE(
+                NULLIF(xi.stock_quantity, 0),
+                (
+                  SELECT IFNULL(SUM(stock_quantity), 0)
+                  FROM xxafmc_stock_out so
+                  WHERE so.item_code = xi.item_code
+                ),
+                0
+              )
+            END AS stock_quantity
           FROM xxafmc_order_details od
           JOIN xxafmc_inventory xi
             ON od.item_id = xi.item_code

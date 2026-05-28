@@ -137,6 +137,19 @@ const getCategoryDefaults = async (categoryId) => {
   return rows && rows.length ? rows[0] : null;
 };
 
+const subCategoryBelongsToCategory = async (categoryId, subCategoryId, executor = db) => {
+  if (!categoryId || !subCategoryId) return false;
+
+  const sql = `
+    SELECT COUNT(1) AS cnt
+    FROM xxafmc_sub_categories
+    WHERE CATEGORY_ID = ?
+      AND SUB_CATEGORY_ID = ?
+  `;
+  const [rows] = await executor.execute(sql, [Number(categoryId), Number(subCategoryId)]);
+  return Number(rows[0]?.cnt || 0) > 0;
+};
+
 const acquireNamedLock = async (connection, lockName) => {
   const [rows] = await connection.execute("SELECT GET_LOCK(?, 10) AS acquired", [lockName]);
   return Number(rows[0]?.acquired || 0) === 1;
@@ -216,6 +229,20 @@ const createItem = async (payload) => {
       "SELECT IFNULL(MAX(ITEM_ID), 0) + 1 AS next_id FROM xxafmc_inventory"
     );
     const nextId = nextIdRows[0]?.next_id || 1;
+
+    if (subCategory) {
+      const isValidSubCategory = await subCategoryBelongsToCategory(
+        categoryId,
+        subCategory,
+        connection
+      );
+      if (!isValidSubCategory) {
+        const error = new Error("INVALID_SUB_CATEGORY");
+        error.code = "INVALID_SUB_CATEGORY";
+        throw error;
+      }
+    }
+
     const defaults = await getCategoryDefaults(categoryId);
 
     let foodPrCharges = defaults?.food_pr_charges ?? 0;
@@ -695,7 +722,10 @@ const addStockOutTransactions = async (payload) => {
         throw error;
       }
 
-      const totalValue = Number(stockItem.unit_price || 0) * numericQuantity;
+      const bottlePrice = Number(stockItem.unit_price || 0);
+      const pegPrice = bottlePrice / divisor;
+      const stockOutQuantity = numericQuantity * divisor;
+      const totalValue = pegPrice * stockOutQuantity;
       const creationTimestamp = formatToSql(new Date());
 
       await connection.execute(
@@ -712,7 +742,7 @@ const addStockOutTransactions = async (payload) => {
           stockItem.item_name,
           Number(stockItem.item_code),
           Number(stockItem.unit_price || 0),
-          numericQuantity,
+          stockOutQuantity,
           totalValue,
           numericBarcode,
           creationTimestamp,
@@ -740,7 +770,7 @@ const addStockOutTransactions = async (payload) => {
           Number(stockItem.item_code),
           stockItem.ac_unit || "Nos",
           Number(stockItem.unit_price || 0),
-          numericQuantity,
+          stockOutQuantity,
           totalValue,
           Number(stockItem.pegs || 0),
           stockItem.volume || "",
