@@ -1496,7 +1496,7 @@ async function createOrder(payload = {}, authUser = {}) {
           itemCode,
           typeId,
           quantity,
-          remarks,
+          normalizedType,
           unitPrice,
           subtotal,
           quantity,

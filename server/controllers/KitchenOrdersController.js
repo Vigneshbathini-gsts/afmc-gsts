@@ -47,6 +47,128 @@ const inventorySummarySql = `
   GROUP BY item_code
 `;
 
+async function validateScansBeforeComplete(connection, req, orderNumber, kitchen) {
+  const { categoryId } = getKitchenConfig(kitchen);
+  const sessionKey = getScanSessionKey(req, orderNumber);
+  const scannedItems = req.session[sessionKey] || [];
+
+  const scannedQty = (predicate) =>
+    scannedItems
+      .filter(predicate)
+      .reduce((sum, item) => sum + Number(item.scanQuantity || 0), 0);
+
+  const [orderRows] = await connection.query(
+    `
+    SELECT
+      xod.item_id,
+      SUM(COALESCE(xod.quantity, 0)) AS quantity,
+      MAX(xod.subcategory) AS subcategory,
+      xod.type,
+      MAX(inv.item_name) AS item_name
+    FROM xxafmc_order_details xod
+    JOIN (${inventorySummarySql}) inv
+      ON inv.item_code = xod.item_id
+    WHERE xod.order_id = ?
+      AND xod.barcode IS NULL
+      AND (xod.order_status IS NULL OR xod.order_status = '')
+      AND inv.category_id = ?
+    GROUP BY xod.item_id, xod.type
+    `,
+    [orderNumber, categoryId]
+  );
+
+  const errors = [];
+
+  for (const row of orderRows) {
+    const parentItem = String(row.item_id || "").trim();
+    const subcategory = Number(row.subcategory);
+    const itemName = row.item_name || parentItem;
+
+    if (![14, 15].includes(subcategory)) {
+      const pegMultiplier = String(row.type || "").trim().toUpperCase() === "LARGE" ? 2 : 1;
+      const expected = Number(row.quantity || 0) * pegMultiplier;
+      const scanned = scannedQty(
+        (item) =>
+          sameCode(item.itemCode, parentItem) &&
+          sameCode(item.parentItem || item.itemCode, parentItem)
+      );
+
+      if (scanned !== expected) {
+        errors.push(
+          `Mismatch for item ${itemName}: ordered ${row.quantity} ${row.type || ""}, expected scans ${expected}, scanned ${scanned}.`
+        );
+      }
+      continue;
+    }
+
+    const [[expectedRow]] = await connection.query(
+      `
+      SELECT COALESCE(SUM(pegs * quantity), 0) AS expected_pegs
+      FROM (
+        SELECT pegs, quantity
+        FROM xxafmc_custom_cocktails_mocktails_details
+        WHERE order_number = ?
+          AND inventory_item_code = ?
+        UNION ALL
+        SELECT pegs, quantity
+        FROM xxafmc_custom_cocktails_mocktails_details_dummy
+        WHERE order_number = ?
+          AND inventory_item_code = ?
+      ) x
+      `,
+      [orderNumber, parentItem, orderNumber, parentItem]
+    );
+
+    const expected = Number(expectedRow?.expected_pegs || 0);
+    const scanned = scannedQty((item) => sameCode(item.parentItem || item.itemCode, parentItem));
+
+    if (scanned !== expected) {
+      errors.push(
+        `Mismatch for parent item ${itemName}: expected pegs ${expected}, scanned ${scanned}.`
+      );
+    }
+  }
+
+  const [pairRows] = await connection.query(
+    `
+    SELECT
+      inventory_item_code AS parent_item,
+      item_code AS child_item,
+      SUM(pegs * quantity) AS expected_pegs
+    FROM (
+      SELECT inventory_item_code, item_code, pegs, quantity
+      FROM xxafmc_custom_cocktails_mocktails_details
+      WHERE order_number = ?
+      UNION ALL
+      SELECT inventory_item_code, item_code, pegs, quantity
+      FROM xxafmc_custom_cocktails_mocktails_details_dummy
+      WHERE order_number = ?
+    ) x
+    GROUP BY inventory_item_code, item_code
+    `,
+    [orderNumber, orderNumber]
+  );
+
+  for (const pair of pairRows) {
+    const expected = Number(pair.expected_pegs || 0);
+    const scanned = scannedQty(
+      (item) => sameCode(item.itemCode, pair.child_item) && sameCode(item.parentItem, pair.parent_item)
+    );
+
+    if (scanned !== expected && scannedQty((item) => sameCode(item.parentItem, pair.parent_item)) > 0) {
+      errors.push(
+        `Child item ${pair.child_item} mismatch for parent ${pair.parent_item}: expected pegs ${expected}, scanned ${scanned}.`
+      );
+    }
+  }
+
+  if (errors.length > 0) {
+    const error = new Error(errors.join(" "));
+    error.statusCode = 400;
+    throw error;
+  }
+}
+
 exports.getOrders = async (req, res) => {
   try {
     const appUser = getRequestUsername(req);
@@ -196,6 +318,8 @@ exports.updateBarOrderStatus = async (req, res) => {
 
       connection = await pool.getConnection();
       await connection.beginTransaction();
+
+      await validateScansBeforeComplete(connection, req, ORDERNUMBER, KITCHEN);
 
       // Insert scanned items + update status atomically to avoid partial/dirty state.
       if (scannedItems.length > 0) {
@@ -362,9 +486,9 @@ exports.updateBarOrderStatus = async (req, res) => {
       try { await connection.rollback(); } catch (_) { }
     }
     console.error("Error updating bar order status:", error);
-    return res.status(500).json({
+    return res.status(error.statusCode || 500).json({
       success: false,
-      message: "Failed to update order status",
+      message: error.statusCode ? error.message : "Failed to update order status",
       error: error.message,
     });
   } finally {
@@ -414,7 +538,12 @@ exports.getOrderItems = async (req, res) => {
            0
          )
        ELSE
-         SUM(xod.quantity) /* Regular items: 1 scan per ordered unit */
+         SUM(
+           CASE
+             WHEN UPPER(TRIM(COALESCE(xod.type, ''))) = 'LARGE' THEN 2
+             ELSE 1
+           END * xod.quantity
+         ) /* Regular items: Large needs 2 scans per ordered unit */
      END AS TOTAL_INGREDIENTS,
     MAX(xi.ITEM_NAME) AS ITEM_NAME,
     COALESCE(xod.TYPE, 'NA') AS TYPE,
@@ -664,7 +793,7 @@ exports.processBarcodeScan = async (req, res) => {
               AND x.order_number = ?
           )
         UNION ALL
-        SELECT (CASE WHEN xo.type = 'Large' THEN 2 ELSE 1 END * COALESCE(xo.quantity, 0)) AS quantity 
+        SELECT (CASE WHEN UPPER(TRIM(COALESCE(xo.type, ''))) = 'LARGE' THEN 2 ELSE 1 END * COALESCE(xo.quantity, 0)) AS quantity 
         FROM xxafmc_order_details xo 
         WHERE xo.order_id = ? AND xo.item_id = ? AND (xo.order_status IS NULL OR xo.order_status = '')
       ) a`,
@@ -851,7 +980,7 @@ exports.processBarcodeScan = async (req, res) => {
               AND x.order_number = ?
           )
         UNION ALL
-        SELECT COALESCE(xi.item_code, xo.ITEM_ID) AS item_code, COALESCE(xi.item_name, 'Unknown') AS item_name, (CASE WHEN xo.type='Large' THEN 2 ELSE 1 END * xo.quantity) AS quantity,
+        SELECT COALESCE(xi.item_code, xo.ITEM_ID) AS item_code, COALESCE(xi.item_name, 'Unknown') AS item_name, (CASE WHEN UPPER(TRIM(COALESCE(xo.type, ''))) = 'LARGE' THEN 2 ELSE 1 END * xo.quantity) AS quantity,
                CAST(xo.ITEM_ID AS CHAR) AS inventory_item_code, 'I' AS Mix, xo.price, xo.order_line_id, xo.free_item_quantity
         FROM xxafmc_order_details xo LEFT JOIN (${inventorySummarySql}) xi ON xi.item_code = xo.ITEM_ID
         WHERE xo.order_id = ? AND xo.item_id = ?
@@ -1746,6 +1875,24 @@ exports.completeOrder = async (req, res) => {
     connection = await pool.getConnection();
     await connection.beginTransaction();
 
+    const { categoryId } = getKitchenConfig(KITCHEN);
+    const [[pendingOutletRow]] = await connection.query(
+      `
+      SELECT COUNT(*) AS pending_count
+      FROM xxafmc_kitchen_notification kn
+      JOIN (${inventorySummarySql}) inv
+        ON inv.item_code = kn.item_id
+      WHERE kn.ordernumber = ?
+        AND inv.category_id = ?
+        AND kn.status IN ('Received', 'Preparing')
+      `,
+      [ORDERNUMBER, categoryId]
+    );
+
+    if (Number(pendingOutletRow?.pending_count || 0) > 0) {
+      await validateScansBeforeComplete(connection, req, ORDERNUMBER, KITCHEN);
+    }
+
     // 1. Update order header
     const [headerResult] = await connection.query(
       `
@@ -1790,9 +1937,9 @@ exports.completeOrder = async (req, res) => {
 
     console.error("Error completing order:", error);
 
-    return res.status(500).json({
+    return res.status(error.statusCode || 500).json({
       success: false,
-      message: "Failed to complete order",
+      message: error.statusCode ? error.message : "Failed to complete order",
       error: error.message
     });
 
