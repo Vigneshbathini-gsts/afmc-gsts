@@ -16,6 +16,7 @@ const createEmptyRow = () => ({
 });
 
 const INGREDIENT_PAGE_SIZE = 20;
+const digitsOnly = (value) => String(value ?? "").replace(/\D/g, "");
 
 export default function CocktailCreate() {
   const navigate = useNavigate();
@@ -418,9 +419,11 @@ export default function CocktailCreate() {
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
             <input
+              inputMode="numeric"
+              pattern="[0-9]*"
               value={form.memberProfit}
               onChange={(event) => {
-                updateForm("memberProfit", event.target.value);
+                updateForm("memberProfit", digitsOnly(event.target.value));
                 if (error) {
                   setError("");
                 }
@@ -429,9 +432,11 @@ export default function CocktailCreate() {
               className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 outline-none focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
             />
             <input
+              inputMode="numeric"
+              pattern="[0-9]*"
               value={form.memberPrCharges}
               onChange={(event) => {
-                updateForm("memberPrCharges", event.target.value);
+                updateForm("memberPrCharges", digitsOnly(event.target.value));
                 if (error) {
                   setError("");
                 }
@@ -440,9 +445,11 @@ export default function CocktailCreate() {
               className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 outline-none focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
             />
             <input
+              inputMode="numeric"
+              pattern="[0-9]*"
               value={form.nonMemberProfit}
               onChange={(event) => {
-                updateForm("nonMemberProfit", event.target.value);
+                updateForm("nonMemberProfit", digitsOnly(event.target.value));
                 if (error) {
                   setError("");
                 }
@@ -451,9 +458,11 @@ export default function CocktailCreate() {
               className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 outline-none focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
             />
             <input
+              inputMode="numeric"
+              pattern="[0-9]*"
               value={form.nonMemberPrCharges}
               onChange={(event) => {
-                updateForm("nonMemberPrCharges", event.target.value);
+                updateForm("nonMemberPrCharges", digitsOnly(event.target.value));
                 if (error) {
                   setError("");
                 }
