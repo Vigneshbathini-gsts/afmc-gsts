@@ -8,7 +8,20 @@ const createValidationError = (message) => {
   return error;
 };
 
-const getStockQuantity = async (conn, itemCode) => {
+const getStockQuantity = async (conn, itemCode, categoryId = null) => {
+  const normalizedCategory = categoryId == null ? null : Number(categoryId);
+
+  if (normalizedCategory === 10) {
+    const [[stockRow]] = await conn.execute(
+      `SELECT IFNULL(SUM(STOCK_QUANTITY), 0) AS stock
+       FROM xxafmc_stock_out
+       WHERE item_code = ?`,
+      [itemCode]
+    );
+
+    return Number(stockRow?.stock || 0);
+  }
+
   // Two stock sources exist in this schema:
   // - `xxafmc_inventory.stock_quantity` (used by inventory listing/transactions)
   // - `xxafmc_stock_out.stock_quantity` (used for bar/ingredient stock buckets)
@@ -560,7 +573,7 @@ const addCartItem = async (userId, itemData) => {
 
     let stockQty;
     if (!isCocktailOrMocktail) {
-      stockQty = await getStockQuantity(conn, resolvedItemCode);
+      stockQty = await getStockQuantity(conn, resolvedItemCode, itemInfo.category_id);
     }
 
     // If cocktail, we must have ingredients
@@ -765,6 +778,7 @@ const getCartItemsByUser = async (userId) => {
       c.last_updated_by,
       c.last_updated_date,
       c.parent_code,
+      xi.category_id,
       c.subcategory,
       xi.sub_category AS inventory_subcategory,
       COALESCE(
@@ -883,9 +897,14 @@ const getCartItemsByUser = async (userId) => {
 
     const canEdit = isCocktailItem && !isFreeItem;
 
+    const categoryId = Number(row.category_id || 0);
     const inventoryStock = Number(row.inventory_stock_quantity || 0);
     const stockOutStock = Number(row.stock_quantity || 0);
-    const effectiveStockQty = inventoryStock > 0 ? inventoryStock : stockOutStock;
+    const effectiveStockQty = categoryId === 10
+      ? stockOutStock
+      : inventoryStock > 0
+        ? inventoryStock
+        : stockOutStock;
     const reservedQty = Number(reservedMap.get(String(row.item_code)) || 0);
     const availableQuantity = isCocktailItem ? null : Math.max(0, effectiveStockQty - reservedQty);
 
@@ -912,6 +931,7 @@ const getCartItemsByUser = async (userId) => {
       lastUpdatedDate: row.last_updated_date,
       parentCode: row.parent_code,
       subcategory,
+      categoryId,
       stockQuantity: effectiveStockQty,
       availableQuantity,
       stockStatus,
@@ -957,7 +977,7 @@ const updateCartItemQuantity = async (cartId, userId, quantity) => {
     // 2. VALIDATE MAIN ITEM STOCK ON QUANTITY CHANGE
     // -------------------------------
     if (!isCocktailOrMocktail) {
-      const stockQty = await getStockQuantity(conn, itemId);
+      const stockQty = await getStockQuantity(conn, itemId, current[0].category_id);
       const orderReservedQty = await getOrderReservedQuantity(conn, itemId);
 
       if (quantity + orderReservedQty > stockQty) {
