@@ -1,6 +1,7 @@
 const db = require("../../config/db");
 const cartModel = require("./cartModel");
 const cocktailModel = require("../../models/cocktailModel");
+const { usesNonMemberPricing } = require("../../helpers/customerPricing");
 
 const getSessionUserKey = (req) =>
   String(req.user?.username || req.user?.user_name || req.user?.userId || "").trim() || "unknown";
@@ -67,12 +68,18 @@ const getStockQuantities = async (conn, itemCodes) => {
   }, {});
 };
 
-const normalizeCocktailIngredientRow = (row, loginType, cartItemQuantity = 1, overrideQuantity = null) => {
+const normalizeCocktailIngredientRow = (
+  row,
+  loginType,
+  cartItemQuantity = 1,
+  overrideQuantity = null,
+  roleId = null
+) => {
   const itemCode = Number(row.ITEM_CODE || 0);
   const itemName = String(row.ITEM_NAME || "").trim();
   const basePegs = Number(row.PEGS || 0);
-  const normalizedLoginType = String(loginType || "").trim().toUpperCase();
-  const selectedPrice = normalizedLoginType === "NON MEMBER"
+  const isNonMember = usesNonMemberPricing({ roleId, loginType });
+  const selectedPrice = isNonMember
     ? Number(row.NON_MEMBER_PRICE ?? row.PRICE ?? 0)
     : Number(row.PRICE ?? row.NON_MEMBER_PRICE ?? 0);
   const quantity = overrideQuantity != null
@@ -100,11 +107,12 @@ const normalizeCocktailIngredientRow = (row, loginType, cartItemQuantity = 1, ov
 };
 
 const buildCocktailCollection = async (req, parentItemCode, cartItemQuantity = 1, orderNumber = "") => {
-  const loginType = String(req.user?.loginType || "").trim().toUpperCase();
+  const loginType = req.user?.loginType;
+  const roleId = req.user?.roleId;
   const detailRows = await cocktailModel.getCocktailDetailRows(parentItemCode);
 
   const collectionRows = detailRows.map((row) =>
-    normalizeCocktailIngredientRow(row, loginType, cartItemQuantity)
+    normalizeCocktailIngredientRow(row, loginType, cartItemQuantity, null, roleId)
   );
 
   const itemCodes = [...new Set(collectionRows.map((row) => row.itemCode).filter(Boolean))];
@@ -329,6 +337,7 @@ exports.addCartItem = async (req, res) => {
       remarks: remarks || "Din",
       type: typeof type === "string" ? type.trim() : type,
       loginType: req.user?.loginType,
+      roleId: req.user?.roleId,
       customIngredients: ingredients,
       orderNumber,
     };
@@ -376,6 +385,7 @@ exports.getCocktailDetails = async (req, res) => {
           parentItemCode: cartItem.item_id,
           cartQuantity: cartItem.quantity,
           loginType: req.user?.loginType,
+          roleId: req.user?.roleId,
         });
         await connection.commit();
       } catch (error) {
@@ -745,9 +755,11 @@ exports.confirmOrder = async (req, res) => {
       const rawUnitPrice = cartPriceRaw ?? null;
       const lineSubtotal = cartTotalRaw ?? null;
       const subCategory = cartSubcategoryRaw ?? null;
-      const loginType = String(req.user?.loginType || "").trim().toUpperCase();
       const roleId = Number(req.user?.roleId || 0);
-      const isNonMember = loginType ? loginType === "NON MEMBER" : roleId !== 20;
+      const isNonMember = usesNonMemberPricing({
+        roleId,
+        loginType: req.user?.loginType,
+      });
       const profit = isNonMember ? Number(cartItem.non_member_profit || 0) : Number(cartItem.profit || 0);
       const foodPrCharges = isNonMember ? Number(cartItem.pr_charges || 0) : Number(cartItem.food_pr_charges || 0);
       const parentCodeRaw = cartItem?.parent_code ?? cartItem?.PARENT_CODE ?? null;

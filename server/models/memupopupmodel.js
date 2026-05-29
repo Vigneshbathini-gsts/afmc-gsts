@@ -1,4 +1,5 @@
 const db = require("../config/db");
+const { usesMemberPricing } = require("../helpers/customerPricing");
 
 const toNumber = (value, fallback = 0) => {
   const numeric = Number(value);
@@ -48,7 +49,7 @@ const getMenuPopupDetails = async ({ itemCode, itemId, authUser }) => {
     appUser
       ? db.execute(
         `
-          SELECT user_id, role_id
+          SELECT user_id, role_id, login_type
           FROM xxafmc_users
           WHERE UPPER(user_name) = UPPER(?)
           LIMIT 1
@@ -96,7 +97,10 @@ const getMenuPopupDetails = async ({ itemCode, itemId, authUser }) => {
   const barcode = barcodeRows[0]?.[0]?.barcode || null;
 
   const roleId = toNumber(user?.role_id, null);
-  const isMember = roleId === 20;
+  const isMember = usesMemberPricing({
+    roleId,
+    loginType: user?.login_type,
+  });
   const categoryId = toNumber(inventory.category_id);
   const subCategory = toNumber(inventory.sub_category, 0);
   const inventoryBasePrice = toNumber(inventory.inventory_unit_price);

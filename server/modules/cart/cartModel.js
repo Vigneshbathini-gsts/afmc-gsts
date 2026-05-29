@@ -1,4 +1,5 @@
 const db = require("../../config/db");
+const { usesNonMemberPricing } = require("../../helpers/customerPricing");
 
 const CUSTOMIZATION_TABLE = "xxafmc_cart_customization";
 
@@ -135,8 +136,14 @@ const getIngredientMetaRows = async (conn, itemCodes) => {
   }, new Map());
 };
 
-const getDefaultCocktailIngredientRows = async (conn, parentItemCode, loginType = "", cartQuantity = 1) => {
-  const normalizedLoginType = String(loginType || "").trim().toUpperCase();
+const getDefaultCocktailIngredientRows = async (
+  conn,
+  parentItemCode,
+  loginType = "",
+  cartQuantity = 1,
+  roleId = null
+) => {
+  const isNonMember = usesNonMemberPricing({ roleId, loginType });
   const [rows] = await conn.execute(
     `
       SELECT
@@ -154,7 +161,7 @@ const getDefaultCocktailIngredientRows = async (conn, parentItemCode, loginType 
 
   const baseIngredients = rows.map((row) => {
     const quantity = Number(row.PEGS || 0);
-    const selectedPrice = normalizedLoginType === "NON MEMBER"
+    const selectedPrice = isNonMember
       ? Number(row.NON_MEMBER_PRICE ?? row.PRICE ?? 0)
       : Number(row.PRICE ?? row.NON_MEMBER_PRICE ?? 0);
     const unitPrice = quantity > 0 ? selectedPrice / quantity : selectedPrice;
@@ -251,8 +258,8 @@ const replaceCartCustomization = async (conn, cartId, ingredients) => {
   }
 };
 
-const createDefaultCustomizationForCart = async (conn, { cartId, parentItemCode, cartQuantity, loginType }) => {
-  const ingredients = await getDefaultCocktailIngredientRows(conn, parentItemCode, loginType, cartQuantity);
+const createDefaultCustomizationForCart = async (conn, { cartId, parentItemCode, cartQuantity, loginType, roleId }) => {
+  const ingredients = await getDefaultCocktailIngredientRows(conn, parentItemCode, loginType, cartQuantity, roleId);
   await validateCustomizationStock(conn, ingredients, cartQuantity);
   await replaceCartCustomization(conn, cartId, ingredients);
   return ingredients;
@@ -467,7 +474,7 @@ const updateCartCustomization = async (cartId, userId, updates) => {
 };
 
 const addCartItem = async (userId, itemData) => {
-  const { item_id, quantity = 1, unit_price = 0, remarks, type, loginType, customIngredients } = itemData;
+  const { item_id, quantity = 1, unit_price = 0, remarks, type, loginType, roleId, customIngredients } = itemData;
 
   const conn = await db.getConnection();
 
@@ -498,7 +505,7 @@ const addCartItem = async (userId, itemData) => {
     if (!itemInfo) throw new Error("Item not found");
 
     const isCocktailOrMocktail = isCocktailOrMocktailInfo(itemInfo);
-    const isNonMember = String(loginType || "").trim().toUpperCase() === "NON MEMBER";
+    const isNonMember = usesNonMemberPricing({ roleId, loginType });
     const selectedProfit = isNonMember
       ? Number(itemInfo.non_member_profit || 0)
       : Number(itemInfo.profit || 0);
@@ -530,7 +537,7 @@ const addCartItem = async (userId, itemData) => {
       // Enrich custom ingredients with stock information
       ingredientsToUse = await enrichIngredientsWithStock(conn, customIngredients, quantity);
     } else {
-      ingredientsToUse = await getDefaultCocktailIngredientRows(conn, resolvedItemCode, loginType, quantity);
+      ingredientsToUse = await getDefaultCocktailIngredientRows(conn, resolvedItemCode, loginType, quantity, roleId);
     }
 
     // For cocktails/mocktails, allow adding to cart even if ingredients are out of stock.

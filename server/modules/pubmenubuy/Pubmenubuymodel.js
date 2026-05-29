@@ -1,4 +1,5 @@
 const db = require("../../config/db");
+const { usesNonMemberPricing } = require("../../helpers/customerPricing");
 
 const createValidationError = (message) => {
   const error = new Error(message);
@@ -128,6 +129,27 @@ async function getInventoryItem(connection, itemCode) {
         IFNULL(FOOD_PR_CHARGES, 0) AS food_pr_charges,
         IFNULL(\`A/C_UNIT\`, 'Nos') AS ac_unit,
         (
+          SELECT IFNULL(MAX(CASE WHEN IFNULL(so.STOCK_QUANTITY, 0) > 0 THEN so.UNIT_PRICE END), 0)
+          FROM xxafmc_stock_out so
+          WHERE so.item_code = xxafmc_inventory.ITEM_CODE
+        ) AS stock_out_unit_price,
+        (
+          SELECT IFNULL(
+            NULLIF(
+              MAX(
+                CASE
+                  WHEN so.PEGS IS NULL OR so.PEGS = 0 THEN 1
+                  ELSE so.PEGS
+                END
+              ),
+              0
+            ),
+            1
+          )
+          FROM xxafmc_stock_out so
+          WHERE so.item_code = xxafmc_inventory.ITEM_CODE
+        ) AS pegs,
+        (
           SELECT IFNULL(SUM(so.STOCK_QUANTITY), 0)
           FROM xxafmc_stock_out so
           WHERE so.item_code = xxafmc_inventory.ITEM_CODE
@@ -146,6 +168,36 @@ async function getInventoryItem(connection, itemCode) {
   );
 
   return rows[0] || null;
+}
+
+function calculateOrderUnitPrice(inventoryItem, isNonMember) {
+  const categoryId = Number(inventoryItem?.category_id || 0);
+  const subCategory = Number(inventoryItem?.sub_category || 0);
+  const inventoryBasePrice = Number(inventoryItem?.unit_price || 0);
+  const stockUnitPrice = Number(inventoryItem?.stock_out_unit_price || 0);
+  const inventoryUnitPrice = stockUnitPrice || inventoryBasePrice;
+  const pegs = Math.max(Number(inventoryItem?.pegs || 1), 1);
+  const profit = isNonMember
+    ? Number(inventoryItem?.non_member_profit || 0)
+    : Number(inventoryItem?.profit || 0);
+  const charges = isNonMember
+    ? Number(inventoryItem?.pr_charges || 0)
+    : Number(inventoryItem?.food_pr_charges || 0);
+
+  let finalPrice = inventoryUnitPrice;
+
+  if (categoryId === 10 && [14, 15].includes(subCategory)) {
+    finalPrice = inventoryBasePrice + charges;
+  } else if (categoryId === 10) {
+    const pricePerPeg = inventoryUnitPrice / pegs;
+    finalPrice = pricePerPeg + (pricePerPeg * profit) / 100 + charges;
+  } else if (categoryId === 14) {
+    finalPrice = inventoryUnitPrice + (inventoryUnitPrice * profit) / 100 + charges;
+  } else {
+    finalPrice = inventoryBasePrice || inventoryUnitPrice;
+  }
+
+  return Number(finalPrice.toFixed(2));
 }
 
 function pickBestOffer(offerRows, quantity) {
@@ -1401,8 +1453,10 @@ async function createOrder(payload = {}, authUser = {}) {
     }
 
     const userId = userRows[0].user_id;
-    const loginType = String(userRows[0].login_type || "").trim().toUpperCase();
-    const isNonMember = loginType === "NON MEMBER";
+    const isNonMember = usesNonMemberPricing({
+      roleId: userRows[0].role_id,
+      loginType: userRows[0].login_type,
+    });
 
     const inventoryItem = await getInventoryItem(connection, itemCode);
 
@@ -1440,7 +1494,7 @@ async function createOrder(payload = {}, authUser = {}) {
       ? Number(inventoryItem.pr_charges || 0)
       : Number(inventoryItem.food_pr_charges || 0);
 
-    const unitPrice = Number(inventoryItem.unit_price || 0);
+    const unitPrice = calculateOrderUnitPrice(inventoryItem, isNonMember);
     const subtotal = Number((unitPrice * quantity).toFixed(2));
 
     if (isMocktailItem && quantity > 5) {

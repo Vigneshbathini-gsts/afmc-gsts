@@ -1242,13 +1242,7 @@ export default function Pubmenubuy({
 ) {
   if (nextQtyCandidate > Number(availableQty)) {
     showToast(`Out of stock. Available quantity: ${availableQty}`, "error");
-    showStockLimitOnImage(liveItem, "Out of Stock");
     return;
-  }
-  if (delta > 0 && nextQtyCandidate >= Number(availableQty)) {
-    showStockLimitOnImage(liveItem, "Out of Stock");
-  } else {
-    clearStockLimitOnImage(liveItem);
   }
 }
 
@@ -1550,20 +1544,41 @@ const removeItem = (id) => {
                     const missingCocktailIngredients = hasMissingCocktailIngredients(orderNumber, item, cocktailDetailsByItemCode);
                     const maxAllowed = getMaxAllowedQuantity(item);
                     const cocktailOverride = getCocktailOverrideForItem(item);
+                    const isCocktailItem = isCocktailOrMocktail(item);
                     const isAtStockLimit =
-                      !isCocktailOrMocktail(item) &&
+                      !isCocktailItem &&
                       !item.isFreeItem &&
                       Number.isFinite(Number(maxAllowed)) &&
                       Number(maxAllowed) >= 0 &&
                       Number(item.quantity || 0) >= Number(maxAllowed);
-                    const imageStockMessage =
-                      stockLimitImageMessages[getStockLimitImageKey(item)] ||
+                    const hasNormalStockIssue =
+                      !isCocktailItem &&
+                      !item.isFreeItem &&
                       (
-                        !item.isFreeItem &&
-                        (cocktailOverride?.isOutOfStock || isOutOfStock(item) || isAtStockLimit)
-                          ? "Out of Stock"
-                          : ""
+                        String(item.stockIssueMessage || "").trim().length > 0 ||
+                        isOutOfStock(item) ||
+                        isAtStockLimit
                       );
+                    const imageStockMessage =
+                      isCocktailItem
+                        ? (
+                          stockLimitImageMessages[getStockLimitImageKey(item)] ||
+                          (
+                            !item.isFreeItem &&
+                            (cocktailOverride?.isOutOfStock || isOutOfStock(item))
+                              ? "Out of Stock"
+                              : ""
+                          )
+                        )
+                        : "";
+                    const disablePlusForStock =
+                      isCocktailItem
+                        ? (() => {
+                          const override = getCocktailOverrideForItem(item);
+                          if (override) return Boolean(override.isOutOfStock);
+                          return String(item.stockIssueMessage || "").trim().length > 0 || isOutOfStock(item);
+                        })()
+                        : false;
 
                     return (
                       <div
@@ -1681,19 +1696,17 @@ const removeItem = (id) => {
                               </div>
                             );
                           })()}
-                          {!isCocktailOrMocktail(item) && !item.isFreeItem && item.availableQuantity !== null && item.availableQuantity !== undefined && (
+                          {!isCocktailItem && !item.isFreeItem && item.availableQuantity !== null && item.availableQuantity !== undefined && (
                             <p className="mt-1 text-xs text-stone-400">
                               {/* Available: {item.availableQuantity} */}
                             </p>
                           )}
-                          {!isCocktailOrMocktail(item) &&
+                          {!isCocktailItem &&
                             !item.isFreeItem &&
                             item.availableQuantity !== null &&
                             item.availableQuantity !== undefined &&
                             Number(item.quantity || 0) > Number(item.availableQuantity || 0) && (
-                              <p className="mt-1 text-xs font-semibold text-red-600">
-                                Out of stock for this quantity
-                              </p>
+                              null
                             )}
                         </div>
 
@@ -1724,56 +1737,17 @@ const removeItem = (id) => {
                                 aria-disabled={
                                   disableEdit ||
                                   updatingLineId === Number(item.orderLineId ?? item.id) ||
-                                  (() => {
-                                    const override = getCocktailOverrideForItem(item);
-                                    if (override) return Boolean(override.isOutOfStock);
-                                    return String(item.stockIssueMessage || "").trim().length > 0 || isOutOfStock(item);
-                                  })() ||
-                                  (() => {
-                                    if (isCocktailOrMocktail(item)) return false;
-                                    const maxAllowed = getMaxAllowedQuantity(item);
-                                    return (
-                                      Number.isFinite(Number(maxAllowed)) &&
-                                      Number(maxAllowed) >= 0 &&
-                                      Number(item.quantity || 0) >= Number(maxAllowed)
-                                    );
-                                  })() ||
+                                  disablePlusForStock ||
                                   item.quantity >= MAX_QTY
                                 }
                                 disabled={
                                   disableEdit ||
                                   updatingLineId === Number(item.orderLineId ?? item.id) ||
-                                  (() => {
-                                    const override = getCocktailOverrideForItem(item);
-                                    if (override) return Boolean(override.isOutOfStock);
-                                    return String(item.stockIssueMessage || "").trim().length > 0 || isOutOfStock(item);
-                                  })() ||
-                                  (() => {
-                                    if (isCocktailOrMocktail(item)) return false;
-                                    const maxAllowed = getMaxAllowedQuantity(item);
-                                    return (
-                                      Number.isFinite(Number(maxAllowed)) &&
-                                      Number(maxAllowed) >= 0 &&
-                                      Number(item.quantity || 0) >= Number(maxAllowed)
-                                    );
-                                  })() ||
+                                  disablePlusForStock ||
                                   item.quantity >= MAX_QTY
                                 }
                                 className={`rounded-md bg-afmc-maroon p-1.5 text-white shadow-sm transition hover:bg-afmc-maroon2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-afmc-gold/50 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-50 ${updatingLineId === Number(item.orderLineId ?? item.id) ||
-                                  (() => {
-                                    const override = getCocktailOverrideForItem(item);
-                                    if (override) return Boolean(override.isOutOfStock);
-                                    return String(item.stockIssueMessage || "").trim().length > 0 || isOutOfStock(item);
-                                  })() ||
-                                  (() => {
-                                    if (isCocktailOrMocktail(item)) return false;
-                                    const maxAllowed = getMaxAllowedQuantity(item);
-                                    return (
-                                      Number.isFinite(Number(maxAllowed)) &&
-                                      Number(maxAllowed) >= 0 &&
-                                      Number(item.quantity || 0) >= Number(maxAllowed)
-                                    );
-                                  })() ||
+                                  disablePlusForStock ||
                                   item.quantity >= MAX_QTY
                                   ? "opacity-60"
                                   : ""
