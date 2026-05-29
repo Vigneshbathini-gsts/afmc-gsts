@@ -1623,7 +1623,7 @@ const removeItem = (id) => {
                           })()}
                           {!isCocktailOrMocktail(item) && !item.isFreeItem && item.availableQuantity !== null && item.availableQuantity !== undefined && (
                             <p className="mt-1 text-xs text-stone-400">
-                              Available: {item.availableQuantity}
+                              {/* Available: {item.availableQuantity} */}
                             </p>
                           )}
                           {!isCocktailOrMocktail(item) &&
