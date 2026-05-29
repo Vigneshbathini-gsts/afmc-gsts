@@ -204,7 +204,6 @@ export default function CartPage({ isAttendant = false }) {
                             const required = ing.pegs * Number(newQuantity || 1);
                             if (required > available) {
                                 const msg = `Out of stock for ingredient ${ing.itemName || ing.itemCode}. Available quantity: ${available}`;
-                                setError(msg);
                                 showToast(msg, 'error');
                                 showStockLimitOnImage(currentItem, "Out of Stock");
                                 setUpdatingItemId(null);
@@ -221,17 +220,23 @@ export default function CartPage({ isAttendant = false }) {
             const currentItemForMax = cartItems.find((c) => Number(c.cartId) === Number(cartId));
             if (currentItemForMax && !isCocktailOrMocktail(currentItemForMax)) {
                 const maxAllowed = getMaxAllowedQuantity(currentItemForMax);
-                if (Number.isFinite(Number(maxAllowed)) && Number(maxAllowed) >= 0 && Number(newQuantity) > Number(maxAllowed)) {
-                    const msg = `Out of stock. Available quantity: ${maxAllowed}`;
-                    setError(msg);
+                const hasKnownAvailableStock = Number.isFinite(Number(maxAllowed)) && Number(maxAllowed) > 0;
+                if (!hasKnownAvailableStock && isOutOfStock(currentItemForMax)) {
+                    const msg = Number(maxAllowed) === 0
+                        ? "Out of stock. Available quantity: 0"
+                        : "Out of stock.";
                     showToast(msg, 'error');
                     showStockLimitOnImage(currentItemForMax, "Out of Stock");
                     setUpdatingItemId(null);
                     return;
                 }
-                if (Number.isFinite(Number(maxAllowed)) && Number(maxAllowed) >= 0 && Number(newQuantity) >= Number(maxAllowed)) {
-                    showStockLimitOnImage(currentItemForMax, "Out of Stock");
-                } else {
+                if (Number.isFinite(Number(maxAllowed)) && Number(maxAllowed) >= 0 && Number(newQuantity) > Number(maxAllowed)) {
+                    const msg = `Out of stock. Available quantity: ${maxAllowed}`;
+                    showToast(msg, 'error');
+                    setUpdatingItemId(null);
+                    return;
+                }
+                if (Number.isFinite(Number(maxAllowed)) && Number(maxAllowed) > 0) {
                     clearStockLimitOnImage(currentItemForMax);
                 }
             }
@@ -409,14 +414,29 @@ export default function CartPage({ isAttendant = false }) {
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {cartItems.map((item) => {
                     const maxAllowed = getMaxAllowedQuantity(item);
-                    const isAtStockLimit =
-                        !isCocktailOrMocktail(item) &&
+                    const hasNoAvailableStock =
                         Number.isFinite(Number(maxAllowed)) &&
-                        Number(maxAllowed) >= 0 &&
-                        Number(item.quantity || 0) >= Number(maxAllowed);
+                        Number(maxAllowed) === 0;
+                    const hasKnownAvailableStock =
+                        Number.isFinite(Number(maxAllowed)) &&
+                        Number(maxAllowed) > 0;
+                    const effectiveOutOfStock =
+                        hasNoAvailableStock || (!hasKnownAvailableStock && isOutOfStock(item));
+                    const isCocktailItem = isCocktailOrMocktail(item);
                     const imageStockMessage =
-                        stockLimitImageMessages[getStockLimitImageKey(item)] ||
-                        (isOutOfStock(item) || isAtStockLimit ? "Out of Stock" : "");
+                        hasNoAvailableStock
+                            ? "Out of Stock"
+                            : isCocktailItem
+                            ? (
+                                stockLimitImageMessages[getStockLimitImageKey(item)] ||
+                                (effectiveOutOfStock ? "Out of Stock" : "")
+                            )
+                            : "";
+                    const stockStatusText = effectiveOutOfStock
+                        ? "Out Of Stock"
+                        : hasKnownAvailableStock
+                            ? "In Stock"
+                            : item.stockStatus;
 
                     return (
                         <div
@@ -477,12 +497,12 @@ export default function CartPage({ isAttendant = false }) {
                             </h2>
 
                             <p
-                                className={`text-xs mt-1 ${item.stockStatus === "Out Of Stock"
+                                className={`text-xs mt-1 ${String(stockStatusText || "").toLowerCase() === "out of stock"
                                     ? "text-red-600"
                                     : "text-green-600"
                                     }`}
                             >
-                                {toInitCap(item.stockStatus) || toInitCap("Checking Stock")}
+                                {toInitCap(stockStatusText) || toInitCap("Checking Stock")}
                             </p>
                         </div>
 
@@ -503,18 +523,7 @@ export default function CartPage({ isAttendant = false }) {
                                     <button
                                         onClick={() => handleQuantityUpdate(item.cartId, (item.quantity || 1) + 1)}
                                         className="rounded-full bg-white px-2 text-xs font-semibold text-gray-700 shadow-sm hover:bg-gray-100 disabled:opacity-50"
-                                        disabled={
-                                            updatingItemId === item.cartId ||
-                                            isOutOfStock(item) ||
-                                            (() => {
-                                                const maxAllowed = getMaxAllowedQuantity(item);
-                                                return (
-                                                    Number.isFinite(Number(maxAllowed)) &&
-                                                    Number(maxAllowed) > 0 &&
-                                                    Number(item.quantity || 0) >= Number(maxAllowed)
-                                                );
-                                            })()
-                                        }
+                                        disabled={updatingItemId === item.cartId}
                                     >
                                         <Plus size={12} />
                                     </button>

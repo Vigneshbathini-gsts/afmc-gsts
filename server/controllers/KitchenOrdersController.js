@@ -1062,6 +1062,7 @@ exports.processBarcodeScan = async (req, res) => {
         itemName: comp.item_name,
         scanQuantity: qtyToAdd,
         itemPrice: finalPrice,
+        lineTotalPrice: Number((Number(finalPrice || 0) * qtyToAdd).toFixed(2)),
         barcode: BARCODE,
         orderLineId: comp.Mix === 'MO' ? parentOrderLineId : comp.order_line_id, // Use parent's order_line_id for ingredients
         scannedAt: new Date().toISOString(),
@@ -1093,7 +1094,10 @@ exports.processBarcodeScan = async (req, res) => {
       data: {
         itemCode: scanItemCode,
         itemName: item.ITEM_NAME,
-        calculatedPrice: addedThisScan[0]?.itemPrice,
+        calculatedPrice: addedThisScan.reduce(
+          (sum, entry) => sum + Number(entry.lineTotalPrice ?? (Number(entry.itemPrice || 0) * Number(entry.scanQuantity || 0))),
+          0
+        ).toFixed(2),
         barcode: BARCODE,
         isCocktailIngredient: addedThisScan.some((entry) => entry.isCocktailIngredient),
         addedThisScan

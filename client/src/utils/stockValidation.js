@@ -9,11 +9,11 @@ function toFiniteNumber(value) {
 
 export function getMaxAllowedQuantity(item) {
   const candidates = [
-    item?.stockQuantity,
-    item?.stock_quantity,
     item?.availableQuantity,
     item?.available_quantity,
     item?.stockQuantityAvailable,
+    item?.stockQuantity,
+    item?.stock_quantity,
   ];
 
   for (const candidate of candidates) {

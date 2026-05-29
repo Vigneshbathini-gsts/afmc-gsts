@@ -55,7 +55,7 @@ export default function OutletOrderDetails() {
   const [itemName, setItemName] = useState("");
   const [price, setPrice] = useState("");
   const orderedBy = orderData?.FIRST_NAME || "";
-  const [qty, setQty] = useState("");
+  const [qty, setQty] = useState("1");
   const [scanMessage, setScanMessage] = useState("");
   const [scanError, setScanError] = useState("");
   const [cameraError, setCameraError] = useState("");
@@ -74,6 +74,15 @@ export default function OutletOrderDetails() {
   const isMountedRef = useRef(true);
   const isManualScanRef = useRef(false);
   const processingScanRef = useRef(false);
+
+  const getScanLinePrice = (item) => {
+    const explicitTotal = Number(item?.lineTotalPrice);
+    if (Number.isFinite(explicitTotal)) return explicitTotal.toFixed(2);
+
+    const unitPrice = Number(item?.itemPrice || 0);
+    const scanQuantity = Number(item?.scanQuantity || 0);
+    return (unitPrice * scanQuantity).toFixed(2);
+  };
 
 
   // Fetch order items and scanned items from session
@@ -168,19 +177,10 @@ export default function OutletOrderDetails() {
     return Math.floor(rawIngredientScans / unitFactor);
   }, [scannedItems]);
 
-  const handleBarcodeBlur = async () => {
-    if (barcode && barcode.trim() !== "" && !processingScanRef.current && !scanning && isManualScanRef.current) {
-      isManualScanRef.current = false;
-      await autoProcessScan(barcode);
-    }
-    isManualScanRef.current = false;
-  };
-
   const handleBarcodeKeyPress = async (e) => {
     if (e.key === "Enter" && barcode && barcode.trim() !== "" && !processingScanRef.current && !scanning) {
       e.preventDefault();
-      isManualScanRef.current = true;
-      await autoProcessScan(barcode);
+      await confirmScan();
     }
   };
 
@@ -198,6 +198,12 @@ export default function OutletOrderDetails() {
 
   const autoProcessScan = useCallback(async (scannedBarcode) => {
     if (!scannedBarcode || processingScanRef.current) return;
+    const scanQuantity = Number(qty);
+    if (!Number.isInteger(scanQuantity) || scanQuantity <= 0) {
+      setScanError("Enter a valid quantity before confirming the scan.");
+      return;
+    }
+
     processingScanRef.current = true;
 
     setProcessingScan(true);
@@ -208,7 +214,7 @@ export default function OutletOrderDetails() {
       const res = await barOrdersAPI.processScan({
         ORDERNUMBER: orderData?.ORDERNUMBER,
         BARCODE: scannedBarcode,
-        QUANTITY: qty || 1,
+        QUANTITY: scanQuantity,
         KITCHEN: department,
         PARENT_ITEM: activeRecipeParentItem || "",
       });
@@ -230,7 +236,7 @@ export default function OutletOrderDetails() {
         setTimeout(() => {
           if (isMountedRef.current) {
             setBarcode("");
-            setQty("");
+            setQty("1");
           }
         }, 800);
       }
@@ -263,6 +269,15 @@ export default function OutletOrderDetails() {
       }, 4000);
     }
   }, [orderData, department, qty, activeRecipeParentItem]);
+
+  const confirmScan = useCallback(async () => {
+    const trimmedBarcode = String(barcode || "").trim();
+    if (!trimmedBarcode) {
+      setScanError("Scan or enter a barcode before confirming.");
+      return;
+    }
+    await autoProcessScan(trimmedBarcode);
+  }, [barcode, autoProcessScan]);
 
   const startScanner = async () => {
     try {
@@ -338,13 +353,13 @@ export default function OutletOrderDetails() {
             },
           },
           async (decodedText) => {
-            if (hasScannedRef.current || processingScan) return;
+            if (hasScannedRef.current || processingScanRef.current) return;
             hasScannedRef.current = true;
 
             setScanSuccess(true);
             setBarcode(decodedText);
             isManualScanRef.current = false;
-            await autoProcessScan(decodedText);
+            setScanMessage("Barcode captured. Check quantity, then confirm scan.");
 
             setTimeout(() => {
               if (scannerRef.current) stopScanner();
@@ -359,7 +374,7 @@ export default function OutletOrderDetails() {
     };
 
     initScanner();
-  }, [scanning, autoProcessScan, processingScan]);
+  }, [scanning]);
 
   const handleItemClick = async (item) => {
     if (!item.LINK_ENABLED || item.LINK_ENABLED !== "Y") return;
@@ -658,7 +673,6 @@ export default function OutletOrderDetails() {
                         value={barcode}
                         onChange={(e) => handleBarcodeChange(e.target.value)}
                         onKeyPress={handleBarcodeKeyPress}
-                        onBlur={handleBarcodeBlur}
                         placeholder="Scan or enter barcode"
                         className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:ring-1 focus:ring-pink-500"
                         disabled={processingScan}
@@ -668,6 +682,8 @@ export default function OutletOrderDetails() {
                       <label className="block text-xs font-medium text-gray-500 mb-1">Quantity</label>
                       <input
                         type="number"
+                        min="1"
+                        step="1"
                         value={qty}
                         onChange={(e) => setQty(e.target.value)}
                         placeholder="1"
@@ -684,6 +700,13 @@ export default function OutletOrderDetails() {
                         }`}
                     >
                       <FaCamera /> {scanning ? "Stop Camera" : "Start Camera"}
+                    </button>
+                    <button
+                      onClick={confirmScan}
+                      disabled={processingScan || scanning || !barcode.trim()}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg transition text-white font-medium bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <FaCheck /> Confirm Scan
                     </button>
                     {cameraError && <div className="text-sm text-red-600">{cameraError}</div>}
                     {processingScan && (
@@ -777,7 +800,7 @@ export default function OutletOrderDetails() {
                           <td className="px-4 py-3 text-sm text-gray-500">
                             {formatDisplayDate(item.scannedAt)}
                           </td>
-                          <td className="px-4 py-3 text-sm text-right font-semibold">Rs {item.itemPrice || "0"}</td>
+                          <td className="px-4 py-3 text-sm text-right font-semibold">Rs {getScanLinePrice(item)}</td>
                           <td className="px-4 py-3 text-sm font-mono text-gray-500">{item.barcode}</td>
                         </tr>
                       ))
