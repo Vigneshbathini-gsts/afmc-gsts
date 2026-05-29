@@ -1,4 +1,5 @@
 const ConfirmOrderservices = require("../services/ConfirmOrderservices");
+const { emitOrderConfirmed } = require("../utils/orderEvents");
 
 exports.confirmOrder = async (req, res) => {
   try {
@@ -8,6 +9,14 @@ exports.confirmOrder = async (req, res) => {
       req.user,
       req.body || {}
     );
+
+    if (Number(data?.insertedCount || 0) > 0) {
+      emitOrderConfirmed({
+        orderNumber: data.orderNumber || ORDER_NUMBER,
+        kitchenTypes: Array.isArray(data.kitchenTypes) ? data.kitchenTypes : [],
+        createdAt: new Date().toISOString(),
+      });
+    }
 
     res.status(200).json({
       success: true,

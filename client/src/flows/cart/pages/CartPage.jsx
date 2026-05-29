@@ -86,12 +86,35 @@ export default function CartPage({ isAttendant = false }) {
     const [cocktailDetailsByCartId, setCocktailDetailsByCartId] = useState({});
     const [confirmModal, setConfirmModal] = useState({ isOpen: false, cartId: null });
     const [proceedConfirmOpen, setProceedConfirmOpen] = useState(false);
+    const [stockLimitImageMessages, setStockLimitImageMessages] = useState({});
 
     const userId = user?.userId;
 
     const showToast = useCallback((message, type = 'success') => {
         setToast({ message, type });
     }, []);
+
+    const getStockLimitImageKey = useCallback((item) => String(Number(item?.cartId ?? item?.id) || item?.cartId || item?.id || item?.itemId || ""), []);
+
+    const showStockLimitOnImage = useCallback((item, message = "Out of Stock") => {
+        const key = getStockLimitImageKey(item);
+        if (!key) return;
+        setStockLimitImageMessages((current) => ({
+            ...current,
+            [key]: message,
+        }));
+    }, [getStockLimitImageKey]);
+
+    const clearStockLimitOnImage = useCallback((item) => {
+        const key = getStockLimitImageKey(item);
+        if (!key) return;
+        setStockLimitImageMessages((current) => {
+            if (!current[key]) return current;
+            const next = { ...current };
+            delete next[key];
+            return next;
+        });
+    }, [getStockLimitImageKey]);
 
     const fetchCartItems = useCallback(async () => {
         if (!userId) return;
@@ -183,6 +206,7 @@ export default function CartPage({ isAttendant = false }) {
                                 const msg = `Out of stock for ingredient ${ing.itemName || ing.itemCode}. Available quantity: ${available}`;
                                 setError(msg);
                                 showToast(msg, 'error');
+                                showStockLimitOnImage(currentItem, "Out of Stock");
                                 setUpdatingItemId(null);
                                 return;
                             }
@@ -201,8 +225,14 @@ export default function CartPage({ isAttendant = false }) {
                     const msg = `Out of stock. Available quantity: ${maxAllowed}`;
                     setError(msg);
                     showToast(msg, 'error');
+                    showStockLimitOnImage(currentItemForMax, "Out of Stock");
                     setUpdatingItemId(null);
                     return;
+                }
+                if (Number.isFinite(Number(maxAllowed)) && Number(maxAllowed) >= 0 && Number(newQuantity) >= Number(maxAllowed)) {
+                    showStockLimitOnImage(currentItemForMax, "Out of Stock");
+                } else {
+                    clearStockLimitOnImage(currentItemForMax);
                 }
             }
 
@@ -217,7 +247,7 @@ export default function CartPage({ isAttendant = false }) {
         } finally {
             setUpdatingItemId(null);
         }
-    }, [cartItems, cocktailDetailsByCartId, setCocktailDetailsByCartId, setCartItems, setCartCount, showToast]);
+    }, [cartItems, cocktailDetailsByCartId, setCocktailDetailsByCartId, setCartItems, setCartCount, showToast, showStockLimitOnImage, clearStockLimitOnImage]);
 
     const handleRemoveItem = useCallback(async () => {
         const { cartId } = confirmModal;
@@ -377,50 +407,68 @@ export default function CartPage({ isAttendant = false }) {
 
             {/* Cart Items Grid */}
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {cartItems.map((item) => (
-                    <div
-                        key={item.cartId}
-                        className={`flex flex-col rounded-xl border border-gray-200 bg-white p-3 shadow-sm transition hover:shadow-md ${updatingItemId === item.cartId ? 'opacity-70' : ''
-                            }`}
-                    >
-                        {/* Image and Action Buttons Row */}
-                        <div className="relative mb-2 flex items-center justify-center bg-gray-50 rounded-lg overflow-hidden">
-                            <div className="relative w-full h-32 flex items-center justify-center">
-                                <img
-                                    src={`${BASEAPI}${item.image || "default.jpg"}`}
-                                    alt={item.itemName || "Item"}
-                                    className="w-full h-full object-contain rounded-lg"
-                                    onError={(e) => {
-                                        e.target.src = "https://via.placeholder.com/200x150?text=No+Image";
-                                    }}
-                                />
-                                {/* Action Buttons Overlay - Top Right */}
-                                <div className="absolute right-1 top-1 flex gap-1 z-10">
-                                    {/* Edit Button - Only show for items with subcategory 14 or 15 (cocktail/mocktail) */}
-                                    {item.subcategory && [14, 15].includes(Number(item.subcategory)) && !item.isFreeItem && (
-                                        <button
-                                            type="button"
-                                            onClick={() => handleEditItem(item.itemId, item.cartId)}
-                                            className="rounded-full bg-white/90 p-1.5 text-blue-600 shadow-md transition hover:bg-blue-50"
-                                            title="Edit item"
-                                        >
-                                            <Pencil size={14} />
-                                        </button>
-                                    )}
-                                    {/* Remove Button - Only for non-free items */}
-                                    {!item.isFreeItem && (
-                                        <button
-                                            type="button"
-                                            onClick={() => confirmRemove(item.cartId)}
-                                            className="rounded-full bg-white/90 p-1.5 text-red-600 shadow-md transition hover:bg-red-50"
-                                            title={toInitCap("Remove item")}
-                                        >
-                                            <Trash2 size={14} />
-                                        </button>
-                                    )}
+                {cartItems.map((item) => {
+                    const maxAllowed = getMaxAllowedQuantity(item);
+                    const isAtStockLimit =
+                        !isCocktailOrMocktail(item) &&
+                        Number.isFinite(Number(maxAllowed)) &&
+                        Number(maxAllowed) >= 0 &&
+                        Number(item.quantity || 0) >= Number(maxAllowed);
+                    const imageStockMessage =
+                        stockLimitImageMessages[getStockLimitImageKey(item)] ||
+                        (isOutOfStock(item) || isAtStockLimit ? "Out of Stock" : "");
+
+                    return (
+                        <div
+                            key={item.cartId}
+                            className={`flex flex-col rounded-xl border border-gray-200 bg-white p-3 shadow-sm transition hover:shadow-md ${updatingItemId === item.cartId ? 'opacity-70' : ''
+                                }`}
+                        >
+                            {/* Image and Action Buttons Row */}
+                            <div className="relative mb-2 flex items-center justify-center bg-gray-50 rounded-lg overflow-hidden">
+                                <div className="relative w-full h-32 flex items-center justify-center">
+                                    <img
+                                        src={`${BASEAPI}${item.image || "default.jpg"}`}
+                                        alt={item.itemName || "Item"}
+                                        className={`w-full h-full object-contain rounded-lg ${imageStockMessage ? "opacity-45" : ""}`}
+                                        onError={(e) => {
+                                            e.target.src = "https://via.placeholder.com/200x150?text=No+Image";
+                                        }}
+                                    />
+                                    {imageStockMessage ? (
+                                        <div className="absolute inset-0 z-[5] flex items-center justify-center bg-black/35 px-3 text-center">
+                                            <span className="rounded-md bg-red-600 px-3 py-1.5 text-sm font-bold uppercase tracking-wide text-white shadow-sm">
+                                                {imageStockMessage}
+                                            </span>
+                                        </div>
+                                    ) : null}
+                                    {/* Action Buttons Overlay - Top Right */}
+                                    <div className="absolute right-1 top-1 flex gap-1 z-10">
+                                        {/* Edit Button - Only show for items with subcategory 14 or 15 (cocktail/mocktail) */}
+                                        {item.subcategory && [14, 15].includes(Number(item.subcategory)) && !item.isFreeItem && (
+                                            <button
+                                                type="button"
+                                                onClick={() => handleEditItem(item.itemId, item.cartId)}
+                                                className="rounded-full bg-white/90 p-1.5 text-blue-600 shadow-md transition hover:bg-blue-50"
+                                                title="Edit item"
+                                            >
+                                                <Pencil size={14} />
+                                            </button>
+                                        )}
+                                        {/* Remove Button - Only for non-free items */}
+                                        {!item.isFreeItem && (
+                                            <button
+                                                type="button"
+                                                onClick={() => confirmRemove(item.cartId)}
+                                                className="rounded-full bg-white/90 p-1.5 text-red-600 shadow-md transition hover:bg-red-50"
+                                                title={toInitCap("Remove item")}
+                                            >
+                                                <Trash2 size={14} />
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
-                        </div>
 
                         {/* Details */}
                         <div className="flex-1">
@@ -477,8 +525,9 @@ export default function CartPage({ isAttendant = false }) {
                                 </div>
                             )}
                         </div>
-                    </div>
-                ))}
+                        </div>
+                    );
+                })}
             </div>
 
             {/* Add custom CSS for animations */}

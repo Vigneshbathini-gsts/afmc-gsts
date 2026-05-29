@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback } from "react";
+import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import {
   FaTimesCircle,
   FaSpinner,
@@ -9,7 +9,7 @@ import {
   FaCocktail,
 } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
-import { barOrdersAPI } from "../../services/api";
+import { API_BASE_URL, barOrdersAPI } from "../../services/api";
 import { toInitCap } from "../../utils/textFormat";
 import {formatDisplayDate} from "../../utils/dateUtils";
 
@@ -24,6 +24,10 @@ export default function OutletOrders({ kitchenType = "Bar" }) {
   const [cancellingOrder, setCancellingOrder] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const knownOrderKeysRef = useRef(new Set());
+  const hasLoadedOrdersRef = useRef(false);
+  const audioContextRef = useRef(null);
+  const skipNextDetectedSoundRef = useRef(false);
 
   const navigate = useNavigate();
   const rowsPerPage = 8;
@@ -36,21 +40,146 @@ export default function OutletOrders({ kitchenType = "Bar" }) {
 
   const icon = isKitchen ? <FaUtensils /> : <FaCocktail />;
 
-  /* FETCH */
-  const fetchOrders = useCallback(async () => {
+  const playNewOrderSound = useCallback(() => {
     try {
-      setLoading(true);
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContext) return;
+
+      const context = audioContextRef.current || new AudioContext();
+      audioContextRef.current = context;
+
+      if (context.state === "suspended") {
+        context.resume().catch(() => {});
+      }
+
+      const now = context.currentTime;
+      const tones = [880, 1174];
+
+      tones.forEach((frequency, index) => {
+        const oscillator = context.createOscillator();
+        const gain = context.createGain();
+        const start = now + index * 0.18;
+        const end = start + 0.14;
+
+        oscillator.type = "sine";
+        oscillator.frequency.setValueAtTime(frequency, start);
+        gain.gain.setValueAtTime(0.0001, start);
+        gain.gain.exponentialRampToValueAtTime(0.28, start + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, end);
+
+        oscillator.connect(gain);
+        gain.connect(context.destination);
+        oscillator.start(start);
+        oscillator.stop(end + 0.02);
+      });
+    } catch (error) {
+      console.warn("Unable to play new order notification sound:", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    const unlockAudio = () => {
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+        const context = audioContextRef.current || new AudioContext();
+        audioContextRef.current = context;
+        if (context.state === "suspended") {
+          context.resume().catch(() => {});
+        }
+      } catch {
+        // Browser audio unlock can fail silently until a later interaction.
+      }
+    };
+
+    window.addEventListener("pointerdown", unlockAudio, { once: true });
+    window.addEventListener("keydown", unlockAudio, { once: true });
+    return () => {
+      window.removeEventListener("pointerdown", unlockAudio);
+      window.removeEventListener("keydown", unlockAudio);
+    };
+  }, []);
+
+  /* FETCH */
+  const fetchOrders = useCallback(async ({ silent = false, playOnNew = true } = {}) => {
+    try {
+      if (!silent) setLoading(true);
       const res = await barOrdersAPI.getOrders(kitchenType);
-      setOrders(res.data || []);
+      const nextOrders = res.data || [];
+      const nextOrderKeys = new Set(
+        nextOrders
+          .map((order) => String(order?.ORDERNUMBER || "").trim())
+          .filter(Boolean)
+      );
+      const hasNewOrder =
+        hasLoadedOrdersRef.current &&
+        [...nextOrderKeys].some((orderKey) => !knownOrderKeysRef.current.has(orderKey));
+
+      knownOrderKeysRef.current = nextOrderKeys;
+      hasLoadedOrdersRef.current = true;
+      setOrders(nextOrders);
+
+      if (hasNewOrder && playOnNew && !skipNextDetectedSoundRef.current) {
+        playNewOrderSound();
+      }
+      skipNextDetectedSoundRef.current = false;
     } catch (err) {
       console.error(err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
-  }, [kitchenType]);
+  }, [kitchenType, playNewOrderSound]);
 
   useEffect(() => {
+    knownOrderKeysRef.current = new Set();
+    hasLoadedOrdersRef.current = false;
     fetchOrders();
+  }, [fetchOrders]);
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token || typeof EventSource === "undefined") return undefined;
+
+    const source = new EventSource(
+      `${API_BASE_URL}/order-events?token=${encodeURIComponent(token)}`,
+      { withCredentials: true }
+    );
+
+    const handleOrderConfirmed = (event) => {
+      let payload = {};
+      try {
+        payload = JSON.parse(event.data || "{}");
+      } catch {
+        payload = {};
+      }
+
+      const eventKitchenTypes = Array.isArray(payload.kitchenTypes)
+        ? payload.kitchenTypes.map((value) => String(value).toLowerCase())
+        : [];
+      const isForThisOutlet =
+        eventKitchenTypes.length === 0 ||
+        eventKitchenTypes.includes(String(kitchenType).toLowerCase());
+
+      if (!isForThisOutlet) return;
+
+      skipNextDetectedSoundRef.current = true;
+      playNewOrderSound();
+      fetchOrders({ silent: true, playOnNew: false });
+    };
+
+    source.addEventListener("order-confirmed", handleOrderConfirmed);
+
+    return () => {
+      source.removeEventListener("order-confirmed", handleOrderConfirmed);
+      source.close();
+    };
+  }, [fetchOrders, kitchenType, playNewOrderSound]);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      fetchOrders({ silent: true });
+    }, 3000);
+    return () => window.clearInterval(intervalId);
   }, [fetchOrders]);
 
   /* FILTER */

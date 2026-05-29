@@ -327,10 +327,33 @@ export default function Pubmenubuy({
   const [toast, setToast] = useState(null);
   const [cocktailDetailsByItemCode, setCocktailDetailsByItemCode] = useState({});
   const [cocktailOverrideIssues, setCocktailOverrideIssues] = useState({});
+  const [stockLimitImageMessages, setStockLimitImageMessages] = useState({});
   const currentBasePath = location.pathname.startsWith("/attendant")
     ? "/attendant"
     : "/user";
   const MAX_QTY = 99;
+
+  const getStockLimitImageKey = (row) => String(Number(row?.orderLineId ?? row?.id) || row?.id || row?.item_code || "");
+
+  const showStockLimitOnImage = (row, message = "Out of Stock") => {
+    const key = getStockLimitImageKey(row);
+    if (!key) return;
+    setStockLimitImageMessages((current) => ({
+      ...current,
+      [key]: message,
+    }));
+  };
+
+  const clearStockLimitOnImage = (row) => {
+    const key = getStockLimitImageKey(row);
+    if (!key) return;
+    setStockLimitImageMessages((current) => {
+      if (!current[key]) return current;
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
+  };
 
   const getCocktailOverrideForItem = (row) => {
     if (!row || !isCocktailOrMocktail(row)) return null;
@@ -1163,6 +1186,10 @@ export default function Pubmenubuy({
       return;
     }
 
+    if (delta < 0) {
+      clearStockLimitOnImage(liveItem);
+    }
+
     if (delta > 0 && currentQty >= MAX_QTY) {
       showToast(`Quantity cannot be more than ${MAX_QTY}.`, "error");
       return;
@@ -1175,7 +1202,9 @@ export default function Pubmenubuy({
       if (isCocktailOrMocktail(liveItem)) {
         const validation = await validateCocktailNextQuantity(liveItem, nextQtyCandidate);
         if (!validation.ok) {
-          showToast(validation.message || "Out of stock for cocktail/mocktail ingredients.", "error");
+          const message = validation.message || "Out of stock for cocktail/mocktail ingredients.";
+          showToast(message, "error");
+          showStockLimitOnImage(liveItem, "Out of Stock");
           return;
         }
       }
@@ -1183,11 +1212,11 @@ export default function Pubmenubuy({
       const cocktailOverride = getCocktailOverrideForItem(liveItem);
       if (cocktailOverride) {
         if (cocktailOverride.isOutOfStock) {
-          showToast(
+          const message =
             cocktailOverride.stockIssueMessage ||
-              "Out of stock for cocktail/mocktail ingredients. Please reduce quantity or update selection.",
-            "error"
-          );
+            "Out of stock for cocktail/mocktail ingredients. Please reduce quantity or update selection.";
+          showToast(message, "error");
+          showStockLimitOnImage(liveItem, "Out of Stock");
           return;
         }
       } else {
@@ -1197,6 +1226,7 @@ export default function Pubmenubuy({
         // without reliable subcategory/stockStatus in this screen's payload.
         if (stockMessage) {
           showToast(stockMessage, "error");
+          showStockLimitOnImage(liveItem, "Out of Stock");
           return;
         }
         // Do not hard-block on cocktail/mocktail `stockStatus` here; it is often stale/incorrect in buy-flow.
@@ -1212,7 +1242,13 @@ export default function Pubmenubuy({
 ) {
   if (nextQtyCandidate > Number(availableQty)) {
     showToast(`Out of stock. Available quantity: ${availableQty}`, "error");
+    showStockLimitOnImage(liveItem, "Out of Stock");
     return;
+  }
+  if (delta > 0 && nextQtyCandidate >= Number(availableQty)) {
+    showStockLimitOnImage(liveItem, "Out of Stock");
+  } else {
+    clearStockLimitOnImage(liveItem);
   }
 }
 
@@ -1266,6 +1302,7 @@ export default function Pubmenubuy({
           `Out of stock for free item. Available quantity: ${freeAvailableQty}`,
           "error"
         );
+        showStockLimitOnImage(liveItem, "Out of Stock");
         return;
       }
     }
@@ -1511,6 +1548,22 @@ const removeItem = (id) => {
                   .filter((item) => Number(item.quantity || 0) > 0)
                   .map((item) => {
                     const missingCocktailIngredients = hasMissingCocktailIngredients(orderNumber, item, cocktailDetailsByItemCode);
+                    const maxAllowed = getMaxAllowedQuantity(item);
+                    const cocktailOverride = getCocktailOverrideForItem(item);
+                    const isAtStockLimit =
+                      !isCocktailOrMocktail(item) &&
+                      !item.isFreeItem &&
+                      Number.isFinite(Number(maxAllowed)) &&
+                      Number(maxAllowed) >= 0 &&
+                      Number(item.quantity || 0) >= Number(maxAllowed);
+                    const imageStockMessage =
+                      stockLimitImageMessages[getStockLimitImageKey(item)] ||
+                      (
+                        !item.isFreeItem &&
+                        (cocktailOverride?.isOutOfStock || isOutOfStock(item) || isAtStockLimit)
+                          ? "Out of Stock"
+                          : ""
+                      );
 
                     return (
                       <div
@@ -1518,12 +1571,19 @@ const removeItem = (id) => {
                         className="group overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-afmc-gold/40 hover:shadow-md focus-within:ring-2 focus-within:ring-afmc-gold/40 focus-within:ring-offset-2 focus-within:ring-offset-stone-50"
                       >
                       {/* Image */}
-                      <div className="flex h-40 items-center justify-center bg-stone-50 p-4">
+                      <div className="relative flex h-40 items-center justify-center overflow-hidden bg-stone-50 p-4">
                         <img
                           src={`${BASEAPI}${item.image || "default.jpg"}`}
                           alt={item.item_name}
-                          className="max-h-full w-auto object-contain transition duration-300 group-hover:scale-[1.03]"
+                          className={`max-h-full w-auto object-contain transition duration-300 group-hover:scale-[1.03] ${imageStockMessage ? "opacity-45" : ""}`}
                         />
+                        {imageStockMessage ? (
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/35 px-3 text-center">
+                            <span className="rounded-md bg-red-600 px-3 py-1.5 text-sm font-bold uppercase tracking-wide text-white shadow-sm">
+                              {imageStockMessage}
+                            </span>
+                          </div>
+                        ) : null}
                       </div>
 
                       {/* Details */}

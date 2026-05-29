@@ -1051,6 +1051,7 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
     }
 
     let insertedCount = 0;
+    const insertedKitchenTypes = new Set();
 
     for (const item of detailRows) {
       const [existingRows] = await connection.execute(
@@ -1109,6 +1110,9 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
       );
 
       insertedCount += 1;
+      if (kitchenType) {
+        insertedKitchenTypes.add(kitchenType);
+      }
     }
 
     // Cart flow: once an order is confirmed, clear the user's cart.
@@ -1121,6 +1125,7 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
     return {
       orderNumber: normalizedOrderNumber,
       insertedCount,
+      kitchenTypes: [...insertedKitchenTypes],
       message:
         insertedCount > 0
           ? "Order confirmed successfully"
