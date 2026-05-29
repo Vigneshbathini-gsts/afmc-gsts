@@ -749,6 +749,7 @@ export default function Inventory() {
     setImageError("");
     try {
       const formData = new FormData();
+      formData.append("itemName", imageForm.itemName || "image");
       formData.append("image", imageForm.image);
       const response = await inventoryAPI.updateImage(imageForm.itemCode, formData);
       const responseFileName =
@@ -772,7 +773,7 @@ export default function Inventory() {
       setImagePreviewUrl("");
       fetchInventory();
       setShowImageModal(false);
-      navigate("/admin/stock-reports/barstock");
+      // navigate("/admin/stock-reports/barstock");
     } catch (err) {
       console.error("Failed to update image:", err);
       setImageError(err.response?.data?.message || "Failed to update image.");
