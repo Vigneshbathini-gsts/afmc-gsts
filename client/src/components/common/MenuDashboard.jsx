@@ -282,7 +282,7 @@ function MenuPopup({ item, loading, onClose }) {
 
 function MenuGrid({ items, showStockStatus = false, ignoreStockStatus = false, onItemClick }) {
   return (
-    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-5">
+    <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 sm:gap-4 lg:grid-cols-5 xl:grid-cols-5">
       {items.map((item, index) => {
         const shouldIgnoreStock = ignoreStockStatus || isCocktailOrMocktailItem(item);
         const outOfStock = !shouldIgnoreStock && isOutOfStock(item);
@@ -298,18 +298,19 @@ function MenuGrid({ items, showStockStatus = false, ignoreStockStatus = false, o
             }}
             disabled={stockDisabled}
             key={item.item_id || item.item_code || `${item.item_name}-${index}`}
-            className={`group relative overflow-hidden rounded-xl border border-gray-300 bg-white text-left shadow-sm transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-afmc-maroon ${
+            className={`group relative overflow-hidden rounded-2xl border border-gray-200 bg-white text-left shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-afmc-maroon ${
               stockDisabled
                 ? "cursor-not-allowed opacity-75"
-                : "hover:shadow-md hover:border-afmc-maroon/50"
+                : "hover:-translate-y-0.5 hover:border-afmc-maroon/30 hover:shadow-[0_14px_30px_rgba(15,23,42,0.11)]"
             }`}
           >
             {/* Image Container */}
-            <div className="relative aspect-square w-full overflow-hidden bg-gray-100">
+            <div className="relative aspect-square w-full overflow-hidden bg-gradient-to-br from-gray-50 via-white to-[#f7f0e5]">
+              <div className="absolute inset-x-4 bottom-3 h-8 rounded-full bg-afmc-gold/10 blur-xl" aria-hidden="true" />
               <img
                 src={`${BASEAPI}${item.image || "default.jpg"}`}
                 alt={item.item_name}
-                className={`h-full w-full object-contain p-3 transition-transform duration-300 ${
+                className={`relative h-full w-full object-contain p-4 transition-transform duration-300 ${
                   stockDisabled ? "grayscale" : "group-hover:scale-105"
                 }`}
               />
@@ -323,8 +324,8 @@ function MenuGrid({ items, showStockStatus = false, ignoreStockStatus = false, o
             </div>
 
             {/* Content */}
-            <div className="space-y-2 p-3">
-              <div className="line-clamp-2 text-sm font-semibold text-gray-900 leading-tight">
+            <div className="space-y-2.5 p-3.5">
+              <div className="line-clamp-2 text-sm font-extrabold text-gray-900 leading-tight">
                 {toInitCap(item.item_name)}
                 {/* <p> {item.stock_status} </p> */}
               </div>
@@ -335,7 +336,7 @@ function MenuGrid({ items, showStockStatus = false, ignoreStockStatus = false, o
                 </div>
               ) : null}
 
-              <div className="pt-2 border-t border-gray-200" />
+              <div className="h-1 rounded-full bg-gradient-to-r from-afmc-maroon/70 via-afmc-gold/70 to-transparent" />
 
               {/* CTA Button */}
               {/* <button
@@ -819,18 +820,25 @@ function ProgressiveMenuGrid({
 
 function MenuHeader({ onBack }) {
   return (
-    <div className="border-b border-gray-300 bg-white shadow-sm">
-      <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Menu</h1>
-            <p className="mt-0.5 text-xs text-gray-600">Select items to add to cart</p>
+    <div className="border-b border-afmc-maroon/10 bg-gradient-to-r from-[#fffdf8] via-white to-[#f7efe6] shadow-[0_10px_28px_rgba(15,23,42,0.08)]">
+      <div className="mx-auto max-w-7xl px-4 py-3.5 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-afmc-maroon text-white shadow-lg shadow-afmc-maroon/20" aria-hidden="true">
+                <Utensils className="h-[18px] w-[18px]" />
+              </span>
+              <div>
+                <h1 className="text-xl font-extrabold tracking-tight text-gray-950 sm:text-2xl">Menu</h1>
+                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-afmc-maroon/70">Add items to cart</p>
+              </div>
+            </div>
           </div>
 
           <button
             type="button"
             onClick={onBack}
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition-all hover:bg-gray-100"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-gray-200 bg-gray-50 px-3.5 py-2 text-sm font-bold text-gray-700 shadow-sm transition-all hover:border-afmc-maroon/25 hover:bg-white hover:text-afmc-maroon hover:shadow"
           >
             <ChevronsLeft className="h-4 w-4" />
             Back
@@ -844,7 +852,7 @@ function MenuHeader({ onBack }) {
 function ScrollTabs({ items, activeKey, onChange }) {
   return (
     <div className="w-full">
-      <div className="flex snap-x snap-mandatory items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="flex snap-x snap-mandatory items-center gap-2 overflow-x-auto rounded-full bg-white/70 p-1 shadow-inner ring-1 ring-gray-200 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {items.map((it) => {
           const active = activeKey === it.key;
           return (
@@ -852,10 +860,10 @@ function ScrollTabs({ items, activeKey, onChange }) {
               key={it.key}
               type="button"
               onClick={() => onChange(it.key)}
-              className={`shrink-0 snap-start rounded-full px-4 py-2 text-sm font-bold ring-1 transition ${
+              className={`shrink-0 snap-start rounded-full px-4 py-2 text-sm font-bold transition ${
                 active
-                  ? "bg-gradient-to-r from-afmc-maroon to-afmc-maroon/80 text-white ring-afmc-maroon/20 shadow-sm"
-                  : "bg-white text-gray-700 ring-gray-200 hover:ring-afmc-maroon/25 hover:text-afmc-maroon"
+                  ? "bg-gradient-to-r from-afmc-maroon to-afmc-maroon/80 text-white shadow-sm"
+                  : "text-gray-700 hover:bg-white hover:text-afmc-maroon"
               }`}
               aria-current={active ? "page" : undefined}
             >
@@ -875,8 +883,8 @@ function MainTabsBar({ activeKey, onChange }) {
   ];
 
   return (
-    <div className="w-full rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-      <div className="grid grid-cols-2">
+    <div className="w-full overflow-hidden rounded-[1.35rem] border border-white bg-white/80 p-1 shadow-[0_12px_35px_rgba(15,23,42,0.08)] ring-1 ring-gray-200/70">
+      <div className="grid grid-cols-2 gap-1">
         {items.map(({ key, label, Icon }) => {
           const active = activeKey === key;
           return (
@@ -884,10 +892,10 @@ function MainTabsBar({ activeKey, onChange }) {
               key={key}
               type="button"
               onClick={() => onChange(key)}
-              className={`relative flex items-center justify-center gap-2 px-4 py-3 text-sm font-extrabold transition ${
+              className={`relative flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-extrabold transition ${
                 active
-                  ? "bg-gradient-to-r from-afmc-maroon to-afmc-maroon/90 text-white"
-                  : "bg-white text-gray-700 hover:bg-gray-50"
+                  ? "bg-gradient-to-r from-afmc-maroon to-[#8f1234] text-white shadow-lg shadow-afmc-maroon/20"
+                  : "text-gray-600 hover:bg-gray-50 hover:text-afmc-maroon"
               }`}
               aria-current={active ? "page" : undefined}
             >
@@ -910,7 +918,7 @@ function MainTabsBar({ activeKey, onChange }) {
 function SubTabsPills({ items, activeKey, onChange }) {
   return (
     <div className="w-full">
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="inline-flex flex-wrap items-center gap-2 rounded-full bg-white/80 p-1.5 shadow-sm ring-1 ring-gray-200">
         {items.map((it) => {
           const active = activeKey === it.key;
           return (
@@ -920,8 +928,8 @@ function SubTabsPills({ items, activeKey, onChange }) {
               onClick={() => onChange(it.key)}
               className={`rounded-full px-5 py-2 text-sm font-extrabold transition ${
                 active
-                  ? "bg-gradient-to-r from-afmc-maroon to-afmc-maroon/85 text-white shadow-sm"
-                  : "bg-transparent text-gray-700 hover:text-afmc-maroon"
+                  ? "bg-gray-950 text-white shadow-sm"
+                  : "bg-transparent text-gray-700 hover:bg-gray-50 hover:text-afmc-maroon"
               }`}
               aria-current={active ? "page" : undefined}
             >
@@ -1586,7 +1594,7 @@ function MenuDashboard() {
       <MenuHeader onBack={() => navigate(`${baseSegment}/dashboard`, { replace: true })} />
 
       {/* Main Content */}
-      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
         <OffersMarquee offers={offers} loading={offersLoading} />
 
         {/* Tabs */}

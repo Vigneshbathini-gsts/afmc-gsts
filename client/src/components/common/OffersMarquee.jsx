@@ -80,7 +80,7 @@ function OfferCard({ offer }) {
 
   return (
     <article
-      className="group relative w-[320px] sm:w-[360px] md:w-[420px] shrink-0 overflow-hidden rounded-[26px] border border-white/20 bg-white/5 shadow-[0_8px_18px_rgba(0,0,0,0.08)] backdrop-blur-lg transition-shadow duration-300 hover:shadow-[0_10px_22px_rgba(0,0,0,0.10)]"
+      className="group relative w-[280px] shrink-0 overflow-hidden rounded-2xl border border-white/20 bg-white/5 shadow-[0_8px_18px_rgba(0,0,0,0.08)] backdrop-blur-lg transition-shadow duration-300 hover:shadow-[0_10px_22px_rgba(0,0,0,0.10)] sm:w-[320px] md:w-[360px]"
       role="listitem"
       aria-label={headline}
     >
@@ -129,24 +129,24 @@ function OfferCard({ offer }) {
         }}
       />
 
-      <div className="relative flex h-full flex-col gap-3 p-5 sm:p-6">
+      <div className="relative flex h-full flex-col gap-2 p-3.5 sm:p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-[11px] font-extrabold tracking-[0.14em] text-white/95 ring-1 ring-white/15">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-extrabold tracking-[0.14em] text-white/95 ring-1 ring-white/15">
                 <ChipIcon className="h-3.5 w-3.5 text-afmc-gold" />
                 {chip.label}
               </span>
-              <span className="h-1.5 w-1.5 rounded-full bg-afmc-gold/70" />
-              <span className="text-[11px] font-semibold text-white/70">Offers</span>
+              <span className="h-1 w-1 rounded-full bg-afmc-gold/70" />
+              <span className="text-[10px] font-semibold text-white/70">Offers</span>
             </div>
           </div>
 
-          <div className="h-10 w-10 rounded-2xl bg-white/10 ring-1 ring-white/10" aria-hidden="true" />
+          <div className="h-7 w-7 rounded-xl bg-white/10 ring-1 ring-white/10" aria-hidden="true" />
         </div>
 
-        <div className="space-y-1.5">
-          <h3 className="line-clamp-2 text-[15px] sm:text-[16px] font-extrabold leading-snug tracking-tight text-white">
+        <div className="space-y-1">
+          <h3 className="line-clamp-2 text-sm font-extrabold leading-snug tracking-tight text-white sm:text-[15px]">
             {headline}
           </h3>
           {subtitle ? (
@@ -154,11 +154,11 @@ function OfferCard({ offer }) {
           ) : null}
         </div>
 
-        <div className="mt-1 h-[1px] w-full bg-gradient-to-r from-white/0 via-white/20 to-white/0" />
+        <div className="h-[1px] w-full bg-gradient-to-r from-white/0 via-white/20 to-white/0" />
 
         <div className="flex items-center justify-between">
-          <span className="text-[11px] font-semibold text-white/70">Premium deals</span>
-          <span className="inline-flex items-center gap-1 rounded-full bg-afmc-gold/10 px-2.5 py-1 text-[11px] font-bold text-afmc-gold ring-1 ring-afmc-gold/25">
+          <span className="text-[10px] font-semibold text-white/70">Premium deals</span>
+          <span className="inline-flex items-center gap-1 rounded-full bg-afmc-gold/10 px-2 py-0.5 text-[10px] font-bold text-afmc-gold ring-1 ring-afmc-gold/25">
             Save more
           </span>
         </div>
@@ -169,8 +169,8 @@ function OfferCard({ offer }) {
 
 function SkeletonRow() {
   return (
-    <div className="relative overflow-hidden rounded-[26px] border border-gray-200 bg-white shadow-sm">
-      <div className="h-[132px] w-[320px] sm:w-[360px] md:w-[420px] animate-pulse bg-gradient-to-br from-gray-100 to-gray-50" />
+    <div className="relative overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+      <div className="h-[98px] w-[280px] animate-pulse bg-gradient-to-br from-gray-100 to-gray-50 sm:w-[320px] md:w-[360px]" />
     </div>
   );
 }
@@ -205,7 +205,7 @@ export default function OffersMarquee({
   if (!shouldRender) return null;
 
   return (
-    <section className="mb-8">
+    <section className="mb-4">
       <style>
         {`
           @keyframes afmc-marquee {
@@ -224,22 +224,27 @@ export default function OffersMarquee({
         `}
       </style>
 
-      <div className="mb-4 flex items-end justify-between gap-4">
-        <div>
-          <h2 className="text-base font-extrabold tracking-tight text-gray-900">{title}</h2>
-          <p className="mt-1 text-xs text-gray-600">{subtitle}</p>
+      <div className="mb-2 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-2.5">
+          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-afmc-maroon/10 text-afmc-maroon">
+            <Flame className="h-4 w-4" />
+          </span>
+          <div>
+            <h2 className="text-sm font-extrabold tracking-tight text-gray-900 sm:text-base">{title}</h2>
+            <p className="text-[11px] font-medium text-gray-500">{subtitle}</p>
+          </div>
         </div>
       </div>
 
       <div className="relative">
-        <div className="relative overflow-hidden rounded-[30px] border border-gray-200 bg-white shadow-sm">
+        <div className="relative overflow-hidden rounded-2xl border border-afmc-maroon/10 bg-gradient-to-r from-white via-[#fffaf1] to-white shadow-[0_10px_28px_rgba(15,23,42,0.07)]">
           <div
             className="afmc-shimmer pointer-events-none absolute inset-y-0 left-0 w-1/3 skew-x-[-18deg] bg-gradient-to-r from-transparent via-[#caa84a]/20 to-transparent"
             style={{ animation: "afmc-shimmer 6.5s ease-in-out infinite" }}
             aria-hidden="true"
           />
 
-          <div className="group relative px-2 py-4 sm:px-3 sm:py-5">
+          <div className="group relative px-2 py-2 sm:px-3">
             {loading ? (
               <div className="flex gap-4">
                 {Array.from({ length: 3 }).map((_, idx) => (
