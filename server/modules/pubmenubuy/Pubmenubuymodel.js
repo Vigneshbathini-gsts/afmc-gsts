@@ -1475,7 +1475,8 @@ async function createOrder(payload = {}, authUser = {}) {
           `
             SELECT pubmed_id
             FROM xxafmc_pubmed
-            WHERE UPPER(TRIM(pubmed_name)) = UPPER(TRIM(?))
+            WHERE UPPER(TRIM(pubmed_name) COLLATE utf8mb4_unicode_ci) =
+              UPPER(TRIM(?) COLLATE utf8mb4_unicode_ci)
             LIMIT 1
           `,
           [String(pubmed)]

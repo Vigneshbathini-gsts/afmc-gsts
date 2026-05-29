@@ -1374,6 +1374,7 @@ exports.getCancelledOrders = async (req, res) => {
           ),
           ''
         ),
+        NULLIF(TRIM(CAST(xxkn.pubmed AS CHAR)), ''),
         'N/A'
       ) AS pubmed_name
 
@@ -1387,6 +1388,8 @@ exports.getCancelledOrders = async (req, res) => {
 
   LEFT JOIN xxafmc_pubmed xp 
       ON TRIM(CAST(xp.pubmed_id AS CHAR)) = TRIM(CAST(xxkn.pubmed AS CHAR))
+      OR UPPER(TRIM(xp.pubmed_name) COLLATE utf8mb4_unicode_ci) =
+        UPPER(TRIM(CAST(xxkn.pubmed AS CHAR)) COLLATE utf8mb4_unicode_ci)
 
   WHERE EXISTS (
       SELECT 1
@@ -1396,13 +1399,14 @@ exports.getCancelledOrders = async (req, res) => {
       WHERE xod.order_id = xxkn.order_num
         AND inv.category_id = ?
       GROUP BY xod.order_id
-     HAVING SUM(
-    CASE
-        WHEN TRIM(UPPER(IFNULL(xod.order_status,''))) NOT IN ('', 'CANCELLED')
-        THEN 1
-        ELSE 0
-    END
-) = 0
+      HAVING COUNT(*) > 0
+        AND COUNT(*) = SUM(
+          CASE
+            WHEN TRIM(UPPER(IFNULL(xod.order_status, ''))) = 'CANCELLED'
+            THEN 1
+            ELSE 0
+          END
+        )
   )
 
   AND ${dateExpression} 
@@ -1804,16 +1808,7 @@ console.log("Fetching order details for order number:", orderNumber, "and kitche
         inv.item_name,
         xod.quantity,
         COALESCE(xod.type, 'NA') AS type,
-        COALESCE(
-          NULLIF(xod.order_status, ''), 
-          MAX(
-            CASE 
-              WHEN xkn.status = 'Completed' THEN '3-Completed'
-              WHEN xkn.status = 'Preparing' THEN '2-Preparing'
-              ELSE '1-Received'
-            END), 
-          'Received'
-        ) AS status
+        'Cancelled' AS status
       FROM xxafmc_order_details xod
       LEFT JOIN (${inventorySummarySql}) inv
         ON inv.item_code = xod.item_id
@@ -1822,6 +1817,7 @@ console.log("Fetching order details for order number:", orderNumber, "and kitche
         AND TRIM(CAST(xkn.item_id AS CHAR)) = TRIM(CAST(xod.item_id AS CHAR))
       WHERE xod.order_id = ?
         AND inv.category_id = ?
+        AND TRIM(UPPER(IFNULL(xod.order_status, ''))) = 'CANCELLED'
       GROUP BY xod.item_id, xod.quantity, xod.type, xod.order_status, inv.item_name
     `;
 
