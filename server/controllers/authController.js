@@ -227,8 +227,10 @@ exports.forgotPassword = async (req, res) => {
       [resetToken, expiryTime, user.USER_ID]
     );
 
+    const frontendUrl = (process.env.FRONTEND_URL || "http://localhost:3000").replace(/\/+$/, "");
+
     // Include username in URL
-    const resetLink = `http://localhost:3000/reset-password/${resetToken}?username=${encodeURIComponent(
+    const resetLink = `${frontendUrl}/reset-password/${resetToken}?username=${encodeURIComponent(
       user.USER_NAME
     )}`;
 

@@ -800,7 +800,7 @@ export default function Inventory() {
     if (!raw) return "";
     if (/^https?:\/\//i.test(raw)) return raw;
     const baseUrl =
-      API_BASE_URL || process.env.REACT_APP_API_URL || "http://localhost:5000/api";
+      API_BASE_URL || process.env.REACT_APP_API_URL || "http://localhost:7300/AFMCMESS/api";
     const cleanBase = baseUrl.replace(/\/api\/?$/, "");
     const normalizedName = raw.split(/[\\/]/).pop();
     const encodedName = encodeURIComponent(normalizedName);

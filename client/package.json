@@ -30,7 +30,7 @@
   "scripts": {
     "postinstall": "node scripts/fix-html5-qrcode-sourcemaps.js",
     "prestart": "node scripts/fix-html5-qrcode-sourcemaps.js",
-    "start": "react-scripts start",
+    "start": "set PORT=3000&& react-scripts start",
     "prebuild": "node scripts/fix-html5-qrcode-sourcemaps.js",
     "build": "react-scripts build",
     "test": "react-scripts test",
