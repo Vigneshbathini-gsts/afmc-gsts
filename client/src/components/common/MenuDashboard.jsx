@@ -282,7 +282,7 @@ function MenuPopup({ item, loading, onClose }) {
 
 function MenuGrid({ items, showStockStatus = false, ignoreStockStatus = false, onItemClick }) {
   return (
-    <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 sm:gap-4 lg:grid-cols-5 xl:grid-cols-5">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-3.5 lg:grid-cols-5 xl:grid-cols-5">
       {items.map((item, index) => {
         const shouldIgnoreStock = ignoreStockStatus || isCocktailOrMocktailItem(item);
         const outOfStock = !shouldIgnoreStock && isOutOfStock(item);
@@ -298,7 +298,7 @@ function MenuGrid({ items, showStockStatus = false, ignoreStockStatus = false, o
             }}
             disabled={stockDisabled}
             key={item.item_id || item.item_code || `${item.item_name}-${index}`}
-            className={`group relative overflow-hidden rounded-2xl border border-gray-200 bg-white text-left shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-afmc-maroon ${
+            className={`group relative overflow-hidden rounded-xl border border-gray-200 bg-white text-left shadow-[0_6px_18px_rgba(15,23,42,0.06)] transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-afmc-maroon ${
               stockDisabled
                 ? "cursor-not-allowed opacity-75"
                 : "hover:-translate-y-0.5 hover:border-afmc-maroon/30 hover:shadow-[0_14px_30px_rgba(15,23,42,0.11)]"
@@ -306,11 +306,11 @@ function MenuGrid({ items, showStockStatus = false, ignoreStockStatus = false, o
           >
             {/* Image Container */}
             <div className="relative aspect-square w-full overflow-hidden bg-gradient-to-br from-gray-50 via-white to-[#f7f0e5]">
-              <div className="absolute inset-x-4 bottom-3 h-8 rounded-full bg-afmc-gold/10 blur-xl" aria-hidden="true" />
+              <div className="absolute inset-x-5 bottom-3 h-7 rounded-full bg-afmc-gold/10 blur-xl" aria-hidden="true" />
               <img
                 src={`${BASEAPI}${item.image || "default.jpg"}`}
                 alt={item.item_name}
-                className={`relative h-full w-full object-contain p-4 transition-transform duration-300 ${
+                className={`relative h-full w-full object-contain p-3.5 transition-transform duration-300 ${
                   stockDisabled ? "grayscale" : "group-hover:scale-105"
                 }`}
               />
@@ -324,8 +324,8 @@ function MenuGrid({ items, showStockStatus = false, ignoreStockStatus = false, o
             </div>
 
             {/* Content */}
-            <div className="space-y-2.5 p-3.5">
-              <div className="line-clamp-2 text-sm font-extrabold text-gray-900 leading-tight">
+            <div className="space-y-2 p-3">
+              <div className="line-clamp-2 text-[13px] font-extrabold leading-tight text-gray-900 sm:text-sm">
                 {toInitCap(item.item_name)}
                 {/* <p> {item.stock_status} </p> */}
               </div>
@@ -336,7 +336,7 @@ function MenuGrid({ items, showStockStatus = false, ignoreStockStatus = false, o
                 </div>
               ) : null}
 
-              <div className="h-1 rounded-full bg-gradient-to-r from-afmc-maroon/70 via-afmc-gold/70 to-transparent" />
+              <div className="h-0.5 rounded-full bg-gradient-to-r from-afmc-maroon/70 via-afmc-gold/70 to-transparent" />
 
               {/* CTA Button */}
               {/* <button
