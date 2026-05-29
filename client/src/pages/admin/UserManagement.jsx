@@ -540,7 +540,7 @@ export default function UserManagement() {
                     value={formData.userName}
                     onChange={handleFormChange}
                     maxLength={50}
-                    placeholder="Enter user name"
+                    placeholder="Enter username same as email"
                     className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-2 text-sm text-gray-800 outline-none transition focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
                   />
                 </div>
@@ -590,7 +590,7 @@ export default function UserManagement() {
                   />
                 </div>
 
-                <div className="md:col-span-2">
+                <div>
                   <label className="mb-1 block text-sm font-medium text-gray-700">
                     Phone Number
                   </label>

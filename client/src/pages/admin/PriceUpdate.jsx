@@ -143,6 +143,8 @@ export default function PriceUpdate() {
 
       setMessage("Price updated successfully");
 
+      navigate("admin/dashboard");
+
       setFormData({
         barcode: "",
         itemCode: "",

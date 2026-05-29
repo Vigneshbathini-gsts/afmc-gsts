@@ -14,7 +14,7 @@ const PaymentPage = () => {
     const [loading, setLoading] = useState(true);
     const [order, setOrder] = useState(null);
     const [allowedPaymentModes, setAllowedPaymentModes] = useState(["IMMEDIATE"]);
-    const [paymentMode, setPaymentMode] = useState("IMMEDIATE");
+    const [paymentMode, setPaymentMode] = useState("CREDIT");
     const [paymentReference, setPaymentReference] = useState("");
     const [paymentStatus, setPaymentStatus] = useState("Paid");
     const [error, setError] = useState("");

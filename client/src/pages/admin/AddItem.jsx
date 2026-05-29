@@ -150,6 +150,7 @@ export default function AddItem() {
     setBarcode("");
     setError("");
     setSuccessMessage("");
+    navigate("/admin/dashboard");
   };
 
   const handleFinish = async () => {

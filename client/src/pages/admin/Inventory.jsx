@@ -369,6 +369,14 @@ export default function Inventory() {
     [items, itemCode]
   );
 
+  const selectCategoryFilter = (nextCategoryId) => {
+    setCategoryId((currentCategoryId) =>
+      String(currentCategoryId) === String(nextCategoryId) ? "" : nextCategoryId
+    );
+    setCategoryFilter("");
+    setIsCategoryDropdownOpen(false);
+  };
+
   const filteredAddCategories = useMemo(() => cleanedCategories, [cleanedCategories]);
 
   const filteredAddSubCategories = useMemo(() => {
@@ -870,9 +878,7 @@ export default function Inventory() {
                       <button
                         type="button"
                         onClick={() => {
-                          setCategoryId("");
-                          setCategoryFilter("");
-                          setIsCategoryDropdownOpen(false);
+                          selectCategoryFilter("");
                         }}
                         className={`w-full px-4 py-2.5 text-left text-sm hover:bg-afmc-maroon2/5 ${!categoryId
                           ? "bg-afmc-maroon2/10 font-medium text-afmc-maroon"
@@ -892,9 +898,7 @@ export default function Inventory() {
                             key={category.category_id}
                             type="button"
                             onClick={() => {
-                              setCategoryId(category.category_id);
-                              setCategoryFilter(category.category_name || "");
-                              setIsCategoryDropdownOpen(false);
+                              selectCategoryFilter(category.category_id);
                             }}
                             className={`w-full px-4 py-2.5 text-left text-sm hover:bg-afmc-maroon2/5 ${String(categoryId) === String(category.category_id)
                               ? "bg-afmc-maroon2/10 font-medium text-afmc-maroon"

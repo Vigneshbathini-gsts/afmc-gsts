@@ -188,7 +188,7 @@ export default function ProfitManagement() {
                                 type="submit"
                                 className="px-6 py-3 rounded-2xl bg-afmc-maroon hover:bg-afmc-maroon2 text-white text-sm font-semibold shadow hover:shadow-md transition"
                             >
-                                Update Member
+                                Save
                             </button>
                         </form>
 
@@ -254,7 +254,7 @@ export default function ProfitManagement() {
                                 type="submit"
                                 className="px-6 py-3 rounded-2xl bg-[#5b5b5b] text-white text-sm font-semibold shadow hover:shadow-md transition"
                             >
-                                Update Non-Member
+                                Save
                             </button>
                         </form>
                     </div>
