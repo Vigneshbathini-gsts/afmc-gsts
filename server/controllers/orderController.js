@@ -11,8 +11,7 @@ const {
 exports.fetchActiveOrders = async (req, res) => {
   try {
     const { from = null, to = null, search = null } = req.query;
-    const roleId = Number(req.user?.roleId);
-    const userId = roleId === 30 ? req.user?.userId || null : null;
+    const userId = req.user?.userId || null;
 
     const data = await getActiveOrders({
       from,
