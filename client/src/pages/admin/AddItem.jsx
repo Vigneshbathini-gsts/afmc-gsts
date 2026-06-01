@@ -32,10 +32,9 @@ export default function AddItem() {
   const [scannerOpen, setScannerOpen] = useState(false);
   const pendingBarcodesRef = useRef(new Set());
 
-  const formatQuantity = (value) => {
-    const numericValue = Number(value || 0);
-    if (!Number.isFinite(numericValue)) return "0";
-    return Number.isInteger(numericValue) ? String(numericValue) : numericValue.toFixed(2);
+  const getDisplayQuantity = (item) => {
+    const pegs = Number(item?.pegs || 0);
+    return pegs > 0 ? pegs : 1;
   };
 
   const createdBy = useMemo(() => {
@@ -78,8 +77,8 @@ export default function AddItem() {
         const response = await inventoryAPI.getStockOutItemByBarcode(normalizedBarcode);
         const item = response.data.data;
 
-        const availableQuantity = Number(item.available_quantity || 0);
-        if (availableQuantity <= 0) {
+        const availableStock = Number(item.available_stock || 0);
+        if (availableStock <= 0) {
           setError(`Scanned barcode ${normalizedBarcode} has no stock.`);
           return;
         }
@@ -95,6 +94,7 @@ export default function AddItem() {
               itemCode: item.item_code,
               itemName: item.item_name,
               quantity: 1,
+              displayQuantity: getDisplayQuantity(item),
               unitPrice: Number(item.unit_price || 0),
               transactionDate,
               barcode: normalizedBarcode,
@@ -102,8 +102,7 @@ export default function AddItem() {
               batchName: item.batch_name || "",
               acUnit: item.ac_unit || "Nos",
               pegs: Number(item.pegs || 0),
-              availableStock: Number(item.available_stock || 0),
-              availableQuantity,
+              availableStock,
             },
           ];
         });
@@ -160,9 +159,7 @@ export default function AddItem() {
       return;
     }
 
-    const overdrawnRow = rows.find(
-      (row) => Number(row.quantity) > Number(row.availableQuantity || 0)
-    );
+    const overdrawnRow = rows.find((row) => Number(row.quantity) > Number(row.availableStock || 0));
     if (overdrawnRow) {
       setError(`Quantity exceeds available stock for barcode ${overdrawnRow.barcode}.`);
       return;
@@ -292,7 +289,6 @@ export default function AddItem() {
                   <th className="px-4 py-3 text-left font-medium">Item Code</th>
                   <th className="px-4 py-3 text-left font-medium">Item Name</th>
                   <th className="px-4 py-3 text-left font-medium">Quantity</th>
-                  <th className="px-4 py-3 text-left font-medium">Available Qty</th>
                   <th className="px-4 py-3 text-left font-medium">Unit Price</th>
                   <th className="px-4 py-3 text-left font-medium">Transaction Date</th>
                   <th className="px-4 py-3 text-left font-medium">Barcode</th>
@@ -304,7 +300,7 @@ export default function AddItem() {
               <tbody>
                 {rows.length === 0 ? (
                   <tr>
-                    <td colSpan="11" className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan="10" className="px-4 py-8 text-center text-gray-500">
                       No staged stock-out items yet.
                     </td>
                   </tr>
@@ -317,12 +313,12 @@ export default function AddItem() {
                       <td className="px-4 py-3">
                         <input
                           type="number"
-                          value={row.quantity}
+                          value={row.displayQuantity ?? row.quantity}
                           readOnly
+                          title={`${row.displayQuantity ?? row.quantity} ${row.acUnit || "Nos"}`}
                           className="w-24 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2"
                         />
                       </td>
-                      <td className="px-4 py-3">{formatQuantity(row.availableQuantity)}</td>
                       <td className="px-4 py-3">{row.unitPrice}</td>
                       <td className="px-4 py-3">{row.transactionDate}</td>
                       <td className="px-4 py-3">{row.barcode}</td>
