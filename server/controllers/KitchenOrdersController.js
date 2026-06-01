@@ -842,24 +842,24 @@ exports.processBarcodeScan = async (req, res) => {
     if (['Nos', 'Can', 'glass'].includes(acUnit)) {
       if (l_barcode_scanned_qty >= 1) {
         await connection.rollback();
-        return res.status(400).json({ success: false, message: `Error: Duplicate bottle scan for ${BARCODE}` });
+        return res.status(400).json({ success: false, message: `Alert: Duplicate bottle scan for ${BARCODE}` });
       }
       if (requestedQty > stockQuantity) {
         await connection.rollback();
-        return res.status(400).json({ success: false, message: `Error: Entered quantity is more than the stock ${BARCODE}` });
+        return res.status(400).json({ success: false, message: `Alert: Entered quantity is more than the stock ${BARCODE}` });
       }
       if (orderedQty < l_scan_item_qty + requestedQty) {
         await connection.rollback();
-        return res.status(400).json({ success: false, message: 'Error: Scanned Qty is morethan Order quantity' });
+        return res.status(400).json({ success: false, message: 'Alert: Scanned quantity exceeds the ordered quantity' });
       }
     } else {
       if (l_total_scanned_qty + requestedQty > stockQuantity) {
         await connection.rollback();
-        return res.status(400).json({ success: false, message: `Error: Scanned Qty is morethen stock for barcode ${BARCODE}` });
+        return res.status(400).json({ success: false, message: `Alert: Scanned Quantity is more than stock for barcode ${BARCODE}` });
       }
       if (orderedQty < l_scan_item_qty + requestedQty) {
         await connection.rollback();
-        return res.status(400).json({ success: false, message: 'Error: Scanned Qty is morethan Order quantity' });
+        return res.status(400).json({ success: false, message: 'Alert: Scanned quantity exceeds the ordered quantity' });
       }
     }
 
@@ -1029,7 +1029,7 @@ exports.processBarcodeScan = async (req, res) => {
       await connection.rollback();
       return res.status(400).json({
         success: false,
-        message: 'Error: Scanned Qty is morethan Order quantity'
+        message: 'Warning : Scanned quantity exceeds the ordered quantity.'
       });
     }
 

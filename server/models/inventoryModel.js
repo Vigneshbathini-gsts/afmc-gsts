@@ -715,7 +715,7 @@ const addStockOutTransactions = async (payload) => {
       }
 
       const divisor = Number(stockItem.pegs) > 0 ? Number(stockItem.pegs) : 1;
-      const inventoryDelta = numericQuantity / divisor;
+      const inventoryDelta = numericQuantity;
 
       if (Number(stockItem.available_stock || 0) < inventoryDelta) {
         const error = new Error("INSUFFICIENT_STOCK");
