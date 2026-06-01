@@ -17,6 +17,12 @@ const createEmptyRow = () => ({
 
 const INGREDIENT_PAGE_SIZE = 20;
 const digitsOnly = (value) => String(value ?? "").replace(/\D/g, "");
+const JPG_IMAGE_ERROR = "Only JPG image files are allowed.";
+const isJpgImageFile = (file) => {
+  if (!file) return true;
+  const fileName = String(file.name || "").toLowerCase();
+  return fileName.endsWith(".jpg") && (!file.type || file.type === "image/jpeg");
+};
 
 export default function CocktailCreate() {
   const navigate = useNavigate();
@@ -103,6 +109,23 @@ export default function CocktailCreate() {
 
   const updateForm = (field, value) => {
     setForm((current) => ({ ...current, [field]: value }));
+  };
+
+  const handleImageChange = (event) => {
+    const file = event.target.files?.[0] || null;
+
+    if (file && !isJpgImageFile(file)) {
+      event.target.value = "";
+      updateForm("image", null);
+      setError(JPG_IMAGE_ERROR);
+      window.alert(JPG_IMAGE_ERROR);
+      return;
+    }
+
+    updateForm("image", file);
+    if (error) {
+      setError("");
+    }
   };
 
   const updateRow = (id, field, value) => {
@@ -286,6 +309,12 @@ export default function CocktailCreate() {
       return;
     }
 
+    if (!isJpgImageFile(form.image)) {
+      setError(JPG_IMAGE_ERROR);
+      window.alert(JPG_IMAGE_ERROR);
+      return;
+    }
+
     try {
       setSaving(true);
       setError("");
@@ -408,10 +437,8 @@ export default function CocktailCreate() {
               <label className="mb-1 block text-sm text-[#4d4640]">Image</label>
               <input
                 type="file"
-                accept="image/*"
-                onChange={(event) =>
-                  updateForm("image", event.target.files?.[0] || null)
-                }
+                accept=".jpg"
+                onChange={handleImageChange}
                 className="w-full rounded-2xl border border-dashed border-gray-300 bg-white px-4 py-3"
               />
             </div>

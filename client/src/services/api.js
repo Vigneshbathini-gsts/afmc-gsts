@@ -17,18 +17,18 @@ const trimTrailingSlash = (value) => value.replace(/\/+$/, "");
 
 const getDefaultApiBase = () => {
   if (typeof window === "undefined") {
-    return "http://localhost:5000/AFMCMESS/api";
+    return "http://localhost:7300/AFMCMESS/api";
   }
 
   const { protocol, hostname, port, origin } = window.location;
 
   if (hostname === "localhost" || hostname === "127.0.0.1") {
-    const backendOrigin = `${protocol}//${hostname}:5000`;
+    const backendOrigin = `${protocol}//${hostname}:7300`;
     return `${backendOrigin}/AFMCMESS/api`;
   }
 
   if (port === "3000") {
-    return `${protocol}//${hostname}:5000/AFMCMESS/api`;
+    return `${protocol}//${hostname}:7300/AFMCMESS/api`;
   }
 
   return `${origin}/AFMCMESS/api`;

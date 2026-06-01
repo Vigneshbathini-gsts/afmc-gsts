@@ -11,6 +11,12 @@ const INVENTORY_PAGE_SIZE = 20;
 const STOCK_TYPE_OPTIONS = ["Purchased", "Free"];
 
 const isValidBarcode = (value) => /^\d{4,32}$/.test(String(value || "").trim());
+const JPG_IMAGE_ERROR = "Only JPG image files are allowed.";
+const isJpgImageFile = (file) => {
+  if (!file) return true;
+  const fileName = String(file.name || "").toLowerCase();
+  return fileName.endsWith(".jpg") && (!file.type || file.type === "image/jpeg");
+};
 
 const toInitCap = (value) =>
   String(value || "")
@@ -496,6 +502,11 @@ export default function Inventory() {
       return;
     }
 
+    if (!isJpgImageFile(formValues.image)) {
+      setAddItemError(JPG_IMAGE_ERROR);
+      return;
+    }
+
     setSaving(true);
     setAddItemError("");
     try {
@@ -750,6 +761,11 @@ export default function Inventory() {
   const handleUpdateImage = async () => {
     if (!imageForm.itemCode || !imageForm.image) {
       setImageError("Please select an image.");
+      return;
+    }
+
+    if (!isJpgImageFile(imageForm.image)) {
+      setImageError(JPG_IMAGE_ERROR);
       return;
     }
 
@@ -1610,13 +1626,21 @@ export default function Inventory() {
                 </label>
                 <input
                   type="file"
-                  accept="image/*"
-                  onChange={(e) =>
+                  accept=".jpg"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null;
+                    if (file && !isJpgImageFile(file)) {
+                      e.target.value = "";
+                      setFormValues((prev) => ({ ...prev, image: null }));
+                      setAddItemError(JPG_IMAGE_ERROR);
+                      return;
+                    }
+                    setAddItemError("");
                     setFormValues((prev) => ({
                       ...prev,
-                      image: e.target.files?.[0] || null,
-                    }))
-                  }
+                      image: file,
+                    }));
+                  }}
                   className="w-full rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-4 py-3 text-gray-700"
                 />
               </div>
@@ -1806,18 +1830,27 @@ export default function Inventory() {
                 </label>
                 <input
                   type="file"
-                  accept="image/*"
-                  onChange={(e) =>
+                  accept=".jpg"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null;
+                    if (file && !isJpgImageFile(file)) {
+                      e.target.value = "";
+                      if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
+                      setImagePreviewUrl("");
+                      setImageError(JPG_IMAGE_ERROR);
+                      setImageForm((prev) => ({ ...prev, image: null }));
+                      return;
+                    }
+                    setImageError("");
                     setImageForm((prev) => {
-                      const file = e.target.files?.[0] || null;
                       if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
                       setImagePreviewUrl(file ? URL.createObjectURL(file) : "");
                       return {
                         ...prev,
                         image: file,
                       };
-                    })
-                  }
+                    });
+                  }}
                   className="w-full rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-4 py-3 text-gray-700"
                 />
               </div>

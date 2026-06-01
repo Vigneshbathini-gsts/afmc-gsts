@@ -136,6 +136,16 @@ for (const prefix of apiPrefixes) {
   app.get(`${prefix}/order-events`, orderEvents.authenticateEventRequest, orderEvents.subscribe);
 }
 
+app.use((err, req, res, next) => {
+  if (!err) return next();
+
+  const message = err.code === "LIMIT_FILE_SIZE"
+    ? "Image size must be 2MB or less."
+    : err.message || "Upload failed.";
+
+  res.status(400).json({ success: false, message });
+});
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
 
