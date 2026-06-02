@@ -76,6 +76,8 @@ function CategoryButton({ active, label, onClick }) {
 
 function getStockQuantity(item) {
   const rawValue =
+    item?.availableQuantity ??
+    item?.available_quantity ??
     item?.stockQuantity ??
     item?.stock_quantity ??
     item?.STOCK_QUANTITY ??
@@ -106,6 +108,11 @@ function isCocktailOrMocktailItem(item) {
 
   const categoryId = Number(item?.category_id ?? item?.categoryId);
   return !Number.isFinite(categoryId) || categoryId === 10;
+}
+
+function getMenuItemCode(item) {
+  const itemCode = Number(item?.item_code ?? item?.itemCode ?? item?.ITEM_CODE ?? item?.item_id);
+  return Number.isFinite(itemCode) && itemCode > 0 ? itemCode : null;
 }
 
 function MenuPopup({ item, loading, onClose }) {
@@ -777,6 +784,7 @@ function ProgressiveMenuGrid({
   step = 20,
 }) {
   const [visibleCount, setVisibleCount] = useState(initialCount);
+  const [availabilityByCode, setAvailabilityByCode] = useState({});
   const sentinelRef = React.useRef(null);
 
   useEffect(() => {
@@ -785,6 +793,74 @@ function ProgressiveMenuGrid({
 
   const hasMore = visibleCount < items.length;
   const slice = useMemo(() => items.slice(0, visibleCount), [items, visibleCount]);
+
+  useEffect(() => {
+    let alive = true;
+
+    const loadAvailability = async () => {
+      if (ignoreStockStatus || slice.length === 0) {
+        if (alive) setAvailabilityByCode({});
+        return;
+      }
+
+      const codes = [
+        ...new Set(
+          slice
+            .filter((item) => !isCocktailOrMocktailItem(item))
+            .map((item) => getMenuItemCode(item))
+            .filter((code) => Number.isFinite(code) && code > 0)
+        ),
+      ];
+
+      if (codes.length === 0) {
+        if (alive) setAvailabilityByCode({});
+        return;
+      }
+
+      try {
+        const response = await cartAPI.getIngredientStocks(codes);
+        const stockMap = response?.data?.data || {};
+        if (!alive) return;
+        setAvailabilityByCode((current) => {
+          const next = { ...current };
+          codes.forEach((code) => {
+            const rawValue = stockMap?.[String(code)];
+            const available = Number(rawValue);
+            if (Number.isFinite(available) && available >= 0) {
+              next[String(code)] = available;
+            }
+          });
+          return next;
+        });
+      } catch (error) {
+        if (!alive) return;
+        console.error("Menu stock availability fetch error:", error);
+      }
+    };
+
+    loadAvailability();
+    return () => {
+      alive = false;
+    };
+  }, [ignoreStockStatus, slice]);
+
+  const stockAwareItems = useMemo(() => {
+    if (ignoreStockStatus) return slice;
+
+    return slice.map((item) => {
+      if (isCocktailOrMocktailItem(item)) return item;
+      const itemCode = getMenuItemCode(item);
+      const availableQuantity = itemCode ? availabilityByCode[String(itemCode)] : undefined;
+      if (availableQuantity === undefined) return item;
+
+      return {
+        ...item,
+        availableQuantity,
+        stockQuantity: availableQuantity,
+        stock_status: availableQuantity === 0 ? "Out Of Stock" : item.stock_status,
+      };
+    });
+  }, [availabilityByCode, ignoreStockStatus, slice]);
 
   useEffect(() => {
     if (!hasMore) return undefined;
@@ -807,7 +883,7 @@ function ProgressiveMenuGrid({
   return (
     <div>
       <MenuGrid
-        items={slice}
+        items={stockAwareItems}
         showStockStatus={showStockStatus}
         ignoreStockStatus={ignoreStockStatus}
         onItemClick={onItemClick}
