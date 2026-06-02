@@ -445,14 +445,11 @@ export default function CartPage({ isAttendant = false }) {
                             ? cocktailDetailsStockStatus === "Out Of Stock"
                             : hasNoAvailableStock || (!hasKnownAvailableStock && isOutOfStock(item));
                     const imageStockMessage =
-                        !isCocktailItem && hasNoAvailableStock
-                            ? "Out of Stock"
-                            : isCocktailItem
-                            ? (
-                                stockLimitImageMessages[getStockLimitImageKey(item)] ||
-                                (effectiveOutOfStock ? "Out of Stock" : "")
-                            )
-                            : "";
+                        isCocktailItem
+                            ? ""
+                            : hasNoAvailableStock
+                                ? "Out of Stock"
+                                : stockLimitImageMessages[getStockLimitImageKey(item)] || "";
                     const stockStatusText = effectiveOutOfStock
                         ? "Out Of Stock"
                         : cocktailDetailsStockStatus || (hasKnownAvailableStock

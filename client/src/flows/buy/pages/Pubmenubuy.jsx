@@ -1304,7 +1304,7 @@ export default function Pubmenubuy({
     adjustQuantity(lineId, delta);
   };
 
-const removeItem = (id) => {
+const removeItem = async (id) => {
   if (disableEdit) {
     showToast("Editing is disabled on this page.", "error");
     return;
@@ -1318,43 +1318,50 @@ const removeItem = (id) => {
     return;
   }
 
-  setItems((current) => {
-    const target = current.find((item) => item.id === id);
+  const target = items.find((item) => Number(item.id) === Number(id));
 
-    if (!target) return current;
-    if (target.isFreeItem) return current;
+  if (!target) {
+    showToast("Unable to identify item for deletion.", "error");
+    return;
+  }
 
-    const targetCode = String(target.item_code || "").trim();
+  if (target.isFreeItem) {
+    showToast("Free items cannot be deleted directly.", "error");
+    return;
+  }
 
-    let updatedItems = [];
+  const targetCode = String(target.item_code || "").trim();
+  if (!orderNumber || !targetCode) {
+    showToast("Unable to delete this order item.", "error");
+    return;
+  }
 
-    if (!targetCode) {
-      updatedItems = current.filter((item) => item.id !== id);
-    } else {
-      // Remove parent + linked free items
-      updatedItems = current.filter((item) => {
-        if (item.id === id) return false;
-        return String(item.parentCode || "") !== targetCode;
+  try {
+    setUpdatingLineId(Number(target.orderLineId ?? target.id) || null);
+    setError("");
+    await Pubmenubuyservice.deleteItem(orderNumber, targetCode);
+
+    const updatedItems = items.filter((item) => {
+      if (Number(item.id) === Number(id)) return false;
+      return String(item.parentCode || "") !== targetCode;
+    });
+
+    setItems(updatedItems);
+    showToast("Item deleted successfully", "success");
+
+    const remainingPaidItems = updatedItems.filter((item) => !item.isFreeItem);
+    if (remainingPaidItems.length === 0) {
+      navigate(`${currentBasePath}/menudash`, {
+        replace: true,
       });
     }
-
-    const remainingPaidItems = updatedItems.filter(
-      (item) => !item.isFreeItem
-    );
-
-    // Navigate if no items left
-    if (remainingPaidItems.length === 0) {
-      // if (backTo) {
-      //   navigate(backTo, { replace: true });
-      // } else {
-        navigate(`${currentBasePath}/menudash`, {
-          replace: true,
-        });
-      // }
-    }
-
-    return updatedItems;
-  });
+  } catch (deleteError) {
+    const message = deleteError?.response?.data?.message || "Unable to delete this item.";
+    setError(message);
+    showToast(message, "error");
+  } finally {
+    setUpdatingLineId(null);
+  }
 };
 
   const handleCancelOrder = async () => {
@@ -1542,35 +1549,10 @@ const removeItem = (id) => {
                   .filter((item) => Number(item.quantity || 0) > 0)
                   .map((item) => {
                     const missingCocktailIngredients = hasMissingCocktailIngredients(orderNumber, item, cocktailDetailsByItemCode);
-                    const maxAllowed = getMaxAllowedQuantity(item);
-                    const cocktailOverride = getCocktailOverrideForItem(item);
                     const isCocktailItem = isCocktailOrMocktail(item);
-                    const isAtStockLimit =
-                      !isCocktailItem &&
-                      !item.isFreeItem &&
-                      Number.isFinite(Number(maxAllowed)) &&
-                      Number(maxAllowed) >= 0 &&
-                      Number(item.quantity || 0) >= Number(maxAllowed);
-                    const hasNormalStockIssue =
-                      !isCocktailItem &&
-                      !item.isFreeItem &&
-                      (
-                        String(item.stockIssueMessage || "").trim().length > 0 ||
-                        isOutOfStock(item) ||
-                        isAtStockLimit
-                      );
-                    const imageStockMessage =
-                      isCocktailItem
-                        ? (
-                          stockLimitImageMessages[getStockLimitImageKey(item)] ||
-                          (
-                            !item.isFreeItem &&
-                            (cocktailOverride?.isOutOfStock || isOutOfStock(item))
-                              ? "Out of Stock"
-                              : ""
-                          )
-                        )
-                        : "";
+                    const imageStockMessage = isCocktailItem
+                      ? ""
+                      : stockLimitImageMessages[getStockLimitImageKey(item)] || "";
                     const disablePlusForStock =
                       isCocktailItem
                         ? (() => {

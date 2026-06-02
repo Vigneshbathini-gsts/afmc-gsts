@@ -429,7 +429,7 @@ const updateCartCustomization = async (cartId, userId, updates) => {
           EXISTS (
             SELECT 1
             FROM xxafmc_cocktails_mocktails_details recipe
-            WHERE recipe.item_code = c.item_id
+            WHERE recipe.inventory_item_code = c.item_id
             LIMIT 1
           ) AS has_recipe
         FROM xxafmc_cart_items c
@@ -519,7 +519,7 @@ const addCartItem = async (userId, itemData) => {
          EXISTS (
            SELECT 1
            FROM xxafmc_cocktails_mocktails_details recipe
-           WHERE recipe.item_code = inv.item_code
+           WHERE recipe.inventory_item_code = inv.item_code
            LIMIT 1
          ) AS has_recipe
        FROM xxafmc_inventory inv
@@ -767,7 +767,7 @@ const getCartItemsByUser = async (userId) => {
       EXISTS (
         SELECT 1
         FROM xxafmc_cocktails_mocktails_details recipe
-        WHERE recipe.item_code = c.item_id
+        WHERE recipe.inventory_item_code = c.item_id
         LIMIT 1
       ) AS has_recipe,
       COALESCE(
@@ -930,7 +930,7 @@ const updateCartItemQuantity = async (cartId, userId, quantity) => {
          EXISTS (
            SELECT 1
            FROM xxafmc_cocktails_mocktails_details recipe
-           WHERE recipe.item_code = c.item_id
+           WHERE recipe.inventory_item_code = c.item_id
            LIMIT 1
          ) AS has_recipe
        FROM xxafmc_cart_items c
@@ -1139,7 +1139,7 @@ const getCartItemById = async (cartId, userId) => {
        EXISTS (
          SELECT 1
          FROM xxafmc_cocktails_mocktails_details recipe
-         WHERE recipe.item_code = c.item_id
+         WHERE recipe.inventory_item_code = c.item_id
          LIMIT 1
        ) AS has_recipe
      FROM xxafmc_cart_items c
@@ -1165,7 +1165,7 @@ const getCartItemByCode = async (userId, itemCode) => {
        EXISTS (
          SELECT 1
          FROM xxafmc_cocktails_mocktails_details recipe
-         WHERE recipe.item_code = c.item_id
+         WHERE recipe.inventory_item_code = c.item_id
          LIMIT 1
        ) AS has_recipe
      FROM xxafmc_cart_items c

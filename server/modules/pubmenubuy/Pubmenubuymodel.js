@@ -1367,6 +1367,26 @@ async function deleteOrderItem(orderNumber, itemCode) {
       [normalizedOrderNumber, existingRow.order_line_id, normalizedItemCode]
     );
 
+    if (isMocktailItem) {
+      await connection.execute(
+        `
+          DELETE FROM xxafmc_custom_cocktails_mocktails_details
+          WHERE order_number = ?
+            AND inventory_item_code = ?
+        `,
+        [normalizedOrderNumber, normalizedItemCode]
+      );
+
+      await connection.execute(
+        `
+          DELETE FROM xxafmc_custom_cocktails_mocktails_details_dummy
+          WHERE order_number = ?
+            AND inventory_item_code = ?
+        `,
+        [normalizedOrderNumber, normalizedItemCode]
+      );
+    }
+
     const [[remainingRow]] = await connection.execute(
       `
         SELECT COUNT(*) AS rowCount
