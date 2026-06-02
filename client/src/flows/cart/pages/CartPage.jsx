@@ -103,6 +103,14 @@ export default function CartPage({ isAttendant = false }) {
             ...current,
             [key]: message,
         }));
+        window.setTimeout(() => {
+            setStockLimitImageMessages((current) => {
+                if (current[key] !== message) return current;
+                const next = { ...current };
+                delete next[key];
+                return next;
+            });
+        }, 3000);
     }, [getStockLimitImageKey]);
 
     const clearStockLimitOnImage = useCallback((item) => {
@@ -165,6 +173,7 @@ export default function CartPage({ isAttendant = false }) {
         if (newQuantity < 1) return;
 
         setUpdatingItemId(cartId);
+        setError(null);
 
         // Validate cocktail/mocktail ingredient stocks before updating
         try {
@@ -247,7 +256,6 @@ export default function CartPage({ isAttendant = false }) {
             setCartCount(items.length);
             showToast("Quantity updated successfully");
         } catch (err) {
-            setError(err?.response?.data?.message || "Unable to update quantity");
             showToast(err?.response?.data?.message || "Failed to update quantity", 'error');
         } finally {
             setUpdatingItemId(null);
@@ -413,7 +421,19 @@ export default function CartPage({ isAttendant = false }) {
             {/* Cart Items Grid */}
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {cartItems.map((item) => {
-                    const maxAllowed = getMaxAllowedQuantity(item);
+                    const isCocktailItem = isCocktailOrMocktail(item);
+                    const cocktailDetails = isCocktailItem ? cocktailDetailsByCartId[String(item.cartId)] : null;
+                    const cocktailDetailsStockStatus = Array.isArray(cocktailDetails) && cocktailDetails.length > 0
+                        ? (
+                            cocktailDetails.every((detail) => {
+                                const status = String(detail?.stockStatus ?? detail?.stock_status ?? "").trim().toLowerCase();
+                                return status === "in stock";
+                            })
+                                ? "In Stock"
+                                : "Out Of Stock"
+                        )
+                        : null;
+                    const maxAllowed = isCocktailItem ? null : getMaxAllowedQuantity(item);
                     const hasNoAvailableStock =
                         Number.isFinite(Number(maxAllowed)) &&
                         Number(maxAllowed) === 0;
@@ -421,10 +441,11 @@ export default function CartPage({ isAttendant = false }) {
                         Number.isFinite(Number(maxAllowed)) &&
                         Number(maxAllowed) > 0;
                     const effectiveOutOfStock =
-                        hasNoAvailableStock || (!hasKnownAvailableStock && isOutOfStock(item));
-                    const isCocktailItem = isCocktailOrMocktail(item);
+                        isCocktailItem
+                            ? cocktailDetailsStockStatus === "Out Of Stock"
+                            : hasNoAvailableStock || (!hasKnownAvailableStock && isOutOfStock(item));
                     const imageStockMessage =
-                        hasNoAvailableStock
+                        !isCocktailItem && hasNoAvailableStock
                             ? "Out of Stock"
                             : isCocktailItem
                             ? (
@@ -434,9 +455,9 @@ export default function CartPage({ isAttendant = false }) {
                             : "";
                     const stockStatusText = effectiveOutOfStock
                         ? "Out Of Stock"
-                        : hasKnownAvailableStock
+                        : cocktailDetailsStockStatus || (hasKnownAvailableStock
                             ? "In Stock"
-                            : item.stockStatus;
+                            : item.stockStatus);
 
                     return (
                         <div
@@ -464,8 +485,8 @@ export default function CartPage({ isAttendant = false }) {
                                     ) : null}
                                     {/* Action Buttons Overlay - Top Right */}
                                     <div className="absolute right-1 top-1 flex gap-1 z-10">
-                                        {/* Edit Button - Only show for items with subcategory 14 or 15 (cocktail/mocktail) */}
-                                        {item.subcategory && [14, 15].includes(Number(item.subcategory)) && !item.isFreeItem && (
+                                        {/* Edit Button - Only show for customizable cocktail/mocktail recipe items */}
+                                        {isCocktailItem && !item.isFreeItem && (
                                             <button
                                                 type="button"
                                                 onClick={() => handleEditItem(item.itemId, item.cartId)}

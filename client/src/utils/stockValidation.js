@@ -1,5 +1,9 @@
 export function isCocktailOrMocktail(item) {
-  return [14, 15].includes(Number(item?.subcategory));
+  return (
+    [14, 15].includes(Number(item?.subcategory)) ||
+    Boolean(item?.canEdit) ||
+    Boolean(item?.hasRecipe)
+  );
 }
 
 function toFiniteNumber(value) {

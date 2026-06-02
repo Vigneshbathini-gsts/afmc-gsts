@@ -90,7 +90,8 @@ const getCartQuantity = async (conn, userId, itemCode, priceZero = false, parent
 };
 
 const isCocktailOrMocktailInfo = (itemInfo) =>
-  Number(itemInfo?.category_id) === 10 && [14, 15].includes(Number(itemInfo?.sub_category));
+  (Number(itemInfo?.category_id) === 10 && [14, 15].includes(Number(itemInfo?.sub_category))) ||
+  Number(itemInfo?.has_recipe || 0) > 0;
 
 const ensureCustomizationTable = async (conn = db) => {
   await conn.execute(`
@@ -419,7 +420,18 @@ const updateCartCustomization = async (cartId, userId, updates) => {
 
     const [cartRows] = await conn.execute(
       `
-        SELECT c.cart_id, c.item_id, c.quantity, xi.category_id, xi.sub_category
+        SELECT
+          c.cart_id,
+          c.item_id,
+          c.quantity,
+          xi.category_id,
+          xi.sub_category,
+          EXISTS (
+            SELECT 1
+            FROM xxafmc_cocktails_mocktails_details recipe
+            WHERE recipe.item_code = c.item_id
+            LIMIT 1
+          ) AS has_recipe
         FROM xxafmc_cart_items c
         LEFT JOIN xxafmc_inventory xi ON c.item_id = xi.item_code
         WHERE c.cart_id = ?
@@ -496,9 +508,22 @@ const addCartItem = async (userId, itemData) => {
     const resolvedItemCode = Number(resolvedRow?.item_code || requestedId);
 
     const [[itemInfo]] = await conn.execute(
-      `SELECT category_id, sub_category, profit, non_member_profit, food_pr_charges, pr_charges, item_name
-         FROM xxafmc_inventory
-         WHERE item_code = ?`,
+      `SELECT
+         inv.category_id,
+         inv.sub_category,
+         inv.profit,
+         inv.non_member_profit,
+         inv.food_pr_charges,
+         inv.pr_charges,
+         inv.item_name,
+         EXISTS (
+           SELECT 1
+           FROM xxafmc_cocktails_mocktails_details recipe
+           WHERE recipe.item_code = inv.item_code
+           LIMIT 1
+         ) AS has_recipe
+       FROM xxafmc_inventory inv
+       WHERE inv.item_code = ?`,
       [resolvedItemCode]
     );
 
@@ -739,6 +764,12 @@ const getCartItemsByUser = async (userId) => {
       xi.category_id,
       c.subcategory,
       xi.sub_category AS inventory_subcategory,
+      EXISTS (
+        SELECT 1
+        FROM xxafmc_cocktails_mocktails_details recipe
+        WHERE recipe.item_code = c.item_id
+        LIMIT 1
+      ) AS has_recipe,
       COALESCE(
         (SELECT SUM(stock_quantity)
          FROM xxafmc_stock_out
@@ -761,7 +792,11 @@ const getCartItemsByUser = async (userId) => {
   const reservedMap = await getReservedTotalsQuantities(db, itemCodes);
 
   const cocktailCartIds = rows
-    .filter((row) => [14, 15].includes(Number(row.inventory_subcategory || 0)) && Number(row.price ?? row.inventory_price ?? 0) !== 0)
+    .filter((row) => isCocktailOrMocktailInfo({
+      category_id: row.category_id,
+      sub_category: row.inventory_subcategory,
+      has_recipe: row.has_recipe,
+    }) && Number(row.price ?? row.inventory_price ?? 0) !== 0)
     .map((row) => Number(row.cart_id))
     .filter((id) => Number.isFinite(id) && id > 0);
 
@@ -819,7 +854,11 @@ const getCartItemsByUser = async (userId) => {
     const subcategory = Number(row.inventory_subcategory || 0);
     const isFreeItem = price === 0;
 
-    const isCocktailItem = [14, 15].includes(subcategory);
+    const isCocktailItem = isCocktailOrMocktailInfo({
+      category_id: row.category_id,
+      sub_category: row.inventory_subcategory,
+      has_recipe: row.has_recipe,
+    });
 
     const canEdit = isCocktailItem && !isFreeItem;
 
@@ -861,6 +900,7 @@ const getCartItemsByUser = async (userId) => {
       stockStatus,
       isFreeItem,
       canEdit,
+      hasRecipe: Number(row.has_recipe || 0) > 0,
     };
   });
 };
@@ -882,7 +922,17 @@ const updateCartItemQuantity = async (cartId, userId, quantity) => {
 
     // Get current item details
     const [current] = await conn.execute(
-      `SELECT c.item_id, c.quantity, xi.category_id, xi.sub_category
+      `SELECT
+         c.item_id,
+         c.quantity,
+         xi.category_id,
+         xi.sub_category,
+         EXISTS (
+           SELECT 1
+           FROM xxafmc_cocktails_mocktails_details recipe
+           WHERE recipe.item_code = c.item_id
+           LIMIT 1
+         ) AS has_recipe
        FROM xxafmc_cart_items c
        LEFT JOIN xxafmc_inventory xi ON c.item_id = xi.item_code
        WHERE c.cart_id = ? AND c.user_id = ?`,
@@ -894,7 +944,7 @@ const updateCartItemQuantity = async (cartId, userId, quantity) => {
     }
 
     const itemId = current[0].item_id;
-    const isCocktailOrMocktail = current[0].category_id === 10 && [14, 15].includes(current[0].sub_category);
+    const isCocktailOrMocktail = isCocktailOrMocktailInfo(current[0]);
 
     // -------------------------------
     // 2. VALIDATE MAIN ITEM STOCK ON QUANTITY CHANGE
@@ -1080,7 +1130,18 @@ const deleteCartItem = async (cartId, userId) => {
 
 const getCartItemById = async (cartId, userId) => {
   const [rows] = await db.execute(
-    `SELECT c.cart_id, c.item_id, c.quantity, xi.category_id, xi.sub_category
+    `SELECT
+       c.cart_id,
+       c.item_id,
+       c.quantity,
+       xi.category_id,
+       xi.sub_category,
+       EXISTS (
+         SELECT 1
+         FROM xxafmc_cocktails_mocktails_details recipe
+         WHERE recipe.item_code = c.item_id
+         LIMIT 1
+       ) AS has_recipe
      FROM xxafmc_cart_items c
      LEFT JOIN xxafmc_inventory xi ON c.item_id = xi.item_code
      WHERE c.cart_id = ?
@@ -1095,7 +1156,18 @@ const getCartItemById = async (cartId, userId) => {
 
 const getCartItemByCode = async (userId, itemCode) => {
   const [rows] = await db.execute(
-    `SELECT c.cart_id, c.item_id, c.quantity, xi.category_id, xi.sub_category
+    `SELECT
+       c.cart_id,
+       c.item_id,
+       c.quantity,
+       xi.category_id,
+       xi.sub_category,
+       EXISTS (
+         SELECT 1
+         FROM xxafmc_cocktails_mocktails_details recipe
+         WHERE recipe.item_code = c.item_id
+         LIMIT 1
+       ) AS has_recipe
      FROM xxafmc_cart_items c
      LEFT JOIN xxafmc_inventory xi ON c.item_id = xi.item_code
      WHERE c.user_id = ?

@@ -213,7 +213,9 @@ const getCartItemByCode = async (req, itemCode) => {
 
 const isCocktailCartItem = (cartItem) => {
   return Boolean(
-    cartItem && cartItem.category_id === 10 && [14, 15].includes(Number(cartItem.sub_category))
+    cartItem &&
+      ((cartItem.category_id === 10 && [14, 15].includes(Number(cartItem.sub_category))) ||
+        Number(cartItem.has_recipe || 0) > 0)
   );
 };
 
