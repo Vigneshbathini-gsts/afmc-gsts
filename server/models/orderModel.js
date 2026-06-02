@@ -305,7 +305,7 @@ async function getOrderDetails(orderNumber) {
   od.quantity,
   ROUND(
     CASE
-      WHEN scanned_totals.unit_scanned_total > 0 THEN scanned_totals.unit_scanned_total
+      WHEN scanned_totals.scanned_total > 0 THEN scanned_totals.scanned_total / NULLIF(od.quantity, 0)
       WHEN custom_totals.unit_custom_total > 0 THEN custom_totals.unit_custom_total
       ELSE COALESCE(od.price, od.subtotal / NULLIF(od.quantity, 0), 0)
     END,
@@ -344,8 +344,7 @@ LEFT JOIN (
     SELECT
       order_number,
       inventory_item_code,
-      ROUND(SUM(IFNULL(scan_quantity, 0) * IFNULL(item_price, 0)), 2) AS scanned_total,
-      ROUND(SUM(IFNULL(scan_quantity, 0) * IFNULL(item_price, 0)) / NULLIF(SUM(IFNULL(scan_quantity, 0)), 0), 2) AS unit_scanned_total
+      ROUND(SUM(IFNULL(scan_quantity, 0) * IFNULL(item_price, 0)), 2) AS scanned_total
     FROM order_scan_collection
     WHERE collection_name = 'S_COLLECTION'
     GROUP BY order_number, inventory_item_code
