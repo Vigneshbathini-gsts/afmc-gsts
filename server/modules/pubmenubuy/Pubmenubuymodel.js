@@ -2114,6 +2114,28 @@ async function updateOrderLineQuantity(orderNumber, orderLineId, userId, quantit
       ]
     );
 
+    if (isCocktailOrMocktail) {
+      await connection.execute(
+        `
+          UPDATE xxafmc_custom_cocktails_mocktails_details
+          SET quantity = ?
+          WHERE order_number = ?
+            AND inventory_item_code = ?
+        `,
+        [normalizedQuantity, normalizedOrderNumber, itemId]
+      );
+
+      await connection.execute(
+        `
+          UPDATE xxafmc_custom_cocktails_mocktails_details_dummy
+          SET quantity = ?
+          WHERE order_number = ?
+            AND inventory_item_code = ?
+        `,
+        [normalizedQuantity, normalizedOrderNumber, itemId]
+      );
+    }
+
     // -------------------------------------------------------
     // Offer handling
     // -------------------------------------------------------

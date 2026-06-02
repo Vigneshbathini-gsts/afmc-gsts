@@ -524,6 +524,34 @@ async function applyCocktailCustomizations(connection, {
   }
 }
 
+async function syncCocktailCustomizationQuantities(connection, orderNumber) {
+  await connection.execute(
+    `
+      UPDATE xxafmc_custom_cocktails_mocktails_details c
+      JOIN xxafmc_order_details od
+        ON od.order_id = c.order_number
+        AND od.item_id = c.inventory_item_code
+        AND NOT (IFNULL(od.price, 0) = 0 AND IFNULL(od.subtotal, 0) = 0)
+      SET c.quantity = od.quantity
+      WHERE c.order_number = ?
+    `,
+    [orderNumber]
+  );
+
+  await connection.execute(
+    `
+      UPDATE xxafmc_custom_cocktails_mocktails_details_dummy c
+      JOIN xxafmc_order_details od
+        ON od.order_id = c.order_number
+        AND od.item_id = c.inventory_item_code
+        AND NOT (IFNULL(od.price, 0) = 0 AND IFNULL(od.subtotal, 0) = 0)
+      SET c.quantity = od.quantity
+      WHERE c.order_number = ?
+    `,
+    [orderNumber]
+  );
+}
+
 async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
   const normalizedOrderNumber = Number(orderNumber);
   if (!Number.isFinite(normalizedOrderNumber) || normalizedOrderNumber <= 0) {
@@ -905,6 +933,8 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
       detailRows,
       payload,
     });
+
+    await syncCocktailCustomizationQuantities(connection, normalizedOrderNumber);
 
     const cocktailMaxMap = await getCocktailMaxQuantityMap(connection, normalizedOrderNumber, cocktailItemIds);
 

@@ -579,11 +579,19 @@ async function getUserOrderHistory({ fromDate, toDate, username, appUser }) {
           )
         ) AS first_name,
         CASE 
-  WHEN MAX(xxod.payment_status) = 'Paid' 
-  THEN 1
-  ELSE 0
-END AS is_paid,
+          WHEN MAX(inv.payment_status) = 'Paid' OR MAX(xxod.payment_status) = 'Paid'
+          THEN 1
+          ELSE 0
+        END AS is_paid,
+        IFNULL(
+          CONCAT(
+            UCASE(LEFT(MAX(inv.payment_method), 1)),
+            LCASE(SUBSTRING(MAX(inv.payment_method), 2))
+          ),
+          ''
+        ) AS payment_method,
         CASE  
+          WHEN MAX(inv.payment_status) IS NOT NULL THEN MAX(inv.payment_status)
           WHEN MAX(xxod.payment_status) IS NULL THEN 'Un Paid'
           ELSE MAX(xxod.payment_status)
         END AS payment_status1
@@ -592,6 +600,7 @@ END AS is_paid,
       JOIN xxafmc_inventory xxui ON xxod.item_id = xxui.item_code
       JOIN xxafmc_kitchen_notification xxkn ON xxod.order_id = xxkn.ordernumber
       JOIN xxafmc_users xu ON xxkn.user_name = xu.user_id
+      LEFT JOIN xxafmc_invoices inv ON inv.order_num = xxoh.order_num
       WHERE UPPER(xu.user_name) = UPPER(?)
         AND xxoh.order_num IN (
           SELECT ordernumber

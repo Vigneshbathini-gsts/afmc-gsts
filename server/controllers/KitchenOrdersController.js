@@ -1278,10 +1278,24 @@ exports.getCocktailDetailsById = async (req, res) => {
         XCMD.ITEM_NAME,
         XCMD.ITEM_CODE,
         XCMD.PEGS,
-        XCMD.QUANTITY
+        COALESCE(XOD.QUANTITY, XCMD.QUANTITY) AS QUANTITY
       FROM xxafmc_order_details XOD
       JOIN xxafmc_custom_cocktails_mocktails_details XCMD ON XOD.ITEM_ID = XCMD.INVENTORY_ITEM_CODE
-      WHERE XCMD.ORDER_NUMBER = ?
+      WHERE XOD.ORDER_ID = ?
+        AND XCMD.ORDER_NUMBER = ?
+        AND XCMD.INVENTORY_ITEM_CODE = ?
+
+      UNION
+
+      SELECT DISTINCT 
+        XCMD.ITEM_NAME,
+        XCMD.ITEM_CODE,
+        XCMD.PEGS,
+        COALESCE(XOD.QUANTITY, XCMD.QUANTITY) AS QUANTITY
+      FROM xxafmc_order_details XOD
+      JOIN xxafmc_custom_cocktails_mocktails_details_dummy XCMD ON XOD.ITEM_ID = XCMD.INVENTORY_ITEM_CODE
+      WHERE XOD.ORDER_ID = ?
+        AND XCMD.ORDER_NUMBER = ?
         AND XCMD.INVENTORY_ITEM_CODE = ?
       
       UNION
@@ -1290,7 +1304,7 @@ exports.getCocktailDetailsById = async (req, res) => {
         XCMD.ITEM_NAME,
         XCMD.ITEM_CODE,
         XCMD.PEGS,
-        XCMD.QUANTITY
+        COALESCE(XOD.QUANTITY, XCMD.QUANTITY) AS QUANTITY
       FROM xxafmc_order_details XOD
       JOIN xxafmc_cocktails_mocktails_details XCMD ON XOD.ITEM_ID = XCMD.INVENTORY_ITEM_CODE
       WHERE XOD.ORDER_ID = ?
@@ -1302,7 +1316,7 @@ exports.getCocktailDetailsById = async (req, res) => {
             AND X.ORDER_NUMBER = ?
         )
       `,
-      [orderNumber, itemId, orderNumber, itemId, orderNumber]
+      [orderNumber, orderNumber, itemId, orderNumber, orderNumber, itemId, orderNumber, itemId, orderNumber]
     );
 
     if (ingredients.length === 0) {
