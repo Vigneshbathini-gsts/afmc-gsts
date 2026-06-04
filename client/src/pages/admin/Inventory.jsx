@@ -2,13 +2,14 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { FaArrowLeft, FaChevronDown, FaSearch, FaPen, FaTrash, FaCamera } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import BarcodeScanner from "../../components/common/BarcodeScanner";
-import { API_BASE_URL, inventoryAPI } from "../../services/api";
+import { inventoryAPI } from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
 
 
 const requiresVolume = (acUnit) => String(acUnit || "").trim().toUpperCase() !== "NOS";
 const INVENTORY_PAGE_SIZE = 20;
 const STOCK_TYPE_OPTIONS = ["Purchased", "Free"];
+const INVENTORY_IMAGE_BASE_URL = "https://afmc.globalsparkteksolutions.com/AFMCIMAGES/";
 
 const isValidBarcode = (value) => /^\d{4,32}$/.test(String(value || "").trim());
 const JPG_IMAGE_ERROR = "Only JPG image files are allowed.";
@@ -566,13 +567,21 @@ export default function Inventory() {
   };
 
   const openImageModal = (row) => {
+    const currentImage =
+      row.file_name ||
+      row.fileName ||
+      row.filename ||
+      row.image ||
+      row.IMAGE ||
+      "";
+
     setImageError("");
     setImagePreviewUrl("");
     setImageForm({
       itemCode: row.item_code,
       itemName: row.item_name,
       image: null,
-      currentImage: row.file_name || "",
+      currentImage,
     });
     setShowImageModal(true);
   };
@@ -823,12 +832,7 @@ export default function Inventory() {
     const raw = String(fileName).trim();
     if (!raw) return "";
     if (/^https?:\/\//i.test(raw)) return raw;
-    const baseUrl =
-      API_BASE_URL || process.env.REACT_APP_API_URL || "http://localhost:7300/AFMCMESS/api";
-    const cleanBase = baseUrl.replace(/\/api\/?$/, "");
-    const normalizedName = raw.split(/[\\/]/).pop();
-    const encodedName = encodeURIComponent(normalizedName);
-    return `${cleanBase}/uploads/${encodedName}`;
+    return `${INVENTORY_IMAGE_BASE_URL}${raw.replace(/^\/+/, "")}`;
   };
 
   return (
