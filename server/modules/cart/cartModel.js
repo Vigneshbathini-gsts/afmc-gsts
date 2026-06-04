@@ -1252,7 +1252,65 @@ const getLovIngredients = async (subCategory) => {
   }
 };
 
-const getIngredientStockMap = async (itemCodes) => {
+const getReservedQuantitiesForOrder = async (connection, itemCodes, excludeOrderNumber) => {
+  const normalizedOrderNumber = Number(excludeOrderNumber);
+  if (!Number.isFinite(normalizedOrderNumber) || normalizedOrderNumber <= 0) {
+    return {};
+  }
+
+  const normalizedCodes = [...new Set((Array.isArray(itemCodes) ? itemCodes : [])
+    .map((code) => Number(code))
+    .filter((code) => Number.isFinite(code) && code > 0))];
+
+  if (normalizedCodes.length === 0) {
+    return {};
+  }
+
+  const placeholders = normalizedCodes.map(() => "?").join(",");
+  const [regularRows] = await connection.query(
+    `
+      SELECT item_id AS itemCode, IFNULL(SUM(quantity), 0) AS quantity
+      FROM xxafmc_order_details
+      WHERE order_id = ?
+        AND item_id IN (${placeholders})
+        AND (order_status IS NULL OR TRIM(order_status) = '')
+      GROUP BY item_id
+    `,
+    [normalizedOrderNumber, ...normalizedCodes]
+  );
+
+  const [ingredientRows] = await connection.query(
+    `
+      SELECT
+        c.item_code AS itemCode,
+        IFNULL(SUM(IFNULL(c.pegs, 0) * IFNULL(od.quantity, 0)), 0) AS quantity
+      FROM (
+        SELECT order_number, inventory_item_code, item_code, pegs
+        FROM xxafmc_custom_cocktails_mocktails_details
+        WHERE order_number = ?
+        UNION ALL
+        SELECT order_number, inventory_item_code, item_code, pegs
+        FROM xxafmc_custom_cocktails_mocktails_details_dummy
+        WHERE order_number = ?
+      ) c
+      INNER JOIN xxafmc_order_details od
+        ON od.order_id = c.order_number
+        AND od.item_id = c.inventory_item_code
+        AND (od.order_status IS NULL OR TRIM(od.order_status) = '')
+      WHERE c.item_code IN (${placeholders})
+      GROUP BY c.item_code
+    `,
+    [normalizedOrderNumber, normalizedOrderNumber, ...normalizedCodes]
+  );
+
+  return [...regularRows, ...ingredientRows].reduce((acc, row) => {
+    const key = String(row.itemCode);
+    acc[key] = Number(acc[key] || 0) + Number(row.quantity || 0);
+    return acc;
+  }, {});
+};
+
+const getIngredientStockMap = async (itemCodes, excludeOrderNumber = null) => {
   let connection;
 
   const normalizedCodes = [...new Set((Array.isArray(itemCodes) ? itemCodes : [])
@@ -1267,12 +1325,26 @@ const getIngredientStockMap = async (itemCodes) => {
     connection = await db.getConnection();
 
     const placeholders = normalizedCodes.map(() => "?").join(",");
+    const excludedReservedMap = await getReservedQuantitiesForOrder(
+      connection,
+      normalizedCodes,
+      excludeOrderNumber
+    );
+
+    const excludedReservedCase = normalizedCodes.length > 0
+      ? `CASE xi.item_code ${normalizedCodes.map(() => "WHEN ? THEN ?").join(" ")} ELSE 0 END`
+      : "0";
+    const excludedReservedParams = normalizedCodes.flatMap((code) => [
+      code,
+      Number(excludedReservedMap[String(code)] || 0),
+    ]);
+
     const query = `
       SELECT
         xi.item_code AS itemCode,
         GREATEST(
           GREATEST(IFNULL(xi.stock_quantity, 0), IFNULL(stock_summary.stock_quantity, 0))
-            - IFNULL(reserved_summary.reserved_quantity, 0),
+            - GREATEST(IFNULL(reserved_summary.reserved_quantity, 0) - (${excludedReservedCase}), 0),
           0
         ) AS stockQuantity
       FROM xxafmc_inventory xi
@@ -1290,7 +1362,7 @@ const getIngredientStockMap = async (itemCodes) => {
       WHERE xi.item_code IN (${placeholders})
     `;
 
-    const [rows] = await connection.query(query, normalizedCodes);
+    const [rows] = await connection.query(query, [...excludedReservedParams, ...normalizedCodes]);
 
     return rows.reduce((acc, row) => {
       acc[String(row.itemCode)] = Number(row.stockQuantity || 0);

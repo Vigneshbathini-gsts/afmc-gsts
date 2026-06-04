@@ -17,11 +17,6 @@ const normalizeDetail = (detail) => detail && ({
     stockStatus: getDetailStockStatus(detail),
 });
 
-const isUnknownStockStatus = (status) => {
-    const normalized = String(status || "").trim().toLowerCase();
-    return !normalized || normalized === "unknown";
-};
-
 export default function ItemDetails() {
     const { id } = useParams();
     const navigate = useNavigate();
@@ -128,34 +123,6 @@ export default function ItemDetails() {
                         }
                     }
 
-                    // For buy-flow edits, prefilled ingredients often don't carry live stock data.
-                    // Enrich them using the cart stock endpoint so status matches cart flow.
-                    if (!isEditingCartItem && fromBuyFlow && Array.isArray(details) && details.length > 0) {
-                        try {
-                            const codes = details
-                                .map((detail) => Number(getDetailItemCode(detail)))
-                                .filter((code) => Number.isFinite(code) && code > 0);
-                            if (codes.length > 0) {
-                                const stockRes = await cartAPI.getIngredientStocks(codes, buyOrderNumber);
-                                const stockMap = stockRes?.data?.data || {};
-                                details = details.map((detail) => {
-                                    const itemCode = Number(getDetailItemCode(detail));
-                                    const stockQuantity = stockMap?.[String(itemCode)];
-                                    if (stockQuantity === undefined) return normalizeDetail(detail);
-                                    return normalizeDetail({
-                                        ...detail,
-                                        stockQuantity,
-                                        stockStatus: isUnknownStockStatus(getDetailStockStatus(detail))
-                                            ? (Number(stockQuantity) > 0 ? "In Stock" : "Out Of Stock")
-                                            : getDetailStockStatus(detail),
-                                    });
-                                });
-                            }
-                        } catch (err) {
-                            console.warn("Could not enrich ingredient stocks:", err);
-                        }
-                    }
-
                     details.forEach((detail, idx) => {
                         const pegs = getDetailPegs(detail);
                         const fallbackQty = detail?.quantity ?? detail?.QUANTITY;
@@ -206,6 +173,46 @@ export default function ItemDetails() {
                         }
                     }
 
+                    // Always refresh ingredient stock from the cart stock endpoint.
+                    // That endpoint returns available stock after subtracting reserved stock.
+                    if (Array.isArray(details) && details.length > 0) {
+                        try {
+                            const codes = [...new Set(details
+                                .map((detail) => Number(getDetailItemCode(detail)))
+                                .filter((code) => Number.isFinite(code) && code > 0))];
+                            if (codes.length > 0) {
+                                const stockRes = await cartAPI.getIngredientStocks(
+                                    codes,
+                                    fromBuyFlow ? buyOrderNumber : undefined
+                                );
+                                const stockMap = stockRes?.data?.data || {};
+                                details = details.map((detail, idx) => {
+                                    const itemCode = Number(getDetailItemCode(detail));
+                                    const stockQuantity = stockMap?.[String(itemCode)];
+                                    if (stockQuantity === undefined) return normalizeDetail(detail);
+
+                                    const requiredQuantity = getDetailRequiredQuantity(detail);
+                                    const displayRequired =
+                                        requiredQuantity != null
+                                            ? Number(requiredQuantity)
+                                            : Number(initialQuantities?.[idx] ?? getDetailPegs(detail) ?? 1);
+                                    const stockStatus =
+                                        Number(stockQuantity) >= (Number.isFinite(displayRequired) ? displayRequired : 1)
+                                            ? "In Stock"
+                                            : "Out Of Stock";
+
+                                    return normalizeDetail({
+                                        ...detail,
+                                        stockQuantity,
+                                        stockStatus,
+                                    });
+                                });
+                            }
+                        } catch (err) {
+                            console.warn("Could not enrich ingredient stocks:", err);
+                        }
+                    }
+
                     if (!isEditingCartItem && Array.isArray(prefillDetails) && prefillDetails.length > 0) {
                         try {
                             localStorage.setItem(draftKey, JSON.stringify({ details, quantities: initialQuantities }));
@@ -230,7 +237,7 @@ export default function ItemDetails() {
         if (id) {
             fetchItemDetails();
         }
-    }, [cartId, draftKey, id, isEditingCartItem, prefillDetails]);
+    }, [buyOrderNumber, cartId, draftKey, fromBuyFlow, id, isEditingCartItem, prefillDetails]);
 
     const updateQuantity = async (index, delta) => {
         const oldQty = quantities[index] || 1;
