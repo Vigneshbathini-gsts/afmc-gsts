@@ -21,17 +21,18 @@ async function getAdminOrderHistory({
       SELECT
         xxoh.order_num,
         MAX(
-          IFNULL(
+          COALESCE(
             (
-              SELECT xnm.first_name
+              SELECT NULLIF(TRIM(xnm.first_name), '')
               FROM xxafmc_non_members xnm
               WHERE xnm.id = xxoh.member_id
             ),
             (
-              SELECT xu2.first_name
+              SELECT NULLIF(TRIM(xu2.first_name), '')
               FROM xxafmc_users xu2
               WHERE xu2.user_id = xxoh.user_id
-            )
+            ),
+            CONCAT('Order ', xxoh.order_num)
           )
         ) AS first_name,
         CASE
@@ -86,12 +87,12 @@ async function getAdminOrderHistory({
         OR UPPER(
           IFNULL(
             (
-              SELECT first_name
+              SELECT NULLIF(TRIM(first_name), '')
               FROM xxafmc_non_members
               WHERE id = xxoh.member_id
             ),
             (
-              SELECT first_name
+              SELECT NULLIF(TRIM(first_name), '')
               FROM xxafmc_users
               WHERE user_id = xxoh.user_id
             )
@@ -144,12 +145,12 @@ async function getAdminOrderHistory({
             OR UPPER(
               IFNULL(
                 (
-                  SELECT first_name
+                  SELECT NULLIF(TRIM(first_name), '')
                   FROM xxafmc_non_members
                   WHERE id = xxoh.member_id
                 ),
                 (
-                  SELECT first_name
+                  SELECT NULLIF(TRIM(first_name), '')
                   FROM xxafmc_users
                   WHERE user_id = xxoh.user_id
                 )
@@ -204,8 +205,8 @@ async function getActiveOrders({
   DATE_FORMAT(oh.order_date, '%c/%e/%Y') AS order_date,
   oh.order_date AS creation_date,
 
-  COALESCE(MAX(nm.first_name), MAX(customer.first_name), '') AS first_name,
-  COALESCE(MAX(nm.phone_number), MAX(customer.phone_number), '') AS phone_number,
+  COALESCE(NULLIF(TRIM(MAX(nm.first_name)), ''), NULLIF(TRIM(MAX(customer.first_name)), ''), CONCAT('Order ', oh.order_num)) AS first_name,
+  COALESCE(NULLIF(TRIM(MAX(nm.phone_number)), ''), NULLIF(TRIM(MAX(customer.phone_number)), ''), '') AS phone_number,
 
   ROUND(MAX(oh.order_total), 2) AS order_total,
 
@@ -572,9 +573,10 @@ async function getUserOrderHistory({ fromDate, toDate, username, appUser }) {
         END AS status,
         DATE_FORMAT(MAX(xxod.creation_date), '%Y-%m-%d %H:%i:%s') AS creation_date,
         MAX(
-          IFNULL(
-            (SELECT xnm.first_name FROM xxafmc_non_members xnm WHERE xnm.id = xxoh.member_id), 
-            (SELECT xu2.first_name FROM xxafmc_users xu2 WHERE xu2.user_id = xxoh.user_id)
+          COALESCE(
+            (SELECT NULLIF(TRIM(xnm.first_name), '') FROM xxafmc_non_members xnm WHERE xnm.id = xxoh.member_id), 
+            (SELECT NULLIF(TRIM(xu2.first_name), '') FROM xxafmc_users xu2 WHERE xu2.user_id = xxoh.user_id),
+            CONCAT('Order ', xxoh.order_num)
           )
         ) AS first_name,
         CASE 
@@ -666,8 +668,7 @@ async function getUserOrderHistory({ fromDate, toDate, username, appUser }) {
         )
         AND DATE(xxod.creation_date) BETWEEN IFNULL(?, CURDATE()) AND IFNULL(?, CURDATE())
       GROUP BY 
-        xxoh.order_num,
-        xu.first_name
+        xxoh.order_num
       ORDER BY 
         MAX(xxod.creation_date) DESC
     `;

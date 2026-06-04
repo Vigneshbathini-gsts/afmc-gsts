@@ -181,9 +181,8 @@ exports.getOrders = async (req, res) => {
 
           MAX(
             COALESCE(
-              (SELECT xnm.FIRST_NAME FROM xxafmc_non_members xnm WHERE xnm.ID = oh.member_id),
-              (SELECT xu2.FIRST_NAME FROM xxafmc_users xu2 WHERE xu2.user_id = oh.user_id),
-              (SELECT xu4.FIRST_NAME FROM xxafmc_users xu4 WHERE xu4.user_id = a.user_name),
+              (SELECT NULLIF(TRIM(xnm.FIRST_NAME), '') FROM xxafmc_non_members xnm WHERE xnm.ID = oh.member_id),
+              (SELECT NULLIF(TRIM(xu2.FIRST_NAME), '') FROM xxafmc_users xu2 WHERE xu2.user_id = oh.user_id),
               CONCAT('Order ', a.ordernumber)
             )
           ) AS FIRST_NAME,
@@ -1409,7 +1408,7 @@ exports.getCancelledOrders = async (req, res) => {
       xxkn.order_num,
       xxkn.order_date,
 
-      COALESCE(xnm.first_name, xu.first_name) AS first_name,
+      COALESCE(NULLIF(TRIM(xnm.first_name), ''), NULLIF(TRIM(xu.first_name), ''), CONCAT('Order ', xxkn.order_num)) AS first_name,
 
       COALESCE(
         NULLIF(
@@ -1596,8 +1595,8 @@ exports.getOrderHistory = async (req, res) => {
   kn.ordernumber AS order_num,
   nm.order_date,
 
-  COALESCE(xnm.first_name, xu.first_name) AS first_name,
-  COALESCE(xnm.phone_number, xu.phone_number) AS phone_number,
+   COALESCE(NULLIF(TRIM(xnm.first_name), ''), NULLIF(TRIM(xu.first_name), ''), CONCAT('Order ', kn.ordernumber)) AS first_name,
+   COALESCE(NULLIF(TRIM(xnm.phone_number), ''), NULLIF(TRIM(xu.phone_number), ''), '') AS phone_number,
 
   COALESCE(
     CONCAT(UPPER(LEFT(xp.pubmed_name, 1)), LOWER(SUBSTRING(xp.pubmed_name, 2))),
