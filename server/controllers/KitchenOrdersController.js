@@ -1886,6 +1886,7 @@ exports.getOrderHistoryItemDetails = async (req, res) => {
         xi.item_name,
         xo.quantity,
         xo.price,
+        xo.subtotal,
         xo.order_status,
         xo.food_pr_charges,
         xo.created_by,

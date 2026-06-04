@@ -206,6 +206,7 @@ const getCocktailIngredientOptions = async (search = "", pagination = {}) => {
     WHERE ITEM_CODE IS NOT NULL
       AND ITEM_NAME IS NOT NULL
       AND TRIM(ITEM_NAME) <> ''
+      AND (CATEGORY_ID IS NULL OR CATEGORY_ID <> 14)
       AND (SUB_CATEGORY IS NULL OR SUB_CATEGORY NOT IN (14, 15))
       AND (
         ? IS NULL
