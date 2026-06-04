@@ -563,7 +563,7 @@ async function getUserOrderHistory({ fromDate, toDate, username, appUser }) {
   const query = `
       SELECT  
         xxoh.order_num,
-        ROUND(xxoh.order_total, 2) AS subtotal,
+        ROUND(IFNULL(MAX(detail_totals.subtotal), 0), 2) AS subtotal,
         CASE 
           WHEN MAX(CASE WHEN xxkn.status = 'Completed' THEN 1 END) = 1 
           THEN 'Completed'
@@ -600,6 +600,60 @@ async function getUserOrderHistory({ fromDate, toDate, username, appUser }) {
       JOIN xxafmc_kitchen_notification xxkn ON xxod.order_id = xxkn.ordernumber
       JOIN xxafmc_users xu ON xxkn.user_name = xu.user_id
       LEFT JOIN xxafmc_invoices inv ON inv.order_num = xxoh.order_num
+      LEFT JOIN (
+        SELECT
+          od.order_id,
+          ROUND(SUM(
+            CASE
+              WHEN scanned_totals.scanned_total > 0 THEN scanned_totals.scanned_total
+              WHEN custom_totals.unit_custom_total > 0 THEN custom_totals.unit_custom_total * od.quantity
+              ELSE IFNULL(od.subtotal, 0)
+            END
+          ), 2) AS subtotal
+        FROM xxafmc_order_details od
+        LEFT JOIN (
+          SELECT
+            order_number,
+            inventory_item_code,
+            ROUND(SUM(IFNULL(scan_quantity, 0) * IFNULL(item_price, 0)), 2) AS scanned_total
+          FROM order_scan_collection
+          WHERE collection_name = 'S_COLLECTION'
+          GROUP BY order_number, inventory_item_code
+        ) scanned_totals
+          ON scanned_totals.order_number = od.order_id
+          AND scanned_totals.inventory_item_code = od.item_id
+        LEFT JOIN (
+          SELECT
+            cm.order_number,
+            cm.inventory_item_code,
+            ROUND(SUM(
+              IFNULL(cm.pegs, 0) *
+              (
+                IFNULL(stock_prices.base_peg_price, 0) * (1 + IFNULL(od_price.profit, 0) / 100) +
+                IFNULL(od_price.food_pr_charges, 0)
+              )
+            ), 2) AS unit_custom_total
+          FROM xxafmc_custom_cocktails_mocktails_details cm
+          JOIN xxafmc_order_details od_price
+            ON od_price.order_id = cm.order_number
+            AND od_price.item_id = cm.inventory_item_code
+          LEFT JOIN (
+            SELECT
+              item_code,
+              MAX(IFNULL(unit_price, 0) / IFNULL(NULLIF(pegs, 0), 1)) AS base_peg_price
+            FROM xxafmc_stock_out
+            WHERE IFNULL(stock_quantity, 0) > 0
+            GROUP BY item_code
+          ) stock_prices
+            ON stock_prices.item_code = cm.item_code
+          GROUP BY cm.order_number, cm.inventory_item_code
+        ) custom_totals
+          ON custom_totals.order_number = od.order_id
+          AND custom_totals.inventory_item_code = od.item_id
+        WHERE TRIM(UPPER(IFNULL(od.order_status, ''))) != 'CANCELLED'
+        GROUP BY od.order_id
+      ) detail_totals
+        ON detail_totals.order_id = xxoh.order_num
       WHERE UPPER(xu.user_name) = UPPER(?)
         AND xxoh.order_num IN (
           SELECT ordernumber
@@ -613,8 +667,7 @@ async function getUserOrderHistory({ fromDate, toDate, username, appUser }) {
         AND DATE(xxod.creation_date) BETWEEN IFNULL(?, CURDATE()) AND IFNULL(?, CURDATE())
       GROUP BY 
         xxoh.order_num,
-        xu.first_name,
-        xxoh.order_total
+        xu.first_name
       ORDER BY 
         MAX(xxod.creation_date) DESC
     `;

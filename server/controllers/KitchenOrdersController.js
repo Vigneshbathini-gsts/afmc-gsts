@@ -1604,8 +1604,7 @@ exports.getOrderHistory = async (req, res) => {
     'N/A'
   ) AS pubmed_name,
 
-  --   ADDED SUBTOTAL
-  FORMAT(nm.order_total, 2) AS subtotal,
+  FORMAT(IFNULL(MAX(order_totals.subtotal), 0), 2) AS subtotal,
 
   CASE
     WHEN SUM(CASE WHEN UPPER(kn.status) = 'CANCELLED' THEN 1 ELSE 0 END) = COUNT(*)
@@ -1641,10 +1640,68 @@ LEFT JOIN xxafmc_users xu
 LEFT JOIN xxafmc_pubmed xp 
   ON xp.pubmed_id = nm.pubmed
 
+LEFT JOIN (
+  SELECT
+    od.order_id,
+    ROUND(SUM(
+      CASE
+        WHEN scanned_totals.scanned_total > 0 THEN scanned_totals.scanned_total
+        WHEN custom_totals.unit_custom_total > 0 THEN custom_totals.unit_custom_total * od.quantity
+        ELSE IFNULL(od.subtotal, 0)
+      END
+    ), 2) AS subtotal
+  FROM xxafmc_order_details od
+  JOIN (${inventorySummarySql}) total_inv
+    ON total_inv.item_code = od.item_id
+  LEFT JOIN (
+    SELECT
+      order_number,
+      inventory_item_code,
+      ROUND(SUM(IFNULL(scan_quantity, 0) * IFNULL(item_price, 0)), 2) AS scanned_total
+    FROM order_scan_collection
+    WHERE collection_name = 'S_COLLECTION'
+    GROUP BY order_number, inventory_item_code
+  ) scanned_totals
+    ON scanned_totals.order_number = od.order_id
+    AND scanned_totals.inventory_item_code = od.item_id
+  LEFT JOIN (
+    SELECT
+      cm.order_number,
+      cm.inventory_item_code,
+      ROUND(SUM(
+        IFNULL(cm.pegs, 0) *
+        (
+          IFNULL(stock_prices.base_peg_price, 0) * (1 + IFNULL(od_price.profit, 0) / 100) +
+          IFNULL(od_price.food_pr_charges, 0)
+        )
+      ), 2) AS unit_custom_total
+    FROM xxafmc_custom_cocktails_mocktails_details cm
+    JOIN xxafmc_order_details od_price
+      ON od_price.order_id = cm.order_number
+      AND od_price.item_id = cm.inventory_item_code
+    LEFT JOIN (
+      SELECT
+        item_code,
+        MAX(IFNULL(unit_price, 0) / IFNULL(NULLIF(pegs, 0), 1)) AS base_peg_price
+      FROM xxafmc_stock_out
+      WHERE IFNULL(stock_quantity, 0) > 0
+      GROUP BY item_code
+    ) stock_prices
+      ON stock_prices.item_code = cm.item_code
+    GROUP BY cm.order_number, cm.inventory_item_code
+  ) custom_totals
+    ON custom_totals.order_number = od.order_id
+    AND custom_totals.inventory_item_code = od.item_id
+  WHERE total_inv.category_id = ?
+    AND TRIM(UPPER(IFNULL(od.order_status, ''))) != 'CANCELLED'
+  GROUP BY od.order_id
+) order_totals
+  ON order_totals.order_id = kn.ordernumber
+
 WHERE inv.category_id = ?
   AND ${dateExpression} BETWEEN ? AND ?
 
-GROUP BY kn.ordernumber, nm.order_date, first_name, phone_number, xp.pubmed_name, nm.order_total
+GROUP BY kn.ordernumber, nm.order_date, first_name, phone_number, xp.pubmed_name
 
 HAVING 
   SUM(CASE WHEN UPPER(kn.status) = 'COMPLETED' THEN 1 ELSE 0 END) > 0
@@ -1676,7 +1733,7 @@ LIMIT ? OFFSET ?
     const totalPages = Math.ceil(totalRecords / limitNum);
 
     // Critical fix for MySQL 8.0.22+ bug
-    const queryParams = [categoryId, from, to, String(limitNum), String(offset)];
+    const queryParams = [categoryId, categoryId, from, to, String(limitNum), String(offset)];
 
     const [rows] = await pool.execute(query, queryParams);
 
@@ -1729,8 +1786,22 @@ exports.getOrderHistoryItemDetails = async (req, res) => {
         xi.item_name,
         xo.quantity,
 
-        xo.subtotal,
-        (xo.price - IFNULL(xo.food_pr_charges, 0)) AS price,
+        ROUND(
+          CASE
+            WHEN MAX(scanned_totals.scanned_total) > 0 THEN MAX(scanned_totals.scanned_total)
+            WHEN MAX(custom_totals.unit_custom_total) > 0 THEN MAX(custom_totals.unit_custom_total) * xo.quantity
+            ELSE IFNULL(xo.subtotal, 0)
+          END,
+          2
+        ) AS subtotal,
+        ROUND(
+          CASE
+            WHEN MAX(scanned_totals.scanned_total) > 0 THEN MAX(scanned_totals.scanned_total) / NULLIF(xo.quantity, 0)
+            WHEN MAX(custom_totals.unit_custom_total) > 0 THEN MAX(custom_totals.unit_custom_total)
+            ELSE COALESCE(xo.price, xo.subtotal / NULLIF(xo.quantity, 0), 0)
+          END - IFNULL(xo.food_pr_charges, 0),
+          2
+        ) AS price,
         IFNULL(xo.food_pr_charges, 0) AS pr_charges,
 
         xo.created_by,
@@ -1758,6 +1829,47 @@ exports.getOrderHistoryItemDetails = async (req, res) => {
       JOIN (${inventorySummarySql}) xi
         ON xo.item_id = xi.item_code
 
+      LEFT JOIN (
+        SELECT
+          order_number,
+          inventory_item_code,
+          ROUND(SUM(IFNULL(scan_quantity, 0) * IFNULL(item_price, 0)), 2) AS scanned_total
+        FROM order_scan_collection
+        WHERE collection_name = 'S_COLLECTION'
+        GROUP BY order_number, inventory_item_code
+      ) scanned_totals
+        ON scanned_totals.order_number = xo.order_id
+       AND scanned_totals.inventory_item_code = xo.item_id
+
+      LEFT JOIN (
+        SELECT
+          cm.order_number,
+          cm.inventory_item_code,
+          ROUND(SUM(
+            IFNULL(cm.pegs, 0) *
+            (
+              IFNULL(stock_prices.base_peg_price, 0) * (1 + IFNULL(od_price.profit, 0) / 100) +
+              IFNULL(od_price.food_pr_charges, 0)
+            )
+          ), 2) AS unit_custom_total
+        FROM xxafmc_custom_cocktails_mocktails_details cm
+        JOIN xxafmc_order_details od_price
+          ON od_price.order_id = cm.order_number
+         AND od_price.item_id = cm.inventory_item_code
+        LEFT JOIN (
+          SELECT
+            item_code,
+            MAX(IFNULL(unit_price, 0) / IFNULL(NULLIF(pegs, 0), 1)) AS base_peg_price
+          FROM xxafmc_stock_out
+          WHERE IFNULL(stock_quantity, 0) > 0
+          GROUP BY item_code
+        ) stock_prices
+          ON stock_prices.item_code = cm.item_code
+        GROUP BY cm.order_number, cm.inventory_item_code
+      ) custom_totals
+        ON custom_totals.order_number = xo.order_id
+       AND custom_totals.inventory_item_code = xo.item_id
+
       --   critical join (same as APEX)
       LEFT JOIN xxafmc_kitchen_notification xxkn 
         ON xxkn.ordernumber = xo.order_id
@@ -1773,7 +1885,6 @@ exports.getOrderHistoryItemDetails = async (req, res) => {
         xo.type,
         xi.item_name,
         xo.quantity,
-        xo.subtotal,
         xo.price,
         xo.order_status,
         xo.food_pr_charges,
@@ -1788,10 +1899,55 @@ exports.getOrderHistoryItemDetails = async (req, res) => {
     // 🔹 Total query
     const totalQuery = `
       SELECT 
-        SUM(xo.subtotal) AS total_amount
+        ROUND(SUM(
+          CASE
+            WHEN scanned_totals.scanned_total > 0 THEN scanned_totals.scanned_total
+            WHEN custom_totals.unit_custom_total > 0 THEN custom_totals.unit_custom_total * xo.quantity
+            ELSE IFNULL(xo.subtotal, 0)
+          END
+        ), 2) AS total_amount
       FROM xxafmc_order_details xo
       JOIN (${inventorySummarySql}) xi
         ON xo.item_id = xi.item_code
+      LEFT JOIN (
+        SELECT
+          order_number,
+          inventory_item_code,
+          ROUND(SUM(IFNULL(scan_quantity, 0) * IFNULL(item_price, 0)), 2) AS scanned_total
+        FROM order_scan_collection
+        WHERE collection_name = 'S_COLLECTION'
+        GROUP BY order_number, inventory_item_code
+      ) scanned_totals
+        ON scanned_totals.order_number = xo.order_id
+        AND scanned_totals.inventory_item_code = xo.item_id
+      LEFT JOIN (
+        SELECT
+          cm.order_number,
+          cm.inventory_item_code,
+          ROUND(SUM(
+            IFNULL(cm.pegs, 0) *
+            (
+              IFNULL(stock_prices.base_peg_price, 0) * (1 + IFNULL(od_price.profit, 0) / 100) +
+              IFNULL(od_price.food_pr_charges, 0)
+            )
+          ), 2) AS unit_custom_total
+        FROM xxafmc_custom_cocktails_mocktails_details cm
+        JOIN xxafmc_order_details od_price
+          ON od_price.order_id = cm.order_number
+          AND od_price.item_id = cm.inventory_item_code
+        LEFT JOIN (
+          SELECT
+            item_code,
+            MAX(IFNULL(unit_price, 0) / IFNULL(NULLIF(pegs, 0), 1)) AS base_peg_price
+          FROM xxafmc_stock_out
+          WHERE IFNULL(stock_quantity, 0) > 0
+          GROUP BY item_code
+        ) stock_prices
+          ON stock_prices.item_code = cm.item_code
+        GROUP BY cm.order_number, cm.inventory_item_code
+      ) custom_totals
+        ON custom_totals.order_number = xo.order_id
+        AND custom_totals.inventory_item_code = xo.item_id
       WHERE xo.order_id = ?
         AND xi.category_id = ?
     `;
