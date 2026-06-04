@@ -1,15 +1,32 @@
 // pages/payment/PaymentPage.jsx
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { useAuth } from "../../../context/AuthContext";
 import orderService from "../../../services/orderService";
 import { toInitCap } from "../../../utils/textFormat";
+
+const getPaymentModesForRole = ({ modes, roleId, pathname }) => {
+    const apiModes = Array.isArray(modes) && modes.length > 0 ? modes : ["IMMEDIATE"];
+    const normalizedRoleId = Number(roleId);
+
+    if (pathname.startsWith("/attendant") || normalizedRoleId === 30) {
+        return ["IMMEDIATE"];
+    }
+
+    if (normalizedRoleId === 20) {
+        return ["IMMEDIATE", "CREDIT"];
+    }
+
+    return apiModes;
+};
 
 const PaymentPage = () => {
     const [searchParams] = useSearchParams();
     const orderNumber = searchParams.get("orderNumber");
     const navigate = useNavigate();
     const location = useLocation();
+    const { user } = useAuth();
 
     const [loading, setLoading] = useState(true);
     const [order, setOrder] = useState(null);
@@ -20,12 +37,7 @@ const PaymentPage = () => {
     const [error, setError] = useState("");
     const [orderItems, setOrderItems] = useState([]);
 
-    useEffect(() => {
-        loadOrder();
-        loadOrderDetails();
-    }, [orderNumber]);
-
-    const loadOrder = async () => {
+    const loadOrder = useCallback(async () => {
         if (!orderNumber) {
             setError("Order number is required.");
             setLoading(false);
@@ -42,32 +54,39 @@ const PaymentPage = () => {
             ]);
 
             const orderData = summaryResponse.data?.data || null;
-            const paymentModes = paymentModesResponse.data?.data || ["IMMEDIATE"];
-
-
+            const paymentModes = getPaymentModesForRole({
+                modes: paymentModesResponse.data?.data,
+                roleId: user?.roleId,
+                pathname: location.pathname,
+            });
 
             setOrder(orderData);
             setAllowedPaymentModes(paymentModes);
 
-            if (orderData?.paymentStatus === "Un Paid") {
+            const isImmediateOnly =
+                paymentModes.length === 1 && paymentModes[0] === "IMMEDIATE";
+
+            if (isImmediateOnly) {
+                setPaymentStatus("Paid");
+            } else if (orderData?.paymentStatus === "Un Paid") {
                 setPaymentStatus("Un Paid");
             } else {
                 setPaymentStatus("Paid");
             }
 
-            if (!paymentModes.includes(paymentMode)) {
-                setPaymentMode("IMMEDIATE");
-            }
+            setPaymentMode((currentMode) =>
+                paymentModes.includes(currentMode) ? currentMode : "IMMEDIATE"
+            );
         } catch (loadError) {
             console.log(loadError);
             setError("Unable to load payment details.");
         } finally {
             setLoading(false);
         }
-    };
+    }, [location.pathname, orderNumber, user?.roleId]);
 
 
-    const loadOrderDetails = async () => {
+    const loadOrderDetails = useCallback(async () => {
         if (!orderNumber) return;
 
         try {
@@ -83,7 +102,12 @@ const PaymentPage = () => {
             setOrderItems([]);
             // We don't set global error here to allow payment processing even if item details fail
         }
-    };
+    }, [orderNumber]);
+
+    useEffect(() => {
+        loadOrder();
+        loadOrderDetails();
+    }, [loadOrder, loadOrderDetails]);
 
     const handlePaymentModeChange = (value) => {
         setPaymentMode(value);
