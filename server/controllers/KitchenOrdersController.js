@@ -1236,6 +1236,37 @@ exports.markNotificationAsRead = async (req, res) => {
   }
 };
 
+exports.markAllNotificationsAsRead = async (req, res) => {
+  try {
+    const kitchen = req.body?.kitchen || req.query?.kitchen || "Bar";
+    const isBar = normalizeKitchen(kitchen) === "Bar";
+    const categoryName = isBar ? "Liquor" : "Snacks";
+
+    const [result] = await pool.query(
+      `UPDATE xxafmc_kitchen_notification kn
+       JOIN xxafmc_inventory inv ON kn.item_id = inv.item_code
+       JOIN xxafmc_categories ct ON inv.category_id = ct.category_id
+       SET kn.MSG_READ = 'Y'
+       WHERE kn.MSG_READ = 'N'
+         AND ct.category_name = ?`,
+      [categoryName]
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Notifications marked as read",
+      count: result.affectedRows || 0,
+    });
+  } catch (error) {
+    console.error("Error clearing notifications:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Failed to clear notifications",
+    });
+  }
+};
+
 
 
 // Get cocktail/mocktail details by ID for ingredient modal

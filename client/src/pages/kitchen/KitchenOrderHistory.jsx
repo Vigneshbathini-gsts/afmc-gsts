@@ -15,6 +15,7 @@ import {
 } from "react-icons/fa";
 import { exportTableToPdf } from '../../utils/pdfExport';
 import { formatDisplayDate, formatForInput } from '../../utils/dateUtils';
+import { toInitCap } from '../../utils/textFormat';
 
 const KitchenOrderHistory = () => {
   const navigate = useNavigate();
@@ -233,10 +234,10 @@ const KitchenOrderHistory = () => {
     const tableRows = dataToExport.map(order => [
       order.order_num?.toString() || '',
       order.order_date ? formatDate(order.order_date) : 'N/A',
-      order.first_name || 'N/A',
+      toInitCap(order.first_name) || 'N/A',
       order.phone_number || 'N/A',
       `${order.subtotal || '0'}`,
-      order.status || 'PREPARING'
+      toInitCap(order.status || 'PREPARING')
     ]);
 
     exportTableToPdf({
@@ -420,7 +421,7 @@ const KitchenOrderHistory = () => {
                       <td className="px-6 py-4 text-gray-600">
                         {order.order_date ? formatDate(order.order_date) : 'N/A'}
                       </td>
-                      <td className="px-6 py-4 text-gray-700">{order.first_name || 'N/A'}</td>
+                      <td className="px-6 py-4 text-gray-700">{toInitCap(order.first_name) || 'N/A'}</td>
                       <td className="px-6 py-4 text-gray-600">{order.phone_number || 'N/A'}</td>
                       <td className="px-6 py-4">
                         <span className="text-sm font-medium text-gray-900">
@@ -429,7 +430,7 @@ const KitchenOrderHistory = () => {
                       </td>
                       <td className="px-6 py-4">
                         <span className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(order.status)}`}>
-                          {order.status || 'PREPARING'}
+                          {toInitCap(order.status || 'PREPARING')}
                         </span>
                       </td>
                     </tr>
@@ -477,7 +478,7 @@ const KitchenOrderHistory = () => {
                   Order Details:  {selectedOrder.order_num}
                 </h3>
                 <p className="text-sm text-white/80 mt-1">
-                  Customer: {selectedOrder.first_name || 'N/A'} |
+                  Customer: {toInitCap(selectedOrder.first_name) || 'N/A'} |
                   Phone: {selectedOrder.phone_number || 'N/A'}
                 </p>
               </div>
@@ -509,9 +510,9 @@ const KitchenOrderHistory = () => {
                       <tbody className="divide-y divide-gray-200">
                         {orderItemDetails[selectedOrder.order_num].items.map((item, index) => (
                           <tr key={index} className="hover:bg-gray-50">
-                            <td className="px-4 py-3 text-sm text-gray-900">{item.item_name || 'N/A'}</td>
+                            <td className="px-4 py-3 text-sm text-gray-900">{toInitCap(item.item_name) || 'N/A'}</td>
                             <td className="px-4 py-3 text-sm text-gray-600">{item.quantity}</td>
-                            <td className="px-4 py-3 text-sm text-gray-600">{item.type || 'N/A'}</td>
+                            <td className="px-4 py-3 text-sm text-gray-600">{toInitCap(item.type) || 'N/A'}</td>
                             <td className="px-4 py-3 text-sm text-gray-600">
                               Rs. {formatCurrency(item.pr_charges)}
                             </td>
@@ -523,7 +524,7 @@ const KitchenOrderHistory = () => {
                                   item.status?.toUpperCase() === 'COMPLETED' ? 'bg-green-100 text-green-800' :
                                     'bg-yellow-100 text-yellow-800'
                                 }`}>
-                                {item.status || 'PENDING'}
+                                {toInitCap(item.status || 'PENDING')}
                               </span>
                             </td>
                           </tr>

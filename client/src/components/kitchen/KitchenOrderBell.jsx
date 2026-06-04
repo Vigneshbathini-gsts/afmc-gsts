@@ -7,6 +7,7 @@ import { useAuth } from "../../context/AuthContext";
 export default function KitchenOrderBell({ kitchen = "Bar" }) {
   const [notifications, setNotifications] = useState([]);
   const [open, setOpen] = useState(false);
+  const [clearingAll, setClearingAll] = useState(false);
   const dropdownRef = useRef(null);
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -66,6 +67,26 @@ export default function KitchenOrderBell({ kitchen = "Bar" }) {
     }
   };
 
+  const handleClearAll = async () => {
+    if (notifications.length === 0 || clearingAll) return;
+
+    const shouldClear = window.confirm(
+      `Clear all ${notifications.length} pending notification(s)?`
+    );
+    if (!shouldClear) return;
+
+    try {
+      setClearingAll(true);
+      await barOrdersAPI.markAllNotificationsAsRead({ kitchen });
+      setNotifications([]);
+    } catch (error) {
+      console.error("Error clearing notifications:", error);
+      alert("Failed to clear notifications. Please try again.");
+    } finally {
+      setClearingAll(false);
+    }
+  };
+
   // ✅ Handle click
   const handleOrderClick = async (order) => {
     const orderNumber = order?.ORDERNUMBER ?? order?.orderNumber;
@@ -103,13 +124,25 @@ export default function KitchenOrderBell({ kitchen = "Bar" }) {
       {/* 🔽 Dropdown */}
       {open && (
         <div className="absolute top-12 right-0 w-[min(24rem,calc(100vw-1rem))] bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden z-50">
-          <div className="px-4 py-3 bg-gradient-to-r from-afmc-maroon to-afmc-maroon2 text-white">
-            <h3 className="font-semibold text-sm">
-              New Orders - {kitchen}
-            </h3>
-            <p className="text-xs text-white/80">
-              {notifications.length} pending order(s)
-            </p>
+          <div className="flex items-start justify-between gap-3 px-4 py-3 bg-gradient-to-r from-afmc-maroon to-afmc-maroon2 text-white">
+            <div>
+              <h3 className="font-semibold text-sm">
+                New Orders - {kitchen}
+              </h3>
+              <p className="text-xs text-white/80">
+                {notifications.length} pending order(s)
+              </p>
+            </div>
+            {notifications.length > 0 && (
+              <button
+                type="button"
+                onClick={handleClearAll}
+                disabled={clearingAll}
+                className="shrink-0 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white ring-1 ring-white/30 transition hover:bg-white/25 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {clearingAll ? "Clearing..." : "Clear all"}
+              </button>
+            )}
           </div>
 
           <div className="max-h-[70vh] overflow-y-auto">

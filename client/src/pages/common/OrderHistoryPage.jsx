@@ -5,6 +5,7 @@ import { exportTableToPdf } from "../../utils/pdfExport";
 import OrderFilters from "../../components/OrderFilters";
 import OrderTable from "../../components/OrderTable";
 import OrderDetailsModal from "../../components/OrderDetailsModal";
+import { toInitCap } from "../../utils/textFormat";
 
 const LEGACY_FILTER_STORAGE_KEY = "orderHistoryFilters";
 const PAGE_SIZE_OPTIONS = [10, 25, 50];
@@ -178,10 +179,10 @@ const OrderHistoryPage = () => {
             rows: visibleOrders.map((order) => [
                 order.order_num ?? "",
                 formatDisplayDate(order.creation_date),
-                order.first_name ?? "",
-                order.status ?? "",
-                showPaymentMethod ? order.payment_method ?? "" : null,
-                order.payment_status ?? order.payment_status1 ?? "",
+                toInitCap(order.first_name),
+                toInitCap(order.status),
+                showPaymentMethod ? toInitCap(order.payment_method) : null,
+                toInitCap(order.payment_status ?? order.payment_status1),
                 Number(order.subtotal ?? order.order_total ?? 0).toFixed(2),
             ].filter((value) => value !== null)),
         });

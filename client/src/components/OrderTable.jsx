@@ -1,5 +1,6 @@
 ﻿import { useNavigate, useLocation } from "react-router-dom";
 import { FaPencilAlt } from "react-icons/fa";
+import { toInitCap } from "../utils/textFormat";
 
 const formatOrderDate = (dateStr) => {
     if (!dateStr) return "-";
@@ -88,7 +89,7 @@ const OrderTable = ({
                                     <td className="px-4 py-3 text-gray-600">
                                         {formatOrderDate(order.creation_date)}
                                     </td>
-                                    <td className="px-4 py-3 text-gray-600">{order.first_name || "-"}</td>
+                                    <td className="px-4 py-3 text-gray-600">{toInitCap(order.first_name) || "-"}</td>
                                     <td className="px-4 py-3">
                                         <span
                                             className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${order.status === "Completed"
@@ -98,12 +99,12 @@ const OrderTable = ({
                                                         : "bg-yellow-100 text-yellow-700"
                                                 }`}
                                         >
-                                            {order.status || "-"}
+                                            {toInitCap(order.status) || "-"}
                                         </span>
                                     </td>
 
                                     {showPaymentMethod && (
-                                        <td className="px-4 py-3 text-gray-600">{order.payment_method || "-"}</td>
+                                        <td className="px-4 py-3 text-gray-600">{toInitCap(order.payment_method) || "-"}</td>
                                     )}
                                     <td className="px-4 py-3">
                                         <span
@@ -112,7 +113,7 @@ const OrderTable = ({
                                                     : "bg-red-100 text-red-700"
                                                 }`}
                                         >
-                                            {paymentStatus}
+                                            {toInitCap(paymentStatus)}
                                         </span>
                                     </td>                                    <td className="px-4 py-3 text-gray-600">₹ {amount}</td>
                                     <td className="px-4 py-3 flex flex-wrap gap-2">

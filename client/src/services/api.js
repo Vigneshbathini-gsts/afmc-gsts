@@ -308,6 +308,7 @@ export const barOrdersAPI = {
   cancelOrder: (data) => api.put("/bar-orders/cancel", data),
   getActiveOrders: (kitchen = "Bar") => api.get(`/bar-orders/active?kitchen=${kitchen}`),
   markNotificationAsRead: (data) => api.put("/bar-orders/notifications/read", data),
+  markAllNotificationsAsRead: (data) => api.put("/bar-orders/notifications/read-all", data),
 getCocktailDetailsById: (itemId, orderNumber) => api.get(`/bar-orders/cocktail/${itemId}?orderNumber=${orderNumber}`),
 getCancelledOrders: (params) => api.get("/bar-orders/cancelled-orders", { params }),
 getOrderHistory: (params) => api.get("/bar-orders/order-history", { params }),
