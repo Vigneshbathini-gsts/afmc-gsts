@@ -2,6 +2,10 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { UserPlus, Phone, User, Users } from "lucide-react";
 import { orderAPI } from "../../services/api";
+import {
+  clearSelectedAttendantCustomer,
+  setSelectedAttendantCustomer,
+} from "../../utils/attendantCustomer";
 
 export default function RegisterMember() {
   const navigation = useNavigate();
@@ -101,7 +105,8 @@ export default function RegisterMember() {
     setStatus({ type: "", message: "" });
 
     try {
-      await orderAPI.saveNonMember(payload);
+      const response = await orderAPI.saveNonMember(payload);
+      setSelectedAttendantCustomer(response.data?.data);
       setForm({
         phoneNumber: "",
         firstName: "",
@@ -125,6 +130,7 @@ export default function RegisterMember() {
       firstName: "",
       lastName: "",
     });
+    clearSelectedAttendantCustomer();
     setStatus({ type: "", message: "" });
     redirectToDashboard();
   };

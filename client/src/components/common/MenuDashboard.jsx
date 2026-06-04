@@ -9,6 +9,10 @@ import Pubmenubuyservice from "../../flows/buy/services/Pubmenubuyservice";
 import FilterDropdown from "./FilterDropdown";
 import OffersMarquee from "./OffersMarquee";
 import { toInitCap } from "../../utils/textFormat";
+import {
+  clearSelectedAttendantCustomer,
+  getSelectedAttendantCustomerPayload,
+} from "../../utils/attendantCustomer";
 
 const BASEAPI = "https://afmc.globalsparkteksolutions.com/AFMCIMAGES/";
 
@@ -1521,6 +1525,7 @@ function MenuDashboard() {
         subCategory: item?.sub_category,
         barcode: item?.barcode,
         pubmed: selectedPubmed,
+        ...(location.pathname.startsWith("/attendant") ? getSelectedAttendantCustomerPayload() : {}),
       });
 
       const orderNumber = response?.data?.data?.orderNumber;
@@ -1529,6 +1534,9 @@ function MenuDashboard() {
       }
 
       const baseSegment = location.pathname.startsWith("/user") ? "/user" : "/attendant";
+      if (baseSegment === "/attendant") {
+        clearSelectedAttendantCustomer();
+      }
       navigate(`${baseSegment}/menudash/buy?orderNumber=${orderNumber}`, {
         state: { orderNumber },
       });

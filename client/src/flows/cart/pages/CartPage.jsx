@@ -8,6 +8,10 @@ import { getMaxAllowedQuantity, isOutOfStock, isCocktailOrMocktail } from "../..
 // Cache cocktail details per cart item
 // so we can validate ingredient-level stock before quantity changes.
 import { toInitCap } from "../../../utils/textFormat";
+import {
+    clearSelectedAttendantCustomer,
+    getSelectedAttendantCustomerPayload,
+} from "../../../utils/attendantCustomer";
 
 const BASEAPI = "https://afmc.globalsparkteksolutions.com/AFMCIMAGES/";
 
@@ -307,10 +311,15 @@ export default function CartPage({ isAttendant = false }) {
                 const selectedPubmed = sessionStorage.getItem("afmc:selectedPubmed") || "";
                 const response = await cartAPI.confirmOrder({
                     ...(selectedPubmed ? { pubmed: selectedPubmed } : {}),
+                    ...(isAttendant ? getSelectedAttendantCustomerPayload() : {}),
                 });
                 const orderNumber = response?.data?.data?.orderNumber;
                 if (!orderNumber) {
                     throw new Error("Order number not returned");
+                }
+
+                if (isAttendant) {
+                    clearSelectedAttendantCustomer();
                 }
 
                  setProceedConfirmOpen(false);

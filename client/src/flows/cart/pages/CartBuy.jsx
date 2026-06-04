@@ -2,6 +2,10 @@ import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import Pubmenubuy from "../../buy/pages/Pubmenubuy";
 import { cartAPI } from "../../../services/api";
+import {
+  clearSelectedAttendantCustomer,
+  getSelectedAttendantCustomerPayload,
+} from "../../../utils/attendantCustomer";
 
 export default function CartBuy() {
   const location = useLocation();
@@ -29,9 +33,14 @@ export default function CartBuy() {
         const selectedPubmed = sessionStorage.getItem("afmc:selectedPubmed") || "";
         const response = await cartAPI.confirmOrder({
           ...(selectedPubmed ? { pubmed: selectedPubmed } : {}),
+          ...(basePath === "/attendant" ? getSelectedAttendantCustomerPayload() : {}),
         });
         const orderNumber = response?.data?.data?.orderNumber;
         if (!orderNumber) throw new Error("Order number not returned");
+
+        if (basePath === "/attendant") {
+          clearSelectedAttendantCustomer();
+        }
 
         if (!ignore) {
           setResolvedOrderNumber(orderNumber);

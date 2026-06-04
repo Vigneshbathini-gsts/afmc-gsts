@@ -1,6 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { cartAPI } from "../../../../services/api";
+import {
+  clearSelectedAttendantCustomer,
+  getSelectedAttendantCustomerPayload,
+} from "../../../../utils/attendantCustomer";
 
 export default function ConfirmOrder() {
   const location = useLocation();
@@ -18,7 +22,9 @@ export default function ConfirmOrder() {
         await cartAPI.confirmOrder({
           orderNumber,
           ...(selectedPubmed ? { pubmed: selectedPubmed } : {}),
+          ...getSelectedAttendantCustomerPayload(),
         });
+        clearSelectedAttendantCustomer();
         setStatus("success");
         setMessage(`Order ${orderNumber} has been confirmed successfully.`);
       } catch (error) {
