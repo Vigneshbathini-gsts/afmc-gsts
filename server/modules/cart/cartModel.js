@@ -1193,10 +1193,10 @@ const getLovIngredients = async (subCategory) => {
     const normalizedSubCategory = Number(subCategory);
 
    
-    const allowedSubCategories =
-      normalizedSubCategory === 14
+    const allowedSubCategories = 
+      normalizedSubCategory === 15
         ? [9, 6, 4, 18]
-        : normalizedSubCategory === 15
+        : normalizedSubCategory === 14
           ? [2, 5, 6, 11, 12, 1310, 17, 16, 18]
           : [];
 

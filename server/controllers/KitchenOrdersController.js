@@ -114,9 +114,30 @@ async function validateScansBeforeComplete(connection, req, orderNumber, kitchen
         FROM xxafmc_custom_cocktails_mocktails_details_dummy
         WHERE order_number = ?
           AND inventory_item_code = ?
+        UNION ALL
+        SELECT xcmd.pegs, SUM(xod.quantity) AS quantity
+        FROM xxafmc_cocktails_mocktails_details xcmd
+        JOIN xxafmc_order_details xod
+          ON xod.item_id = xcmd.inventory_item_code
+         AND xod.order_id = ?
+         AND (xod.order_status IS NULL OR xod.order_status = '')
+        WHERE xcmd.inventory_item_code = ?
+          AND NOT EXISTS (
+            SELECT 1
+            FROM xxafmc_custom_cocktails_mocktails_details x
+            WHERE x.inventory_item_code = xcmd.inventory_item_code
+              AND x.order_number = ?
+          )
+          AND NOT EXISTS (
+            SELECT 1
+            FROM xxafmc_custom_cocktails_mocktails_details_dummy x
+            WHERE x.inventory_item_code = xcmd.inventory_item_code
+              AND x.order_number = ?
+          )
+        GROUP BY xcmd.inventory_item_code, xcmd.item_code, xcmd.pegs
       ) x
       `,
-      [orderNumber, parentItem, orderNumber, parentItem]
+      [orderNumber, parentItem, orderNumber, parentItem, orderNumber, parentItem, orderNumber, orderNumber]
     );
 
     const expected = Number(expectedRow?.expected_pegs || 0);
@@ -143,10 +164,30 @@ async function validateScansBeforeComplete(connection, req, orderNumber, kitchen
       SELECT inventory_item_code, item_code, pegs, quantity
       FROM xxafmc_custom_cocktails_mocktails_details_dummy
       WHERE order_number = ?
+      UNION ALL
+      SELECT xcmd.inventory_item_code, xcmd.item_code, xcmd.pegs, SUM(xod.quantity) AS quantity
+      FROM xxafmc_cocktails_mocktails_details xcmd
+      JOIN xxafmc_order_details xod
+        ON xod.item_id = xcmd.inventory_item_code
+       AND xod.order_id = ?
+       AND (xod.order_status IS NULL OR xod.order_status = '')
+      WHERE NOT EXISTS (
+          SELECT 1
+          FROM xxafmc_custom_cocktails_mocktails_details x
+          WHERE x.inventory_item_code = xcmd.inventory_item_code
+            AND x.order_number = ?
+        )
+        AND NOT EXISTS (
+          SELECT 1
+          FROM xxafmc_custom_cocktails_mocktails_details_dummy x
+          WHERE x.inventory_item_code = xcmd.inventory_item_code
+            AND x.order_number = ?
+        )
+      GROUP BY xcmd.inventory_item_code, xcmd.item_code, xcmd.pegs
     ) x
     GROUP BY inventory_item_code, item_code
     `,
-    [orderNumber, orderNumber]
+    [orderNumber, orderNumber, orderNumber, orderNumber, orderNumber]
   );
 
   for (const pair of pairRows) {
@@ -766,24 +807,28 @@ exports.processBarcodeScan = async (req, res) => {
     const [orderQtyRows] = await connection.query(`
       SELECT SUM(quantity) AS total_quantity FROM (
         SELECT (COALESCE(x.pegs, 1) * COALESCE(x.quantity, 0)) AS quantity FROM xxafmc_custom_cocktails_mocktails_details x 
-        JOIN xxafmc_order_details xo ON x.inventory_item_code = xo.item_id 
+        JOIN xxafmc_order_details xo
+          ON x.inventory_item_code = xo.item_id
+         AND xo.order_id = x.order_number
+         AND (xo.order_status IS NULL OR xo.order_status = '')
         WHERE x.order_number = ? AND x.item_code = ?
           AND (? = '' OR x.inventory_item_code = ?)
         UNION ALL
         SELECT (COALESCE(x.pegs, 1) * COALESCE(x.quantity, 0)) AS quantity FROM xxafmc_custom_cocktails_mocktails_details_dummy x 
-        JOIN xxafmc_order_details xo ON x.inventory_item_code = xo.item_id 
+        JOIN xxafmc_order_details xo
+          ON x.inventory_item_code = xo.item_id
+         AND xo.order_id = x.order_number
+         AND (xo.order_status IS NULL OR xo.order_status = '')
         WHERE x.order_number = ? AND x.item_code = ?
           AND (? = '' OR x.inventory_item_code = ?)
         UNION ALL
-        SELECT (COALESCE(xcmd.pegs, 1) * COALESCE(xcmd.quantity, 0)) AS quantity
+        SELECT (COALESCE(xcmd.pegs, 1) * COALESCE(SUM(xo.quantity), 0)) AS quantity
         FROM xxafmc_cocktails_mocktails_details xcmd
-        WHERE (
-            (? <> '' AND xcmd.inventory_item_code = ?)
-            OR
-            (? = '' AND xcmd.inventory_item_code IN (
-              SELECT item_id FROM xxafmc_order_details WHERE order_id = ?
-            ))
-          )
+        JOIN xxafmc_order_details xo
+          ON xo.item_id = xcmd.inventory_item_code
+         AND xo.order_id = ?
+         AND (xo.order_status IS NULL OR xo.order_status = '')
+        WHERE ((? <> '' AND xcmd.inventory_item_code = ?) OR ? = '')
           AND xcmd.item_code = ?
           AND NOT EXISTS (
             SELECT 1
@@ -791,6 +836,13 @@ exports.processBarcodeScan = async (req, res) => {
             WHERE x.inventory_item_code = xcmd.inventory_item_code
               AND x.order_number = ?
           )
+          AND NOT EXISTS (
+            SELECT 1
+            FROM xxafmc_custom_cocktails_mocktails_details_dummy x
+            WHERE x.inventory_item_code = xcmd.inventory_item_code
+              AND x.order_number = ?
+          )
+        GROUP BY xcmd.inventory_item_code, xcmd.item_code, xcmd.pegs
         UNION ALL
         SELECT (CASE WHEN UPPER(TRIM(COALESCE(xo.type, ''))) = 'LARGE' THEN 2 ELSE 1 END * COALESCE(xo.quantity, 0)) AS quantity 
         FROM xxafmc_order_details xo 
@@ -805,11 +857,12 @@ exports.processBarcodeScan = async (req, res) => {
         scanItemCode,
         forcedParentItem,
         forcedParentItem,
-        forcedParentItem,
-        forcedParentItem,
-        forcedParentItem,
         ORDERNUMBER,
+        forcedParentItem,
+        forcedParentItem,
+        forcedParentItem,
         scanItemCode,
+        ORDERNUMBER,
         ORDERNUMBER,
         ORDERNUMBER,
         scanItemCode,
@@ -951,26 +1004,32 @@ exports.processBarcodeScan = async (req, res) => {
       FROM (
         SELECT DISTINCT x.item_code, x.item_name, (x.pegs*x.quantity) AS quantity, x.inventory_item_code, 'MO' AS Mix
              , NULL AS price, NULL AS order_line_id, NULL AS free_item_quantity
-        FROM xxafmc_custom_cocktails_mocktails_details x JOIN xxafmc_order_details xo ON x.inventory_item_code = xo.item_id
+        FROM xxafmc_custom_cocktails_mocktails_details x
+        JOIN xxafmc_order_details xo
+          ON x.inventory_item_code = xo.item_id
+         AND xo.order_id = x.order_number
+         AND (xo.order_status IS NULL OR xo.order_status = '')
         WHERE x.order_number = ? AND x.item_code = ?
           AND (? = '' OR x.inventory_item_code = ?)
         UNION ALL
         SELECT DISTINCT x.item_code, x.item_name, (x.pegs*x.quantity) AS quantity, x.inventory_item_code, 'MO' AS Mix
              , NULL AS price, NULL AS order_line_id, NULL AS free_item_quantity
-        FROM xxafmc_custom_cocktails_mocktails_details_dummy x JOIN xxafmc_order_details xo ON x.inventory_item_code = xo.item_id
+        FROM xxafmc_custom_cocktails_mocktails_details_dummy x
+        JOIN xxafmc_order_details xo
+          ON x.inventory_item_code = xo.item_id
+         AND xo.order_id = x.order_number
+         AND (xo.order_status IS NULL OR xo.order_status = '')
         WHERE x.order_number = ? AND x.item_code = ?
           AND (? = '' OR x.inventory_item_code = ?)
         UNION ALL
-        SELECT DISTINCT xcmd.item_code, xcmd.item_name, (xcmd.pegs * xcmd.quantity) AS quantity,
+        SELECT xcmd.item_code, xcmd.item_name, (xcmd.pegs * SUM(xo.quantity)) AS quantity,
                xcmd.inventory_item_code, 'MO' AS Mix, NULL AS price, NULL AS order_line_id, NULL AS free_item_quantity
         FROM xxafmc_cocktails_mocktails_details xcmd
-        WHERE (
-            (? <> '' AND xcmd.inventory_item_code = ?)
-            OR
-            (? = '' AND xcmd.inventory_item_code IN (
-              SELECT item_id FROM xxafmc_order_details WHERE order_id = ?
-            ))
-          )
+        JOIN xxafmc_order_details xo
+          ON xo.item_id = xcmd.inventory_item_code
+         AND xo.order_id = ?
+         AND (xo.order_status IS NULL OR xo.order_status = '')
+        WHERE ((? <> '' AND xcmd.inventory_item_code = ?) OR ? = '')
           AND xcmd.item_code = ?
           AND NOT EXISTS (
             SELECT 1
@@ -978,6 +1037,13 @@ exports.processBarcodeScan = async (req, res) => {
             WHERE x.inventory_item_code = xcmd.inventory_item_code
               AND x.order_number = ?
           )
+          AND NOT EXISTS (
+            SELECT 1
+            FROM xxafmc_custom_cocktails_mocktails_details_dummy x
+            WHERE x.inventory_item_code = xcmd.inventory_item_code
+              AND x.order_number = ?
+          )
+        GROUP BY xcmd.inventory_item_code, xcmd.item_code, xcmd.item_name, xcmd.pegs
         UNION ALL
         SELECT COALESCE(xi.item_code, xo.ITEM_ID) AS item_code, COALESCE(xi.item_name, 'Unknown') AS item_name, (CASE WHEN UPPER(TRIM(COALESCE(xo.type, ''))) = 'LARGE' THEN 2 ELSE 1 END * xo.quantity) AS quantity,
                CAST(xo.ITEM_ID AS CHAR) AS inventory_item_code, 'I' AS Mix, xo.price, xo.order_line_id, xo.free_item_quantity
@@ -993,11 +1059,12 @@ exports.processBarcodeScan = async (req, res) => {
         scanItemCode,
         forcedParentItem,
         forcedParentItem,
-        forcedParentItem,
-        forcedParentItem,
-        forcedParentItem,
         ORDERNUMBER,
+        forcedParentItem,
+        forcedParentItem,
+        forcedParentItem,
         scanItemCode,
+        ORDERNUMBER,
         ORDERNUMBER,
         ORDERNUMBER,
         scanItemCode,
