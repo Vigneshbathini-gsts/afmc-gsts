@@ -87,7 +87,7 @@ export default function KitchenOrderBell({ kitchen = "Bar" }) {
 
   return (
     <div className="relative" ref={dropdownRef}>
-      {/* 🔔 Bell Icon */}
+      {/*  Bell Icon */}
       <button
         onClick={() => setOpen(!open)}
         className="relative p-3 rounded-xl bg-gray-100 hover:bg-afmc-maroon/10 transition"

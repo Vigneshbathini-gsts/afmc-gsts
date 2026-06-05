@@ -214,7 +214,23 @@ const createItem = async (payload) => {
     createdBy,
     fileName,
     mimeType,
+    barcode,
   } = payload;
+
+  if (barcode) {
+    const normalized = sanitizeBarcode(barcode);
+    // check if barcode already exists in transactions or stock_out
+    const exists = await Promise.all([
+      barcodeExistsInDb(normalized),
+      stockOutBarcodeExistsInDb(normalized),
+    ]).then((results) => results.some((r) => r));
+
+    if (exists) {
+      const error = new Error("DUPLICATE_BARCODE");
+      error.code = "DUPLICATE_BARCODE";
+      throw error;
+    }
+  }
 
   const connection = await db.getConnection();
   let lockAcquired = false;
@@ -301,7 +317,7 @@ const createItem = async (payload) => {
   }
 };
 
-const getBarTypes = async () => {
+const getBrTypes = async () => {
   const sql = `
     SELECT TYPE AS type, AC_QUANTITY AS ac_quantity, TYPE_ID AS type_id, UOM AS uom
     FROM xxafmc_bar
