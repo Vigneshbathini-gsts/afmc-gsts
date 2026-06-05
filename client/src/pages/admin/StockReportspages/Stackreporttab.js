@@ -33,7 +33,7 @@ export default function Stackreporttab({
   return (
     <div className="w-full relative z-10">
       {showTopBar && (
-        <div className="flex justify-between items-center gap-4 mb-4">
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-4">
           <button
             onClick={() => navigate("/admin/dashboard")}
             className="px-4 py-2 bg-gray-200 rounded-full hover:bg-gray-300"
@@ -42,7 +42,7 @@ export default function Stackreporttab({
           </button>
 
           {isOverviewPage && (
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-gray-500 text-center sm:text-left">
               Choose a report tab to view the report details.
             </p>
           )}
@@ -60,7 +60,7 @@ export default function Stackreporttab({
         </div>
       )}
 
-      <div className="flex bg-white/70 backdrop-blur-md border border-afmc-gold/25 rounded-xl shadow overflow-hidden">
+      <div className="flex bg-white/70 backdrop-blur-md border border-afmc-gold/25 rounded-xl shadow overflow-x-auto no-scrollbar">
         {tabs.map((tab) => {
           const isActive = location.pathname === tab.path;
 
@@ -68,7 +68,7 @@ export default function Stackreporttab({
             <div
               key={tab.path}
               onClick={() => navigate(tab.path)}
-              className={`flex-1 text-center py-4 cursor-pointer transition-all ${
+              className={`flex-1 min-w-[160px] text-center py-4 cursor-pointer transition-all ${
                 isActive
                   ? "relative font-semibold text-afmc-maroon bg-gradient-to-r from-afmc-maroon/5 via-white to-afmc-gold/15"
                   : "text-afmc-maroon hover:bg-afmc-maroon/5"

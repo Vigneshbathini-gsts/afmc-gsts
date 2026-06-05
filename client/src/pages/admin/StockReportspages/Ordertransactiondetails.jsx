@@ -338,7 +338,7 @@ export default function OrderTransactionUI() {
       <div className="absolute top-16 left-12 w-72 h-72 bg-afmc-maroon/10 rounded-full blur-3xl"></div>
       <div className="absolute bottom-20 right-20 w-80 h-80 bg-afmc-maroon2/10 rounded-full blur-3xl"></div>
 
-      <div className="relative z-10 p-8">
+      <div className="relative z-10 p-4 md:p-8">
         <div className="flex items-center justify-between mb-6 md:mb-8">
           <h1 className="text-2xl font-semibold text-afmc-maroon">
             Order Transaction Reports
@@ -355,8 +355,8 @@ export default function OrderTransactionUI() {
 
         <Stackreporttab showTopBar={false} showReportTitle={false} />
 
-        <div className="mt-8 bg-white/80 border border-white/60 rounded-3xl shadow-xl backdrop-blur-sm p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+        <div className="mt-8 bg-white/80 border border-white/60 rounded-3xl shadow-xl backdrop-blur-sm p-4 md:p-6">
+          <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 From Date <span className="text-red-500">*</span>
@@ -383,7 +383,7 @@ export default function OrderTransactionUI() {
               />
             </div>
 
-            <div>
+            <div className="col-span-2 md:col-span-1">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Order Number
               </label>
@@ -397,7 +397,7 @@ export default function OrderTransactionUI() {
               />
             </div>
 
-            <div>
+            <div className="col-span-2 lg:col-span-1">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Item Name
               </label>
@@ -415,7 +415,7 @@ export default function OrderTransactionUI() {
               />
             </div>
 
-            <div>
+            <div className="col-span-2 md:col-span-1">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 User Name
               </label>
@@ -433,7 +433,7 @@ export default function OrderTransactionUI() {
               />
             </div>
 
-            <div>
+            <div className="col-span-2 md:col-span-1">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Kitchen Name
               </label>

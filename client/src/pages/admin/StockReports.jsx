@@ -242,8 +242,8 @@ export default function StockReports() {
         </div>
 
         <div className="bg-white/80 border border-white/60 rounded-3xl shadow-xl backdrop-blur-sm p-6">
-          <div className="flex flex-wrap items-end gap-4 mb-6">
-            <div>
+          <div className="grid grid-cols-2 md:flex md:flex-wrap items-end gap-4 mb-6">
+            <div className="col-span-1">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 From
               </label>
@@ -255,7 +255,7 @@ export default function StockReports() {
               />
             </div>
 
-            <div>
+            <div className="col-span-1">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 To
               </label>
@@ -270,7 +270,7 @@ export default function StockReports() {
             <button
               type="button"
               onClick={handleSearch}
-              className="px-6 py-3 rounded-2xl bg-[#5b5b5b] text-white font-semibold flex items-center gap-2 shadow hover:shadow-md"
+              className="col-span-1 md:col-span-auto px-6 py-3 rounded-2xl bg-[#5b5b5b] text-white font-semibold flex items-center justify-center gap-2 shadow hover:shadow-md h-[46px]"
             >
               <FaSearch />
               Search
@@ -279,7 +279,7 @@ export default function StockReports() {
             <button
               type="button"
               onClick={downloadPdf}
-              className="ml-auto px-6 py-3 rounded-2xl bg-afmc-maroon hover:bg-afmc-maroon2 text-white font-semibold flex items-center gap-2 shadow hover:shadow-md transition"
+              className="col-span-1 md:ml-auto px-6 py-3 rounded-2xl bg-afmc-maroon hover:bg-afmc-maroon2 text-white font-semibold flex items-center justify-center gap-2 shadow hover:shadow-md transition h-[46px]"
             >
               <FaDownload />
               Download PDF
