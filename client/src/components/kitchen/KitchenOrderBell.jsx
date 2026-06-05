@@ -51,6 +51,8 @@ export default function KitchenOrderBell({ kitchen = "Bar" }) {
       document.removeEventListener("mousedown", handleOutsideClick);
   }, []);
 
+  // compute mobile dropdown position to sit below header
+
   // ✅ Mark as read
   const handleMarkAsRead = async (notificationId) => {
     console.log("Marking notification as read:", notificationId);
@@ -123,8 +125,15 @@ export default function KitchenOrderBell({ kitchen = "Bar" }) {
 
       {/* 🔽 Dropdown */}
       {open && (
-        <div className="absolute top-12 right-0 w-[min(24rem,calc(100vw-1rem))] bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden z-50">
-          <div className="flex items-start justify-between gap-3 px-4 py-3 bg-gradient-to-r from-afmc-maroon to-afmc-maroon2 text-white">
+        <>
+          <div
+            className="fixed inset-0 bg-black/20 z-40 sm:hidden"
+            onClick={() => setOpen(false)}
+          />
+          <div
+            className="fixed inset-x-4 top-20 bottom-4 overflow-hidden bg-white rounded-3xl shadow-2xl border border-gray-200 z-50 sm:relative sm:inset-auto sm:top-12 sm:right-0 sm:w-[min(24rem,calc(100vw-1rem))]"
+          >
+          <div className="flex flex-col gap-2 px-4 py-3 bg-gradient-to-r from-afmc-maroon to-afmc-maroon2 text-white sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h3 className="font-semibold text-sm">
                 New Orders - {kitchen}
@@ -153,8 +162,8 @@ export default function KitchenOrderBell({ kitchen = "Bar" }) {
                   className="px-4 py-3 border-b border-gray-100 hover:bg-gray-50 transition cursor-pointer"
                   onClick={() => handleOrderClick(order)}
                 >
-                  <div className="flex items-start gap-3">
-                    <FaUtensils className="mt-1 text-afmc-maroon" />
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+                    <FaUtensils className="text-afmc-maroon" />
                     <div className="flex-1">
                       <p className="text-sm font-semibold text-gray-800">
                         Order #{order.ORDERNUMBER}
@@ -181,6 +190,7 @@ export default function KitchenOrderBell({ kitchen = "Bar" }) {
             )}
           </div>
         </div>
+      </>
       )}
     </div>
   );

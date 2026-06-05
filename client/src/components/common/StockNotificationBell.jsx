@@ -36,6 +36,7 @@ export default function StockNotificationBell() {
     };
   }, []);
 
+
   const handleMarkAsRead = async (itemCode) => {
     try {
       await notificationAPI.markStockOutRead(itemCode);
@@ -88,14 +89,23 @@ export default function StockNotificationBell() {
 
       {/* Dropdown */}
       {open && (
-        <div className="absolute right-0 top-12 w-[min(20rem,calc(100vw-1rem))] bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden z-50">
+        <>
+          <div
+            className="fixed inset-0 bg-black/20 z-40 sm:hidden"
+            onClick={() => setOpen(false)}
+          />
+          <div
+            className="fixed inset-x-4 top-20 bottom-4 overflow-hidden bg-white rounded-3xl shadow-2xl border border-gray-200 z-50 sm:relative sm:inset-auto sm:top-12 sm:right-0 sm:w-[min(20rem,calc(100vw-1rem))]"
+          >
           {/* Header */}
-          <div className="px-4 py-3 bg-gradient-to-r from-afmc-maroon to-afmc-maroon2 text-white">
-            <h3 className="font-semibold text-sm">Stock Out Notifications</h3>
-            <p className="text-xs text-white/80">
-              {notifications.length} unread item
-              {notifications.length !== 1 ? "s" : ""}
-            </p>
+          <div className="flex flex-col gap-2 px-4 py-3 bg-gradient-to-r from-afmc-maroon to-afmc-maroon2 text-white sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h3 className="font-semibold text-sm">Stock Out Notifications</h3>
+              <p className="text-xs text-white/80">
+                {notifications.length} unread item
+                {notifications.length !== 1 ? "s" : ""}
+              </p>
+            </div>
           </div>
 
           {/* Body */}
@@ -107,8 +117,8 @@ export default function StockNotificationBell() {
                   className="px-4 py-3 border-b border-gray-100 hover:bg-gray-50 transition cursor-pointer"
                   onClick={() => handleNotificationClick(note)}
                 >
-                  <div className="flex items-start gap-3">
-                    <div className="mt-1 text-red-500">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+                    <div className="mt-0 text-red-500 sm:mt-1">
                       <FaExclamationTriangle size={14} />
                     </div>
 
@@ -140,6 +150,7 @@ export default function StockNotificationBell() {
             )}
           </div>
         </div>
+      </>
       )}
     </div>
   );

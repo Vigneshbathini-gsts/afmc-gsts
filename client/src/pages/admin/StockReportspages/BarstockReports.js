@@ -210,8 +210,8 @@ export default function BarstockReports() {
         <Stackreporttab showTopBar={false} showReportTitle={false} />
 
         <div className="mt-8 bg-white/80 border border-white/60 rounded-3xl shadow-xl backdrop-blur-sm p-6">
-          <div className="flex flex-wrap items-end gap-4 mb-6">
-            <div>
+          <div className="flex flex-col gap-4 mb-6 md:flex-row md:items-end md:flex-wrap">
+            <div className="w-full md:w-auto">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Item Name
               </label>
@@ -220,14 +220,14 @@ export default function BarstockReports() {
                 placeholder="Search Item Name..."
                 value={itemName}
                 onChange={(e) => setItemName(e.target.value)}
-                className="w-72 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
+                className="w-full md:w-72 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
               />
             </div>
 
             <button
               type="button"
               onClick={handleSearch}
-              className="px-6 py-3 rounded-2xl bg-[#5b5b5b] text-white font-semibold flex items-center gap-2 shadow hover:shadow-md"
+              className="w-full md:w-auto px-6 py-3 rounded-2xl bg-[#5b5b5b] text-white font-semibold flex items-center justify-center gap-2 shadow hover:shadow-md"
             >
               Search
             </button>
@@ -236,7 +236,7 @@ export default function BarstockReports() {
               type="button"
               onClick={handleDownload}
               disabled={downloading}
-              className="px-6 py-3 rounded-2xl bg-afmc-maroon hover:bg-afmc-maroon2 text-white font-semibold flex items-center gap-2 shadow hover:shadow-md transition disabled:opacity-60 disabled:cursor-not-allowed"
+              className="w-full md:w-auto px-6 py-3 rounded-2xl bg-afmc-maroon hover:bg-afmc-maroon2 text-white font-semibold flex items-center justify-center gap-2 shadow hover:shadow-md transition disabled:opacity-60 disabled:cursor-not-allowed"
               title="Download PDF"
             >
               <FaDownload size={16} />
@@ -245,11 +245,12 @@ export default function BarstockReports() {
           </div>
 
           <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
-            <div
-              className="max-h-[70vh] overflow-auto"
-              onScroll={handleScroll}
-            >
-              <table className="w-full text-left text-sm">
+            <div className="overflow-x-auto">
+              <div
+                className="max-h-[70vh] overflow-auto"
+                onScroll={handleScroll}
+              >
+                <table className="min-w-[720px] w-full text-left text-sm">
                 <thead className="sticky top-0 bg-gray-50 text-gray-600">
                   <tr>
                     <th className="px-4 py-3 text-left font-medium">
@@ -298,7 +299,7 @@ export default function BarstockReports() {
 
                   {!loading && !data.length && (
                     <tr>
-                      <td className="px-4 py-6 text-center text-gray-500" colSpan="7">
+                      <td className="px-4 py-6 text-center text-gray-500" colSpan="6">
                         No records found.
                       </td>
                     </tr>
@@ -320,6 +321,7 @@ export default function BarstockReports() {
           </div>
         </div>
       </div>
+    </div>
     </div>
   );
 }

@@ -4,7 +4,7 @@ const OrderFilters = ({
     onSearch,
 }) => {
     return (
-        <div className="grid grid-cols-5 gap-4 mb-6">
+        <div className="grid grid-cols-1 gap-4 mb-6 sm:grid-cols-2 lg:grid-cols-4">
             <input
                 type="date"
                 value={filters.fromDate}
@@ -14,7 +14,7 @@ const OrderFilters = ({
                         fromDate: e.target.value,
                     })
                 }
-                className="border p-2 rounded"
+                className="w-full border p-2 rounded"
             />
 
             <input
@@ -26,10 +26,8 @@ const OrderFilters = ({
                         toDate: e.target.value,
                     })
                 }
-                className="border p-2 rounded"
+                className="w-full border p-2 rounded"
             />
-
-
 
             <input
                 type="text"
@@ -41,12 +39,12 @@ const OrderFilters = ({
                         orderNumber: e.target.value,
                     })
                 }
-                className="border p-2 rounded"
+                className="w-full border p-2 rounded"
             />
 
             <button
                 onClick={onSearch}
-                className="bg-black text-white rounded px-4"
+                className="w-full rounded bg-black px-4 py-2 text-white transition hover:bg-gray-800"
             >
                 Search
             </button>

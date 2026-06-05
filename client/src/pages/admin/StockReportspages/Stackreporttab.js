@@ -33,10 +33,10 @@ export default function Stackreporttab({
   return (
     <div className="w-full relative z-10">
       {showTopBar && (
-        <div className="flex justify-between items-center gap-4 mb-4">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-4">
           <button
             onClick={() => navigate("/admin/dashboard")}
-            className="px-4 py-2 bg-gray-200 rounded-full hover:bg-gray-300"
+            className="w-full md:w-auto px-4 py-2 bg-gray-200 rounded-full hover:bg-gray-300"
           >
             Go To Dashboard
           </button>
@@ -60,7 +60,7 @@ export default function Stackreporttab({
         </div>
       )}
 
-      <div className="flex bg-white/70 backdrop-blur-md border border-afmc-gold/25 rounded-xl shadow overflow-hidden">
+      <div className="flex overflow-x-auto bg-white/70 backdrop-blur-md border border-afmc-gold/25 rounded-xl shadow">
         {tabs.map((tab) => {
           const isActive = location.pathname === tab.path;
 
@@ -68,7 +68,7 @@ export default function Stackreporttab({
             <div
               key={tab.path}
               onClick={() => navigate(tab.path)}
-              className={`flex-1 text-center py-4 cursor-pointer transition-all ${
+              className={`min-w-[12rem] flex-1 text-center py-4 cursor-pointer transition-all ${
                 isActive
                   ? "relative font-semibold text-afmc-maroon bg-gradient-to-r from-afmc-maroon/5 via-white to-afmc-gold/15"
                   : "text-afmc-maroon hover:bg-afmc-maroon/5"

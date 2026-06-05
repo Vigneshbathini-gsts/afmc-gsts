@@ -242,8 +242,8 @@ export default function StockReports() {
         </div>
 
         <div className="bg-white/80 border border-white/60 rounded-3xl shadow-xl backdrop-blur-sm p-6">
-          <div className="flex flex-wrap items-end gap-4 mb-6">
-            <div>
+          <div className="flex flex-col gap-4 mb-6 md:flex-row md:items-end md:flex-wrap">
+            <div className="w-full md:w-auto">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 From
               </label>
@@ -251,11 +251,11 @@ export default function StockReports() {
                 type="date"
                 value={fromDate}
                 onChange={(e) => setFromDate(e.target.value)}
-                className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
+                className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
               />
             </div>
 
-            <div>
+            <div className="w-full md:w-auto">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 To
               </label>
@@ -263,14 +263,14 @@ export default function StockReports() {
                 type="date"
                 value={toDate}
                 onChange={(e) => setToDate(e.target.value)}
-                className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
+                className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
               />
             </div>
 
             <button
               type="button"
               onClick={handleSearch}
-              className="px-6 py-3 rounded-2xl bg-[#5b5b5b] text-white font-semibold flex items-center gap-2 shadow hover:shadow-md"
+              className="w-full md:w-auto px-6 py-3 rounded-2xl bg-[#5b5b5b] text-white font-semibold flex items-center justify-center gap-2 shadow hover:shadow-md"
             >
               <FaSearch />
               Search
@@ -279,7 +279,7 @@ export default function StockReports() {
             <button
               type="button"
               onClick={downloadPdf}
-              className="ml-auto px-6 py-3 rounded-2xl bg-afmc-maroon hover:bg-afmc-maroon2 text-white font-semibold flex items-center gap-2 shadow hover:shadow-md transition"
+              className="w-full md:w-auto px-6 py-3 rounded-2xl bg-afmc-maroon hover:bg-afmc-maroon2 text-white font-semibold flex items-center justify-center gap-2 shadow hover:shadow-md transition"
             >
               <FaDownload />
               Download PDF
@@ -338,13 +338,13 @@ export default function StockReports() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={activeTab === "in" ? 7 : 6} className="px-4 py-6 text-center text-gray-500">
+                    <td colSpan={6} className="px-4 py-6 text-center text-gray-500">
                       Loading report...
                     </td>
                   </tr>
                 ) : rows.length === 0 ? (
                   <tr>
-                    <td colSpan={activeTab === "in" ? 7 : 6} className="px-4 py-6 text-center text-gray-500">
+                    <td colSpan={6} className="px-4 py-6 text-center text-gray-500">
                       No records found.
                     </td>
                   </tr>

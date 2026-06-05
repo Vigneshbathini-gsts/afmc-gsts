@@ -275,7 +275,7 @@ const KitchenOrderHistory = () => {
       <div className="absolute bottom-20 right-20 w-80 h-80 bg-afmc-maroon2/10 rounded-full blur-3xl"></div>
 
       <div className="relative z-10 p-6 md:p-8 space-y-6">
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-2xl font-semibold text-afmc-maroon">
             Kitchen Order History
           </h1>
@@ -352,12 +352,12 @@ const KitchenOrderHistory = () => {
               {fromDate && toDate && ` from ${formatDate(fromDate)} to ${formatDate(toDate)}`}
             </p>
           </div>
-          <div className="flex gap-3 items-center w-full md:w-auto">
+          <div className="flex flex-col gap-3 w-full md:flex-row md:items-center md:w-auto">
             <div className="relative w-full md:w-80">
               <FaSearch className="absolute top-1/2 left-3 -translate-y-1/2 text-gray-400 text-sm" />
               <input
                 type="text"
-                placeholder="Search by order  , name or phone..."
+                placeholder="Search by order, name or phone..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-3 rounded-2xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-afmc-maroon2/20 text-sm"
@@ -374,7 +374,7 @@ const KitchenOrderHistory = () => {
             <button
               onClick={downloadPDF}
               disabled={filteredOrders.length === 0}
-              className="px-6 py-3 rounded-2xl bg-afmc-maroon hover:bg-afmc-maroon2 text-white font-semibold flex items-center gap-2 shadow hover:shadow-md transition disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap"
+              className="px-6 py-3 rounded-2xl bg-afmc-maroon hover:bg-afmc-maroon2 text-white font-semibold flex items-center justify-center gap-2 shadow hover:shadow-md transition disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap w-full md:w-auto"
             >
               <FaDownload />
               Download PDF
@@ -402,7 +402,7 @@ const KitchenOrderHistory = () => {
                     <th className="px-6 py-4 text-left">Order  </th>
                     <th className="px-6 py-4 text-left">Order Date</th>
                     <th className="px-6 py-4 text-left">Customer Name</th>
-                    <th className="px-6 py-4 text-left">Phone Number</th>
+                    <th className="hidden sm:table-cell px-6 py-4 text-left">Phone Number</th>
                     <th className="px-6 py-4 text-left">Subtotal</th>
                     <th className="px-6 py-4 text-left">Status</th>
                   </tr>
@@ -422,7 +422,7 @@ const KitchenOrderHistory = () => {
                         {order.order_date ? formatDate(order.order_date) : 'N/A'}
                       </td>
                       <td className="px-6 py-4 text-gray-700">{toInitCap(order.first_name) || 'N/A'}</td>
-                      <td className="px-6 py-4 text-gray-600">{order.phone_number || 'N/A'}</td>
+                      <td className="hidden sm:table-cell px-6 py-4 text-gray-600">{order.phone_number || 'N/A'}</td>
                       <td className="px-6 py-4">
                         <span className="text-sm font-medium text-gray-900">
                           Rs. {formatCurrency(order.subtotal)}
@@ -471,8 +471,8 @@ const KitchenOrderHistory = () => {
       {/* Modal for Order Details */}
       {modalOpen && selectedOrder && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-5xl w-full max-h-[90vh] overflow-hidden">
-            <div className="bg-gradient-to-r from-afmc-maroon to-afmc-maroon2 px-6 py-4 flex justify-between items-center">
+          <div className="bg-white rounded-2xl shadow-xl max-w-full sm:max-w-5xl w-full max-h-[90vh] overflow-hidden">
+            <div className="bg-gradient-to-r from-afmc-maroon to-afmc-maroon2 px-6 py-4 flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center">
               <div>
                 <h3 className="text-xl font-bold text-white">
                   Order Details:  {selectedOrder.order_num}

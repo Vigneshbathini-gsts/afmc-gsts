@@ -49,7 +49,7 @@ const OrderTable = ({
                         <th className="px-4 py-3">Order Status</th>
 
                         {showPaymentMethod && (
-                            <th className="px-4 py-3">Payment Method</th>
+                            <th className="hidden md:table-cell px-4 py-3">Payment Method</th>
                         )}
                         <th className="px-4 py-3">Payment Status</th>
                         <th className="px-4 py-3">Amount</th>
@@ -104,9 +104,9 @@ const OrderTable = ({
                                     </td>
 
                                     {showPaymentMethod && (
-                                        <td className="px-4 py-3 text-gray-600">{toInitCap(order.payment_method) || "-"}</td>
+                                        <td className="hidden md:table-cell px-4 py-3 text-gray-600">{toInitCap(order.payment_method) || "-"}</td>
                                     )}
-                                    <td className="px-4 py-3">
+                                    <td className="px-4 py-3 whitespace-nowrap">
                                         <span
                                             className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${String(paymentStatus).trim().toLowerCase() === "paid"
                                                     ? "bg-green-100 text-green-700"
@@ -115,7 +115,8 @@ const OrderTable = ({
                                         >
                                             {toInitCap(paymentStatus)}
                                         </span>
-                                    </td>                                    <td className="px-4 py-3 text-gray-600">₹ {amount}</td>
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-gray-600">₹ {amount}</td>
                                     <td className="px-4 py-3 flex flex-wrap gap-2">
                                         <FaPencilAlt
                                             onClick={() => {

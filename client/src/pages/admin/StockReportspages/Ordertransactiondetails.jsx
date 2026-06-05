@@ -495,110 +495,136 @@ export default function OrderTransactionUI() {
           ) : (
             <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
               <div className="max-h-[70vh] overflow-auto" onScroll={handleTableScroll}>
-                <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50 text-gray-600">
-                    <tr>
-                      <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
-                        Order Number
-                      </th>
-                      {/* <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
-                        User Name
-                      </th> */}
-                      {/* <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
-                        Kitchen Name
-                      </th> */}
-                      <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
-                        Item Name
-                      </th>
-                      <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
-                        Quantity
-                      </th>
-                      {/* <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
-                        Profit %
-                      </th> */}
-                      <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
-                        Total Profit
-                      </th>
-                      <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
-                        Preparation Charges
-                      </th>
-                      <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
-                        Subtotal
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {loading ? (
-                      <tr>
-                        <td colSpan="9" className="text-center py-8">
-                          <div className="flex justify-center items-center">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-afmc-maroon"></div>
-                            <span className="ml-2">Loading data...</span>
+                <div className="sm:hidden p-4 space-y-4">
+                  {loading ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <div className="inline-flex items-center gap-2 animate-pulse">
+                        <span className="h-8 w-8 rounded-full border-b-2 border-afmc-maroon"></span>
+                        Loading data...
+                      </div>
+                    </div>
+                  ) : data.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-6 text-center text-gray-500">
+                      No records found for the selected criteria.
+                    </div>
+                  ) : (
+                    data.map((row, index) => (
+                      <div
+                        key={row.ORDER_LINE_ID || `row-${index}`}
+                        className="rounded-3xl border border-gray-200 bg-gray-50 p-4 shadow-sm"
+                      >
+                        <div className="flex items-center justify-between gap-3 mb-3">
+                          <span className="text-sm font-semibold text-afmc-maroon">
+                            Order #{row.ORDER_NUM || "-"}
+                          </span>
+                          <span className="rounded-full bg-afmc-maroon/10 px-3 py-1 text-xs font-semibold text-afmc-maroon">
+                            {row.QUANTITY || "-"} qty
+                          </span>
+                        </div>
+                        <div className="space-y-2 text-sm text-gray-700">
+                          <div>
+                            <span className="block text-xs text-gray-500">Item</span>
+                            <span>{toInitCap(stripHtml(row.ITEM_NAME || "-"))}</span>
                           </div>
-                        </td>
-                      </tr>
-                    ) : data.length === 0 ? (
+                          <div>
+                            <span className="block text-xs text-gray-500">Total Profit</span>
+                            <span>{row.TOTAL_PROFIT || "-"}</span>
+                          </div>
+                          <div>
+                            <span className="block text-xs text-gray-500">Preparation Charges</span>
+                            <span>{row.FOOD_PR_CHARGES || "-"}</span>
+                          </div>
+                          <div>
+                            <span className="block text-xs text-gray-500">Subtotal</span>
+                            <span>{row.SUBTOTAL || "-"}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <div className="hidden sm:block overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 text-gray-600">
                       <tr>
-                        <td colSpan="9" className="px-4 py-6 text-center text-gray-500">
-                          No records found for the selected criteria.
-                        </td>
+                        <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
+                          Order Number
+                        </th>
+                        <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
+                          Item Name
+                        </th>
+                        <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
+                          Quantity
+                        </th>
+                        <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
+                          Total Profit
+                        </th>
+                        <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
+                          Preparation Charges
+                        </th>
+                        <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
+                          Subtotal
+                        </th>
                       </tr>
-                    ) : (
-                      <>
-                        {data.map((row, index) => (
-                          <tr
-                            key={row.ORDER_LINE_ID || `row-${index}`}
-                            className="border-t border-gray-100 hover:bg-gray-50"
-                          >
-                            <td className="px-4 py-3 whitespace-nowrap">
-                              {row.ORDER_NUM || "-"}
-                            </td>
-                            {/* <td className="px-4 py-3 whitespace-nowrap">
-                              {row.FIRST_NAME || "-"}
-                            </td> */}
-                            {/* <td className="px-4 py-3 whitespace-nowrap">
-                              {row.PUBMED_NAME || "-"}
-                            </td> */}
-                            <td className="px-4 py-3 whitespace-nowrap">
-                              {toInitCap(stripHtml(row.ITEM_NAME || "-"))}
-                            </td>
-                            <td className="px-4 py-3 whitespace-nowrap">
-                              {row.QUANTITY || "-"}
-                            </td>
-                            {/* <td className="px-4 py-3 whitespace-nowrap">
-                              {row.TOTALPERCENT || "-"}
-                            </td> */}
-                            <td className="px-4 py-3 whitespace-nowrap">
-                              {row.TOTAL_PROFIT || "-"}
-                            </td>
-                            <td className="px-4 py-3 whitespace-nowrap">
-                              {row.FOOD_PR_CHARGES || "-"}
-                            </td>
-                            <td className="px-4 py-3 whitespace-nowrap">
-                              {row.SUBTOTAL || "-"}
-                            </td>
-                          </tr>
-                        ))}
-                        <tr className="border-t border-gray-200 bg-gray-100 font-semibold">
-                          <td className="px-4 py-3 whitespace-nowrap" />
-                          <td className="px-4 py-3 whitespace-nowrap" />
-                          <td className="px-4 py-3 whitespace-nowrap">TOTAL</td>
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            {formatMoney(totals.totalProfit)}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            {formatMoney(totals.prepCharges)}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            {formatMoney(totals.subtotal)}
+                    </thead>
+                    <tbody>
+                      {loading ? (
+                        <tr>
+                          <td colSpan="6" className="text-center py-8">
+                            <div className="flex justify-center items-center">
+                              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-afmc-maroon"></div>
+                              <span className="ml-2">Loading data...</span>
+                            </div>
                           </td>
                         </tr>
-                      </>
-                    )}
-                  </tbody>
-                </table>
+                      ) : data.length === 0 ? (
+                        <tr>
+                          <td colSpan="6" className="px-4 py-6 text-center text-gray-500">
+                            No records found for the selected criteria.
+                          </td>
+                        </tr>
+                      ) : (
+                        <>
+                          {data.map((row, index) => (
+                            <tr
+                              key={row.ORDER_LINE_ID || `row-${index}`}
+                              className="border-t border-gray-100 hover:bg-gray-50"
+                            >
+                              <td className="px-4 py-3 whitespace-nowrap">
+                                {row.ORDER_NUM || "-"}
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap">
+                                {toInitCap(stripHtml(row.ITEM_NAME || "-"))}
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap">
+                                {row.QUANTITY || "-"}
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap">
+                                {row.TOTAL_PROFIT || "-"}
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap">
+                                {row.FOOD_PR_CHARGES || "-"}
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap">
+                                {row.SUBTOTAL || "-"}
+                              </td>
+                            </tr>
+                          ))}
+                          <tr className="border-t border-gray-200 bg-gray-100 font-semibold">
+                            <td className="px-4 py-3 whitespace-nowrap" />
+                            <td className="px-4 py-3 whitespace-nowrap">TOTAL</td>
+                            <td className="px-4 py-3 whitespace-nowrap" />
+                            <td className="px-4 py-3 whitespace-nowrap">{formatMoney(totals.totalProfit)}</td>
+                            <td className="px-4 py-3 whitespace-nowrap">{formatMoney(totals.prepCharges)}</td>
+                            <td className="px-4 py-3 whitespace-nowrap">{formatMoney(totals.subtotal)}</td>
+                          </tr>
+                        </>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
+
                 {loadingMore && (
                   <p className="px-4 py-4 text-center text-gray-500">
                     Loading more data...
