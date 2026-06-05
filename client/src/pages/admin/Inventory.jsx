@@ -1277,12 +1277,12 @@ export default function Inventory() {
                   Volume
                 </label>
                 <input
-                  type="text"
+                  type="number"
                   value={stockForm.volume}
                   onChange={(e) =>
                     setStockForm((prev) => ({ ...prev, volume: e.target.value }))
                   }
-                  placeholder="e.g., 750ML"
+                  placeholder="e.g., 750"
                   className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-700"
                 />
               </div>
