@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { FaBell, FaUtensils } from "react-icons/fa";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { barOrdersAPI } from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
 
@@ -10,6 +10,7 @@ export default function KitchenOrderBell({ kitchen = "Bar" }) {
   const [clearingAll, setClearingAll] = useState(false);
   const dropdownRef = useRef(null);
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
 
   const basePath =
@@ -50,6 +51,11 @@ export default function KitchenOrderBell({ kitchen = "Bar" }) {
     return () =>
       document.removeEventListener("mousedown", handleOutsideClick);
   }, []);
+
+  // Close dropdown when route changes (ensures it doesn't remain open after navigation)
+  useEffect(() => {
+    setOpen(false);
+  }, [location.pathname]);
 
   // compute mobile dropdown position to sit below header
 
@@ -94,6 +100,10 @@ export default function KitchenOrderBell({ kitchen = "Bar" }) {
     const orderNumber = order?.ORDERNUMBER ?? order?.orderNumber;
     if (!orderNumber) return;
 
+    // Close the dropdown immediately to remove any overlay/backdrop
+    // before navigating/opening the order details (prevents UI conflicts)
+    setOpen(false);
+
     try {
       await handleMarkAsRead(order.NOTIFICATION_ID);
     } finally {
@@ -104,16 +114,15 @@ export default function KitchenOrderBell({ kitchen = "Bar" }) {
       navigate(`${basePath}/order-details?${params.toString()}`, {
         state: { ...order, ORDERNUMBER: orderNumber, kitchenType: kitchen },
       });
-      setOpen(false);
     }
   };
 
   return (
-    <div className="relative" ref={dropdownRef}>
+    <div className="relative inline-flex" ref={dropdownRef}>
       {/* 🔔 Bell Icon */}
       <button
         onClick={() => setOpen(!open)}
-        className="relative p-3 rounded-xl bg-gray-100 hover:bg-afmc-maroon/10 transition"
+        className="relative inline-flex items-center justify-center p-3 rounded-xl bg-gray-100 hover:bg-afmc-maroon/10 transition"
       >
         <FaBell className="text-gray-700 text-lg" />
         {notifications.length > 0 && (
@@ -131,7 +140,7 @@ export default function KitchenOrderBell({ kitchen = "Bar" }) {
             onClick={() => setOpen(false)}
           />
           <div
-            className="fixed inset-x-4 top-20 bottom-4 overflow-hidden bg-white rounded-3xl shadow-2xl border border-gray-200 z-50 sm:relative sm:inset-auto sm:top-12 sm:right-0 sm:w-[min(24rem,calc(100vw-1rem))]"
+            className="fixed inset-x-4 top-20 bottom-4 overflow-hidden bg-white rounded-3xl shadow-2xl border border-gray-200 z-50 sm:absolute sm:inset-auto sm:top-full sm:mt-2 sm:right-0 sm:w-[min(24rem,calc(100vw-1rem))] sm:max-w-[24rem]"
           >
           <div className="flex flex-col gap-2 px-4 py-3 bg-gradient-to-r from-afmc-maroon to-afmc-maroon2 text-white sm:flex-row sm:items-center sm:justify-between">
             <div>

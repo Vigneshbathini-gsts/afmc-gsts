@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
 import { FaBell, FaExclamationTriangle } from "react-icons/fa";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { notificationAPI } from "../../services/api";
 
 export default function StockNotificationBell() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [notifications, setNotifications] = useState([]);
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef(null);
@@ -36,6 +37,11 @@ export default function StockNotificationBell() {
     };
   }, []);
 
+  // Close dropdown when route changes
+  useEffect(() => {
+    setOpen(false);
+  }, [location.pathname]);
+
 
   const handleMarkAsRead = async (itemCode) => {
     try {
@@ -52,31 +58,34 @@ export default function StockNotificationBell() {
   };
 
   const handleNotificationClick = async (note) => {
+    // Close dropdown immediately to remove any overlay/backdrop
+    // before navigating (prevents UI/modal conflicts)
+    setOpen(false);
+
     try {
       await notificationAPI.markStockOutRead(note.item_code);
 
       setNotifications((prev) =>
         prev.filter((item) => item.item_code !== note.item_code)
       );
-      setOpen(false);
-
-      navigate(
-        `/admin/stock-reports/barstock?itemCode=${encodeURIComponent(
-          note.item_code
-        )}&itemName=${encodeURIComponent(note.item_name || "")}`
-      );
     } catch (error) {
-      console.error("Error opening stock notification:", error);
-      alert("Failed to open stock notification");
+      console.error("Error marking notification as read:", error);
+      // proceed to navigate even if marking as read failed
     }
+
+    navigate(
+      `/admin/stock-reports/barstock?itemCode=${encodeURIComponent(
+        note.item_code
+      )}&itemName=${encodeURIComponent(note.item_name || "")}`
+    );
   };
 
   return (
-    <div className="relative" ref={dropdownRef}>
+    <div className="relative inline-flex" ref={dropdownRef}>
       {/* Bell Button */}
       <button
         onClick={() => setOpen(!open)}
-        className="relative p-3 rounded-xl bg-gray-100 hover:bg-afmc-maroon/10 transition"
+        className="relative inline-flex items-center justify-center p-3 rounded-xl bg-gray-100 hover:bg-afmc-maroon/10 transition"
       >
         <FaBell className="text-gray-700 text-lg" />
 
@@ -95,7 +104,7 @@ export default function StockNotificationBell() {
             onClick={() => setOpen(false)}
           />
           <div
-            className="fixed inset-x-4 top-20 bottom-4 overflow-hidden bg-white rounded-3xl shadow-2xl border border-gray-200 z-50 sm:relative sm:inset-auto sm:top-12 sm:right-0 sm:w-[min(20rem,calc(100vw-1rem))]"
+            className="fixed inset-x-4 top-20 bottom-4 overflow-hidden bg-white rounded-3xl shadow-2xl border border-gray-200 z-50 sm:absolute sm:inset-auto sm:top-full sm:mt-2 sm:right-0 sm:w-[min(20rem,calc(100vw-1rem))] sm:max-w-[20rem]"
           >
           {/* Header */}
           <div className="flex flex-col gap-2 px-4 py-3 bg-gradient-to-r from-afmc-maroon to-afmc-maroon2 text-white sm:flex-row sm:items-center sm:justify-between">
