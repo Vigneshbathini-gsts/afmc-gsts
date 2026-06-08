@@ -25,6 +25,15 @@ const toInitCap = (value) =>
     .toLowerCase()
     .replace(/(^|\s)\S/g, (match) => match.toUpperCase());
 
+const getServingVolume = (subCategoryId, acUnit) => {
+  const sub = Number(subCategoryId);
+  const unit = String(acUnit || "").trim().toLowerCase();
+
+  if (sub === 6 && unit === "glass") return "200";
+  if (sub === 9 && unit === "glass") return "250";
+  return "";
+};
+
 const getAllowedAcUnits = (categoryId, subCategoryId) => {
   const cat = Number(categoryId);
   const sub = Number(subCategoryId);
@@ -44,7 +53,7 @@ const getAllowedAcUnits = (categoryId, subCategoryId) => {
       allowed.add("Nos");
     }
     if ([9].includes(sub)) {
-      allowed.add("Glass");
+      allowed.add("glass");
       allowed.add("Nos");
     }
   }
@@ -422,9 +431,7 @@ export default function Inventory() {
 
   const acUnitOptions = useMemo(() => {
     const allowed = getAllowedAcUnits(formValues.categoryId, formValues.subCategory);
-    if (allowed.length === 0) return allAcUnitOptions;
-    const normalizedAllowed = new Set(allowed.map((value) => String(value).toLowerCase()));
-    return allAcUnitOptions.filter((value) => normalizedAllowed.has(String(value).toLowerCase()));
+    return allowed.length === 0 ? allAcUnitOptions : allowed;
   }, [allAcUnitOptions, formValues.categoryId, formValues.subCategory]);
 
   useEffect(() => {
@@ -517,6 +524,7 @@ export default function Inventory() {
       formData.append("categoryId", formValues.categoryId);
       formData.append("subCategory", formValues.subCategory);
       formData.append("acUnit", formValues.acUnit);
+      formData.append("servingVolume", getServingVolume(formValues.subCategory, formValues.acUnit));
       formData.append("prepCharges", formValues.prepCharges);
       console.log("createdBy", currentLoggedInUser)
       formData.append("createdBy", currentLoggedInUser);
@@ -1264,10 +1272,17 @@ export default function Inventory() {
                 </label>
                 <input
                   type="number"
+                  min="0"
+                  step="any"
                   value={stockForm.rate}
-                  onChange={(e) =>
-                    setStockForm((prev) => ({ ...prev, rate: e.target.value }))
-                  }
+                  onChange={(e) => {
+                    let v = String(e.target.value || "");
+                    v = v.replace(/e/gi, "");
+                    v = v.replace(/[^0-9.]/g, "");
+                    const parts = v.split('.');
+                    if (parts.length > 2) v = parts[0] + '.' + parts.slice(1).join('');
+                    setStockForm((prev) => ({ ...prev, rate: v }));
+                  }}
                   className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-700"
                 />
               </div>
@@ -1277,11 +1292,16 @@ export default function Inventory() {
                   Volume
                 </label>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  min="0"
                   value={stockForm.volume}
-                  onChange={(e) =>
-                    setStockForm((prev) => ({ ...prev, volume: e.target.value }))
-                  }
+                  onChange={(e) => {
+                    let v = String(e.target.value || "");
+                    v = v.replace(/[^0-9]/g, "");
+                    setStockForm((prev) => ({ ...prev, volume: v }));
+                  }}
                   placeholder="e.g., 750"
                   className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-700"
                 />

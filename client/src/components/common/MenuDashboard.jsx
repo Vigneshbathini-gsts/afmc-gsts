@@ -101,9 +101,12 @@ function formatPrice(value) {
 }
 
 function isOutOfStock(item) {
+  const status = String(item?.stockStatus ?? item?.stock_status ?? "").trim().toLowerCase();
+  if (status === "out of stock") return true;
+
   const stockQuantity = getStockQuantity(item);
   if (stockQuantity !== null) return stockQuantity <= 0;
-  return String(item?.stock_status || "").trim().toLowerCase() === "out of stock";
+  return false;
 }
 
 function isCocktailOrMocktailItem(item) {
@@ -322,7 +325,7 @@ function MenuGrid({ items, showStockStatus = false, ignoreStockStatus = false, o
                 src={`${BASEAPI}${item.image || "default.jpg"}`}
                 alt={item.item_name}
                 className={`relative h-full w-full object-contain p-3.5 transition-transform duration-300 ${
-                  stockDisabled ? "grayscale" : "group-hover:scale-105"
+                  stockDisabled ? "blur-[2px] grayscale opacity-60" : "group-hover:scale-105"
                 }`}
               />
 

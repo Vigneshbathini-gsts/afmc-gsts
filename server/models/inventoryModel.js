@@ -170,6 +170,15 @@ const requiresVolume = (acUnit) => {
   return unit !== "" && unit !== "NOS";
 };
 
+const getDefaultServingVolume = (subCategory, acUnit) => {
+  const sub = Number(subCategory);
+  const unit = String(acUnit || "").trim().toLowerCase();
+
+  if (sub === 6 && unit === "glass") return "200";
+  if (sub === 9 && unit === "glass") return "250";
+  return "";
+};
+
 const validateStockInItem = (item) => {
   const numericRate = Number(item.rate);
   const normalizedBarcode = sanitizeBarcode(item.barcode);
@@ -210,6 +219,7 @@ const createItem = async (payload) => {
     categoryId,
     subCategory,
     acUnit,
+    servingVolume,
     prepCharges,
     createdBy,
     fileName,
@@ -255,13 +265,17 @@ const createItem = async (payload) => {
       prCharges = 0;
     }
 
+    const normalizedAcUnit = acUnit || "Nos";
+    const defaultServingVolume = getDefaultServingVolume(subCategory, normalizedAcUnit);
+    const pegs = defaultServingVolume || servingVolume || "";
+
     const sql = `
       INSERT INTO xxafmc_inventory
         (ITEM_ID, ITEM_CODE, ITEM_NAME, DESCRIPTION, CATEGORY_ID, SUB_CATEGORY,
-         \`A/C_UNIT\`, STOCK_QUANTITY, PROFIT, FOOD_PR_CHARGES, NON_MEMBER_PROFIT,
+         \`A/C_UNIT\`, PEGS, STOCK_QUANTITY, PROFIT, FOOD_PR_CHARGES, NON_MEMBER_PROFIT,
          PR_CHARGES, CREATION_DATE, CREATED_BY, IMAGE, MIME_TYPE, FILE_NAME)
       VALUES
-        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     const params = [
@@ -271,7 +285,8 @@ const createItem = async (payload) => {
       description || "",
       Number(categoryId),
       subCategory ? Number(subCategory) : null,
-      acUnit || "Nos",
+      normalizedAcUnit,
+      pegs,
       0,
       profit,
       foodPrCharges,
@@ -290,7 +305,8 @@ const createItem = async (payload) => {
       item_id: nextId,
       item_code: nextId,
       item_name: itemName,
-      ac_unit: acUnit || "Nos",
+      ac_unit: normalizedAcUnit,
+      pegs,
       stock_quantity: 0,
     };
   } finally {
@@ -497,6 +513,14 @@ const calculatePegs = ({ subCategory, typeId, volume, acQuantity }) => {
   return 0;
 };
 
+const getBarLookupUnit = (subCategory, acUnit) => {
+  const sub = Number(subCategory);
+  const unit = String(acUnit || "").trim();
+
+  if (sub === 9 && unit.toLowerCase() === "glass") return "glass";
+  return unit;
+};
+
 const addStockTransactions = async (payload) => {
   const items = Array.isArray(payload) ? payload : [payload];
 
@@ -573,9 +597,10 @@ const addStockTransactions = async (payload) => {
         error.code = "INVALID_DATA";
         throw error;
       }
+      const barLookupUnit = getBarLookupUnit(inventoryItem.sub_category, effectiveAcUnit);
       const [barRows] = await connection.execute(
         "SELECT AC_QUANTITY AS ac_quantity, TYPE_ID AS type_id FROM xxafmc_bar WHERE TYPE = ? LIMIT 1",
-        [effectiveAcUnit]
+        [barLookupUnit]
       );
       const barRow = barRows && barRows.length ? barRows[0] : null;
 

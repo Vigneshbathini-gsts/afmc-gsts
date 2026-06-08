@@ -61,6 +61,7 @@ exports.createItem = async (req, res) => {
       categoryId,
       subCategory,
       acUnit,
+      servingVolume,
       prepCharges,
       createdBy,
     } = req.body;
@@ -87,6 +88,7 @@ exports.createItem = async (req, res) => {
       categoryId,
       subCategory,
       acUnit,
+      servingVolume,
       prepCharges,
       createdBy,
       fileName: file?.filename,
