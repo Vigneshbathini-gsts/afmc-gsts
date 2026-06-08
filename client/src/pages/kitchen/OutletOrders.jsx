@@ -341,6 +341,7 @@ export default function OutletOrders({ kitchenType = "Bar" }) {
       >
         {/* TOP BAR */}
         <div
+          className="outlet-orders-topbar"
           style={{
             padding: 16,
             borderBottom: "1px solid #eee",
@@ -357,7 +358,7 @@ export default function OutletOrders({ kitchenType = "Bar" }) {
             </p>
           </div>
 
-          <div style={{ position: "relative", width: 260 }}>
+          <div className="outlet-orders-search" style={{ position: "relative", width: "100%", maxWidth: 340, minWidth: 0 }}>
             <FaSearch
               style={{
                 position: "absolute",
@@ -392,77 +393,79 @@ export default function OutletOrders({ kitchenType = "Bar" }) {
           </div>
         ) : (
           <>
-            <table style={{ width: "100%", fontSize: 14 }}>
-              <thead style={{ background: "#fafafa" }}>
-                <tr>
-                  <th style={th}>Order No</th>
-                  <th style={th}>Name</th>
-                  <th style={th}>Status</th>
-                  <th style={th}>Date</th>
-                  <th style={th}>Bar</th>
-                  <th style={th}>Kitchen</th>
-                  <th style={th}>Cancel</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {paginatedOrders.map((o, i) => (
-                  <tr key={i} style={{ borderTop: "1px solid #eee" }}>
-                    <td style={td}>
-                      <span
-                        onClick={() => handleOrderClick(o)}
-                        style={{
-                          color: MAROON,
-                          cursor: "pointer",
-                          fontWeight: 600,
-                        }}
-                      >
-                        {o.ORDERNUMBER}
-                      </span>
-                    </td>
-
-                    <td style={td}>{toInitCap(o.FIRST_NAME || "")}</td>
-
-                    <td style={td}>
-                      <span
-                        style={{
-                          padding: "4px 10px",
-                          borderRadius: 20,
-                          fontSize: 12,
-                          fontWeight: 600,
-                          ...getStatusStyle(o.STATUS),
-                        }}
-                      >
-                        {toInitCap(o.STATUS || "")}
-                      </span>
-                    </td>
-
-                    <td style={td}>{formatDisplayDate(o.CREATION_DATE)}</td>
-                    <td style={td}>{toInitCap(o.Handled_by_bar || "")}</td>
-                    <td style={td}>{toInitCap(o.Handled_by_kitchen || "")}</td>
-
-                    <td style={{ ...td, textAlign: "center" }}>
-                      {cancellingOrder === String(o.ORDERNUMBER) ? (
-                        <FaSpinner className="spin" style={{ color: "#999" }} />
-                      ) : (
-                        <FaTimesCircle
-                          onClick={(event) => handleCancelOrder(o, event)}
-                          title={o.CAN_CANCEL === "Y" ? "Cancel order" : "Order cannot be cancelled"}
-                          style={{
-                            color:
-                              o.CAN_CANCEL === "Y" ? "#e74c3c" : "#ccc",
-                            cursor:
-                              o.CAN_CANCEL === "Y"
-                                ? "pointer"
-                                : "not-allowed",
-                          }}
-                        />
-                      )}
-                    </td>
+            <div className="outlet-orders-table-wrapper">
+              <table className="outlet-orders-table" style={{ width: "100%", fontSize: 14 }}>
+                <thead style={{ background: "#fafafa" }}>
+                  <tr>
+                    <th style={th}>Order No</th>
+                    <th style={th}>Name</th>
+                    <th style={th}>Status</th>
+                    <th style={th}>Date</th>
+                    <th style={th}>Bar</th>
+                    <th style={th}>Kitchen</th>
+                    <th style={th}>Cancel</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+
+                <tbody>
+                  {paginatedOrders.map((o, i) => (
+                    <tr key={i} style={{ borderTop: "1px solid #eee" }}>
+                      <td data-label="Order No" style={td}>
+                        <span
+                          onClick={() => handleOrderClick(o)}
+                          style={{
+                            color: MAROON,
+                            cursor: "pointer",
+                            fontWeight: 600,
+                          }}
+                        >
+                          {o.ORDERNUMBER}
+                        </span>
+                      </td>
+
+                      <td data-label="Name" style={td}>{toInitCap(o.FIRST_NAME || "")}</td>
+
+                      <td data-label="Status" style={td}>
+                        <span
+                          style={{
+                            padding: "4px 10px",
+                            borderRadius: 20,
+                            fontSize: 12,
+                            fontWeight: 600,
+                            ...getStatusStyle(o.STATUS),
+                          }}
+                        >
+                          {toInitCap(o.STATUS || "")}
+                        </span>
+                      </td>
+
+                      <td data-label="Date" style={td}>{formatDisplayDate(o.CREATION_DATE)}</td>
+                      <td data-label="Bar" style={td}>{toInitCap(o.Handled_by_bar || "")}</td>
+                      <td data-label="Kitchen" style={td}>{toInitCap(o.Handled_by_kitchen || "")}</td>
+
+                      <td data-label="Cancel" style={{ ...td, textAlign: "center" }}>
+                        {cancellingOrder === String(o.ORDERNUMBER) ? (
+                          <FaSpinner className="spin" style={{ color: "#999" }} />
+                        ) : (
+                          <FaTimesCircle
+                            onClick={(event) => handleCancelOrder(o, event)}
+                            title={o.CAN_CANCEL === "Y" ? "Cancel order" : "Order cannot be cancelled"}
+                            style={{
+                              color:
+                                o.CAN_CANCEL === "Y" ? "#e74c3c" : "#ccc",
+                              cursor:
+                                o.CAN_CANCEL === "Y"
+                                  ? "pointer"
+                                  : "not-allowed",
+                            }}
+                          />
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
             {/* PAGINATION */}
             <div
