@@ -21,6 +21,18 @@ const getPaymentModesForRole = ({ modes, roleId, pathname }) => {
     return apiModes;
 };
 
+const isFreeItem = (item) => {
+    const freeItemQuantity = Number(item.FREE_ITEM_QUANTITY ?? item.free_item_quantity ?? 0);
+    const rowPrice = Number(item.PRICE ?? item.price ?? 0);
+    return freeItemQuantity > 0 || rowPrice === 0;
+};
+
+const getDisplayMoney = (amount) =>
+    Number(amount || 0).toLocaleString("en-IN", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    });
+
 const PaymentPage = () => {
     const [searchParams] = useSearchParams();
     const orderNumber = searchParams.get("orderNumber");
@@ -308,10 +320,10 @@ const PaymentPage = () => {
                                                 {item.QUANTITY || item.quantity || 0}
                                             </td>
                                             <td className="px-4 py-3 text-center text-sm font-semibold text-stone-800">
-                                                ₹ {Number(item.PRICE || item.price || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                ₹ {getDisplayMoney(isFreeItem(item) ? 0 : Number(item.PRICE || item.price || 0))}
                                             </td>
                                             <td className="px-4 py-3 text-center text-sm font-semibold text-stone-800">
-                                                ₹ {Number(item.SUBTOTAL || item.subtotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                ₹ {getDisplayMoney(isFreeItem(item) ? 0 : Number(item.SUBTOTAL || item.subtotal || 0))}
                                             </td>
                                         </tr>
                                     ))

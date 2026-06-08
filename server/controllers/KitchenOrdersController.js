@@ -52,8 +52,9 @@ async function validateScansBeforeComplete(connection, req, orderNumber, kitchen
   const sessionKey = getScanSessionKey(req, orderNumber);
   const scannedItems = req.session[sessionKey] || [];
 
-  const scannedQty = (predicate) =>
+  const scannedQty = (predicate, { includeFree = false } = {}) =>
     scannedItems
+      .filter((item) => includeFree || !item.isFreeItem)
       .filter(predicate)
       .reduce((sum, item) => sum + Number(item.scanQuantity || 0), 0);
 

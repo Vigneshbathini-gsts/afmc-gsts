@@ -166,7 +166,15 @@ export default function OutletOrderDetails() {
 
 
   const getScannedQuantityByItemCode = useCallback((item) => {
-    const normalizedItemCode = String(item.ITEM_ID ?? "").trim();
+    const orderLineId = Number(item.ORDER_LINE_ID ?? item.orderLineId ?? 0);
+
+    if (orderLineId > 0) {
+      return scannedItems
+        .filter(si => Number(si.orderLineId ?? 0) === orderLineId)
+        .reduce((sum, si) => sum + Number(si.scanQuantity || 0), 0);
+    }
+
+    const normalizedItemCode = String(item.ITEM_ID ?? item.item_code ?? item.itemCode ?? "").trim();
     const unitFactor = Number(item.ingredientsPerUnit || 1);
 
     const rawIngredientScans = scannedItems
