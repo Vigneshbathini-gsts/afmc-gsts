@@ -595,10 +595,10 @@ export default function OrderHistory() {
                         <>
                           {selectedOrderItems.map((item, index) => (
                             <tr key={`${item?.order_line_id || index}-${index}`} className="border-t border-gray-100 text-gray-700">
-                              <td className="px-4 py-3">{item?.item_name || "-"}</td>
-                              <td className="px-4 py-3">{item?.quantity ?? "-"}</td>
+                              <td className="px-4 py-3">{toInitCap(item?.item_name) || "NA"}</td>
+                              <td className="px-4 py-3">{item?.quantity ?? "NA"}</td>
                               <td className={`px-4 py-3 ${getStatusClassName(item?.status)}`}>
-                                {item?.status || "Received"}
+                                {toInitCap(item?.status) || "Received"}
                               </td>
                               <td className="px-4 py-3">{item?.type || "NA"}</td>
                               <td className="px-4 py-3">{formatCurrency(item?.price)}</td>
