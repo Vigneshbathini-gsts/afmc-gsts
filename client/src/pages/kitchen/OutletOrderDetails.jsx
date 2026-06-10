@@ -4,7 +4,6 @@ import {
   FaSpinner,
   FaTimesCircle,
   FaCheckCircle,
-  FaCamera,
   FaHistory,
   FaCheck,
   FaBan,
@@ -74,6 +73,7 @@ export default function OutletOrderDetails() {
   const isMountedRef = useRef(true);
   const isManualScanRef = useRef(false);
   const processingScanRef = useRef(false);
+  const autoStartedScannerRef = useRef(false);
 
   const getScanLinePrice = (item) => {
     const explicitTotal = Number(item?.lineTotalPrice);
@@ -120,7 +120,6 @@ export default function OutletOrderDetails() {
 
   useEffect(() => {
     isMountedRef.current = true;
-
     // Persist/restore order data so refresh doesn't lose the context.
     // Priority: navigation state -> sessionStorage -> query params.
     const nextFromState = orderDataFromState || null;
@@ -132,7 +131,6 @@ export default function OutletOrderDetails() {
         // ignore
       }
     }
-
     // If we don't have full order data but we do have an order number, at least restore that,
     // so we can fetch items + scanned history from the backend.
     if (!orderData?.ORDERNUMBER && orderNumberFromQuery) {
@@ -151,7 +149,6 @@ export default function OutletOrderDetails() {
     if ((orderDataFromState?.ORDERNUMBER || orderData?.ORDERNUMBER || orderNumberFromQuery) && fetchOrderItems) {
       fetchOrderItems();
     }
-
     return () => {
       isMountedRef.current = false;
       if (scannerRef.current) stopScanner();
@@ -173,25 +170,33 @@ export default function OutletOrderDetails() {
         .filter(si => Number(si.orderLineId ?? 0) === orderLineId)
         .reduce((sum, si) => sum + Number(si.scanQuantity || 0), 0);
     }
-
     const normalizedItemCode = String(item.ITEM_ID ?? item.item_code ?? item.itemCode ?? "").trim();
     const unitFactor = Number(item.ingredientsPerUnit || 1);
-
     const rawIngredientScans = scannedItems
       .filter(si => String(si.parentItem ?? si.itemCode ?? "").trim() === normalizedItemCode)
       .reduce((sum, si) => sum + Number(si.scanQuantity || 0), 0);
-
     // Only return completed "whole" parent units
     return Math.floor(rawIngredientScans / unitFactor);
   }, [scannedItems]);
 
-  const handleBarcodeKeyPress = async (e) => {
-    if (e.key === "Enter" && barcode && barcode.trim() !== "" && !processingScanRef.current && !scanning) {
-      e.preventDefault();
-      await confirmScan();
-    }
-  };
+  // const handleBarcodeKeyPress = async (e) => {
+  //   if (e.key === "Enter" && barcode && barcode.trim() !== "" && !processingScanRef.current && !scanning) {
+  //     e.preventDefault();
+  //     await confirmScan();
+  //   }
+  // };
 
+  const handleBarcodeKeyPress = async (e) => {
+  if (
+    e.key === "Enter" &&
+    e.target.value.trim() &&
+    !processingScanRef.current
+  ) {
+    e.preventDefault();
+    await autoProcessScan(e.target.value.trim());
+  }
+};
+  
   const handleBarcodeChange = (value) => {
     setBarcode(value);
     if (value && !scanning) {
@@ -204,6 +209,8 @@ export default function OutletOrderDetails() {
     }
   };
 
+
+  
   const autoProcessScan = useCallback(async (scannedBarcode) => {
     if (!scannedBarcode || processingScanRef.current) return;
     const scanQuantity = Number(qty);
@@ -287,7 +294,7 @@ export default function OutletOrderDetails() {
     await autoProcessScan(trimmedBarcode);
   }, [barcode, autoProcessScan]);
 
-  const startScanner = async () => {
+  const startScanner = useCallback(async () => {
     try {
       setCameraError("");
       setScanError("");
@@ -299,7 +306,7 @@ export default function OutletOrderDetails() {
     } catch (error) {
       console.error("Error opening scanner:", error);
     }
-  };
+  }, []);
 
   const stopScanner = async () => {
     if (isStoppingRef.current) return;
@@ -364,13 +371,19 @@ export default function OutletOrderDetails() {
             if (hasScannedRef.current || processingScanRef.current) return;
             hasScannedRef.current = true;
 
+            const scannedBarcode = String(decodedText || "").trim();
             setScanSuccess(true);
-            setBarcode(decodedText);
+            setBarcode(scannedBarcode);
             isManualScanRef.current = false;
-            setScanMessage("Barcode captured. Check quantity, then confirm scan.");
+            setScanMessage("Barcode captured. Processing scan...");
 
-            setTimeout(() => {
-              if (scannerRef.current) stopScanner();
+            setTimeout(async () => {
+              if (scannerRef.current) await stopScanner();
+              await autoProcessScan(scannedBarcode);
+              if (isMountedRef.current) {
+                hasScannedRef.current = false;
+                startScanner();
+              }
             }, 500);
           }
         );
@@ -382,7 +395,14 @@ export default function OutletOrderDetails() {
     };
 
     initScanner();
-  }, [scanning]);
+  }, [autoProcessScan, scanning, startScanner]);
+
+  useEffect(() => {
+    if (!orderData?.ORDERNUMBER || loading || scanning || autoStartedScannerRef.current) return;
+
+    autoStartedScannerRef.current = true;
+    startScanner();
+  }, [loading, orderData?.ORDERNUMBER, scanning, startScanner]);
 
   const handleItemClick = async (item) => {
     if (!item.LINK_ENABLED || item.LINK_ENABLED !== "Y") return;
@@ -680,7 +700,7 @@ export default function OutletOrderDetails() {
                         type="text"
                         value={barcode}
                         onChange={(e) => handleBarcodeChange(e.target.value)}
-                        onKeyPress={handleBarcodeKeyPress}
+                        onKeyDown={handleBarcodeKeyPress}
                         placeholder="Scan or enter barcode"
                         className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:ring-1 focus:ring-pink-500"
                         disabled={processingScan}
@@ -699,23 +719,6 @@ export default function OutletOrderDetails() {
                         disabled={processingScan}
                       />
                     </div>
-                    <button
-                      onClick={scanning ? stopScanner : startScanner}
-                      disabled={processingScan}
-                      className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg transition text-white font-medium disabled:opacity-50 ${scanning
-                        ? "bg-gray-700 hover:bg-gray-800"
-                        : "bg-afmc-maroon hover:bg-afmc-maroon2"
-                        }`}
-                    >
-                      <FaCamera /> {scanning ? "Stop Camera" : "Start Camera"}
-                    </button>
-                    <button
-                      onClick={confirmScan}
-                      disabled={processingScan || scanning || !barcode.trim()}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg transition text-white font-medium bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <FaCheck /> Confirm Scan
-                    </button>
                     {cameraError && <div className="text-sm text-red-600">{cameraError}</div>}
                     {processingScan && (
                       <div className="flex items-center gap-2 text-sm text-blue-600">

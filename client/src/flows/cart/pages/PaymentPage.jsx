@@ -65,6 +65,7 @@ const PaymentPage = () => {
                 orderService.getPaymentModes(),
             ]);
 
+            console.log("summaryResponse",summaryResponse);
             const orderData = summaryResponse.data?.data || null;
             const paymentModes = getPaymentModesForRole({
                 modes: paymentModesResponse.data?.data,
@@ -104,6 +105,7 @@ const PaymentPage = () => {
         try {
             const response = await orderService.getOrderDetailsInPayment(orderNumber);
             const responseData = response?.data?.data;
+            console.log("responseData",responseData);
             const orderDetails = Array.isArray(responseData)
                 ? responseData
                 : responseData?.items || [];
@@ -201,6 +203,16 @@ const PaymentPage = () => {
                             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">{toInitCap("Items")}</p>
                             <p className="mt-1 text-lg font-semibold text-stone-900">{orderItems?.length || 0}</p>
                         </div>
+
+                        <div className="rounded-2xl border border-stone-200 bg-white px-4 py-3">
+    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
+        {toInitCap("Order Total")}
+    </p>
+    <p className="mt-1 text-lg font-semibold text-stone-900">
+        ₹ {getDisplayMoney(order?.totalAmount || 0)}
+    </p>
+</div>
+                        
                         {/* <div className="rounded-2xl border border-afmc-gold/25 bg-gradient-to-br from-white to-afmc-gold/5 px-4 py-3">
                             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">Status</p>
                             <p className="mt-1 text-lg font-semibold text-afmc-maroon">
