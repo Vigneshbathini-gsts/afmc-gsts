@@ -53,7 +53,7 @@ export default function OutletOrders({ kitchenType = "Bar" }) {
       audioContextRef.current = context;
 
       if (context.state === "suspended") {
-        context.resume().catch(() => {});
+        context.resume().catch(() => { });
       }
 
       const now = context.currentTime;
@@ -89,7 +89,7 @@ export default function OutletOrders({ kitchenType = "Bar" }) {
         const context = audioContextRef.current || new AudioContext();
         audioContextRef.current = context;
         if (context.state === "suspended") {
-          context.resume().catch(() => {});
+          context.resume().catch(() => { });
         }
       } catch {
         // Browser audio unlock can fail silently until a later interaction.
@@ -196,9 +196,8 @@ export default function OutletOrders({ kitchenType = "Bar" }) {
         String(o.FIRST_NAME || "").toLowerCase().includes(search) ||
         String(o.STATUS || "").toLowerCase().includes(search);
 
-      const matchesStatus =
-        statusFilter === "All" ||
-        String(o.STATUS || "").toLowerCase() === statusFilter.toLowerCase();
+      // Status filter - if "All" show everything, otherwise filter by selected status
+      const matchesStatus = statusFilter === "All" || o.STATUS === statusFilter;
 
       return matchesSearch && matchesStatus;
     });
@@ -252,38 +251,38 @@ export default function OutletOrders({ kitchenType = "Bar" }) {
     }
   };
 
- const confirmCancelOrder = async () => {
-  if (!selectedOrder) return;
+  const confirmCancelOrder = async () => {
+    if (!selectedOrder) return;
 
-  try {
-    setCancellingOrder(String(selectedOrder.ORDERNUMBER));
+    try {
+      setCancellingOrder(String(selectedOrder.ORDERNUMBER));
 
-    await barOrdersAPI.cancelOrder({
-      ORDERNUMBER: selectedOrder.ORDERNUMBER,
-      KITCHEN: kitchenType,
-    });
+      await barOrdersAPI.cancelOrder({
+        ORDERNUMBER: selectedOrder.ORDERNUMBER,
+        KITCHEN: kitchenType,
+      });
 
-    setShowConfirmModal(false);
-    setShowSuccessModal(true);
+      setShowConfirmModal(false);
+      setShowSuccessModal(true);
 
-    fetchOrders();
-  } catch (error) {
-    console.error("Error cancelling order:", error);
-    alert("Failed to cancel order. Please try again.");
-  } finally {
-    setCancellingOrder("");
-  }
-};
+      fetchOrders();
+    } catch (error) {
+      console.error("Error cancelling order:", error);
+      alert("Failed to cancel order. Please try again.");
+    } finally {
+      setCancellingOrder("");
+    }
+  };
 
-const handleCancelOrder = async (order, event) => {
-  event.stopPropagation();
+  const handleCancelOrder = async (order, event) => {
+    event.stopPropagation();
 
-  if (order.CAN_CANCEL !== "Y" || cancellingOrder) return;
+    if (order.CAN_CANCEL !== "Y" || cancellingOrder) return;
 
-  // Just set the selected order and show the confirmation modal
-  setSelectedOrder(order);
-  setShowConfirmModal(true);
-};
+    // Just set the selected order and show the confirmation modal
+    setSelectedOrder(order);
+    setShowConfirmModal(true);
+  };
 
   const getStatusStyle = (status) => {
     switch (status) {
@@ -307,12 +306,12 @@ const handleCancelOrder = async (order, event) => {
   return (
     <div className="p-6">
       {/* HEADER */}
-      <div 
+      <div
         className="rounded-2xl p-5 mb-5 text-white"
         style={{ background: `linear-gradient(135deg, ${MAROON}, ${MAROON2})` }}
       >
         <div className="flex items-center gap-3">
-          <div 
+          <div
             className="p-2.5 rounded-xl"
             style={{ background: "rgba(255,255,255,0.1)", color: GOLD }}
           >
@@ -350,12 +349,15 @@ const handleCancelOrder = async (order, event) => {
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
               className="px-3 py-2 rounded-lg border text-sm bg-white cursor-pointer focus:outline-none focus:ring-2 transition-all"
-              style={{ borderColor: 'rgba(107,26,79,0.2)', '--tw-ring-color': MAROON }}
+              style={{
+                borderColor: "rgba(107,26,79,0.2)",
+                "--tw-ring-color": MAROON,
+              }}
             >
-              <option value="All">All Status ({getStatusCount("All")})</option>
-              <option value="Received">Received ({getStatusCount("Received")})</option>
-              <option value="Preparing">Preparing ({getStatusCount("Preparing")})</option>
-              <option value="Completed">Completed ({getStatusCount("Completed")})</option>
+              <option value="All">All Orders</option>
+              <option value="Received">Received</option>
+              <option value="Preparing">Preparing</option>
+              <option value="Completed">Completed</option>
             </select>
           </div>
         </div>
@@ -415,11 +417,10 @@ const handleCancelOrder = async (order, event) => {
                           <FaTimesCircle
                             onClick={(event) => handleCancelOrder(o, event)}
                             title={o.CAN_CANCEL === "Y" ? "Cancel order" : "Order cannot be cancelled"}
-                            className={`text-xl ${
-                              o.CAN_CANCEL === "Y" 
-                                ? "text-red-500 hover:text-red-600 cursor-pointer transition-colors" 
+                            className={`text-xl ${o.CAN_CANCEL === "Y"
+                                ? "text-red-500 hover:text-red-600 cursor-pointer transition-colors"
                                 : "text-gray-300 cursor-not-allowed"
-                            }`}
+                              }`}
                           />
                         )}
                       </td>
