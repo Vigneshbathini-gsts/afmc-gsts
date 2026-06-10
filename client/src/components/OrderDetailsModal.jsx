@@ -57,7 +57,7 @@ export default function OrderDetailsModal({ isOpen, onClose, orderNumber }) {
           : Array.isArray(responseData?.items)
             ? responseData.items
             : [];
-            console.log("Fetched order details:", fetchedItems);
+            // console.log("Fetched order details:", fetchedItems);
         setItems(fetchedItems);
       } catch (err) {
         console.error("Error fetching order details:", err);
@@ -123,7 +123,7 @@ export default function OrderDetailsModal({ isOpen, onClose, orderNumber }) {
                     const subtotalValue = parseNumber(item.subtotal || item.SUBTOTAL || item.total);
                     const isFreeItem = priceValue === 0 && subtotalValue === 0;
                    const typeValue =
-  item.type || item.TYPE || (isFreeItem ? "Free Item" : "NA");
+  item.type || item.TYPE || item.ac_unit || item.acUnit || (isFreeItem ? "Free Item" : "NA");
 
 const displayType =
   typeValue === "NA" ? "NA" : toInitCap(typeValue);
@@ -164,7 +164,7 @@ const displayType =
                 const subtotalValue = parseNumber(item.subtotal || item.SUBTOTAL || item.total);
                 const isFreeItem = priceValue === 0 && subtotalValue === 0;
                 const typeValue =
-  item.type || item.TYPE || (isFreeItem ? "Free Item" : "NA");
+  item.type || item.TYPE || item.ac_unit || item.acUnit || (isFreeItem ? "Free Item" : "NA");
 
 const displayType =
   typeValue === "NA" ? "NA" : toInitCap(typeValue);

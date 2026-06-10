@@ -17,6 +17,15 @@ const normalizeDetail = (detail) => detail && ({
     stockStatus: getDetailStockStatus(detail),
 });
 
+const initCap = (str) => {
+  if (!str) return "";
+
+  return str
+    .toLowerCase()
+    .split(" ")
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+};
 export default function ItemDetails() {
     const { id } = useParams();
     const navigate = useNavigate();
@@ -311,6 +320,11 @@ export default function ItemDetails() {
     };
 
     const handleAddIngredientsClick = () => {
+        const existingCount = item?.details?.length || 0;
+        if (existingCount >= 5) {
+            toast.warning("Maximum 5 ingredients already added. Remove some ingredients to add more.");
+            return;
+        }
         setShowModal(true);
         setSelectedIngredients([]);
         setSearchTerm("");
@@ -318,20 +332,57 @@ export default function ItemDetails() {
     };
 
     const handleIngredientSelect = (ingredient) => {
-        if (selectedIngredients.length >= 3) {
-            toast.warning("Maximum 3 ingredients can be selected");
+        // Calculate total ingredients (existing + selected)
+        const existingCount = item?.details?.length || 0;
+        const selectedCount = selectedIngredients.length;
+        const totalCount = existingCount + selectedCount;
+        
+        if (totalCount >= 5) {
+            toast.warning("Maximum 5 ingredients allowed per recipe");
             return;
         }
 
         const alreadySelected = selectedIngredients.some(item => item.d === ingredient.d);
-        const alreadyInRecipe = item?.details?.some(
+        
+        // Check if ingredient already exists in recipe
+        const existingIngredientIndex = item?.details?.findIndex(
             (detail) => String(getDetailItemName(detail) || "").trim().toLowerCase() === String(ingredient.d || "").trim().toLowerCase()
                 || String(getDetailItemCode(detail) || "").trim() === String(ingredient.r || "").trim()
         );
 
-        if (alreadySelected || alreadyInRecipe) {
-            toast.warning("Ingredient already exists in the recipe");
+        if (alreadySelected) {
+            toast.warning("Ingredient already selected");
             return;
+        }
+
+        if (existingIngredientIndex !== -1 && existingIngredientIndex >= 0) {
+            // Ingredient exists, increase its quantity instead of adding new
+            const currentQty = quantities[existingIngredientIndex] || 1;
+            const newQty = currentQty + 1;
+            
+            // Check stock availability
+            const existingDetail = item.details[existingIngredientIndex];
+            const rawStockQuantity = getDetailStockQuantity(existingDetail);
+            const stockQuantity = rawStockQuantity == null || rawStockQuantity === "" ? null : Number(rawStockQuantity);
+            const cartItemQuantity = Number(item?.cartItemQuantity || 1);
+            const effectiveCartQty = Number.isFinite(cartItemQuantity) && cartItemQuantity > 0 ? cartItemQuantity : 1;
+            
+            if (Number.isFinite(stockQuantity) && stockQuantity >= 0) {
+                const requiredNext = newQty * effectiveCartQty;
+                if (requiredNext > stockQuantity) {
+                    const itemName = getDetailItemName(existingDetail);
+                    toast.error(`${itemName} available quantity: ${stockQuantity}`);
+                    return;
+                }
+            }
+            
+            // Update quantity
+            const newQuantities = { ...quantities, [existingIngredientIndex]: newQty };
+            setQuantities(newQuantities);
+            persistCustomDetails(item?.details || [], newQuantities);
+            
+            toast.success(`${initCap(ingredient.d)} already exists increasing the  quantity ${newQty}`);
+            return; // Don't add to selected ingredients list
         }
 
         setSelectedIngredients(prev => [...prev, ingredient]);
@@ -347,19 +398,31 @@ export default function ItemDetails() {
             return;
         }
 
+        const existingCount = item?.details?.length || 0;
+        const newTotal = existingCount + selectedIngredients.length;
+        
+        if (newTotal > 5) {
+            toast.warning(`Cannot add ${selectedIngredients.length} ingredient(s). Maximum 5 ingredients allowed. You currently have ${existingCount} ingredient(s).`);
+            return;
+        }
+
         // Add selected ingredients to the item details with default quantity 1
         const newDetails = [...(item.details || [])];
-        selectedIngredients.forEach(ingredient => {
+        const newQuantities = { ...quantities };
+        const startIndex = item.details?.length || 0;
+        
+        selectedIngredients.forEach((ingredient, idx) => {
             const rawStockQuantity = ingredient?.stockQuantity ?? ingredient?.STOCK_QUANTITY ?? ingredient?.stock_quantity ?? null;
             const stockQuantity =
                 rawStockQuantity == null || rawStockQuantity === ""
                     ? null
                     : Number(rawStockQuantity);
             const stockStatusRaw = ingredient?.stockStatus ?? ingredient?.STOCK_STATUS ?? ingredient?.stock_status ?? null;
+            
             newDetails.push({
                 itemName: ingredient.d,
-                itemCode: ingredient.r, // Assuming r contains the item code
-                pegs: 1, // Default quantity
+                itemCode: ingredient.r,
+                pegs: 1,
                 memberPrice: null,
                 unitPrice: ingredient.unitPrice,
                 stockQuantity,
@@ -369,12 +432,8 @@ export default function ItemDetails() {
                         ? (stockQuantity > 0 ? "In Stock" : "Out Of Stock")
                         : "Unknown"),
             });
-        });
-
-        const newQuantities = { ...quantities };
-        const startIndex = item.details?.length || 0;
-        selectedIngredients.forEach((_, index) => {
-            newQuantities[startIndex + index] = 1;
+            
+            newQuantities[startIndex + idx] = 1;
         });
 
         setItem(prev => ({
@@ -758,12 +817,12 @@ export default function ItemDetails() {
                                         {/* Selected Ingredients */}
                                         <div className="mb-4">
                                             <h3 className="mb-2 text-sm font-semibold text-stone-700">
-                                                Selected Ingredients ({selectedIngredients.length}/3)
+                                                Selected Ingredients ({selectedIngredients.length}/5)
                                             </h3>
                                             <div className="max-h-40 space-y-2 overflow-y-auto rounded-xl border border-stone-200 bg-stone-50 p-2">
                                                 {selectedIngredients.map((ingredient, index) => (
                                                     <div key={index} className="flex items-center justify-between rounded-lg bg-white p-2 shadow-sm">
-                                                        <span className="text-sm font-medium text-stone-800">{ingredient.d}</span>
+                                                        <span className="text-sm font-medium text-stone-800">{initCap(ingredient.d)}</span>
                                                         <button
                                                             onClick={() => handleRemoveSelectedIngredient(index)}
                                                             className="rounded-md p-1 text-red-600 transition hover:bg-red-50"
@@ -801,7 +860,7 @@ export default function ItemDetails() {
                                                         onClick={() => handleIngredientSelect(ingredient)}
                                                         className="cursor-pointer border-b border-stone-100 p-3 transition last:border-b-0 hover:bg-afmc-gold/5"
                                                     >
-                                                        <span className="text-sm font-medium text-stone-800">{ingredient.d}</span>
+                                                        <span className="text-sm font-medium text-stone-800">{initCap(ingredient.d)}</span>
                                                     </div>
                                                 ))
                                             )}

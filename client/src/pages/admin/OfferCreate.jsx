@@ -206,10 +206,10 @@ export default function OfferCreate() {
         message: formData.message || "",
       };
 
-      console.log("Sending payload:", payload);
+      // console.log("Sending payload:", payload);
 
       const response = await offersAPI.createOffer(payload);
-      console.log("Response:", response.data);
+      // console.log("Response:", response.data);
 
       setSuccessMessage("Offer created successfully!");
 

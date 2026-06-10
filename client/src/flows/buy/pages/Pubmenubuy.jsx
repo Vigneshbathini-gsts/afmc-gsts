@@ -102,7 +102,6 @@ function Toast({ message, type = "success", onClose }) {
   const [isVisible, setIsVisible] = useState(true);
 
   useEffect(() => {
-    // Reset visibility whenever a new toast message is shown
     setIsVisible(true);
   }, [message, type]);
 
@@ -224,9 +223,6 @@ function normalizeItem(item, fallbackIndex = 0) {
       ? null
       : Number(rawSubcategory);
 
-  // Some order-details payloads may send `available_quantity: 0` for cocktails/mocktails while
-  // ingredient-based availability is still being computed server-side. Treat that as "unknown"
-  // unless an explicit out-of-stock status/message is present, to avoid showing false OOS.
   const isCocktail = [14, 15].includes(Number(subcategory));
   const normalizedStockStatus = String(stockStatus || "").trim().toLowerCase();
   const hasExplicitStockIssue =
@@ -433,7 +429,6 @@ export default function Pubmenubuy({
           for (const ing of normalizedDetails) {
             const rawAvailable = stockMap?.[String(ing.itemCode)];
             if (rawAvailable === undefined || rawAvailable === null || rawAvailable === "") {
-              // If backend didn't return stock for an ingredient code, treat as unknown (do not hard-block).
               hasUnknownStock = true;
               continue;
             }
@@ -471,16 +466,14 @@ export default function Pubmenubuy({
       ignore = true;
     };
   }, [orderNumber, items, cocktailDetailsByItemCode]);
+
   const stockIssue = useMemo(() => {
     return (
       items.find((item) => {
-        // Cocktail/mocktail stock validation is handled separately (and may be overridden by edited ingredients).
         if (isCocktailOrMocktail(item)) {
           return false;
         }
 
-        // Ignore free-item stock validation
-        // when backend sends 0/null stock
         if (item.isFreeItem) {
           const freeAvailable = item.availableQuantity;
 
@@ -698,17 +691,12 @@ export default function Pubmenubuy({
       return [];
     }
 
-    // NEVER keep free rows with qty <= 0
     const cleanedItems = nextItems.filter(
       (row) => !(row?.isFreeItem && Number(row?.quantity || 0) <= 0)
     );
 
     const parents = cleanedItems.filter((row) => !row?.isFreeItem);
-
-    const children = cleanedItems.filter(
-      (row) => row?.isFreeItem
-    );
-
+    const children = cleanedItems.filter((row) => row?.isFreeItem);
     const hasChildForParent = new Set(
       children
         .map((row) => String(row?.parentCode || "").trim())
@@ -728,12 +716,10 @@ export default function Pubmenubuy({
         parent?.free_item_quantity
       );
 
-      // REMOVE FREE ITEM COMPLETELY
       if (expectedFreeQty <= 0) {
         continue;
       }
 
-      // Already exists
       if (hasChildForParent.has(parentCode)) {
         continue;
       }
@@ -807,8 +793,6 @@ export default function Pubmenubuy({
     );
   };
 
-
-
   const calculateFreeQuantity = (paidQuantity, offerQuantity, freeItemQuantity) => {
     const paid = Number(paidQuantity || 0);
     if (!Number.isFinite(paid) || paid <= 0) return 0;
@@ -821,7 +805,6 @@ export default function Pubmenubuy({
       return Math.floor(paid / offerQty) * freePerOffer;
     }
 
-    // Fallback: Buy 2 get 1 free
     return Math.floor(paid / 2);
   };
 
@@ -842,8 +825,6 @@ export default function Pubmenubuy({
 
   const syncFreeItemQuantities = async () => {
     // No-op by design.
-    // Free items are computed/persisted by the backend in `updateLineQuantity` and returned in its response.
-    // A follow-up refetch here can overwrite fresh local state with stale backend data under some conditions.
   };
 
   const adjustQuantity = async (orderLineId, delta) => {
@@ -902,8 +883,6 @@ export default function Pubmenubuy({
         }
       }
 
-      // Only validate "next qty" against stock when increasing quantity.
-      // Decreasing should always be allowed (down to 1), even if the item is currently marked OOS.
       if (delta > 0) {
         if (!(isCocktailOrMocktail(targetItem) && cocktailOverride && !cocktailOverride.isOutOfStock)) {
           const stockValidation = validateNextQuantity(targetItem, nextQtyCandidate);
@@ -933,7 +912,6 @@ export default function Pubmenubuy({
 
       let freeAvailableQty = null;
       for (const freeItem of linkedFreeItems) {
-        // Ignore stale/placeholder/generated free rows
         if (
           Number(freeItem?.quantity || 0) <= 0 ||
           Number(freeItem?.orderLineId || 0) <= 0
@@ -972,7 +950,6 @@ export default function Pubmenubuy({
 
       const nextItems = current
         .map((item) => {
-          // Update parent item
           if (item.orderLineId === numericOrderLineId) {
             const unitPrice = Number(
               item.unitPrice || (currentQty > 0 ? item.subtotal / currentQty : 0) || 0
@@ -988,12 +965,10 @@ export default function Pubmenubuy({
             };
           }
 
-          // Update linked free items
           if (
             item.isFreeItem &&
             String(item.parentCode || "").trim() === targetCode
           ) {
-            // REMOVE FREE ITEM COMPLETELY
             if (expectedFreeQty <= 0) {
               return null;
             }
@@ -1008,9 +983,6 @@ export default function Pubmenubuy({
         })
         .filter(Boolean);
 
-      // If the parent crosses the offer threshold, the linked free line may not exist yet.
-      // Optimistically create a placeholder free row so the UI updates immediately; it will be
-      // replaced by the backend response after `updateLineQuantity`.
       const freeItemCode = Number(targetItem.free_item_code || 0);
       const freeItemName = String(targetItem.free_item_name || "Free item").trim() || "Free item";
       const freeItemImage = String(targetItem.free_item_image || "").trim();
@@ -1084,8 +1056,6 @@ export default function Pubmenubuy({
       setItems(ensureOfferFreeRows(normalized));
       setError("");
       showToast("Quantity updated successfully", "success");
-      // The backend response already returns an updated order summary (including offer-linked free items).
-      // Avoid an immediate refetch here; it can briefly reintroduce stale quantities in slow networks.
       await syncFreeItemQuantities();
     } catch (updateError) {
       const message = updateError?.response?.data?.message || "Unable to update quantity.";
@@ -1134,7 +1104,6 @@ export default function Pubmenubuy({
       for (const ing of ingredients) {
         const rawAvailable = stockMap?.[String(ing.itemCode)];
         if (rawAvailable === undefined || rawAvailable === null || rawAvailable === "") {
-          // Missing stock data should not hard-block quantity updates.
           continue;
         }
         const available = Number(rawAvailable);
@@ -1169,7 +1138,7 @@ export default function Pubmenubuy({
     }
 
     if (updatingLineId === lineId) {
-      showToast("Please waitΓÇª updating quantity.", "error");
+      showToast("Please wait… updating quantity.", "error");
       return;
     }
 
@@ -1197,7 +1166,6 @@ export default function Pubmenubuy({
 
     const nextQtyCandidate = currentQty + delta;
 
-    // Cocktail/mocktail stock validation (mirrors CartPage behavior)
     if (delta > 0) {
       if (isCocktailOrMocktail(liveItem)) {
         const validation = await validateCocktailNextQuantity(liveItem, nextQtyCandidate);
@@ -1222,31 +1190,27 @@ export default function Pubmenubuy({
       } else {
         const stockMessage = String(liveItem?.stockIssueMessage || "").trim();
 
-        // Backend may return ingredient-level stock issues via message only (often for cocktail/mocktail),
-        // without reliable subcategory/stockStatus in this screen's payload.
         if (stockMessage) {
           showToast(stockMessage, "error");
           showStockLimitOnImage(liveItem, "Out of Stock");
           return;
         }
-        // Do not hard-block on cocktail/mocktail `stockStatus` here; it is often stale/incorrect in buy-flow.
       }
     }
 
     const availableQty = liveItem?.availableQuantity;
     if (
-  !isCocktailOrMocktail(liveItem) &&
-  availableQty !== null &&
-  availableQty !== undefined &&
-  Number.isFinite(Number(availableQty))
-) {
-  if (nextQtyCandidate > Number(availableQty)) {
-    showToast(`Out of stock. Available quantity: ${availableQty}`, "error");
-    return;
-  }
-}
+      !isCocktailOrMocktail(liveItem) &&
+      availableQty !== null &&
+      availableQty !== undefined &&
+      Number.isFinite(Number(availableQty))
+    ) {
+      if (nextQtyCandidate > Number(availableQty)) {
+        showToast(`Out of stock. Available quantity: ${availableQty}`, "error");
+        return;
+      }
+    }
 
-    // Offer/free-item stock validation (same messaging as cart)
     const expectedFreeQty = calculateFreeQuantity(
       nextQtyCandidate,
       liveItem?.offer_quantity,
@@ -1261,7 +1225,6 @@ export default function Pubmenubuy({
 
       let freeAvailableQty = null;
       for (const freeItem of linkedFreeItems) {
-        // Ignore stale/placeholder/generated free rows
         if (
           Number(freeItem?.quantity || 0) <= 0 ||
           Number(freeItem?.orderLineId || 0) <= 0
@@ -1304,73 +1267,96 @@ export default function Pubmenubuy({
     adjustQuantity(lineId, delta);
   };
 
-const removeItem = async (id) => {
-  if (disableEdit) {
-    showToast("Editing is disabled on this page.", "error");
-    return;
-  }
-
-  const confirmed = window.confirm(
-    "Are you sure you want to delete this item?"
-  );
-
-  if (!confirmed) {
-    return;
-  }
-
-  const target = items.find((item) => Number(item.id) === Number(id));
-
-  if (!target) {
-    showToast("Unable to identify item for deletion.", "error");
-    return;
-  }
-
-  if (target.isFreeItem) {
-    showToast("Free items cannot be deleted directly.", "error");
-    return;
-  }
-
-  const targetCode = String(target.item_code || "").trim();
-  if (!orderNumber || !targetCode) {
-    showToast("Unable to delete this order item.", "error");
-    return;
-  }
-
-  try {
-    setUpdatingLineId(Number(target.orderLineId ?? target.id) || null);
-    setError("");
-    await Pubmenubuyservice.deleteItem(orderNumber, targetCode);
-
-    const updatedItems = items.filter((item) => {
-      if (Number(item.id) === Number(id)) return false;
-      return String(item.parentCode || "") !== targetCode;
-    });
-
-    setItems(updatedItems);
-    showToast("Item deleted successfully", "success");
-
-    const remainingPaidItems = updatedItems.filter((item) => !item.isFreeItem);
-    if (remainingPaidItems.length === 0) {
-      navigate(`${currentBasePath}/menudash`, {
-        replace: true,
-      });
-    }
-  } catch (deleteError) {
-    const message = deleteError?.response?.data?.message || "Unable to delete this item.";
-    setError(message);
-    showToast(message, "error");
-  } finally {
-    setUpdatingLineId(null);
-  }
-};
-
-  const handleCancelOrder = async () => {
-    if (!orderNumber || cancelling) {
+  const removeItem = async (id) => {
+    if (disableEdit) {
+      showToast("Editing is disabled on this page.", "error");
       return;
     }
 
     const confirmed = window.confirm(
-      `Are you sure you want to cancel order`
+      "Are you sure you want to delete this item?"
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    const target = items.find((item) => Number(item.id) === Number(id));
+
+    if (!target) {
+      showToast("Unable to identify item for deletion.", "error");
+      return;
+    }
+
+    if (target.isFreeItem) {
+      showToast("Free items cannot be deleted directly.", "error");
+      return;
+    }
+
+    const targetCode = String(target.item_code || "").trim();
+    if (!orderNumber || !targetCode) {
+      showToast("Unable to delete this order item.", "error");
+      return;
+    }
+
+    try {
+      setUpdatingLineId(Number(target.orderLineId ?? target.id) || null);
+      setError("");
+      await Pubmenubuyservice.deleteItem(orderNumber, targetCode);
+
+      const updatedItems = items.filter((item) => {
+        if (Number(item.id) === Number(id)) return false;
+        return String(item.parentCode || "") !== targetCode;
+      });
+
+      setItems(updatedItems);
+      showToast("Item deleted successfully", "success");
+
+      const remainingPaidItems = updatedItems.filter((item) => !item.isFreeItem);
+      if (remainingPaidItems.length === 0) {
+        navigate(`${currentBasePath}/menudash`, {
+          replace: true,
+        });
+      }
+    } catch (deleteError) {
+      const message = deleteError?.response?.data?.message || "Unable to delete this item.";
+      setError(message);
+      showToast(message, "error");
+    } finally {
+      setUpdatingLineId(null);
+    }
+  };
+
+  const handleCancelOrder = async () => {
+    // Validate order is ready to cancel
+    if (!orderNumber) {
+      showToast("Order number is missing. Please go back and try again.", "error");
+      return;
+    }
+
+    if (cancelling || loading) {
+      if (loading) {
+        showToast("Please wait, order is still loading...", "error");
+      } else {
+        showToast("Cancellation is already in progress...", "error");
+      }
+      return;
+    }
+
+    // Don't allow cancel if we haven't loaded order data yet
+    if (items.length === 0 && !loading) {
+      showToast("No order data found to cancel. Please try again.", "error");
+      return;
+    }
+
+    // For newly created orders, wait a moment for backend sync
+    if (items.length === 0 && loading) {
+      showToast("Order is still loading. Please wait before cancelling.", "error");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Are you sure you want to cancel order ${orderNumber}?`
     );
 
     if (!confirmed) {
@@ -1381,32 +1367,63 @@ const removeItem = async (id) => {
       setCancelling(true);
       setError("");
       const response = await Pubmenubuyservice.cancelOrder(orderNumber);
-      // window.alert(response?.data?.message || "Order cancelled");
+      showToast(response?.data?.message || "Order cancelled successfully", "success");
+      
       if (backTo) {
         navigate(backTo, { replace: true });
       } else {
         navigate(location.pathname.replace(/\/buy$/, ""), { replace: true });
       }
     } catch (cancelError) {
-      setError(
-        cancelError.response?.data?.message || "Unable to cancel this order."
-      );
+      const errorMessage = cancelError?.response?.data?.message || "Unable to cancel this order.";
+      setError(errorMessage);
+      showToast(errorMessage, "error");
     } finally {
       setCancelling(false);
     }
   };
 
   const handleConfirmOrder = async () => {
-    if (!orderNumber || confirming || loading || Boolean(stockIssueMessage)) {
+    // Comprehensive validation before confirming
+    if (!orderNumber) {
+      setError("Order number is missing. Please go back and try again.");
+      showToast("Order number is missing", "error");
+      return;
+    }
+
+    if (confirming || loading) {
+      const message = loading ? "Please wait, order is still loading..." : "Confirmation is already in progress...";
+      showToast(message, "error");
+      return;
+    }
+
+    // Check if items are loaded
+    if (items.length === 0 && !loading) {
+      setError("No items found in this order. Please add items before confirming.");
+      showToast("No items to confirm", "error");
+      return;
+    }
+
+    // For newly created orders, wait a moment for backend sync
+    if (items.length === 0 && loading) {
+      showToast("Order is still loading. Please wait before confirming.", "error");
+      return;
+    }
+
+    // Check for stock issues
+    if (stockIssueMessage) {
+      showToast(stockIssueMessage, "error");
       return;
     }
 
     try {
       setConfirming(true);
       setError("");
+      
       const cocktailCustomizations = buildCocktailCustomizationPayload(orderNumber, items);
-      // Include latest item quantities in the payload so backend can persist updates
-      const itemsPayload = (Array.isArray(items) ? items : [])
+      
+      // Validate that we have valid items to confirm
+      const validItems = (Array.isArray(items) ? items : [])
         .map((it) => ({
           item_id: Number(it.itemId || it.item_id || it.item_code || it.id || 0) || 0,
           order_line_id: Number(it.orderLineId || it.order_line_id || 0) || 0,
@@ -1414,19 +1431,30 @@ const removeItem = async (id) => {
           is_free_item: Boolean(it.isFreeItem),
           quantity: Number(it.quantity || 0),
         }))
-        .filter((x) => Number.isFinite(x.item_id) && x.item_id > 0);
+        .filter((x) => Number.isFinite(x.item_id) && x.item_id > 0 && x.quantity > 0);
+
+      if (validItems.length === 0) {
+        setError("No valid items to confirm. Please add items to your order.");
+        showToast("No valid items to confirm", "error");
+        setConfirming(false);
+        return;
+      }
 
       const payload = {};
       if (cocktailCustomizations.length > 0) payload.cocktailCustomizations = cocktailCustomizations;
-      if (itemsPayload.length > 0) payload.items = itemsPayload;
+      if (validItems.length > 0) payload.items = validItems;
 
       await ConfirmOrderservice.confirmOrder(orderNumber, payload);
+      
+      // Clear any stored overrides
       cocktailCustomizations.forEach((customization) => {
         const key = getBuyflowOverrideStorageKey(orderNumber, customization.itemCode);
         if (key) {
           localStorage.removeItem(key);
         }
       });
+      
+      // Navigate to confirmation page
       if (afterConfirmTo) {
         navigate(`${afterConfirmTo}?orderNumber=${encodeURIComponent(orderNumber)}`, {
           replace: true,
@@ -1439,9 +1467,12 @@ const removeItem = async (id) => {
         });
       }
     } catch (confirmError) {
-      setError(
-        confirmError.response?.data?.message || "Unable to confirm this order."
-      );
+      console.error("Confirm order error:", confirmError);
+      const errorMessage = confirmError?.response?.data?.message || 
+                          confirmError?.message || 
+                          "Unable to confirm this order. Please try again.";
+      setError(errorMessage);
+      showToast(errorMessage, "error");
     } finally {
       setConfirming(false);
     }
@@ -1459,7 +1490,6 @@ const removeItem = async (id) => {
                 <p className="text-xs uppercase tracking-[0.18em] text-white/80">
                   {toInitCap("Order Details")}
                 </p>
-
               </div>
 
               <div className="flex flex-wrap gap-2">
@@ -1473,20 +1503,31 @@ const removeItem = async (id) => {
 
                 <ActionButton
                   onClick={handleConfirmOrder}
-                  disabled={Boolean(stockIssueMessage) || confirming || loading}
+                  disabled={loading || confirming || Boolean(stockIssueMessage) || items.length === 0}
                   className="bg-afmc-maroon px-4 py-2 text-white ring-1 ring-afmc-gold/30 hover:bg-afmc-maroon/90 disabled:cursor-not-allowed disabled:opacity-60"
+                  title={
+                    loading ? "Loading order details..." : 
+                    items.length === 0 ? "No items to confirm" : 
+                    stockIssueMessage ? stockIssueMessage : 
+                    "Confirm order"
+                  }
                 >
                   <CheckCircle2 className="h-4 w-4" />
-                  {confirming ? toInitCap("Confirming...") : toInitCap("Confirm")}
+                  {loading ? toInitCap("Loading...") : confirming ? toInitCap("Confirming...") : toInitCap("Confirm")}
                 </ActionButton>
 
                 <ActionButton
                   onClick={handleCancelOrder}
-                  disabled={cancelling || loading}
+                  disabled={loading || cancelling || items.length === 0}
                   className="bg-white/10 px-4 py-2 text-white shadow-sm ring-1 ring-white/25 hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-60"
+                  title={
+                    loading ? "Loading order details..." : 
+                    items.length === 0 ? "No order to cancel" : 
+                    "Cancel order"
+                  }
                 >
                   <XCircle className="h-4 w-4" />
-                  {cancelling ? toInitCap("Cancelling...") : toInitCap("Cancel")}
+                  {loading ? toInitCap("Loading...") : cancelling ? toInitCap("Cancelling...") : toInitCap("Cancel")}
                 </ActionButton>
               </div>
             </div>
@@ -1496,7 +1537,6 @@ const removeItem = async (id) => {
           <div className="grid gap-3 border-t border-stone-200 bg-white p-4 md:grid-cols-3">
             <div className="rounded-xl border border-stone-200 bg-white p-3">
               <p className="text-xs text-stone-500">{toInitCap("Order Number")}</p>
-
               <h3 className="mt-1 text-xl font-semibold text-stone-900">
                 {orderHeader?.order_num || orderNumber}
               </h3>
@@ -1504,7 +1544,6 @@ const removeItem = async (id) => {
 
             <div className="rounded-xl border border-stone-200 bg-white p-3">
               <p className="text-xs text-stone-500">{toInitCap("Order Date")}</p>
-
               <h3 className="mt-1 text-xl font-semibold text-stone-900">
                 {formatDate(orderHeader?.order_date)}
               </h3>
@@ -1517,8 +1556,6 @@ const removeItem = async (id) => {
               </h3>
               <p className="mt-0.5 text-xs text-stone-500">{toInitCap("Review before confirm")}</p>
             </div>
-
-
           </div>
         </div>
 
@@ -1673,7 +1710,7 @@ const removeItem = async (id) => {
                                   ))}
                                 </ul>
                                 {details.length > 6 ? (
-                                  <p className="mt-1 text-[11px] text-stone-500">+{details.length - 6} moreΓÇª</p>
+                                  <p className="mt-1 text-[11px] text-stone-500">+{details.length - 6} more…</p>
                                 ) : null}
                               </div>
                             );
@@ -1758,8 +1795,6 @@ const removeItem = async (id) => {
                   );
                 })}
               </div>
-
-
             </div>
           )}
         </div>

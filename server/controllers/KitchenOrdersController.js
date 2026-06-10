@@ -1712,6 +1712,7 @@ LEFT JOIN (
     od.order_id,
     ROUND(SUM(
       CASE
+        WHEN IFNULL(od.price, 0) = 0 OR UPPER(TRIM(IFNULL(od.type, ''))) = 'FREE ITEM' THEN 0
         WHEN scanned_totals.scanned_total > 0 THEN scanned_totals.scanned_total
         WHEN custom_totals.unit_custom_total > 0 THEN custom_totals.unit_custom_total * od.quantity
         ELSE IFNULL(od.subtotal, 0)
@@ -1855,6 +1856,7 @@ exports.getOrderHistoryItemDetails = async (req, res) => {
 
         ROUND(
           CASE
+            WHEN IFNULL(xo.price, 0) = 0 OR UPPER(TRIM(IFNULL(xo.type, ''))) = 'FREE ITEM' THEN 0
             WHEN MAX(scanned_totals.scanned_total) > 0 THEN MAX(scanned_totals.scanned_total)
             WHEN MAX(custom_totals.unit_custom_total) > 0 THEN MAX(custom_totals.unit_custom_total) * xo.quantity
             ELSE IFNULL(xo.subtotal, 0)
@@ -1969,6 +1971,7 @@ exports.getOrderHistoryItemDetails = async (req, res) => {
       SELECT 
         ROUND(SUM(
           CASE
+            WHEN IFNULL(xo.price, 0) = 0 OR UPPER(TRIM(IFNULL(xo.type, ''))) = 'FREE ITEM' THEN 0
             WHEN scanned_totals.scanned_total > 0 THEN scanned_totals.scanned_total
             WHEN custom_totals.unit_custom_total > 0 THEN custom_totals.unit_custom_total * xo.quantity
             ELSE IFNULL(xo.subtotal, 0)
