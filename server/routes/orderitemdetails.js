@@ -80,49 +80,104 @@ const getOrderItemDetails = async (req, res) => {
     toDate
   );
 
+  const scannedTotalsJoin = `
+    LEFT JOIN (
+      SELECT
+        order_number,
+        inventory_item_code,
+        ROUND(SUM(IFNULL(scan_quantity, 0) * IFNULL(item_price, 0)), 2) AS scanned_subtotal
+      FROM order_scan_collection
+      WHERE collection_name = 'S_COLLECTION'
+      GROUP BY order_number, inventory_item_code
+    ) st
+      ON st.order_number = od.order_id
+      AND st.inventory_item_code = od.item_id
+  `;
+
+  const customTotalsJoin = `
+    LEFT JOIN (
+      SELECT
+        cm.order_number,
+        cm.inventory_item_code,
+        ROUND(SUM(
+          IFNULL(cm.pegs, 0) *
+          (
+            IFNULL(stock_prices.base_peg_price, 0) * (1 + IFNULL(od_price.profit, 0) / 100) +
+            IFNULL(od_price.food_pr_charges, 0)
+          )
+        ), 2) AS unit_custom_subtotal
+      FROM xxafmc_custom_cocktails_mocktails_details cm
+      JOIN xxafmc_order_details od_price
+        ON od_price.order_id = cm.order_number
+        AND od_price.item_id = cm.inventory_item_code
+      LEFT JOIN (
+        SELECT
+          item_code,
+          MAX(IFNULL(unit_price, 0) / IFNULL(NULLIF(pegs, 0), 1)) AS base_peg_price
+        FROM xxafmc_stock_out
+        WHERE IFNULL(stock_quantity, 0) > 0
+        GROUP BY item_code
+      ) stock_prices
+        ON stock_prices.item_code = cm.item_code
+      GROUP BY cm.order_number, cm.inventory_item_code
+    ) ct
+      ON ct.order_number = od.order_id
+      AND ct.inventory_item_code = od.item_id
+  `;
+
+  const effectiveSubtotalExpression = `
+    CASE
+      WHEN xi.sub_category IN (14, 15) AND IFNULL(st.scanned_subtotal, 0) > 0
+        THEN st.scanned_subtotal
+      WHEN xi.sub_category IN (14, 15) AND IFNULL(ct.unit_custom_subtotal, 0) > 0
+        THEN ct.unit_custom_subtotal * IFNULL(od.quantity, 0)
+      ELSE IFNULL(od.subtotal, 0)
+    END
+  `;
+
   const baseQuery = `
     SELECT 
         od.item_id,
         SUM(od.quantity) AS quantity,
-        IFNULL(SUM(od.subtotal), 0) AS subtotal,
+        IFNULL(SUM(${effectiveSubtotalExpression}), 0) AS subtotal,
         
         CASE 
-            WHEN IFNULL(SUM(od.subtotal),0) > 0 THEN  
-                (SUM(CASE WHEN od.subtotal > 0 THEN od.subtotal ELSE 0 END) -
-                 SUM(CASE WHEN od.subtotal > 0 THEN IFNULL(od.food_pr_charges, 0) * od.quantity ELSE 0 END)) / 
+            WHEN IFNULL(SUM(${effectiveSubtotalExpression}),0) > 0 THEN
+                (SUM(CASE WHEN ${effectiveSubtotalExpression} > 0 THEN ${effectiveSubtotalExpression} ELSE 0 END) -
+                 SUM(CASE WHEN ${effectiveSubtotalExpression} > 0 THEN IFNULL(od.food_pr_charges, 0) * od.quantity ELSE 0 END)) /
                  (1 + (MAX(IFNULL(od.profit, 0)) / 100))
             ELSE 0
         END AS price,
 
         SUM(CASE 
-                WHEN od.subtotal > 0 
+                WHEN ${effectiveSubtotalExpression} > 0
                 THEN IFNULL(od.food_pr_charges,0) * od.quantity 
                 ELSE 0 
             END) AS food_pr_charges,
 
         SUM(CASE 
-                WHEN od.subtotal > 0 
+                WHEN ${effectiveSubtotalExpression} > 0
                 THEN IFNULL(od.profit,0) * od.quantity 
                 ELSE 0 
             END) AS totalprofit,
 
         CASE 
-            WHEN IFNULL(SUM(od.subtotal),0) > 0 THEN  
+            WHEN IFNULL(SUM(${effectiveSubtotalExpression}),0) > 0 THEN
                 (MAX(IFNULL(od.profit, 0)) / 100) * (
-                    (SUM(CASE WHEN od.subtotal > 0 THEN od.subtotal ELSE 0 END) -
-                     SUM(CASE WHEN od.subtotal > 0 THEN IFNULL(od.food_pr_charges, 0) * od.quantity ELSE 0 END)) /
+                    (SUM(CASE WHEN ${effectiveSubtotalExpression} > 0 THEN ${effectiveSubtotalExpression} ELSE 0 END) -
+                     SUM(CASE WHEN ${effectiveSubtotalExpression} > 0 THEN IFNULL(od.food_pr_charges, 0) * od.quantity ELSE 0 END)) /
                      (1 + (MAX(IFNULL(od.profit, 0)) / 100))
                 )
             ELSE 0
         END AS total_profit,
 
         CASE 
-            WHEN IFNULL(SUM(od.subtotal),0) > 0 THEN  
+            WHEN IFNULL(SUM(${effectiveSubtotalExpression}),0) > 0 THEN
                 ((MAX(IFNULL(od.profit, 0)) / 100) * (
-                    (SUM(CASE WHEN od.subtotal > 0 THEN od.subtotal ELSE 0 END) -
-                     SUM(CASE WHEN od.subtotal > 0 THEN IFNULL(od.food_pr_charges, 0) * od.quantity ELSE 0 END)) /
+                    (SUM(CASE WHEN ${effectiveSubtotalExpression} > 0 THEN ${effectiveSubtotalExpression} ELSE 0 END) -
+                     SUM(CASE WHEN ${effectiveSubtotalExpression} > 0 THEN IFNULL(od.food_pr_charges, 0) * od.quantity ELSE 0 END)) /
                      (1 + (MAX(IFNULL(od.profit, 0)) / 100))
-                )) / NULLIF(SUM(CASE WHEN od.subtotal > 0 THEN od.quantity END), 0)
+                )) / NULLIF(SUM(CASE WHEN ${effectiveSubtotalExpression} > 0 THEN od.quantity END), 0)
             ELSE 0
         END AS unit_profit,
 
@@ -136,6 +191,8 @@ const getOrderItemDetails = async (req, res) => {
     JOIN xxafmc_role r ON xu.role_id = r.role_id
     LEFT JOIN xxafmc_non_members nm ON nm.id = oh.member_id
     LEFT JOIN xxafmc_pubmed xp ON xp.pubmed_id = oh.pubmed
+    ${scannedTotalsJoin}
+    ${customTotalsJoin}
 
     WHERE 
         TRIM(UPPER(od.payment_status)) = 'PAID'

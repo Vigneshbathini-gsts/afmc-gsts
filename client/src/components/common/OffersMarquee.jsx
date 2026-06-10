@@ -181,7 +181,7 @@ export default function OffersMarquee({
   title = "Offers for you",
   subtitle = "Premium deals curated for today.",
   useMockWhenEmpty = true,
-  speedSeconds = 34,
+  speedSeconds = 100,
 }) {
   const cleaned = useMemo(() => {
     const raw = Array.isArray(offers) ? offers : [];
@@ -198,9 +198,9 @@ export default function OffersMarquee({
   }, [offers, loading, useMockWhenEmpty]);
 
   const shouldRender = loading || cleaned.length > 0;
-  const animDuration = `${Math.max(18, Number(speedSeconds) || 34)}s`;
+  const animDuration = `${Math.max(28, Number(speedSeconds) || 100)}s`;
   const twoOfferSpeed = cleaned.length <= 2;
-  const resolvedDuration = twoOfferSpeed ? `${Math.max(26, Number(speedSeconds) || 34)}s` : animDuration;
+  const resolvedDuration = twoOfferSpeed ? `${Math.max(26, Number(speedSeconds) || 100)}s` : animDuration;
 
   if (!shouldRender) return null;
 

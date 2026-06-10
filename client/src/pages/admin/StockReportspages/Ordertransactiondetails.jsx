@@ -283,10 +283,10 @@ export default function OrderTransactionUI() {
           row.PUBMED_NAME || "-",
           toInitCap(stripHtml(row.ITEM_NAME) || "-"),
           row.QUANTITY || "-",
-          row.TOTALPERCENT || "-",
-          row.TOTAL_PROFIT || "-",
-          row.FOOD_PR_CHARGES || "-",
-          row.SUBTOTAL || "-",
+          row.TOTALPERCENT || "0.00",
+          row.TOTAL_PROFIT || "0.00",
+          row.FOOD_PR_CHARGES || "0.00",
+          row.SUBTOTAL || "0.00",
         ]),
         [
           "",
@@ -528,15 +528,15 @@ export default function OrderTransactionUI() {
                           </div>
                           <div>
                             <span className="block text-xs text-gray-500">Total Profit</span>
-                            <span>{row.TOTAL_PROFIT || "-"}</span>
+                            <span>{row.TOTAL_PROFIT || "0.00"}</span>
                           </div>
                           <div>
                             <span className="block text-xs text-gray-500">Preparation Charges</span>
-                            <span>{row.FOOD_PR_CHARGES || "-"}</span>
+                            <span>{row.FOOD_PR_CHARGES || "0.00"}</span>
                           </div>
                           <div>
                             <span className="block text-xs text-gray-500">Subtotal</span>
-                            <span>{row.SUBTOTAL || "-"}</span>
+                            <span>{row.SUBTOTAL || "0.00"}</span>
                           </div>
                         </div>
                       </div>
@@ -601,13 +601,13 @@ export default function OrderTransactionUI() {
                                 {row.QUANTITY || "-"}
                               </td>
                               <td className="px-4 py-3 whitespace-nowrap">
-                                {row.TOTAL_PROFIT || "-"}
+                                {row.TOTAL_PROFIT || "0.00"}
                               </td>
                               <td className="px-4 py-3 whitespace-nowrap">
-                                {row.FOOD_PR_CHARGES || "-"}
+                                {row.FOOD_PR_CHARGES || "0.00"}
                               </td>
                               <td className="px-4 py-3 whitespace-nowrap">
-                                {row.SUBTOTAL || "-"}
+                                {row.SUBTOTAL || "0.00"}
                               </td>
                             </tr>
                           ))}

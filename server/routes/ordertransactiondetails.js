@@ -122,17 +122,72 @@ const getOrderTransactionDetails = async (req, res) => {
       baseWhere += ` AND (? IS NULL OR UPPER(TRIM(IFNULL(XI.ITEM_NAME, ''))) = ?)`;
     }
 
+    const scannedTotalsJoin = `
+      LEFT JOIN (
+        SELECT
+          order_number,
+          inventory_item_code,
+          ROUND(SUM(IFNULL(scan_quantity, 0) * IFNULL(item_price, 0)), 2) AS scanned_subtotal
+        FROM order_scan_collection
+        WHERE collection_name = 'S_COLLECTION'
+        GROUP BY order_number, inventory_item_code
+      ) ST
+        ON ST.order_number = OD.ORDER_ID
+        AND ST.inventory_item_code = OD.ITEM_ID
+    `;
+
+    const customTotalsJoin = `
+      LEFT JOIN (
+        SELECT
+          cm.order_number,
+          cm.inventory_item_code,
+          ROUND(SUM(
+            IFNULL(cm.pegs, 0) *
+            (
+              IFNULL(stock_prices.base_peg_price, 0) * (1 + IFNULL(od_price.profit, 0) / 100) +
+              IFNULL(od_price.food_pr_charges, 0)
+            )
+          ), 2) AS unit_custom_subtotal
+        FROM xxafmc_custom_cocktails_mocktails_details cm
+        JOIN xxafmc_order_details od_price
+          ON od_price.order_id = cm.order_number
+          AND od_price.item_id = cm.inventory_item_code
+        LEFT JOIN (
+          SELECT
+            item_code,
+            MAX(IFNULL(unit_price, 0) / IFNULL(NULLIF(pegs, 0), 1)) AS base_peg_price
+          FROM xxafmc_stock_out
+          WHERE IFNULL(stock_quantity, 0) > 0
+          GROUP BY item_code
+        ) stock_prices
+          ON stock_prices.item_code = cm.item_code
+        GROUP BY cm.order_number, cm.inventory_item_code
+      ) CT
+        ON CT.order_number = OD.ORDER_ID
+        AND CT.inventory_item_code = OD.ITEM_ID
+    `;
+
+    const effectiveSubtotalExpression = `
+      CASE
+        WHEN XI.SUB_CATEGORY IN (14, 15) AND IFNULL(ST.scanned_subtotal, 0) > 0
+          THEN ST.scanned_subtotal
+        WHEN XI.SUB_CATEGORY IN (14, 15) AND IFNULL(CT.unit_custom_subtotal, 0) > 0
+          THEN CT.unit_custom_subtotal * IFNULL(OD.QUANTITY, 0)
+        ELSE IFNULL(OD.SUBTOTAL, 0)
+      END
+    `;
+
     const detailQuery = `
       SELECT DISTINCT
         OD.ORDER_LINE_ID,
         OD.ORDER_ID,
         OD.ITEM_ID,
         OD.QUANTITY,
-        ROUND(OD.SUBTOTAL, 2) AS SUBTOTAL,
+        ROUND(${effectiveSubtotalExpression}, 2) AS SUBTOTAL,
         ROUND(
           CASE 
-            WHEN OD.SUBTOTAL <> 0 THEN  
-              (OD.SUBTOTAL - IFNULL(OD.FOOD_PR_CHARGES * OD.QUANTITY, 0)) 
+            WHEN ${effectiveSubtotalExpression} <> 0 THEN
+              (${effectiveSubtotalExpression} - IFNULL(OD.FOOD_PR_CHARGES * OD.QUANTITY, 0))
               / (1 + (IFNULL(OD.PROFIT, 0) / 100)) / OD.QUANTITY
             ELSE 0
           END, 2
@@ -141,12 +196,12 @@ const getOrderTransactionDetails = async (req, res) => {
         IFNULL(OD.PROFIT * OD.QUANTITY, 0) AS TOTALPROFIT,
         ROUND(
           (IFNULL(OD.PROFIT, 0) / 100) *
-          ((OD.SUBTOTAL - IFNULL(OD.FOOD_PR_CHARGES * OD.QUANTITY, 0)) /
+          ((${effectiveSubtotalExpression} - IFNULL(OD.FOOD_PR_CHARGES * OD.QUANTITY, 0)) /
           (1 + (IFNULL(OD.PROFIT, 0) / 100))), 2
         ) AS TOTAL_PROFIT,
         ROUND(
           ((IFNULL(OD.PROFIT, 0) / 100) *
-          ((OD.SUBTOTAL - IFNULL(OD.FOOD_PR_CHARGES * OD.QUANTITY, 0)) /
+          ((${effectiveSubtotalExpression} - IFNULL(OD.FOOD_PR_CHARGES * OD.QUANTITY, 0)) /
           (1 + (IFNULL(OD.PROFIT, 0) / 100)))) / OD.QUANTITY, 2
         ) AS UNIT_PROFIT,
         IFNULL(OD.PROFIT, 0) AS TOTALPERCENT,
@@ -164,6 +219,8 @@ const getOrderTransactionDetails = async (req, res) => {
       LEFT JOIN xxafmc_users XU ON OH.USER_ID = XU.USER_ID
       LEFT JOIN xxafmc_pubmed XP ON XP.PUBMED_ID = OH.PUBMED
       LEFT JOIN xxafmc_non_members XNM ON XNM.ID = OH.MEMBER_ID
+      ${scannedTotalsJoin}
+      ${customTotalsJoin}
       ${baseWhere}
       ORDER BY OH.ORDER_NUM DESC, OD.ORDER_LINE_ID DESC
       LIMIT ${limit} OFFSET ${offset}
@@ -175,13 +232,13 @@ const getOrderTransactionDetails = async (req, res) => {
         NULL AS ORDER_ID,
         NULL AS ITEM_ID,
         'Total' AS QUANTITY,
-        ROUND(SUM(OD.SUBTOTAL),2) AS SUBTOTAL,
+        ROUND(SUM(${effectiveSubtotalExpression}),2) AS SUBTOTAL,
         NULL AS PRICE,
         ROUND(SUM(IFNULL(OD.FOOD_PR_CHARGES * OD.QUANTITY,0)),2) AS FOOD_PR_CHARGES,
         SUM(IFNULL(OD.PROFIT * OD.QUANTITY,0)) AS TOTALPROFIT,
         ROUND(SUM(
           (IFNULL(OD.PROFIT, 0) / 100) *
-          ((OD.SUBTOTAL - IFNULL(OD.FOOD_PR_CHARGES * OD.QUANTITY, 0)) /
+          ((${effectiveSubtotalExpression} - IFNULL(OD.FOOD_PR_CHARGES * OD.QUANTITY, 0)) /
           (1 + (IFNULL(OD.PROFIT, 0) / 100)))
         ),2) AS TOTAL_PROFIT,
         NULL AS UNIT_PROFIT,
@@ -200,6 +257,8 @@ const getOrderTransactionDetails = async (req, res) => {
       LEFT JOIN xxafmc_users XU ON OH.USER_ID = XU.USER_ID
       LEFT JOIN xxafmc_pubmed XP ON XP.PUBMED_ID = OH.PUBMED
       LEFT JOIN xxafmc_non_members XNM ON XNM.ID = OH.MEMBER_ID
+      ${scannedTotalsJoin}
+      ${customTotalsJoin}
       ${baseWhere}
     `;
 
