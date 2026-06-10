@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { barOrdersAPI, orderAPI } from "../../services/api";
 import { exportTableToPdf } from "../../utils/pdfExport";
+import { toInitCap } from "../../utils/textFormat";
 
 const toInputDate = (date) => {
   const d = date instanceof Date ? date : new Date(date);
@@ -462,7 +463,7 @@ export default function OrderHistory() {
                           {row?.order_date || ""}
                         </td>
                         <td className="px-4 py-3">
-                          {isTotalRow ? "" : row?.first_name || "-"}
+                          {isTotalRow ? "" : toInitCap(row?.first_name) || "-"}
                         </td>
                         <td
                           className={`px-4 py-3 ${

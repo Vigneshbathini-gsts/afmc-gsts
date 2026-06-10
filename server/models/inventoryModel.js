@@ -864,7 +864,7 @@ const getStockInReport = async ({ fromDate, toDate, limit, offset }) => {
       AND XIT.FLAG = 'IN'
       AND XI.SUB_CATEGORY NOT IN (14, 15)
     GROUP BY XIT.ITEM_CODE, XI.ITEM_NAME, XIT.BATCH_ID, XI.\`A/C_UNIT\`
-    ORDER BY transaction_date DESC
+    ORDER BY creation_date DESC
     ${hasPagination ? `LIMIT ${limitNumber} OFFSET ${offsetNumber}` : ""}
   `;
   const [rows] = await db.execute(sql, [start, end]);

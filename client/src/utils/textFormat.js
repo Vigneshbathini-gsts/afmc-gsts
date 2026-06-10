@@ -3,7 +3,7 @@ export function toInitCap(value) {
   const text = String(value).trim();
   if (!text) return "";
 
-  const upperTokens = new Set(["ml", "l", "kg", "g", "gm", "nos", "pcs"]);
+  const upperTokens = new Set(["l", "kg", "g", "gm", "pcs"]);
 
   const normalizeToken = (token) => {
     const raw = String(token || "");

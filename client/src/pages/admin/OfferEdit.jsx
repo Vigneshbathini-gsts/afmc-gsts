@@ -312,7 +312,9 @@ export default function OfferEdit() {
                     name="endDate"
                     value={formData.endDate}
                     onChange={handleEndDateChange}
+                    min={new Date().toISOString().split("T")[0]}
                     className="w-full outline-none text-gray-700 bg-transparent"
+
                   />
                 </div>
                 <p className="text-xs text-gray-400 mt-1">

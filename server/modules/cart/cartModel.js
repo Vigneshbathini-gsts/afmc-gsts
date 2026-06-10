@@ -576,7 +576,7 @@ const addCartItem = async (userId, itemData) => {
     // 2. CHECK EXISTING CART ITEM
     // -------------------------------
     const selectedType = String(type || "").trim();
-    const cartDescription = selectedType || remarks || "Item";
+    const cartDescription = selectedType || "NA";
     const existingSql = selectedType
       ? `SELECT cart_id, quantity FROM xxafmc_cart_items
          WHERE user_id = ? AND item_id = ? AND price != 0 AND UPPER(description) = UPPER(?)`

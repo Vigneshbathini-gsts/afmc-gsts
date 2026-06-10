@@ -122,7 +122,11 @@ export default function OrderDetailsModal({ isOpen, onClose, orderNumber }) {
                     const priceValue = parseNumber(item.price || item.PRICE);
                     const subtotalValue = parseNumber(item.subtotal || item.SUBTOTAL || item.total);
                     const isFreeItem = priceValue === 0 && subtotalValue === 0;
-                    const displayType = toInitCap(item.type || item.TYPE || (isFreeItem ? "Free Item" : "Na"));
+                   const typeValue =
+  item.type || item.TYPE || (isFreeItem ? "Free Item" : "NA");
+
+const displayType =
+  typeValue === "NA" ? "NA" : toInitCap(typeValue);
 
                     return (
                       <tr key={index} className="border-t hover:bg-gray-50">
@@ -159,7 +163,11 @@ export default function OrderDetailsModal({ isOpen, onClose, orderNumber }) {
                 const priceValue = parseNumber(item.price || item.PRICE);
                 const subtotalValue = parseNumber(item.subtotal || item.SUBTOTAL || item.total);
                 const isFreeItem = priceValue === 0 && subtotalValue === 0;
-                const displayType = toInitCap(item.type || item.TYPE || (isFreeItem ? "Free Item" : "Na"));
+                const typeValue =
+  item.type || item.TYPE || (isFreeItem ? "Free Item" : "NA");
+
+const displayType =
+  typeValue === "NA" ? "NA" : toInitCap(typeValue);
 
                 return (
                   <div key={index} className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm">

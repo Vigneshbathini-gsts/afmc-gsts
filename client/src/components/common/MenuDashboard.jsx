@@ -426,6 +426,8 @@ function MenuPopupCompact({ item, loading, onClose, onBuy }) {
         type: isPegsUnit ? pegType : null,
       };
 
+      console.log("Adding to cart with data:", cartData);
+
       // Reservation/stock checks before adding to cart
       try {
         const desiredQty = Number(cartData.quantity || 1) || 1;
