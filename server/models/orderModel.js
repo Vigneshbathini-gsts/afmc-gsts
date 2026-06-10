@@ -320,6 +320,7 @@ async function getOrderDetails(orderNumber) {
     END,
     2
   ) AS subtotal,
+  COALESCE(NULLIF(xi.ac_unit, ''), 'Nos') AS ac_unit,
   COALESCE(NULLIF(xi.type, ''), NULLIF(od.type, ''), 'NA') AS type,
   COALESCE(
     NULLIF(od.order_status, ''),
@@ -384,7 +385,8 @@ LEFT JOIN (
     SELECT 
       item_code,
       MAX(item_name) AS item_name,
-      MAX(type) AS type
+      MAX(type) AS type,
+      MAX(\`A/C_UNIT\`) AS ac_unit
     FROM xxafmc_inventory
     GROUP BY item_code
 ) xi
