@@ -307,7 +307,7 @@ export default function Offers() {
                   <thead className="bg-white/70 border-b border-gray-200">
                     <tr className="text-gray-700">
                       <th className="px-5 py-4 font-semibold">Action</th>
-                      <th className="px-5 py-4 font-semibold">Offer Id</th>
+                      <th className="px-5 py-4 font-semibold">Offer ID</th>
                       <th className="px-5 py-4 font-semibold">Item Name</th>
                       <th className="px-5 py-4 font-semibold">Free Item</th>
                       <th className="px-5 py-4 font-semibold">Offer Date</th>

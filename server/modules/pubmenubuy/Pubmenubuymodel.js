@@ -1921,19 +1921,19 @@ async function updateOrderLineQuantity(orderNumber, orderLineId, userId, quantit
   const normalizedQuantity = Number(quantity);
 
   if (!Number.isFinite(normalizedOrderNumber) || normalizedOrderNumber <= 0) {
-    const error = new Error("Valid order number is required");
+    const error = new Error("Valid Order number is required");
     error.statusCode = 400;
     throw error;
   }
 
   if (!Number.isFinite(normalizedOrderLineId) || normalizedOrderLineId <= 0) {
-    const error = new Error("Valid order line id is required");
+    const error = new Error("Valid Order line ID is required");
     error.statusCode = 400;
     throw error;
   }
 
   if (!Number.isFinite(normalizedUserId) || normalizedUserId <= 0) {
-    const error = new Error("Valid user id is required");
+    const error = new Error("Valid User ID is required");
     error.statusCode = 400;
     throw error;
   }

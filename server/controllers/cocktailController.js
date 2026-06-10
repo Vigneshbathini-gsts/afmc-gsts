@@ -42,7 +42,7 @@ const getCocktailById = async (req, res) => {
     if (!Number.isInteger(itemId) || itemId <= 0) {
       return res.status(400).json({
         success: false,
-        message: "Valid item id is required",
+        message: "Valid Item ID is required",
       });
     }
 
@@ -139,7 +139,7 @@ const updateCocktail = async (req, res) => {
     if (!Number.isInteger(itemId) || itemId <= 0) {
       return res.status(400).json({
         success: false,
-        message: "Valid item id is required",
+        message: "Valid Item ID is required",
       });
     }
 

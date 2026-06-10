@@ -254,7 +254,7 @@ const PaymentPage = () => {
                                             e.target.value
                                         )
                                     }
-                                    placeholder={toInitCap("Enter Transaction Id")}
+                                    placeholder={toInitCap("Enter Transaction ID")}
                                     className="h-12 w-full rounded-2xl border border-stone-300 bg-white px-4 text-sm font-medium text-stone-800 outline-none transition focus:border-afmc-maroon focus:ring-2 focus:ring-afmc-maroon/15"
                                 />
                             </div>

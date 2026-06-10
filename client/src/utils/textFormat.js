@@ -12,6 +12,9 @@ export function toInitCap(value) {
     const lower = raw.toLowerCase();
     if (upperTokens.has(lower)) return lower.toUpperCase();
 
+    // Keep ID uppercase
+    if (lower === "id") return "ID";
+
     const isAllCaps = raw === raw.toUpperCase() && /[A-Z]/.test(raw);
     const hasSeparator = /[\/&]/.test(raw);
     const isNumberLike = /^[0-9]+([.,][0-9]+)?$/.test(raw);

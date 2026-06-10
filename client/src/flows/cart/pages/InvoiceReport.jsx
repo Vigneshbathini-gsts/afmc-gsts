@@ -189,7 +189,7 @@ export default function InvoiceReport() {
             <div className="p-5">
               <div className="mx-auto max-w-md space-y-5 rounded-[26px] bg-[#fffaf4] px-6 py-8 text-center">
                 <div className="flex justify-between text-sm text-stone-600">
-                  <span>{toInitCap("Invoice Id")} :</span>
+                  <span>{toInitCap("Invoice ID")} :</span>
                   <span className="font-semibold text-stone-900">{reportData?.header?.invoice_id || "-"}</span>
                 </div>
 
