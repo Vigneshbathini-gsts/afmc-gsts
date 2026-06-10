@@ -229,7 +229,7 @@ export default function StockReports() {
       <div className="p-8 relative z-10">
         <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
           <h1 className="text-2xl font-semibold text-gray-800">
-            Stock In/Out Report
+            {activeTab === "in" ? "Stock In Report" : "Stock Out Report"}
           </h1>
           <button
             type="button"

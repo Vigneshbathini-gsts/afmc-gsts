@@ -57,7 +57,7 @@ async function getAdminOrderHistory({
         ) AS order_date,
         1 AS ord,
         ROUND(COALESCE(xxoh.order_total, (
-          SELECT SUM(xxod2.subtotal)
+          SELECT SUM(CASE WHEN xxod2.FREE_ITEM_CODE IS NOT NULL THEN 0 ELSE xxod2.subtotal END)
           FROM xxafmc_order_details xxod2
           WHERE xxod2.order_id = xxoh.order_num
         ), 0), 2) AS subtotal
@@ -114,7 +114,7 @@ async function getAdminOrderHistory({
         ROUND(IFNULL(SUM(subtotal), 0), 2) AS subtotal
       FROM (
         SELECT xxoh.order_num, COALESCE(xxoh.order_total, (
-          SELECT SUM(xxod2.subtotal)
+          SELECT SUM(CASE WHEN xxod2.FREE_ITEM_CODE IS NOT NULL THEN 0 ELSE xxod2.subtotal END)
           FROM xxafmc_order_details xxod2
           WHERE xxod2.order_id = xxoh.order_num
         ), 0) AS subtotal
@@ -306,6 +306,7 @@ async function getOrderDetails(orderNumber) {
   od.quantity,
   ROUND(
     CASE
+      WHEN od.FREE_ITEM_CODE IS NOT NULL THEN 0
       WHEN scanned_totals.scanned_total > 0 AND (od.price IS NULL OR od.price <> 0) THEN scanned_totals.scanned_total / NULLIF(od.quantity, 0)
       WHEN custom_totals.unit_custom_total > 0 THEN custom_totals.unit_custom_total
       ELSE COALESCE(od.price, od.subtotal / NULLIF(od.quantity, 0), 0)
@@ -314,6 +315,7 @@ async function getOrderDetails(orderNumber) {
   ) AS price,
   ROUND(
     CASE
+      WHEN od.FREE_ITEM_CODE IS NOT NULL THEN 0
       WHEN scanned_totals.scanned_total > 0 AND (od.price IS NULL OR od.price <> 0) THEN scanned_totals.scanned_total
       WHEN custom_totals.unit_custom_total > 0 THEN custom_totals.unit_custom_total * od.quantity
       ELSE IFNULL(od.subtotal, 0)
@@ -407,6 +409,7 @@ async function getOrderSummary(orderNumber) {
         COALESCE((
           SELECT SUM(
             CASE
+              WHEN od.FREE_ITEM_CODE IS NOT NULL THEN 0
               WHEN scanned_totals.scanned_total > 0 AND (od.price IS NULL OR od.price <> 0) THEN scanned_totals.scanned_total
               WHEN custom_totals.unit_custom_total > 0 THEN custom_totals.unit_custom_total * od.quantity
               ELSE COALESCE(od.subtotal, 0)
@@ -609,6 +612,7 @@ async function getUserOrderHistory({ fromDate, toDate, username, appUser }) {
           od.order_id,
           ROUND(SUM(
             CASE
+              WHEN od.FREE_ITEM_CODE IS NOT NULL THEN 0
               WHEN scanned_totals.scanned_total > 0 AND (od.price IS NULL OR od.price <> 0) THEN scanned_totals.scanned_total
               WHEN custom_totals.unit_custom_total > 0 THEN custom_totals.unit_custom_total * od.quantity
               ELSE IFNULL(od.subtotal, 0)

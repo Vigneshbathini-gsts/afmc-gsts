@@ -471,8 +471,8 @@ const KitchenOrderHistory = () => {
       {/* Modal for Order Details */}
       {modalOpen && selectedOrder && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-full sm:max-w-5xl w-full max-h-[90vh] overflow-hidden">
-            <div className="bg-gradient-to-r from-afmc-maroon to-afmc-maroon2 px-6 py-4 flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center">
+          <div className="bg-white rounded-2xl shadow-xl max-w-full sm:max-w-5xl w-full h-[75vh] max-h-[85vh] overflow-hidden flex flex-col">
+            <div className="bg-gradient-to-r from-afmc-maroon to-afmc-maroon2 px-6 py-4 flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center shrink-0">
               <div>
                 <h3 className="text-xl font-bold text-white">
                   Order Details:  {selectedOrder.order_num}
@@ -487,7 +487,7 @@ const KitchenOrderHistory = () => {
               </button>
             </div>
 
-            <div className="px-6 py-4 overflow-y-auto max-h-[calc(90vh-120px)]">
+            <div className="px-6 py-4 overflow-y-auto flex-1">
               {loadingDetails ? (
                 <div className="text-center py-8">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-afmc-maroon mx-auto"></div>
@@ -508,7 +508,9 @@ const KitchenOrderHistory = () => {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
-                        {orderItemDetails[selectedOrder.order_num].items.map((item, index) => (
+                        {orderItemDetails[selectedOrder.order_num].items.map((item, index) => {
+                          const isFree = String(item.type || "").toLowerCase() === "free item" || Number(item.price) === 0;
+                          return (
                           <tr key={index} className="hover:bg-gray-50">
                             <td className="px-4 py-3 text-sm text-gray-900">{toInitCap(item.item_name) || 'N/A'}</td>
                             <td className="px-4 py-3 text-sm text-gray-600">{item.quantity}</td>
@@ -517,7 +519,7 @@ const KitchenOrderHistory = () => {
                               Rs. {formatCurrency(item.pr_charges)}
                             </td>
                             <td className="px-4 py-3 text-sm font-medium text-gray-900">
-                              Rs. {formatCurrency(item.subtotal)}
+                              Rs. {formatCurrency(isFree ? 0 : item.subtotal)}
                             </td>
                             <td className="px-4 py-3">
                               <span className={`px-2 py-1 rounded-full text-xs font-medium ${item.status?.toUpperCase() === 'CANCELLED' ? 'bg-red-100 text-red-800' :
@@ -528,7 +530,7 @@ const KitchenOrderHistory = () => {
                               </span>
                             </td>
                           </tr>
-                        ))}
+                        );})}
                       </tbody>
                     </table>
                   </div>
@@ -538,11 +540,11 @@ const KitchenOrderHistory = () => {
                       <div className="flex justify-between items-center pt-2 border-t border-gray-200">
                         <span className="text-lg font-bold text-gray-900">Grand Total:</span>
                         <span className="text-xl font-bold text-afmc-maroon">
-                          Rs. {orderItemDetails[selectedOrder.order_num].summary?.totalAmount
-                            ? formatCurrency(orderItemDetails[selectedOrder.order_num].summary.totalAmount)
-                            : orderItemDetails[selectedOrder.order_num].items
-                              .reduce((sum, item) => sum + (parseFloat(item.subtotal) || 0), 0)
-                              .toFixed(2)}
+                          Rs. {formatCurrency(orderItemDetails[selectedOrder.order_num].items
+                              .reduce((sum, item) => {
+                                const isFree = String(item.type || "").toLowerCase() === "free item" || Number(item.price) === 0;
+                                return sum + (isFree ? 0 : (parseFloat(item.subtotal) || 0));
+                              }, 0))}
                         </span>
                       </div>
                     </div>
