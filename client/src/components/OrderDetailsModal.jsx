@@ -57,7 +57,7 @@ export default function OrderDetailsModal({ isOpen, onClose, orderNumber }) {
           : Array.isArray(responseData?.items)
             ? responseData.items
             : [];
-            console.log("Fetched order details:", fetchedItems);
+            // console.log("Fetched order details:", fetchedItems);
         setItems(fetchedItems);
       } catch (err) {
         console.error("Error fetching order details:", err);
@@ -122,7 +122,10 @@ export default function OrderDetailsModal({ isOpen, onClose, orderNumber }) {
                     const priceValue = parseNumber(item.price || item.PRICE);
                     const subtotalValue = parseNumber(item.subtotal || item.SUBTOTAL || item.total);
                     const isFreeItem = priceValue === 0 && subtotalValue === 0;
-                    const displayType = toInitCap(item.type || item.TYPE || (isFreeItem ? "Free Item" : "Na"));
+                    const displayType = toInitCap(
+                      item.ac_unit || item.acUnit || item.type || item.TYPE ||
+                      (isFreeItem ? "Free Item" : "Na")
+                    );
 
                     return (
                       <tr key={index} className="border-t hover:bg-gray-50">
@@ -159,7 +162,10 @@ export default function OrderDetailsModal({ isOpen, onClose, orderNumber }) {
                 const priceValue = parseNumber(item.price || item.PRICE);
                 const subtotalValue = parseNumber(item.subtotal || item.SUBTOTAL || item.total);
                 const isFreeItem = priceValue === 0 && subtotalValue === 0;
-                const displayType = toInitCap(item.type || item.TYPE || (isFreeItem ? "Free Item" : "Na"));
+                const displayType = toInitCap(
+                  item.ac_unit || item.acUnit || item.type || item.TYPE ||
+                  (isFreeItem ? "Free Item" : "Na")
+                );
 
                 return (
                   <div key={index} className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm">
