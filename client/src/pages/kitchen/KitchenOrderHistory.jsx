@@ -397,7 +397,7 @@ const KitchenOrderHistory = () => {
           <>
             <div className="overflow-x-auto">
               <table className="min-w-full text-sm">
-                <thead className="bg-gray-50 text-gray-700 uppercase text-xs tracking-wider">
+                <thead className="bg-gray-50 text-gray-700    text-xs tracking-wider">
                   <tr>
                     <th className="px-6 py-4 text-left">Order  </th>
                     <th className="px-6 py-4 text-left">Order Date</th>
@@ -499,12 +499,12 @@ const KitchenOrderHistory = () => {
                     <table className="min-w-full border rounded-lg">
                       <thead className="bg-gray-50">
                         <tr>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item Name</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quantity</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Preparation Charges</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Subtotal</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Item Name</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500  ">Quantity</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500  ">Type</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500  ">Preparation Charges</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500  ">Subtotal</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500  ">Status</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
@@ -524,7 +524,7 @@ const KitchenOrderHistory = () => {
                                   item.status?.toUpperCase() === 'COMPLETED' ? 'bg-green-100 text-green-800' :
                                     'bg-yellow-100 text-yellow-800'
                                 }`}>
-                                {toInitCap(item.status || 'PENDING')}
+                                {toInitCap(item.status || 'Pending')}
                               </span>
                             </td>
                           </tr>

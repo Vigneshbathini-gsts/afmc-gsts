@@ -14,6 +14,7 @@ export function toInitCap(value) {
 
     // Keep ID uppercase
     if (lower === "id") return "ID";
+    if (lower === "ml") return "ml";
 
     const isAllCaps = raw === raw.toUpperCase() && /[A-Z]/.test(raw);
     const hasSeparator = /[\/&]/.test(raw);
