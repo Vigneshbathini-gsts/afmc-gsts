@@ -1,6 +1,7 @@
 // pages/payment/PaymentPage.jsx
 
 import { useCallback, useEffect, useState } from "react";
+import { toast } from "react-toastify";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../../context/AuthContext";
 import orderService from "../../../services/orderService";
@@ -92,7 +93,9 @@ const PaymentPage = () => {
             );
         } catch (loadError) {
             console.log(loadError);
-            setError("Unable to load payment details.");
+            const loadErrorMessage = "Unable to load payment details.";
+            setError(loadErrorMessage);
+            toast.error(loadErrorMessage);
         } finally {
             setLoading(false);
         }
@@ -130,12 +133,12 @@ const PaymentPage = () => {
 
     const handleCompletePayment = async () => {
         if (!orderNumber) {
-            alert("Order number is required.");
+            toast.error("Order number is required.");
             return;
         }
 
         if (paymentMode === "IMMEDIATE" && !paymentReference.trim()) {
-            alert("Payment reference is required.");
+            toast.error("Payment reference is required.");
             return;
         }
 
@@ -146,6 +149,8 @@ const PaymentPage = () => {
                 paymentReference,
                 paymentStatus,
             });
+
+            toast.success("Payment completed successfully.");
 
             const basePath = location.pathname.startsWith("/attendant")
                 ? "/attendant"
@@ -166,7 +171,7 @@ const PaymentPage = () => {
             );
         } catch (payError) {
             console.log(payError);
-            alert("Payment failed. Please try again.");
+            toast.error("Payment failed. Please try again.");
         }
     };
 
