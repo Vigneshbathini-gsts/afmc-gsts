@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../../context/AuthContext";
 import { cartAPI } from "../../../services/api";
 import { Trash2, Minus, Plus, X, Pencil } from "lucide-react";
+import { toast } from "react-toastify";
 import { getMaxAllowedQuantity, isOutOfStock, isCocktailOrMocktail } from "../../../utils/stockValidation";
 
 // Cache cocktail details per cart item
@@ -14,40 +15,6 @@ import {
 } from "../../../utils/attendantCustomer";
 
 const BASEAPI = "https://afmc.globalsparkteksolutions.com/AFMCIMAGES/";
-
-// Toast component for notifications
-const Toast = ({ message, type, onClose }) => {
-    const [isVisible, setIsVisible] = useState(true);
-
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            setIsVisible(false);
-            setTimeout(onClose, 300); // Wait for fade animation
-        }, 3000);
-        return () => clearTimeout(timer);
-    }, [onClose]);
-
-    return (
-        <div 
-            className={`fixed bottom-4 right-4 z-50 rounded-lg shadow-lg p-4 ${type === 'error' ? 'bg-red-600' : 'bg-green-600'
-                } text-white min-w-[200px] transition-all duration-300 ease-in-out pointer-events-auto ${
-                    isVisible 
-                        ? 'opacity-100 translate-y-0' 
-                        : 'opacity-0 translate-y-3 pointer-events-none'
-                }`}
-        >
-            <div className="flex items-center justify-between gap-3">
-                <span className="text-sm">{message}</span>
-                <button onClick={() => {
-                    setIsVisible(false);
-                    setTimeout(onClose, 300);
-                }} className="hover:opacity-80">
-                    <X size={16} />
-                </button>
-            </div>
-        </div>
-    );
-};
 
 // Confirmation Modal component
 const ConfirmModal = ({ isOpen, onClose, onConfirm, title, message, confirmLabel = "Confirm" }) => {
@@ -86,7 +53,6 @@ export default function CartPage({ isAttendant = false }) {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [updatingItemId, setUpdatingItemId] = useState(null);
-    const [toast, setToast] = useState(null);
     const [cocktailDetailsByCartId, setCocktailDetailsByCartId] = useState({});
     const [confirmModal, setConfirmModal] = useState({ isOpen: false, cartId: null });
     const [proceedConfirmOpen, setProceedConfirmOpen] = useState(false);
@@ -95,7 +61,11 @@ export default function CartPage({ isAttendant = false }) {
     const userId = user?.userId;
 
     const showToast = useCallback((message, type = 'success') => {
-        setToast({ message, type });
+        if (type === 'error') {
+            toast.error(message);
+        } else {
+            toast.success(message);
+        }
     }, []);
 
     const getStockLimitImageKey = useCallback((item) => String(Number(item?.cartId ?? item?.id) || item?.cartId || item?.id || item?.itemId || ""), []);
@@ -354,15 +324,6 @@ export default function CartPage({ isAttendant = false }) {
 
     return (
         <div className="space-y-4 pb-20 md:pb-4">
-            {/* Toast Notifications - Always rendered, visibility controlled via CSS */}
-            {toast && (
-                <Toast
-                    message={toast.message}
-                    type={toast.type}
-                    onClose={() => setToast(null)}
-                />
-            )}
-
             {/* Confirmation Modal */}
             <ConfirmModal
                 isOpen={confirmModal.isOpen}

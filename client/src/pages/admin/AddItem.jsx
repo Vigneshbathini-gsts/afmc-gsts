@@ -1,4 +1,5 @@
 import React, { useCallback, useMemo, useRef, useState } from "react";
+import { toast } from "react-toastify";
 import {
   FaArrowLeft,
   FaBarcode,
@@ -52,12 +53,16 @@ export default function AddItem() {
     async (barcodeValue) => {
       const normalizedBarcode = String(barcodeValue || "").trim();
       if (!normalizedBarcode) {
-        setError("Barcode is required.");
+        const validationMessage = "Barcode is required.";
+        setError(validationMessage);
+        toast.error(validationMessage);
         return;
       }
 
       if (!transactionDate) {
-        setError("Transaction date is required.");
+        const validationMessage = "Transaction date is required.";
+        setError(validationMessage);
+        toast.error(validationMessage);
         return;
       }
 
@@ -65,7 +70,9 @@ export default function AddItem() {
         rows.some((row) => String(row.barcode) === normalizedBarcode) ||
         pendingBarcodesRef.current.has(normalizedBarcode)
       ) {
-        setError("This barcode is already added.");
+        const validationMessage = "This barcode is already added.";
+        setError(validationMessage);
+        toast.error(validationMessage);
         return;
       }
 
@@ -79,7 +86,9 @@ export default function AddItem() {
 
         const availableStock = Number(item.available_stock || 0);
         if (availableStock <= 0) {
-          setError(`Scanned barcode ${normalizedBarcode} has no stock.`);
+          const validationMessage = `Scanned barcode ${normalizedBarcode} has no stock.`;
+          setError(validationMessage);
+          toast.error(validationMessage);
           return;
         }
 
@@ -107,9 +116,13 @@ export default function AddItem() {
           ];
         });
         setBarcode("");
+        toast.success(`Added barcode ${normalizedBarcode} successfully.`);
       } catch (requestError) {
+        const requestErrorMessage =
+          requestError.response?.data?.message || "Unable to fetch item for barcode.";
         console.error("Failed to fetch barcode item:", requestError);
-        setError(requestError.response?.data?.message || "Unable to fetch item for barcode.");
+        setError(requestErrorMessage);
+        toast.error(requestErrorMessage);
       } finally {
         pendingBarcodesRef.current.delete(normalizedBarcode);
         setLoading(false);
@@ -142,6 +155,7 @@ export default function AddItem() {
 
   const handleDeleteRow = (index) => {
     setRows((current) => current.filter((_, rowIndex) => rowIndex !== index));
+    toast.success("Item removed successfully.");
   };
 
   const handleCancel = () => {
@@ -155,13 +169,17 @@ export default function AddItem() {
   const handleFinish = async () => {
     const invalidRow = rows.find((row) => !row.quantity || Number(row.quantity) <= 0);
     if (invalidRow) {
-      setError("Every row must have a quantity greater than 0.");
+      const validationMessage = "Every row must have a quantity greater than 0.";
+      setError(validationMessage);
+      toast.error(validationMessage);
       return;
     }
 
     const overdrawnRow = rows.find((row) => Number(row.quantity) > Number(row.availableStock || 0));
     if (overdrawnRow) {
-      setError(`Quantity exceeds available stock for barcode ${overdrawnRow.barcode}.`);
+      const validationMessage = `Quantity exceeds available stock for barcode ${overdrawnRow.barcode}.`;
+      setError(validationMessage);
+      toast.error(validationMessage);
       return;
     }
 
@@ -180,14 +198,17 @@ export default function AddItem() {
 
       setRows([]);
       setBarcode("");
-      setSuccessMessage("Stock-out transaction completed successfully.");
+      const successMessage = "Stock-out transaction completed successfully.";
+      setSuccessMessage(successMessage);
+      toast.success(successMessage);
       // Navigate to today's stock out details page
       navigate("/admin/today-stock-out-details");
     } catch (requestError) {
+      const requestErrorMessage =
+        requestError.response?.data?.message || "Unable to complete stock-out transaction.";
       console.error("Failed to save stock-out transaction:", requestError);
-      setError(
-        requestError.response?.data?.message || "Unable to complete stock-out transaction."
-      );
+      setError(requestErrorMessage);
+      toast.error(requestErrorMessage);
     } finally {
       setSaving(false);
     }

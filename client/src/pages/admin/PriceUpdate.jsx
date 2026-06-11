@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
 import {
   FaBarcode,
   FaBoxOpen,
@@ -32,6 +33,7 @@ export default function PriceUpdate() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [scanSuccess, setScanSuccess] = useState(false);
+  const skipBarcodeLookupOnBlurRef = useRef(false);
 
   // =========================
   // Input Change
@@ -83,6 +85,7 @@ export default function PriceUpdate() {
         itemName: item.itemName || "",
         unitPrice: item.unitPrice || "",
       }));
+      toast.success(`Item fetched: ${item.itemName || item.itemCode || "Item found"}`);
     } catch (err) {
       setFormData((prev) => ({
         ...prev,
@@ -91,7 +94,9 @@ export default function PriceUpdate() {
         unitPrice: "",
       }));
 
-      setError(err.response?.data?.message || "Item not found");
+      const fetchError = err.response?.data?.message || "Item not found";
+      setError(fetchError);
+      toast.error(fetchError);
     } finally {
       setFetchingItem(false);
     }
@@ -101,6 +106,11 @@ export default function PriceUpdate() {
   // Barcode Enter Search
   // =========================
   const handleBarcodeBlur = () => {
+    if (skipBarcodeLookupOnBlurRef.current) {
+      skipBarcodeLookupOnBlurRef.current = false;
+      return;
+    }
+
     if (formData.barcode.trim()) {
       fetchItemByBarcode(formData.barcode.trim());
     }
@@ -122,17 +132,23 @@ export default function PriceUpdate() {
       setMessage("");
 
       if (!formData.barcode.trim()) {
-        setError("Barcode is required");
+        const validationError = "Barcode is required";
+        setError(validationError);
+        toast.error(validationError);
         return;
       }
 
       if (!formData.itemName.trim()) {
-        setError("Please fetch a valid item first");
+        const validationError = "Please fetch a valid item first";
+        setError(validationError);
+        toast.error(validationError);
         return;
       }
 
       if (!formData.unitPrice || Number(formData.unitPrice) <= 0) {
-        setError("Please enter a valid unit price");
+        const validationError = "Please enter a valid unit price";
+        setError(validationError);
+        toast.error(validationError);
         return;
       }
 
@@ -141,7 +157,9 @@ export default function PriceUpdate() {
         unitPrice: formData.unitPrice,
       });
 
-      setMessage("Price updated successfully");
+      const successMessage = "Price updated successfully";
+      setMessage(successMessage);
+      toast.success(successMessage);
 
       navigate("/admin/dashboard");
 
@@ -152,7 +170,9 @@ export default function PriceUpdate() {
         unitPrice: "",
       });
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to update price");
+      const saveError = err.response?.data?.message || "Failed to update price";
+      setError(saveError);
+      toast.error(saveError);
     } finally {
       setLoading(false);
     }
@@ -388,6 +408,9 @@ export default function PriceUpdate() {
           <div className="flex flex-col sm:flex-row gap-4 pt-4">
             <button
               type="button"
+              onMouseDown={() => {
+                skipBarcodeLookupOnBlurRef.current = true;
+              }}
               onClick={handleSave}
               disabled={loading || fetchingItem}
               className="flex-1 bg-afmc-maroon hover:bg-afmc-maroon2 text-white font-semibold py-3 rounded-2xl shadow-md transition flex items-center justify-center gap-2 disabled:opacity-70"

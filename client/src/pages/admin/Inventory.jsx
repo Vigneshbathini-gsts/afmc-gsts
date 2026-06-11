@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import BarcodeScanner from "../../components/common/BarcodeScanner";
 import { inventoryAPI } from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
+import { toast } from "react-toastify";
 
 
 const requiresVolume = (acUnit) => String(acUnit || "").trim().toUpperCase() !== "NOS";
@@ -533,6 +534,7 @@ export default function Inventory() {
       }
 
       await inventoryAPI.createWithImage(formData);
+      toast.success("Item created successfully");
       setShowAddModal(false);
       fetchItems(categoryId || "");
       fetchInventory();
@@ -721,12 +723,14 @@ export default function Inventory() {
 
   const handleAddStock = async () => {
     if (stockRows.length === 0) {
-      setStockError("Add at least one stock row before saving.");
+      const validationMessage = "Add at least one stock row before saving.";
+      setStockError(validationMessage);
+      toast.error(validationMessage);
       return;
     }
 
     if (!stockForm.prepCharges && stockRows.some((row) => !row.prepCharges)) {
-      window.alert("Preparation charges selection is required.");
+      toast.error("Preparation charges selection is required.");
       return;
     }
 
@@ -747,11 +751,14 @@ export default function Inventory() {
           createdBy: currentLoggedInUser,
         })),
       });
+      toast.success("Stock added successfully");
       closeStockModal();
       fetchInventory();
     } catch (err) {
+      const addStockError = err.response?.data?.message || "Failed to add stock.";
       console.error("Failed to add stock:", err);
-      setStockError(err.response?.data?.message || "Failed to add stock.");
+      setStockError(addStockError);
+      toast.error(addStockError);
     } finally {
       setStockSaving(false);
     }
@@ -811,6 +818,7 @@ export default function Inventory() {
         currentImage: responseFileName || prev.currentImage,
         image: null,
       }));
+      toast.success("Image updated successfully");
       setImagePreviewUrl("");
       fetchInventory();
       setShowImageModal(false);

@@ -282,25 +282,25 @@ export default function ItemDetails() {
         }
     };
 
-    const deleteIngredient = (index) => {
-        setItem((prev) => {
-            const newDetails = (prev.details || []).filter((_, idx) => idx !== index);
-            const newQuantities = {};
-            Object.entries(quantities).forEach(([key, value]) => {
-                const idx = Number(key);
-                if (idx === index) return;
-                const newIndex = idx > index ? idx - 1 : idx;
-                newQuantities[newIndex] = value;
-            });
-            persistCustomDetails(newDetails, newQuantities);
-            setQuantities(newQuantities);
-            return {
-                ...prev,
-                details: newDetails,
-            };
+    const deleteIngredient = async (index) => {
+        const newDetails = (item?.details || []).filter((_, idx) => idx !== index);
+        const newQuantities = {};
+        Object.entries(quantities).forEach(([key, value]) => {
+            const idx = Number(key);
+            if (idx === index) return;
+            const newIndex = idx > index ? idx - 1 : idx;
+            newQuantities[newIndex] = value;
         });
 
-        toast.info("Ingredient removed from recipe");
+        const saved = await persistCustomDetails(newDetails, newQuantities);
+        if (saved) {
+            setItem((prev) => ({
+                ...prev,
+                details: newDetails,
+            }));
+            setQuantities(newQuantities);
+            toast.info("Ingredient removed from recipe");
+        }
     };
 
     const fetchLovIngredients = async () => {
@@ -396,7 +396,7 @@ export default function ItemDetails() {
         setSelectedIngredients(prev => prev.filter((_, i) => i !== index));
     };
 
-    const handleAddIngredients = () => {
+    const handleAddIngredients = async () => {
         if (selectedIngredients.length === 0) {
             toast.warning("Please select at least one ingredient");
             return;
@@ -440,13 +440,17 @@ export default function ItemDetails() {
             newQuantities[startIndex + idx] = 1;
         });
 
+        const saved = await persistCustomDetails(newDetails, newQuantities);
+        if (!saved) {
+            toast.error("Failed to add selected ingredients");
+            return;
+        }
+
         setItem(prev => ({
             ...prev,
             details: newDetails
         }));
         setQuantities(newQuantities);
-        persistCustomDetails(newDetails, newQuantities);
-
         setShowModal(false);
         setSelectedIngredients([]);
         toast.success(`${selectedIngredients.length} ingredient(s) added successfully`);
@@ -455,6 +459,19 @@ export default function ItemDetails() {
     const filteredLovData = lovData.filter(item =>
         item.d.toLowerCase().includes(searchTerm.toLowerCase())
     );
+
+    const isDetailOutOfStock = (detail, index) => {
+        const stockQuantity = Number(getDetailStockQuantity(detail));
+        if (!Number.isFinite(stockQuantity) || stockQuantity < 0) return false;
+
+        const requiredQuantity = Number(getDetailRequiredQuantity(detail) ?? quantities[index] ?? getDetailPegs(detail) ?? 1) || 1;
+        return (
+            String(getDetailStockStatus(detail)).trim().toLowerCase() === "out of stock" ||
+            stockQuantity < requiredQuantity
+        );
+    };
+
+    const hasOutOfStockIngredient = (item?.details || []).some((detail, index) => isDetailOutOfStock(detail, index));
 
     const handleAddToCart = async () => {
         if (!item) {
@@ -671,7 +688,8 @@ export default function ItemDetails() {
                                 </button>
                                 <button
                                     onClick={handleAddToCart}
-                                    className="inline-flex items-center gap-2 rounded-full bg-afmc-maroon px-4 py-2 text-sm font-semibold text-white shadow-sm ring-1 ring-afmc-gold/30 transition hover:bg-afmc-maroon/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-afmc-gold/60 focus-visible:ring-offset-2 focus-visible:ring-offset-afmc-maroon"
+                                    disabled={hasOutOfStockIngredient}
+                                    className="inline-flex items-center gap-2 rounded-full bg-afmc-maroon px-4 py-2 text-sm font-semibold text-white shadow-sm ring-1 ring-afmc-gold/30 transition hover:bg-afmc-maroon/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-afmc-gold/60 focus-visible:ring-offset-2 focus-visible:ring-offset-afmc-maroon disabled:cursor-not-allowed disabled:bg-stone-300"
                                 >
                                     <FaSave className="text-xs" />
                                     {isEditingCartItem ? "Save Customization" : fromBuyFlow ? "Save Ingredients" : "Add to Cart"}

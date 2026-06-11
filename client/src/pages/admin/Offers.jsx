@@ -133,7 +133,7 @@ export default function Offers() {
   // =========================
   // NAVIGATION
   // =========================
-  const handleBack = () => navigate(-1);
+  const handleBack = () => navigate("/admin/dashboard");
   const handleCreate = () => navigate("/admin/offers/create");
   const handleEdit = (id) => navigate(`/admin/offers/edit/${id}`);
 

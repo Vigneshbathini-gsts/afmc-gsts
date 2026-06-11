@@ -8,6 +8,7 @@ export default function KitchenOrderBell({ kitchen = "Bar" }) {
   const [notifications, setNotifications] = useState([]);
   const [open, setOpen] = useState(false);
   const [clearingAll, setClearingAll] = useState(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
   const dropdownRef = useRef(null);
   const navigate = useNavigate();
   const location = useLocation();
@@ -45,6 +46,7 @@ export default function KitchenOrderBell({ kitchen = "Bar" }) {
     const handleOutsideClick = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setOpen(false);
+        setShowClearConfirm(false);
       }
     };
     document.addEventListener("mousedown", handleOutsideClick);
@@ -53,9 +55,10 @@ export default function KitchenOrderBell({ kitchen = "Bar" }) {
   }, []);
 
 
-  const handleCloseModel=()=>{
+  const handleCloseModel = () => {
     setOpen(false);
-  }
+    setShowClearConfirm(false);
+  };
 
   // Close dropdown when route changes (ensures it doesn't remain open after navigation)
   useEffect(() => {
@@ -80,14 +83,13 @@ export default function KitchenOrderBell({ kitchen = "Bar" }) {
     }
   };
 
-  const handleClearAll = async () => {
+  const handleClearAll = () => {
     if (notifications.length === 0 || clearingAll) return;
+    setShowClearConfirm(true);
+  };
 
-    const shouldClear = window.confirm(
-      `Clear all ${notifications.length} pending notification(s)?`
-    );
-    if (!shouldClear) return;
-
+  const handleConfirmClearAll = async () => {
+    setShowClearConfirm(false);
     try {
       setClearingAll(true);
       await barOrdersAPI.markAllNotificationsAsRead({ kitchen });
@@ -98,6 +100,10 @@ export default function KitchenOrderBell({ kitchen = "Bar" }) {
     } finally {
       setClearingAll(false);
     }
+  };
+
+  const handleCancelClearAll = () => {
+    setShowClearConfirm(false);
   };
 
   // ✅ Handle click
@@ -211,6 +217,38 @@ export default function KitchenOrderBell({ kitchen = "Bar" }) {
     </div>
   </div>
 </>
+      )}
+
+      {showClearConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6">
+          <div className="w-full max-w-md rounded-3xl bg-white shadow-2xl border border-gray-200">
+            <div className="p-6">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Confirm clear all
+              </h3>
+              <p className="mt-2 text-sm text-gray-600">
+                Clear all {notifications.length} pending notification(s)?
+              </p>
+              <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={handleCancelClearAll}
+                  className="w-full rounded-full border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition sm:w-auto"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmClearAll}
+                  disabled={clearingAll}
+                  className="w-full rounded-full bg-afmc-maroon px-4 py-2 text-sm font-medium text-white hover:bg-afmc-maroon2 transition disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+                >
+                  {clearingAll ? "Clearing..." : "Yes, clear all"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

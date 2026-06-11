@@ -1,6 +1,7 @@
 // pages/payment/PaymentPage.jsx
 
 import { useCallback, useEffect, useState } from "react";
+import { toast } from "react-toastify";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../../context/AuthContext";
 import orderService from "../../../services/orderService";
@@ -65,7 +66,7 @@ const PaymentPage = () => {
                 orderService.getPaymentModes(),
             ]);
 
-            console.log("summaryResponse",summaryResponse);
+            console.log("summaryResponse", summaryResponse);
             const orderData = summaryResponse.data?.data || null;
             const paymentModes = getPaymentModesForRole({
                 modes: paymentModesResponse.data?.data,
@@ -92,7 +93,9 @@ const PaymentPage = () => {
             );
         } catch (loadError) {
             console.log(loadError);
-            setError("Unable to load payment details.");
+            const loadErrorMessage = "Unable to load payment details.";
+            setError(loadErrorMessage);
+            toast.error(loadErrorMessage);
         } finally {
             setLoading(false);
         }
@@ -105,7 +108,7 @@ const PaymentPage = () => {
         try {
             const response = await orderService.getOrderDetailsInPayment(orderNumber);
             const responseData = response?.data?.data;
-            console.log("responseData",responseData);
+            console.log("responseData", responseData);
             const orderDetails = Array.isArray(responseData)
                 ? responseData
                 : responseData?.items || [];
@@ -130,12 +133,12 @@ const PaymentPage = () => {
 
     const handleCompletePayment = async () => {
         if (!orderNumber) {
-            alert("Order number is required.");
+            toast.error("Order number is required.");
             return;
         }
 
         if (paymentMode === "IMMEDIATE" && !paymentReference.trim()) {
-            alert("Payment reference is required.");
+            toast.error("Payment reference is required.");
             return;
         }
 
@@ -146,6 +149,8 @@ const PaymentPage = () => {
                 paymentReference,
                 paymentStatus,
             });
+
+            toast.success("Payment completed successfully.");
 
             const basePath = location.pathname.startsWith("/attendant")
                 ? "/attendant"
@@ -166,7 +171,7 @@ const PaymentPage = () => {
             );
         } catch (payError) {
             console.log(payError);
-            alert("Payment failed. Please try again.");
+            toast.error("Payment failed. Please try again.");
         }
     };
 
@@ -205,14 +210,14 @@ const PaymentPage = () => {
                         </div>
 
                         <div className="rounded-2xl border border-stone-200 bg-white px-4 py-3">
-    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
-        {toInitCap("Order Total")}
-    </p>
-    <p className="mt-1 text-lg font-semibold text-stone-900">
-        ₹ {getDisplayMoney(order?.totalAmount || 0)}
-    </p>
-</div>
-                        
+                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
+                                {toInitCap("Order Total")}
+                            </p>
+                            <p className="mt-1 text-lg font-semibold text-stone-900">
+                                ₹ {getDisplayMoney(order?.totalAmount || 0)}
+                            </p>
+                        </div>
+
                         {/* <div className="rounded-2xl border border-afmc-gold/25 bg-gradient-to-br from-white to-afmc-gold/5 px-4 py-3">
                             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">Status</p>
                             <p className="mt-1 text-lg font-semibold text-afmc-maroon">

@@ -1547,9 +1547,13 @@ function MenuDashboard() {
       });
       closePopup();
     } catch (error) {
-      window.alert(
-        error?.response?.data?.message || error?.message || "Unable to create order."
-      );
+      const msg = error?.response?.data?.message || error?.message || "Unable to create order.";
+      try {
+        toast.error(msg);
+      } catch {
+        // fallback to console if toast isn't available
+        console.error(msg);
+      }
     }
   };
 

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "react-toastify";
 import { Save, Search } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { cocktailAPI } from "../../services/api";
@@ -136,10 +137,11 @@ export default function CocktailEdit() {
       );
     } catch (pricingError) {
       console.error(pricingError);
-      setError(
+      const pricingErrorMessage =
         pricingError.response?.data?.message ||
-          "Unable to calculate member/non-member price for the selected item."
-      );
+        "Unable to calculate member/non-member price for the selected item.";
+      setError(pricingErrorMessage);
+      toast.error(pricingErrorMessage);
     }
   };
 
@@ -152,7 +154,9 @@ export default function CocktailEdit() {
     );
 
     if (normalizedItemCode && alreadySelected) {
-      setError("This ingredient is already selected for this item.");
+      const duplicateMessage = "This ingredient is already selected for this item.";
+      setError(duplicateMessage);
+      toast.error(duplicateMessage);
       return;
     }
 
@@ -223,9 +227,11 @@ export default function CocktailEdit() {
   };
 
   const deleteRow = (id) => {
-    setRows((current) =>
-      current.length === 1 ? current : current.filter((row) => row.id !== id)
-    );
+    setRows((current) => {
+      if (current.length === 1) return current;
+      toast.success("Ingredient row removed.");
+      return current.filter((row) => row.id !== id);
+    });
   };
 
   useEffect(() => {
@@ -353,7 +359,9 @@ export default function CocktailEdit() {
 
   const handleSubmit = async () => {
     if (!itemId) {
-      setError("Item id is missing.");
+      const missingIdMessage = "Item id is missing.";
+      setError(missingIdMessage);
+      toast.error(missingIdMessage);
       return;
     }
 
@@ -362,12 +370,16 @@ export default function CocktailEdit() {
       setError("");
 
       if (!form.itemName?.trim()) {
-        setError("Item name is required.");
+        const validationMessage = "Item name is required.";
+        setError(validationMessage);
+        toast.error(validationMessage);
         return;
       }
 
       if (!form.subCategory) {
-        setError("Please select Cocktail or Mocktail.");
+        const validationMessage = "Please select Cocktail or Mocktail.";
+        setError(validationMessage);
+        toast.error(validationMessage);
         return;
       }
 
@@ -394,13 +406,16 @@ export default function CocktailEdit() {
       }
 
       await cocktailAPI.update(itemId, payload);
+      const successMessage = "Cocktail item updated successfully.";
+      toast.success(successMessage);
       navigate("/admin/cocktail-management");
     } catch (submitError) {
       console.error(submitError);
-      setError(
+      const message =
         submitError.response?.data?.message ||
-          "Unable to update cocktail item. Please review the entered values."
-      );
+        "Unable to update cocktail item. Please review the entered values.";
+      setError(message);
+      toast.error(message);
     } finally {
       setSaving(false);
     }

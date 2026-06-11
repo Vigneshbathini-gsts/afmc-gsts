@@ -11,6 +11,7 @@ import {
   FaSortAmountUp,
   FaCalendarCheck,
 } from "react-icons/fa";
+import { toast } from "react-toastify";
 import { offersAPI } from "../../services/api";
 
 export default function OfferEdit() {
@@ -90,14 +91,18 @@ export default function OfferEdit() {
 
       // Validate that end date is provided
       if (!formData.endDate) {
-        setError("Please select an end date");
+        const message = "Please select an end date";
+        setError(message);
+        toast.error(message);
         setSaving(false);
         return;
       }
 
       // Validate that end date is not before start date
       if (formData.offerDate && formData.endDate < formData.offerDate) {
-        setError("End date cannot be earlier than start date");
+        const message = "End date cannot be earlier than start date";
+        setError(message);
+        toast.error(message);
         setSaving(false);
         return;
       }
@@ -109,34 +114,41 @@ export default function OfferEdit() {
 
       // Check if status code is 200 (success)
       if (res.status === 200) {
-        setSuccessMessage(res.data?.message || "Offer deactivated successfully!");
-        
+        const message = res.data?.message || "Offer deactivated successfully!";
+        setSuccessMessage(message);
+        toast.success(message);
+
         setTimeout(() => {
           navigate("/admin/offers");
         }, 1500);
       } else {
-        setError("Unexpected response from server");
+        const message = "Unexpected response from server";
+        setError(message);
+        toast.error(message);
       }
     } catch (err) {
       console.error("Update Offer Error:", err);
       console.error("Error response:", err.response?.data);
       
       // Handle different error status codes
+      let message;
       if (err.response?.status === 400) {
-        setError(err.response?.data?.message || "Invalid data provided");
+        message = err.response?.data?.message || "Invalid data provided";
       } else if (err.response?.status === 404) {
-        setError("Offer not found");
+        message = "Offer not found";
       } else if (err.response?.status === 500) {
-        setError("Server error. Please try again later.");
+        message = "Server error. Please try again later.";
       } else {
-        setError(err.response?.data?.message || "Failed to deactivate offer");
+        message = err.response?.data?.message || "Failed to deactivate offer";
       }
+      setError(message);
+      toast.error(message);
     } finally {
       setSaving(false);
     }
   };
 
-  const handleBack = () => navigate(-1);
+  const handleBack = () => navigate("/admin/offers");
   const handleDashboard = () => navigate("/admin/dashboard");
 
   if (loadingOffer) {
