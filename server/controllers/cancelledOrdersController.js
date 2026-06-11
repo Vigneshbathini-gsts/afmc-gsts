@@ -22,12 +22,21 @@ exports.getCancelledOrders = async (req, res) => {
           'Cancelled' AS status,
           oh.ORDER_DATE,
           COALESCE(nm.FIRST_NAME, u.FIRST_NAME) AS FIRST_NAME,
-          COALESCE(p.PUBMED_NAME, NULLIF(TRIM(CAST(oh.PUBMED AS CHAR)), '')) AS pubmed_name
+          COALESCE(
+            NULLIF(
+              CONCAT(
+                UPPER(LEFT(TRIM(p.PUBMED_NAME), 1)),
+                LOWER(SUBSTRING(TRIM(p.PUBMED_NAME), 2))
+              ),
+              ''
+            ),
+            NULLIF(TRIM(CAST(oh.PUBMED AS CHAR)), '')
+          ) AS pubmed_name
       FROM xxafmc_order_header oh
       LEFT JOIN xxafmc_non_members nm ON nm.ID = oh.MEMBER_ID
       LEFT JOIN xxafmc_users u ON u.USER_ID = oh.USER_ID
       LEFT JOIN xxafmc_pubmed p
-        ON TRIM(CAST(p.PUBMED_ID AS CHAR)) = TRIM(CAST(oh.PUBMED AS CHAR))
+        ON p.PUBMED_ID = oh.PUBMED
         OR UPPER(TRIM(p.PUBMED_NAME) COLLATE utf8mb4_unicode_ci) =
           UPPER(TRIM(CAST(oh.PUBMED AS CHAR)) COLLATE utf8mb4_unicode_ci)
       WHERE oh.ORDER_NUM IN (
