@@ -37,6 +37,7 @@ export default function ItemDetails() {
     const fromBuyFlow = Boolean(location.state?.fromBuyFlow);
     const buyOrderNumber = location.state?.orderNumber;
     const [item, setItem] = useState(null);
+    console.log("item", item);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [quantities, setQuantities] = useState({});
@@ -310,7 +311,10 @@ export default function ItemDetails() {
             const response = await cartAPI.getLovIngredients(item.SUB_CATEGORY);
             if (response.data.success) {
                 setLovData(response.data.data);
+                console.log("ingre",response.data.data)
+                
             }
+            
         } catch (err) {
             console.error("Error fetching LOV ingredients:", err);
             toast.error("Failed to load ingredients list");

@@ -134,10 +134,39 @@ async function getCocktailMaxQuantityMap(connection, orderNumber, parentItemIds)
   const maxMap = new Map();
 
   for (const parentId of normalizedParents) {
-    const ingredients = byParent.get(parentId) || [];
+    let ingredients = byParent.get(parentId) || [];
+
+    if (ingredients.length === 0) {
+      const [legacyRows] = await connection.execute(
+        `
+          SELECT item_code AS ingredient_item_code, item_name AS ingredient_name, pegs AS ingredient_pegs
+          FROM xxafmc_cocktails_mocktails_details
+          WHERE inventory_item_code = ?
+        `,
+        [parentId]
+      );
+
+      ingredients = legacyRows.map((row) => ({
+        itemCode: Number(row.ingredient_item_code),
+        itemName: String(row.ingredient_name || "").trim(),
+        pegs: Number(row.ingredient_pegs || 0),
+      }));
+    }
+
     if (ingredients.length === 0) {
       maxMap.set(parentId, null);
       continue;
+    }
+
+    const missingCodes = ingredients
+      .map((ingredient) => Number(ingredient.itemCode))
+      .filter((code) => Number.isFinite(code) && code > 0 && !Object.prototype.hasOwnProperty.call(stockMap, String(code)));
+
+    if (missingCodes.length > 0) {
+      const missingStockMap = await getIngredientStockQuantities(connection, missingCodes);
+      const missingReservedMap = await getIngredientReservedQuantitiesExcludingOrder(connection, missingCodes, normalizedOrderNumber);
+      Object.assign(stockMap, missingStockMap);
+      Object.assign(reservedMap, missingReservedMap);
     }
 
     let maxPossibleQty = Infinity;
@@ -154,6 +183,47 @@ async function getCocktailMaxQuantityMap(connection, orderNumber, parentItemIds)
   }
 
   return maxMap;
+}
+
+async function getCocktailIngredientRows(connection, orderNumber, parentItemId) {
+  const normalizedOrderNumber = Number(orderNumber);
+  const normalizedParentId = Number(parentItemId);
+  if (
+    !Number.isFinite(normalizedOrderNumber) || normalizedOrderNumber <= 0 ||
+    !Number.isFinite(normalizedParentId) || normalizedParentId <= 0
+  ) {
+    return [];
+  }
+
+  const [customRows] = await connection.execute(
+    `
+      SELECT item_code, pegs
+      FROM xxafmc_custom_cocktails_mocktails_details
+      WHERE order_number = ?
+        AND inventory_item_code = ?
+      UNION ALL
+      SELECT item_code, pegs
+      FROM xxafmc_custom_cocktails_mocktails_details_dummy
+      WHERE order_number = ?
+        AND inventory_item_code = ?
+    `,
+    [normalizedOrderNumber, normalizedParentId, normalizedOrderNumber, normalizedParentId]
+  );
+
+  if (customRows.length > 0) {
+    return customRows;
+  }
+
+  const [legacyRows] = await connection.execute(
+    `
+      SELECT item_code, pegs
+      FROM xxafmc_cocktails_mocktails_details
+      WHERE inventory_item_code = ?
+    `,
+    [normalizedParentId]
+  );
+
+  return legacyRows;
 }
 
 function normalizeCocktailCustomizations(payload) {
@@ -1007,16 +1077,7 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
           continue;
         }
 
-        const [ingredientRows] = await connection.execute(
-          `
-            SELECT item_code, pegs
-            FROM xxafmc_custom_cocktails_mocktails_details
-            WHERE order_number = ?
-              AND inventory_item_code = ?
-          `,
-          [normalizedOrderNumber, itemId]
-        );
-
+        const ingredientRows = await getCocktailIngredientRows(connection, normalizedOrderNumber, itemId);
         for (const ingredient of ingredientRows) {
           const ingredientCode = Number(ingredient.item_code || 0);
           const pegsPerUnit = Number(ingredient.pegs || 0);

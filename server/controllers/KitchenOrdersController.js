@@ -33,6 +33,128 @@ const saveSession = (req) =>
     req.session.save((err) => (err ? reject(err) : resolve()));
   });
 
+async function releaseReservationRows(connection, reservationRows) {
+  console.log("Releasing reservation rows:", reservationRows);
+  
+  for (const row of reservationRows) {
+    const itemCode = String(row.item_code || "").trim();
+    const quantity = Number(row.release_qty || 0);
+    if (!itemCode || !Number.isFinite(quantity) || quantity <= 0) {
+      console.log("Skipping invalid row:", { itemCode, quantity });
+      continue;
+    }
+
+    console.log(`Releasing ${quantity} units for item code ${itemCode}`);
+
+    await connection.query(
+      `INSERT IGNORE INTO xxafmc_stock_reservation_totals (item_code, reserved_qty) VALUES (?, 0)`,
+      [itemCode]
+    );
+    
+    const [result] = await connection.query(
+      `
+        UPDATE xxafmc_stock_reservation_totals
+        SET reserved_qty = GREATEST(0, IFNULL(reserved_qty, 0) - ?)
+        WHERE item_code = ?
+        LIMIT 1
+      `,
+      [quantity, itemCode]
+    );
+    
+    console.log(`Released ${quantity} for item ${itemCode}. Update result:`, result.affectedRows);
+  }
+}
+
+async function getReservationReleaseRowsForCancel(connection, { orderNumber, orderLineId, categoryId }) {
+  const params = [];
+  let filterSql = "";
+
+  if (orderLineId) {
+    filterSql = "xod.ORDER_LINE_ID = ?";
+    params.push(orderLineId);
+  } else {
+    filterSql = "xod.ORDER_ID = ? AND inv.category_id = ?";
+    params.push(orderNumber, categoryId);
+  }
+
+  const [rows] = await connection.query(
+    `
+      SELECT item_code, SUM(release_qty) AS release_qty
+      FROM (
+        SELECT
+          xod.item_id AS item_code,
+          SUM(COALESCE(xod.quantity, 0)) AS release_qty
+        FROM xxafmc_order_details xod
+        JOIN (${inventorySummarySql}) inv ON inv.item_code = xod.item_id
+        WHERE ${filterSql}
+          AND (xod.ORDER_STATUS IS NULL OR TRIM(xod.ORDER_STATUS) = '')
+          AND COALESCE(inv.sub_category, xod.subcategory) NOT IN (14, 15)
+        GROUP BY xod.item_id
+
+        UNION ALL
+
+        SELECT
+          cm.item_code,
+          SUM(COALESCE(cm.pegs, 0) * COALESCE(cm.quantity, 0)) AS release_qty
+        FROM xxafmc_order_details xod
+        JOIN (${inventorySummarySql}) inv ON inv.item_code = xod.item_id
+        JOIN xxafmc_custom_cocktails_mocktails_details cm
+          ON cm.order_number = xod.order_id
+         AND cm.inventory_item_code = xod.item_id
+        WHERE ${filterSql}
+          AND (xod.ORDER_STATUS IS NULL OR TRIM(xod.ORDER_STATUS) = '')
+          AND COALESCE(inv.sub_category, xod.subcategory) IN (14, 15)
+        GROUP BY cm.item_code
+
+        UNION ALL
+
+        SELECT
+          cm.item_code,
+          SUM(COALESCE(cm.pegs, 0) * COALESCE(cm.quantity, 0)) AS release_qty
+        FROM xxafmc_order_details xod
+        JOIN (${inventorySummarySql}) inv ON inv.item_code = xod.item_id
+        JOIN xxafmc_custom_cocktails_mocktails_details_dummy cm
+          ON cm.order_number = xod.order_id
+         AND cm.inventory_item_code = xod.item_id
+        WHERE ${filterSql}
+          AND (xod.ORDER_STATUS IS NULL OR TRIM(xod.ORDER_STATUS) = '')
+          AND COALESCE(inv.sub_category, xod.subcategory) IN (14, 15)
+        GROUP BY cm.item_code
+
+        UNION ALL
+
+        SELECT
+          recipe.item_code,
+          SUM(COALESCE(recipe.pegs, 0) * COALESCE(xod.quantity, 0)) AS release_qty
+        FROM xxafmc_order_details xod
+        JOIN (${inventorySummarySql}) inv ON inv.item_code = xod.item_id
+        JOIN xxafmc_cocktails_mocktails_details recipe
+          ON recipe.inventory_item_code = xod.item_id
+        WHERE ${filterSql}
+          AND (xod.ORDER_STATUS IS NULL OR TRIM(xod.ORDER_STATUS) = '')
+          AND COALESCE(inv.sub_category, xod.subcategory) IN (14, 15)
+          AND NOT EXISTS (
+            SELECT 1
+            FROM xxafmc_custom_cocktails_mocktails_details custom
+            WHERE custom.order_number = xod.order_id
+              AND custom.inventory_item_code = xod.item_id
+          )
+          AND NOT EXISTS (
+            SELECT 1
+            FROM xxafmc_custom_cocktails_mocktails_details_dummy custom
+            WHERE custom.order_number = xod.order_id
+              AND custom.inventory_item_code = xod.item_id
+          )
+        GROUP BY recipe.item_code
+      ) release_rows
+      GROUP BY item_code
+    `,
+    [...params, ...params, ...params, ...params]
+  );
+
+  return rows;
+}
+
 const inventorySummarySql = `
   SELECT
     item_code,
@@ -423,18 +545,7 @@ exports.updateBarOrderStatus = async (req, res) => {
               [qty, item.barcode]
             );
 
-             // Decrement the master inventory total for this item
-             if (physicalItemCode) {
-                await connection.query(
-                 `
-                   UPDATE xxafmc_inventory
-                   SET
-                    STOCK_QUANTITY = GREATEST(0, IFNULL(STOCK_QUANTITY, 0) - ?)
-                   WHERE ITEM_CODE = ?
-                 `,
-                 [qty, physicalItemCode]
-                );
-              }
+             
 
               // Decrement reserved totals for this item (does not touch stock_out buckets)
               if (physicalItemCode) {
@@ -1552,12 +1663,33 @@ exports.getCancelledOrders = async (req, res) => {
 };
 
 exports.cancelBarOrderItem = async (req, res) => {
+  let connection;
   try {
     const { ORDER_LINE_ID, ORDERNUMBER, KITCHEN = "Bar" } = req.body;
     const { categoryId } = getKitchenConfig(KITCHEN);
 console.log("Cancel request received with:", { ORDER_LINE_ID, ORDERNUMBER, KITCHEN, categoryId });
+
+    if (!ORDERNUMBER && !ORDER_LINE_ID) {
+      return res.status(400).json({
+        success: false,
+        message: "Order line ID or order number is required",
+      });
+    }
+
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+
     if (ORDERNUMBER) {
-      const [updateResult] = await pool.query(
+      console.log("Complete order cancel - Order number:", { ORDERNUMBER, categoryId });
+
+      const reservationRows = await getReservationReleaseRowsForCancel(connection, {
+        orderNumber: ORDERNUMBER,
+        categoryId,
+      });
+
+      console.log("Reservation rows to release for complete order:", reservationRows);
+
+      const [updateResult] = await connection.query(
         `
         UPDATE xxafmc_order_details xod
         JOIN (${inventorySummarySql}) inv ON inv.item_code = xod.item_id
@@ -1569,7 +1701,9 @@ console.log("Cancel request received with:", { ORDER_LINE_ID, ORDERNUMBER, KITCH
         [ORDERNUMBER, categoryId]
       );
 
-      await pool.query(
+      await releaseReservationRows(connection, reservationRows);
+
+      await connection.query(
         `
         UPDATE xxafmc_kitchen_notification kn
         JOIN (${inventorySummarySql}) inv ON inv.item_code = kn.item_id
@@ -1581,6 +1715,8 @@ console.log("Cancel request received with:", { ORDER_LINE_ID, ORDERNUMBER, KITCH
         [ORDERNUMBER, categoryId]
       );
 
+      await connection.commit();
+
       return res.status(200).json({
         success: true,
         message: updateResult.affectedRows > 0
@@ -1589,26 +1725,64 @@ console.log("Cancel request received with:", { ORDER_LINE_ID, ORDERNUMBER, KITCH
       });
     }
 
-    if (!ORDER_LINE_ID) {
-      return res.status(400).json({
+    // First get the order_id and category info from this line item
+    const [lineItems] = await connection.query(
+      `
+      SELECT xod.order_id, xi.category_id, xod.item_id
+      FROM xxafmc_order_details xod
+      LEFT JOIN (${inventorySummarySql}) xi ON xi.item_code = xod.item_id
+      WHERE xod.ORDER_LINE_ID = ?
+        AND (xod.ORDER_STATUS IS NULL OR TRIM(xod.ORDER_STATUS) = '')
+      `,
+      [ORDER_LINE_ID]
+    );
+
+    if (lineItems.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({
         success: false,
-        message: "Order line ID or order number is required",
+        message: "Order item not found or already processed",
       });
     }
 
-    const [updateResult] = await pool.query(
-      `UPDATE xxafmc_order_details SET ORDER_STATUS = 'CANCELLED' WHERE ORDER_LINE_ID = ?`,
+    const lineItem = lineItems[0];
+    const lineCategoryId = Number(lineItem.category_id) || categoryId;
+
+    console.log("Single item cancel - Line item details:", { 
+      ORDER_LINE_ID, 
+      orderId: lineItem.order_id,
+      itemId: lineItem.item_id,
+      lineCategoryId 
+    });
+
+    const reservationRows = await getReservationReleaseRowsForCancel(connection, {
+      orderLineId: ORDER_LINE_ID,
+      categoryId: lineCategoryId,
+    });
+
+    console.log("Reservation rows to release:", reservationRows);
+
+    const [updateResult] = await connection.query(
+      `
+      UPDATE xxafmc_order_details
+      SET ORDER_STATUS = 'CANCELLED'
+      WHERE ORDER_LINE_ID = ?
+        AND (ORDER_STATUS IS NULL OR TRIM(ORDER_STATUS) = '')
+      `,
       [ORDER_LINE_ID]
     );
 
     if (updateResult.affectedRows === 0) {
+      await connection.rollback();
       return res.status(404).json({
         success: false,
-        message: "Order item not found",
+        message: "Order item not found or already processed",
       });
     }
 
-    await pool.query(
+    await releaseReservationRows(connection, reservationRows);
+
+    await connection.query(
       `UPDATE xxafmc_kitchen_notification kn
        SET kn.status = 'Cancelled'
        WHERE EXISTS (
@@ -1618,17 +1792,24 @@ console.log("Cancel request received with:", { ORDER_LINE_ID, ORDERNUMBER, KITCH
       [ORDER_LINE_ID]
     );
 
+    await connection.commit();
+
     return res.status(200).json({
       success: true,
       message: "Order item cancelled successfully",
     });
   } catch (error) {
+    if (connection) {
+      try { await connection.rollback(); } catch (_) { }
+    }
     console.error("Error cancelling bar order item:", error);
     return res.status(500).json({
       success: false,
       message: "Failed to cancel order item",
       error: error.message,
     });
+  } finally {
+    if (connection) connection.release();
   }
 };
 

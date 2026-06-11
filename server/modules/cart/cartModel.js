@@ -1211,7 +1211,7 @@ const getLovIngredients = async (subCategory) => {
         xi.item_name AS d,
         xi.item_code AS r,
         GREATEST(
-          GREATEST(IFNULL(xi.stock_quantity, 0), IFNULL(stock_summary.stock_quantity, 0))
+          IFNULL(stock_summary.stock_quantity, 0)
             - IFNULL(reserved_summary.reserved_quantity, 0),
           0
         ) AS stockQuantity,
