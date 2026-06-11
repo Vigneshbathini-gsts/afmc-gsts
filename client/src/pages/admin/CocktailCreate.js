@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "react-toastify";
 import { PlusCircle, Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cocktailAPI } from "../../services/api";
@@ -118,7 +119,7 @@ export default function CocktailCreate() {
       event.target.value = "";
       updateForm("image", null);
       setError(JPG_IMAGE_ERROR);
-      window.alert(JPG_IMAGE_ERROR);
+      toast.error(JPG_IMAGE_ERROR);
       return;
     }
 
@@ -178,10 +179,11 @@ export default function CocktailCreate() {
       );
     } catch (pricingError) {
       console.error(pricingError);
-      setError(
+      const pricingErrorMessage =
         pricingError.response?.data?.message ||
-          "Unable to calculate member/non-member price for the selected item."
-      );
+        "Unable to calculate member/non-member price for the selected item.";
+      setError(pricingErrorMessage);
+      toast.error(pricingErrorMessage);
     }
   };
 
@@ -264,9 +266,11 @@ export default function CocktailCreate() {
   };
 
   const deleteRow = (id) => {
-    setRows((current) =>
-      current.length === 1 ? current : current.filter((row) => row.id !== id)
-    );
+    setRows((current) => {
+      if (current.length === 1) return current;
+      toast.success("Ingredient row removed.");
+      return current.filter((row) => row.id !== id);
+    });
   };
 
   const filteredRows = useMemo(() => {
@@ -305,13 +309,13 @@ export default function CocktailCreate() {
 
     if (validationMessage) {
       setError(validationMessage);
-      window.alert(validationMessage);
+      toast.error(validationMessage);
       return;
     }
 
     if (!isJpgImageFile(form.image)) {
       setError(JPG_IMAGE_ERROR);
-      window.alert(JPG_IMAGE_ERROR);
+      toast.error(JPG_IMAGE_ERROR);
       return;
     }
 
@@ -320,12 +324,16 @@ export default function CocktailCreate() {
       setError("");
 
       if (!form.itemName?.trim()) {
-        setError("Item name is required.");
+        const validationMessage = "Item name is required.";
+        setError(validationMessage);
+        toast.error(validationMessage);
         return;
       }
 
       if (!form.subCategory) {
-        setError("Please select Cocktail or Mocktail.");
+        const validationMessage = "Please select Cocktail or Mocktail.";
+        setError(validationMessage);
+        toast.error(validationMessage);
         return;
       }
 
@@ -352,6 +360,8 @@ export default function CocktailCreate() {
       }
 
       await cocktailAPI.create(payload);
+      const successMessage = "Cocktail item created successfully.";
+      toast.success(successMessage);
       navigate("/admin/cocktail-management");
     } catch (submitError) {
       console.error(submitError);
@@ -359,7 +369,7 @@ export default function CocktailCreate() {
         submitError.response?.data?.message ||
         "Unable to create cocktail item. Please check the entered values.";
       setError(message);
-      window.alert(message);
+      toast.error(message);
     } finally {
       setSaving(false);
     }

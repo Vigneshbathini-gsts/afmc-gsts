@@ -423,18 +423,7 @@ exports.updateBarOrderStatus = async (req, res) => {
               [qty, item.barcode]
             );
 
-             // Decrement the master inventory total for this item
-             if (physicalItemCode) {
-                await connection.query(
-                 `
-                   UPDATE xxafmc_inventory
-                   SET
-                    STOCK_QUANTITY = GREATEST(0, IFNULL(STOCK_QUANTITY, 0) - ?)
-                   WHERE ITEM_CODE = ?
-                 `,
-                 [qty, physicalItemCode]
-                );
-              }
+             
 
               // Decrement reserved totals for this item (does not touch stock_out buckets)
               if (physicalItemCode) {

@@ -81,6 +81,7 @@ export default function ItemDetails() {
                 await cartAPI.customizeCocktail(cartId, {
                     ingredients: buildCustomizationPayload(details, quantitiesState),
                 });
+                toast.success("Ingredients updated");
                 return true;
             } catch (err) {
                 console.error("Error saving cart customization:", err);

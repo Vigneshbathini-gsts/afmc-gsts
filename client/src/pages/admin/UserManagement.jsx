@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
 import {
   ChevronsLeft,
@@ -79,10 +80,11 @@ export default function UserManagement() {
       setUsers(response.data?.data || []);
     } catch (fetchError) {
       console.error("Failed to fetch users:", fetchError);
+      const fetchErrorMessage =
+        fetchError.response?.data?.message || "Unable to load user details.";
       setUsers([]);
-      setError(
-        fetchError.response?.data?.message || "Unable to load user details."
-      );
+      setError(fetchErrorMessage);
+      toast.error(fetchErrorMessage);
     } finally {
       setLoading(false);
     }
@@ -173,6 +175,7 @@ export default function UserManagement() {
     const validationMessage = validateCreateForm(formData);
     if (validationMessage) {
       setFormError(validationMessage);
+      toast.error(validationMessage);
       return;
     }
 
@@ -180,7 +183,9 @@ export default function UserManagement() {
       setSaving(true);
       const response = await userAPI.create(trimmedPayload);
 
-      setFormSuccess(response.data?.message || "User created successfully.");
+      const successMessage = response.data?.message || "User created successfully.";
+      setFormSuccess(successMessage);
+      toast.success(successMessage);
 
       await fetchUsers(search);
 
@@ -189,9 +194,10 @@ export default function UserManagement() {
       }, 900);
     } catch (saveError) {
       console.error("Failed to create user:", saveError);
-      setFormError(
-        saveError.response?.data?.message || "Unable to create user."
-      );
+      const createErrorMessage =
+        saveError.response?.data?.message || "Unable to create user.";
+      setFormError(createErrorMessage);
+      toast.error(createErrorMessage);
     } finally {
       setSaving(false);
     }
@@ -241,7 +247,9 @@ export default function UserManagement() {
 
   const handleBulkUpload = async () => {
     if (!uploadFile) {
-      setUploadError("Please choose a CSV file to upload.");
+      const uploadFileError = "Please choose a CSV file to upload.";
+      setUploadError(uploadFileError);
+      toast.error(uploadFileError);
       return;
     }
 
@@ -262,22 +270,24 @@ export default function UserManagement() {
         .map((item) => item.reason)
         .join(" | ");
 
-      setUploadSuccess(
+      const uploadSuccessMessage =
         `${response.data?.message || "Bulk upload completed."} Skipped: ${
           result?.skippedCount || 0
-        }${skippedMessages ? ` (${skippedMessages})` : ""}`
-      );
+        }${skippedMessages ? ` (${skippedMessages})` : ""}`;
+      setUploadSuccess(uploadSuccessMessage);
+      toast.success(uploadSuccessMessage);
 
       await fetchUsers(search);
     } catch (uploadSaveError) {
       console.error("Failed to bulk upload users:", uploadSaveError);
       const backendErrors = uploadSaveError.response?.data?.errors;
-      setUploadError(
+      const uploadErrorMessage =
         Array.isArray(backendErrors) && backendErrors.length
           ? backendErrors.join(" | ")
           : uploadSaveError.response?.data?.message ||
-              "Unable to upload users."
-      );
+              "Unable to upload users.";
+      setUploadError(uploadErrorMessage);
+      toast.error(uploadErrorMessage);
     } finally {
       setUploading(false);
     }

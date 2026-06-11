@@ -6,6 +6,9 @@ import ConfirmOrderservice from "../../../services/ConfirmOrderservice";
 import { getMaxAllowedQuantity, isCocktailOrMocktail, isOutOfStock, validateNextQuantity } from "../../../utils/stockValidation";
 import { barOrdersAPI, cartAPI } from "../../../services/api";
 import { toInitCap } from "../../../utils/textFormat";
+import Swal from "sweetalert2";
+import "sweetalert2/dist/sweetalert2.min.css";
+import { toast } from "react-toastify";
 
 const BASEAPI = "https://afmc.globalsparkteksolutions.com/AFMCIMAGES/";
 
@@ -96,44 +99,6 @@ function hasMissingCocktailIngredients(orderNumber, item, detailsByItemCode = {}
   if (!isCocktailOrMocktail(item)) return false;
   const details = getCocktailDetailsForItem(orderNumber, item, detailsByItemCode);
   return Array.isArray(details) && details.length === 0;
-}
-
-function Toast({ message, type = "success", onClose }) {
-  const [isVisible, setIsVisible] = useState(true);
-
-  useEffect(() => {
-    setIsVisible(true);
-  }, [message, type]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsVisible(false);
-      setTimeout(() => onClose?.(), 300);
-    }, 3000);
-    return () => clearTimeout(timer);
-  }, [message, type, onClose]);
-
-  return (
-    <div
-      className={`fixed bottom-4 right-4 z-50 rounded-lg shadow-lg p-4 ${type === "error" ? "bg-red-600" : "bg-green-600"
-        } text-white min-w-[220px] transition-all duration-300 ease-in-out pointer-events-auto ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3 pointer-events-none"
-        }`}
-    >
-      <div className="flex items-center justify-between gap-3">
-        <span className="text-sm">{message}</span>
-        <button
-          type="button"
-          onClick={() => {
-            setIsVisible(false);
-            setTimeout(() => onClose?.(), 300);
-          }}
-          className="hover:opacity-80"
-        >
-          <XCircle className="h-4 w-4" />
-        </button>
-      </div>
-    </div>
-  );
 }
 
 function formatDate(value = new Date()) {
@@ -320,7 +285,6 @@ export default function Pubmenubuy({
   const [confirming, setConfirming] = useState(false);
   const [updatingLineId, setUpdatingLineId] = useState(null);
   const [error, setError] = useState("");
-  const [toast, setToast] = useState(null);
   const [cocktailDetailsByItemCode, setCocktailDetailsByItemCode] = useState({});
   const [cocktailOverrideIssues, setCocktailOverrideIssues] = useState({});
   const [stockLimitImageMessages, setStockLimitImageMessages] = useState({});
@@ -542,7 +506,33 @@ export default function Pubmenubuy({
   }, [stockIssue, cocktailStockIssue, cocktailOverrideIssues, missingCocktailIngredientItem]);
 
   const showToast = (message, type = "success") => {
-    setToast({ message, type });
+    if (type === "error") toast.error(message);
+    else toast.success(message);
+  };
+
+  const confirmAction = async (
+    title,
+    text,
+    confirmButtonText = "Yes",
+    cancelButtonText = "No"
+  ) => {
+    const result = await Swal.fire({
+      title,
+      text,
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonText,
+      cancelButtonText,
+      reverseButtons: true,
+      focusCancel: true,
+      customClass: {
+        popup: "rounded-3xl",
+      },
+      confirmButtonColor: "#93272c",
+      cancelButtonColor: "#6b7280",
+    });
+
+    return result.isConfirmed;
   };
 
   const handleEditCocktail = (item) => {
@@ -840,6 +830,7 @@ export default function Pubmenubuy({
     setUpdatingLineId(numericOrderLineId);
     let validationMessage = "";
     let nextQuantity = null;
+    let previousQuantity = null;
 
     setItems((current) => {
       const targetItem = current.find((item) => item.orderLineId === numericOrderLineId) || null;
@@ -854,6 +845,7 @@ export default function Pubmenubuy({
       }
 
       const currentQty = Number(targetItem.quantity || 1);
+      previousQuantity = currentQty;
       const nextQtyCandidate = currentQty + delta;
 
       if (nextQtyCandidate < 1) {
@@ -900,8 +892,7 @@ export default function Pubmenubuy({
       const expectedFreeQty = calculateFreeQuantity(
         nextQtyCandidate,
         targetItem.offer_quantity,
-        targetItem.free_item_quantity
-      );
+        targetItem.free_item_quantity      );
 
       const targetCode = String(targetItem.item_code || "").trim();
       const linkedFreeItems = targetCode
@@ -1055,7 +1046,13 @@ export default function Pubmenubuy({
       const normalized = rows.map((item, index) => normalizeItem(item, index));
       setItems(ensureOfferFreeRows(normalized));
       setError("");
-      showToast("Quantity updated successfully", "success");
+      
+      // ✅ SUCCESS TOAST FOR QUANTITY UPDATE
+      const action = delta > 0 ? "increased" : "decreased";
+      const itemName = items.find((item) => item.orderLineId === numericOrderLineId)?.item_name || "Item";
+      showToast(`${itemName} quantity ${action} to ${nextQuantity}`, "success");
+      
+      console.debug("[Pubmenubuy] quantity update completed", { orderNumber, orderLineId: numericOrderLineId, nextQuantity });
       await syncFreeItemQuantities();
     } catch (updateError) {
       const message = updateError?.response?.data?.message || "Unable to update quantity.";
@@ -1273,8 +1270,11 @@ export default function Pubmenubuy({
       return;
     }
 
-    const confirmed = window.confirm(
-      "Are you sure you want to delete this item?"
+    const confirmed = await confirmAction(
+      "Delete item",
+      "Are you sure you want to delete this item?",
+      "Delete",
+      "Cancel"
     );
 
     if (!confirmed) {
@@ -1355,8 +1355,11 @@ export default function Pubmenubuy({
       return;
     }
 
-    const confirmed = window.confirm(
-      `Are you sure you want to cancel order ${orderNumber}?`
+    const confirmed = await confirmAction(
+      "Cancel order",
+      `Are you sure you want to cancel order ${orderNumber}?`,
+      "Yes, cancel",
+      "No"
     );
 
     if (!confirmed) {
@@ -1368,7 +1371,7 @@ export default function Pubmenubuy({
       setError("");
       const response = await Pubmenubuyservice.cancelOrder(orderNumber);
       showToast(response?.data?.message || "Order cancelled successfully", "success");
-      
+
       if (backTo) {
         navigate(backTo, { replace: true });
       } else {
@@ -1416,12 +1419,23 @@ export default function Pubmenubuy({
       return;
     }
 
+    const confirmed = await confirmAction(
+      "Confirm order",
+      `Are you sure you want to confirm order ${orderNumber}?`,
+      "Confirm",
+      "Cancel"
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
     try {
       setConfirming(true);
       setError("");
-      
+
       const cocktailCustomizations = buildCocktailCustomizationPayload(orderNumber, items);
-      
+
       // Validate that we have valid items to confirm
       const validItems = (Array.isArray(items) ? items : [])
         .map((it) => ({
@@ -1445,7 +1459,9 @@ export default function Pubmenubuy({
       if (validItems.length > 0) payload.items = validItems;
 
       await ConfirmOrderservice.confirmOrder(orderNumber, payload);
-      
+
+      showToast("Order confirmed successfully", "success");
+
       // Clear any stored overrides
       cocktailCustomizations.forEach((customization) => {
         const key = getBuyflowOverrideStorageKey(orderNumber, customization.itemCode);
@@ -1453,7 +1469,7 @@ export default function Pubmenubuy({
           localStorage.removeItem(key);
         }
       });
-      
+
       // Navigate to confirmation page
       if (afterConfirmTo) {
         navigate(`${afterConfirmTo}?orderNumber=${encodeURIComponent(orderNumber)}`, {
@@ -1468,9 +1484,9 @@ export default function Pubmenubuy({
       }
     } catch (confirmError) {
       console.error("Confirm order error:", confirmError);
-      const errorMessage = confirmError?.response?.data?.message || 
-                          confirmError?.message || 
-                          "Unable to confirm this order. Please try again.";
+      const errorMessage = confirmError?.response?.data?.message ||
+        confirmError?.message ||
+        "Unable to confirm this order. Please try again.";
       setError(errorMessage);
       showToast(errorMessage, "error");
     } finally {
@@ -1480,7 +1496,6 @@ export default function Pubmenubuy({
 
   return (
     <div className="min-h-screen bg-stone-50 px-3 py-4 md:px-6">
-      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
       <div className="mx-auto max-w-[1180px] space-y-4">
         {/* Header */}
         <div className="overflow-hidden rounded-2xl border border-afmc-gold/20 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
@@ -1506,10 +1521,10 @@ export default function Pubmenubuy({
                   disabled={loading || confirming || Boolean(stockIssueMessage) || items.length === 0}
                   className="bg-afmc-maroon px-4 py-2 text-white ring-1 ring-afmc-gold/30 hover:bg-afmc-maroon/90 disabled:cursor-not-allowed disabled:opacity-60"
                   title={
-                    loading ? "Loading order details..." : 
-                    items.length === 0 ? "No items to confirm" : 
-                    stockIssueMessage ? stockIssueMessage : 
-                    "Confirm order"
+                    loading ? "Loading order details..." :
+                      items.length === 0 ? "No items to confirm" :
+                        stockIssueMessage ? stockIssueMessage :
+                          "Confirm order"
                   }
                 >
                   <CheckCircle2 className="h-4 w-4" />
@@ -1521,9 +1536,9 @@ export default function Pubmenubuy({
                   disabled={loading || cancelling || items.length === 0}
                   className="bg-white/10 px-4 py-2 text-white shadow-sm ring-1 ring-white/25 hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-60"
                   title={
-                    loading ? "Loading order details..." : 
-                    items.length === 0 ? "No order to cancel" : 
-                    "Cancel order"
+                    loading ? "Loading order details..." :
+                      items.length === 0 ? "No order to cancel" :
+                        "Cancel order"
                   }
                 >
                   <XCircle className="h-4 w-4" />
@@ -1604,30 +1619,30 @@ export default function Pubmenubuy({
                         key={item.orderLineId ?? item.id}
                         className="group overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-afmc-gold/40 hover:shadow-md focus-within:ring-2 focus-within:ring-afmc-gold/40 focus-within:ring-offset-2 focus-within:ring-offset-stone-50"
                       >
-                      {/* Image */}
-                      <div className="relative flex h-40 items-center justify-center overflow-hidden bg-stone-50 p-4">
-                        <img
-                          src={`${BASEAPI}${item.image || "default.jpg"}`}
-                          alt={item.item_name}
-                          className={`max-h-full w-auto object-contain transition duration-300 group-hover:scale-[1.03] ${imageStockMessage ? "opacity-45" : ""}`}
-                        />
-                        {imageStockMessage ? (
-                          <div className="absolute inset-0 flex items-center justify-center bg-black/35 px-3 text-center">
-                            <span className="rounded-md bg-red-600 px-3 py-1.5 text-sm font-bold uppercase tracking-wide text-white shadow-sm">
-                              {imageStockMessage}
-                            </span>
-                          </div>
-                        ) : null}
-                      </div>
+                        {/* Image */}
+                        <div className="relative flex h-40 items-center justify-center overflow-hidden bg-stone-50 p-4">
+                          <img
+                            src={`${BASEAPI}${item.image || "default.jpg"}`}
+                            alt={item.item_name}
+                            className={`max-h-full w-auto object-contain transition duration-300 group-hover:scale-[1.03] ${imageStockMessage ? "opacity-45" : ""}`}
+                          />
+                          {imageStockMessage ? (
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/35 px-3 text-center">
+                              <span className="rounded-md bg-red-600 px-3 py-1.5 text-sm font-bold uppercase tracking-wide text-white shadow-sm">
+                                {imageStockMessage}
+                              </span>
+                            </div>
+                          ) : null}
+                        </div>
 
-                      {/* Details */}
-                      <div className="space-y-3 p-4">
-                        <div>
-                          <div className="flex items-start justify-between gap-3">
-                            <h3 className="line-clamp-1 text-base font-semibold text-stone-900">
-                              {toInitCap(item.item_name)}
-                            </h3>
-                            {!disableEdit && !hideCocktailEdit && isCocktailOrMocktail(item) && (!item.isFreeItem || missingCocktailIngredients) ? (
+                        {/* Details */}
+                        <div className="space-y-3 p-4">
+                          <div>
+                            <div className="flex items-start justify-between gap-3">
+                              <h3 className="line-clamp-1 text-base font-semibold text-stone-900">
+                                {toInitCap(item.item_name)}
+                              </h3>
+                              {!disableEdit && !hideCocktailEdit && isCocktailOrMocktail(item) && (!item.isFreeItem || missingCocktailIngredients) ? (
                                 <button
                                   type="button"
                                   onClick={() => handleEditCocktail(item)}
@@ -1637,163 +1652,163 @@ export default function Pubmenubuy({
                                   <Pencil className="h-3.5 w-3.5" />
                                   {toInitCap("Edit")}
                                 </button>
-                            ) : null}
-                          </div>
-
-                          <p className="mt-1 text-sm text-stone-500">
-                            {toInitCap("Quantity")}: <span className="font-semibold text-stone-800">{item.quantity}</span>
-                            {item.isFreeItem && !missingCocktailIngredients ? (
-                              <span className="ml-1 rounded-full bg-afmc-gold/10 px-2 py-0.5 text-[11px] font-semibold text-afmc-maroon">
-                                {toInitCap("Free")}
-                              </span>
-                            ) : null}
-                          </p>
-                          {isCocktailOrMocktail(item) && (() => {
-                            const itemCode = String(item?.item_code || "").trim();
-                            const override = itemCode ? cocktailOverrideIssues?.[itemCode] : null;
-                            const statusText = override?.hasDetails
-                              ? (override.isOutOfStock ? "Out Of Stock" : "In Stock")
-                              : (item.stockStatus || "");
-
-                            if (!statusText || missingCocktailIngredients) return null;
-
-                            return (
-                              <p
-                                className={`mt-1 text-xs font-semibold ${String(statusText).toLowerCase() === "out of stock" ? "text-red-600" : "text-green-700"}`}
-                              >
-                                {toInitCap(statusText)}
-                              </p>
-                            );
-                          })()}
-                          {isCocktailOrMocktail(item) && (() => {
-                            const itemCode = String(item?.item_code || "").trim();
-                            const override = itemCode ? cocktailOverrideIssues?.[itemCode] : null;
-                            const message = override?.hasDetails
-                              ? (override.stockIssueMessage || "")
-                              : String(item.stockIssueMessage || "").trim();
-
-                            if (!message) return null;
-
-                            return (
-                              <p className="mt-1 text-xs font-semibold text-red-600">
-                                {message}
-                              </p>
-                            );
-                          })()}
-
-                          {isCocktailOrMocktail(item) && (() => {
-                            const itemCode = String(item?.item_code || "").trim();
-                            const overridden = getBuyflowOverrideDetails(orderNumber, itemCode);
-                            const details = overridden || (itemCode ? cocktailDetailsByItemCode[itemCode] : null);
-                            if (!details || details.length === 0) {
-                              if (missingCocktailIngredients) {
-                                return (
-                                  <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
-                                    Ingredients missing. Edit this item to add ingredients.
-                                  </div>
-                                );
-                              }
-                              return null;
-                            }
-
-                            return (
-                              <div className="mt-2 rounded-lg bg-stone-50 px-3 py-2 text-xs text-stone-700">
-                                <p className="mb-1 font-semibold text-stone-800">Ingredients</p>
-                                <ul className="space-y-0.5">
-                                  {details.slice(0, 6).map((ing, idx) => (
-                                    <li key={`${ing.ITEM_CODE || ing.itemCode || idx}`} className="flex justify-between gap-2">
-                                      <span className="truncate">{ing.ITEM_NAME || ing.itemName || "Item"}</span>
-                                      <span className="shrink-0 text-stone-600">
-                                        {Number(ing.PEGS ?? ing.pegs ?? ing.QUANTITY ?? ing.quantity ?? 0) || 0}
-                                      </span>
-                                    </li>
-                                  ))}
-                                </ul>
-                                {details.length > 6 ? (
-                                  <p className="mt-1 text-[11px] text-stone-500">+{details.length - 6} more…</p>
-                                ) : null}
-                              </div>
-                            );
-                          })()}
-                          {!isCocktailItem && !item.isFreeItem && item.availableQuantity !== null && item.availableQuantity !== undefined && (
-                            <p className="mt-1 text-xs text-stone-400">
-                              {/* Available: {item.availableQuantity} */}
-                            </p>
-                          )}
-                          {!isCocktailItem &&
-                            !item.isFreeItem &&
-                            item.availableQuantity !== null &&
-                            item.availableQuantity !== undefined &&
-                            Number(item.quantity || 0) > Number(item.availableQuantity || 0) && (
-                              null
-                            )}
-                        </div>
-
-                        {/* Controls */}
-                        {!item.isFreeItem ? (
-                          <div className="flex items-center justify-between rounded-xl bg-stone-50 px-3 py-2">
-                            <div className="flex items-center gap-1">
-                              <button
-                                type="button"
-                                onClick={() => handleQtyClick(item, -1)}
-                                aria-disabled={disableEdit || updatingLineId === Number(item.orderLineId ?? item.id) || item.quantity <= 1}
-                                disabled={disableEdit || updatingLineId === Number(item.orderLineId ?? item.id) || item.quantity <= 1}
-                                className={`rounded-md bg-white p-1.5 text-stone-700 shadow-sm transition hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-afmc-gold/40 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-50 ${updatingLineId === Number(item.orderLineId ?? item.id) || item.quantity <= 1
-                                  ? "opacity-50"
-                                  : ""
-                                  }`}
-                              >
-                                <Minus className="h-4 w-4" />
-                              </button>
-
-                              <span className="min-w-[28px] text-center text-sm font-semibold text-stone-900">
-                                {item.quantity}
-                              </span>
-
-                              <button
-                                type="button"
-                                onClick={() => handleQtyClick(item, 1)}
-                                aria-disabled={
-                                  disableEdit ||
-                                  updatingLineId === Number(item.orderLineId ?? item.id) ||
-                                  disablePlusForStock ||
-                                  item.quantity >= MAX_QTY
-                                }
-                                disabled={
-                                  disableEdit ||
-                                  updatingLineId === Number(item.orderLineId ?? item.id) ||
-                                  disablePlusForStock ||
-                                  item.quantity >= MAX_QTY
-                                }
-                                className={`rounded-md bg-afmc-maroon p-1.5 text-white shadow-sm transition hover:bg-afmc-maroon2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-afmc-gold/50 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-50 ${updatingLineId === Number(item.orderLineId ?? item.id) ||
-                                  disablePlusForStock ||
-                                  item.quantity >= MAX_QTY
-                                  ? "opacity-60"
-                                  : ""
-                                  }`}
-                              >
-                                <Plus className="h-4 w-4" />
-                              </button>
+                              ) : null}
                             </div>
 
-                            <button
-                              type="button"
-                              onClick={() => removeItem(item.id)}
-                              disabled={disableEdit}
-                              className={`rounded-md bg-red-50 p-1.5 text-red-600 transition hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-50 ${disableEdit ? "opacity-50 cursor-not-allowed" : ""}`}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
+                            <p className="mt-1 text-sm text-stone-500">
+                              {toInitCap("Quantity")}: <span className="font-semibold text-stone-800">{item.quantity}</span>
+                              {item.isFreeItem && !missingCocktailIngredients ? (
+                                <span className="ml-1 rounded-full bg-afmc-gold/10 px-2 py-0.5 text-[11px] font-semibold text-afmc-maroon">
+                                  {toInitCap("Free")}
+                                </span>
+                              ) : null}
+                            </p>
+                            {isCocktailOrMocktail(item) && (() => {
+                              const itemCode = String(item?.item_code || "").trim();
+                              const override = itemCode ? cocktailOverrideIssues?.[itemCode] : null;
+                              const statusText = override?.hasDetails
+                                ? (override.isOutOfStock ? "Out Of Stock" : "In Stock")
+                                : (item.stockStatus || "");
+
+                              if (!statusText || missingCocktailIngredients) return null;
+
+                              return (
+                                <p
+                                  className={`mt-1 text-xs font-semibold ${String(statusText).toLowerCase() === "out of stock" ? "text-red-600" : "text-green-700"}`}
+                                >
+                                  {toInitCap(statusText)}
+                                </p>
+                              );
+                            })()}
+                            {isCocktailOrMocktail(item) && (() => {
+                              const itemCode = String(item?.item_code || "").trim();
+                              const override = itemCode ? cocktailOverrideIssues?.[itemCode] : null;
+                              const message = override?.hasDetails
+                                ? (override.stockIssueMessage || "")
+                                : String(item.stockIssueMessage || "").trim();
+
+                              if (!message) return null;
+
+                              return (
+                                <p className="mt-1 text-xs font-semibold text-red-600">
+                                  {message}
+                                </p>
+                              );
+                            })()}
+
+                            {isCocktailOrMocktail(item) && (() => {
+                              const itemCode = String(item?.item_code || "").trim();
+                              const overridden = getBuyflowOverrideDetails(orderNumber, itemCode);
+                              const details = overridden || (itemCode ? cocktailDetailsByItemCode[itemCode] : null);
+                              if (!details || details.length === 0) {
+                                if (missingCocktailIngredients) {
+                                  return (
+                                    <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
+                                      Ingredients missing. Edit this item to add ingredients.
+                                    </div>
+                                  );
+                                }
+                                return null;
+                              }
+
+                              return (
+                                <div className="mt-2 rounded-lg bg-stone-50 px-3 py-2 text-xs text-stone-700">
+                                  <p className="mb-1 font-semibold text-stone-800">Ingredients</p>
+                                  <ul className="space-y-0.5">
+                                    {details.slice(0, 6).map((ing, idx) => (
+                                      <li key={`${ing.ITEM_CODE || ing.itemCode || idx}`} className="flex justify-between gap-2">
+                                        <span className="truncate">{ing.ITEM_NAME || ing.itemName || "Item"}</span>
+                                        <span className="shrink-0 text-stone-600">
+                                          {Number(ing.PEGS ?? ing.pegs ?? ing.QUANTITY ?? ing.quantity ?? 0) || 0}
+                                        </span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                  {details.length > 6 ? (
+                                    <p className="mt-1 text-[11px] text-stone-500">+{details.length - 6} more…</p>
+                                  ) : null}
+                                </div>
+                              );
+                            })()}
+                            {!isCocktailItem && !item.isFreeItem && item.availableQuantity !== null && item.availableQuantity !== undefined && (
+                              <p className="mt-1 text-xs text-stone-400">
+                                {/* Available: {item.availableQuantity} */}
+                              </p>
+                            )}
+                            {!isCocktailItem &&
+                              !item.isFreeItem &&
+                              item.availableQuantity !== null &&
+                              item.availableQuantity !== undefined &&
+                              Number(item.quantity || 0) > Number(item.availableQuantity || 0) && (
+                                null
+                              )}
                           </div>
-                        ) : !missingCocktailIngredients ? (
-                          <div className="rounded-xl bg-stone-50 px-3 py-2 text-xs font-medium text-stone-600">
-                            Free item
-                          </div>
-                        ) : null}
+
+                          {/* Controls */}
+                          {!item.isFreeItem ? (
+                            <div className="flex items-center justify-between rounded-xl bg-stone-50 px-3 py-2">
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleQtyClick(item, -1)}
+                                  aria-disabled={disableEdit || updatingLineId === Number(item.orderLineId ?? item.id) || item.quantity <= 1}
+                                  disabled={disableEdit || updatingLineId === Number(item.orderLineId ?? item.id) || item.quantity <= 1}
+                                  className={`rounded-md bg-white p-1.5 text-stone-700 shadow-sm transition hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-afmc-gold/40 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-50 ${updatingLineId === Number(item.orderLineId ?? item.id) || item.quantity <= 1
+                                    ? "opacity-50"
+                                    : ""
+                                    }`}
+                                >
+                                  <Minus className="h-4 w-4" />
+                                </button>
+
+                                <span className="min-w-[28px] text-center text-sm font-semibold text-stone-900">
+                                  {item.quantity}
+                                </span>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleQtyClick(item, 1)}
+                                  aria-disabled={
+                                    disableEdit ||
+                                    updatingLineId === Number(item.orderLineId ?? item.id) ||
+                                    disablePlusForStock ||
+                                    item.quantity >= MAX_QTY
+                                  }
+                                  disabled={
+                                    disableEdit ||
+                                    updatingLineId === Number(item.orderLineId ?? item.id) ||
+                                    disablePlusForStock ||
+                                    item.quantity >= MAX_QTY
+                                  }
+                                  className={`rounded-md bg-afmc-maroon p-1.5 text-white shadow-sm transition hover:bg-afmc-maroon2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-afmc-gold/50 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-50 ${updatingLineId === Number(item.orderLineId ?? item.id) ||
+                                    disablePlusForStock ||
+                                    item.quantity >= MAX_QTY
+                                    ? "opacity-60"
+                                    : ""
+                                    }`}
+                                >
+                                  <Plus className="h-4 w-4" />
+                                </button>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() => removeItem(item.id)}
+                                disabled={disableEdit}
+                                className={`rounded-md bg-red-50 p-1.5 text-red-600 transition hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-50 ${disableEdit ? "opacity-50 cursor-not-allowed" : ""}`}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          ) : !missingCocktailIngredients ? (
+                            <div className="rounded-xl bg-stone-50 px-3 py-2 text-xs font-medium text-stone-600">
+                              Free item
+                            </div>
+                          ) : null}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
               </div>
             </div>
           )}

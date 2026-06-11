@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
 import { FaArrowLeft } from "react-icons/fa";
 import { profitAPI } from "../../services/api";
 
@@ -30,7 +31,7 @@ export default function ProfitManagement() {
             setReportData(res.data.data || []);
         } catch (error) {
             console.error("Error fetching pricing report:", error);
-            alert("Failed to load pricing report");
+            toast.error("Failed to load pricing report");
         } finally {
             setLoading(false);
         }
@@ -61,7 +62,7 @@ export default function ProfitManagement() {
                         : 0,
             });
 
-            alert("Member pricing updated successfully");
+            toast.success("Member pricing updated successfully");
             setMemberForm({
                 category: "Liquor",
                 profit: "",
@@ -70,7 +71,7 @@ export default function ProfitManagement() {
             fetchReport();
         } catch (error) {
             console.error(error);
-            alert(error?.response?.data?.message || "Failed to update member pricing");
+            toast.error(error?.response?.data?.message || "Failed to update member pricing");
         }
     };
 
@@ -87,7 +88,7 @@ export default function ProfitManagement() {
                         : 0,
             });
 
-            alert("Non-member pricing updated successfully");
+            toast.success("Non-member pricing updated successfully");
             setNonMemberForm({
                 category: "Liquor",
                 profit: "",
@@ -96,7 +97,7 @@ export default function ProfitManagement() {
             fetchReport();
         } catch (error) {
             console.error(error);
-            alert(
+            toast.error(
                 error?.response?.data?.message || "Failed to update non-member pricing"
             );
         }

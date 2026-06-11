@@ -12,6 +12,7 @@ import {
   FaSearch,
   FaChevronDown,
 } from "react-icons/fa";
+import { toast } from "react-toastify";
 import { offersAPI } from "../../services/api";
 
 const toInitCap = (str) => {
@@ -34,14 +35,7 @@ export default function OfferCreate() {
     return `${year}-${month}-${day}`;
   };
 
-  // Helper function to get today's date in YYYY-MM-DD format
-  // const getTodayDate = () => {
-  //   const today = new Date();
-  //   const year = today.getFullYear();
-  //   const month = String(today.getMonth() + 1).padStart(2, '0');
-  //   const day = String(today.getDate()).padStart(2, '0');
-  //   return `${year}-${month}-${day}`;
-  // };
+
 
   const [formData, setFormData] = useState({
     itemCode: "",
@@ -172,27 +166,37 @@ export default function OfferCreate() {
 
       // Validations
       if (!formData.itemCode) {
-        setError("Please select Item Name");
+        const message = "Please select Item Name";
+        setError(message);
+        toast.error(message);
         return;
       }
 
       if (!formData.offerQuantity || Number(formData.offerQuantity) <= 0) {
-        setError("Please enter valid Item Quantity");
+        const message = "Please enter valid Item Quantity";
+        setError(message);
+        toast.error(message);
         return;
       }
 
       if (!formData.freeItemCode) {
-        setError("Please select Free Item Name");
+        const message = "Please select Free Item Name";
+        setError(message);
+        toast.error(message);
         return;
       }
 
       if (!formData.freeItemQuantity || Number(formData.freeItemQuantity) <= 0) {
-        setError("Please enter valid Free Item Quantity");
+        const message = "Please enter valid Free Item Quantity";
+        setError(message);
+        toast.error(message);
         return;
       }
 
       if (!formData.offerDate) {
-        setError("Please select Start Date");
+        const message = "Please select Start Date";
+        setError(message);
+        toast.error(message);
         return;
       }
 
@@ -208,10 +212,11 @@ export default function OfferCreate() {
 
       // console.log("Sending payload:", payload);
 
-      const response = await offersAPI.createOffer(payload);
-      // console.log("Response:", response.data);
+      await offersAPI.createOffer(payload);
+      // console.log("Response:", response?.data);
 
       setSuccessMessage("Offer created successfully!");
+      toast.success("Offer created successfully!");
 
       setTimeout(() => {
         navigate("/admin/offers");
@@ -219,13 +224,15 @@ export default function OfferCreate() {
     } catch (err) {
       console.error("Create Offer Error:", err);
       console.error("Error response:", err.response?.data);
-      setError(err.response?.data?.message || "Failed to create offer");
+      const message = err.response?.data?.message || "Failed to create offer";
+      setError(message);
+      toast.error(message);
     } finally {
       setSaving(false);
     }
   };
 
-  const handleBack = () => navigate(-1);
+  const handleBack = () => navigate("/admin/offers");
   const handleDashboard = () => navigate("/admin/dashboard");
 
 return (

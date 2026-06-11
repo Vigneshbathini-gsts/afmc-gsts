@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { toast } from "react-toastify";
 import { ArrowLeft, Save } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { userAPI } from "../../services/api";
@@ -79,9 +80,10 @@ export default function UserEdit() {
         });
       } catch (fetchError) {
         console.error("Failed to fetch user:", fetchError);
-        setError(
-          fetchError.response?.data?.message || "Unable to load user details."
-        );
+        const fetchErrorMessage =
+          fetchError.response?.data?.message || "Unable to load user details.";
+        setError(fetchErrorMessage);
+        toast.error(fetchErrorMessage);
       } finally {
         setLoading(false);
       }
@@ -145,6 +147,7 @@ export default function UserEdit() {
     const validationMessage = validateEditForm(formData, roles);
     if (validationMessage) {
       setError(validationMessage);
+      toast.error(validationMessage);
       return;
     }
 
@@ -168,12 +171,15 @@ export default function UserEdit() {
         loginType: updatedUser?.LOGIN_TYPE || prev.loginType,
       }));
 
-      setSuccess(response.data?.message || "User updated successfully.");
+      const successMessage = response.data?.message || "User updated successfully.";
+      setSuccess(successMessage);
+      toast.success(successMessage);
     } catch (saveError) {
       console.error("Failed to update user:", saveError);
-      setError(
-        saveError.response?.data?.message || "Unable to update user."
-      );
+      const updateErrorMessage =
+        saveError.response?.data?.message || "Unable to update user.";
+      setError(updateErrorMessage);
+      toast.error(updateErrorMessage);
     } finally {
       setSaving(false);
     }
