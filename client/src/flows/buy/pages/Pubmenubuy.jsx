@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { CheckCircle2, ChevronLeft, Minus, Pencil, Plus, Trash2, XCircle } from "lucide-react";
 import Pubmenubuyservice from "../services/Pubmenubuyservice";
@@ -6,8 +6,6 @@ import ConfirmOrderservice from "../../../services/ConfirmOrderservice";
 import { getMaxAllowedQuantity, isCocktailOrMocktail, isOutOfStock, validateNextQuantity } from "../../../utils/stockValidation";
 import { barOrdersAPI, cartAPI } from "../../../services/api";
 import { toInitCap } from "../../../utils/textFormat";
-import Swal from "sweetalert2";
-import "sweetalert2/dist/sweetalert2.min.css";
 import { toast } from "react-toastify";
 
 const BASEAPI = "https://afmc.globalsparkteksolutions.com/AFMCIMAGES/";
@@ -288,6 +286,23 @@ export default function Pubmenubuy({
   const [cocktailDetailsByItemCode, setCocktailDetailsByItemCode] = useState({});
   const [cocktailOverrideIssues, setCocktailOverrideIssues] = useState({});
   const [stockLimitImageMessages, setStockLimitImageMessages] = useState({});
+  const [confirmModal, setConfirmModal] = useState({
+    open: false,
+    title: "",
+    text: "",
+    confirmText: "Yes",
+    cancelText: "No",
+  });
+  const confirmResolveRef = useRef(null);
+
+  const closeConfirmModal = (confirmed) => {
+    setConfirmModal((prev) => ({ ...prev, open: false }));
+    if (confirmResolveRef.current) {
+      confirmResolveRef.current(confirmed);
+      confirmResolveRef.current = null;
+    }
+  };
+
   const currentBasePath = location.pathname.startsWith("/attendant")
     ? "/attendant"
     : "/user";
@@ -510,29 +525,17 @@ export default function Pubmenubuy({
     else toast.success(message);
   };
 
-  const confirmAction = async (
-    title,
-    text,
-    confirmButtonText = "Yes",
-    cancelButtonText = "No"
-  ) => {
-    const result = await Swal.fire({
-      title,
-      text,
-      icon: "question",
-      showCancelButton: true,
-      confirmButtonText,
-      cancelButtonText,
-      reverseButtons: true,
-      focusCancel: true,
-      customClass: {
-        popup: "rounded-3xl",
-      },
-      confirmButtonColor: "#93272c",
-      cancelButtonColor: "#6b7280",
+  const confirmAction = (title, text, confirmButtonText = "Yes", cancelButtonText = "No") => {
+    return new Promise((resolve) => {
+      confirmResolveRef.current = resolve;
+      setConfirmModal({
+        open: true,
+        title,
+        text,
+        confirmText: confirmButtonText,
+        cancelText: cancelButtonText,
+      });
     });
-
-    return result.isConfirmed;
   };
 
   const handleEditCocktail = (item) => {
@@ -1814,6 +1817,43 @@ export default function Pubmenubuy({
           )}
         </div>
       </div>
+
+      {confirmModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6">
+          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl ring-1 ring-black/10">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900">{confirmModal.title}</h3>
+                <p className="mt-2 text-sm leading-6 text-slate-600">{confirmModal.text}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => closeConfirmModal(false)}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:bg-slate-50"
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => closeConfirmModal(false)}
+                className="inline-flex justify-center rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                {confirmModal.cancelText}
+              </button>
+              <button
+                type="button"
+                onClick={() => closeConfirmModal(true)}
+                className="inline-flex justify-center rounded-full bg-afmc-maroon px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-afmc-maroon2"
+              >
+                {confirmModal.confirmText}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
