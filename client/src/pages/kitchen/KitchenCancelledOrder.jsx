@@ -14,6 +14,7 @@ import {
     FaSync,
     FaArrowLeft,
 } from "react-icons/fa";
+import { toInitCap } from '../../utils/textFormat';
 
 const KitchenCancelledOrder = () => {
     const navigate = useNavigate();
@@ -344,17 +345,17 @@ const KitchenCancelledOrder = () => {
                             <table className="min-w-full text-sm">
                                 <thead className="bg-gray-50 text-gray-700  text-xs tracking-wider">
                                     <tr>
-                                        <th className="px-6 py-4 text-left">Order</th>
-                                        <th className="px-6 py-4 text-left">Date</th>
-                                        <th className="px-6 py-4 text-left">Customer Name</th>
-                                        <th className="px-6 py-4 text-left">Pubmed</th>
-                                        <th className="px-6 py-4 text-left">Status</th>
+                                        <th className="px-6 py-3 text-left">Order</th>
+                                        <th className="px-6 py-3 text-left">Date</th>
+                                        <th className="px-6 py-3 text-left">Customer Name</th>
+                                        <th className="px-6 py-3 text-left">Pubmed</th>
+                                        <th className="px-6 py-3 text-left">Status</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {paginatedOrders.map((order, index) => (
                                         <tr key={order.order_num || index} className="border-t border-gray-100 hover:bg-gray-50 transition">
-                                            <td className="px-6 py-4 font-semibold">
+                                            <td className="px-6 py-3 font-semibold">
                                                 <button
                                                     onClick={() => handleOrderClick(order)}
                                                     className="text-afmc-maroon hover:text-afmc-maroon2 hover:underline font-medium cursor-pointer"
@@ -362,12 +363,12 @@ const KitchenCancelledOrder = () => {
                                                     {order.order_num}
                                                 </button>
                                             </td>
-                                            <td className="px-6 py-4 text-gray-600">
+                                            <td className="px-6 py-3 text-gray-600">
                                                 {order.order_date ? formatDate(order.order_date) : 'N/A'}
                                             </td>
-                                            <td className="px-6 py-4 text-gray-700">{order.first_name || 'N/A'}</td>
-                                            <td className="px-6 py-4 text-gray-600">{order.pubmed_name || 'N/A'}</td>
-                                            <td className="px-6 py-4">
+                                            <td className="px-6 py-3 text-gray-700">{toInitCap(order.first_name) || 'N/A'}</td>
+                                            <td className="px-6 py-3 text-gray-600">{toInitCap(order.pubmed_name) || 'N/A'}</td>
+                                            <td className="px-6 py-3">
                                                 <span className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${getStatusClasses()}`}>
                                                     Cancelled
                                                 </span>
