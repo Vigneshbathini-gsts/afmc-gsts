@@ -25,22 +25,24 @@ exports.getAllOffers = async (req, res) => {
           ofr.FREE_ITEM_QUANTITY as free_item_quantity
 
       FROM xxafmc_offers ofr
-      LEFT JOIN xxafmc_inventory inv 
-        ON ofr.ITEM_CODE = inv.item_code
-      LEFT JOIN xxafmc_inventory freeinv 
-        ON ofr.FREE_ITEM_CODE = freeinv.item_code
-
-      GROUP BY 
-          ofr.OFFER_ID, 
-          ofr.ITEM_CODE, 
-          ofr.FREE_ITEM_CODE, 
-          ofr.OFFER_QUANTITY, 
-          ofr.OFFER_DATE,
-          ofr.MESSAGE, 
-          ofr.END_DATE, 
-          ofr.FREE_ITEM_QUANTITY
-
-      ORDER BY ofr.OFFER_ID DESC
+LEFT JOIN xxafmc_inventory inv 
+  ON ofr.ITEM_CODE = inv.item_code
+LEFT JOIN xxafmc_inventory freeinv 
+  ON ofr.FREE_ITEM_CODE = freeinv.item_code
+WHERE (
+    ofr.END_DATE IS NULL
+    OR CURDATE() <= ofr.END_DATE
+)
+GROUP BY
+    ofr.OFFER_ID, 
+    ofr.ITEM_CODE, 
+    ofr.FREE_ITEM_CODE, 
+    ofr.OFFER_QUANTITY, 
+    ofr.OFFER_DATE,
+    ofr.MESSAGE, 
+    ofr.END_DATE, 
+    ofr.FREE_ITEM_QUANTITY
+ORDER BY ofr.OFFER_ID DESC
     `);
 
     res.status(200).json({

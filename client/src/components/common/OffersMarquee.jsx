@@ -158,9 +158,9 @@ function OfferCard({ offer }) {
 
         <div className="flex items-center justify-between">
           <span className="text-[10px] font-semibold text-white/70">Premium deals</span>
-          <span className="inline-flex items-center gap-1 rounded-full bg-afmc-gold/10 px-2 py-0.5 text-[10px] font-bold text-afmc-gold ring-1 ring-afmc-gold/25">
+          {/* <span className="inline-flex items-center gap-1 rounded-full bg-afmc-gold/10 px-2 py-0.5 text-[10px] font-bold text-afmc-gold ring-1 ring-afmc-gold/25">
             Save more
-          </span>
+          </span> */}
         </div>
       </div>
     </article>
