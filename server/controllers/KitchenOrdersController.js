@@ -47,6 +47,101 @@ const inventorySummarySql = `
   GROUP BY item_code
 `;
 
+const isCancellableOrderStatus = (status) => {
+  const normalized = String(status || "").trim().toUpperCase();
+  return !normalized || normalized === "RECEIVED" || normalized === "PREPARING";
+};
+
+async function releaseReservedQty(connection, itemCode, quantity) {
+  const normalizedItemCode = Number(itemCode);
+  const qty = Number(quantity || 0);
+
+  if (!Number.isFinite(normalizedItemCode) || normalizedItemCode <= 0) return;
+  if (!Number.isFinite(qty) || qty <= 0) return;
+
+  await connection.query(
+    `INSERT IGNORE INTO xxafmc_stock_reservation_totals (item_code, reserved_qty) VALUES (?, 0)`,
+    [normalizedItemCode]
+  );
+
+  await connection.query(
+    `
+      UPDATE xxafmc_stock_reservation_totals
+      SET reserved_qty = GREATEST(0, IFNULL(reserved_qty, 0) - ?)
+      WHERE item_code = ?
+      LIMIT 1
+    `,
+    [qty, normalizedItemCode]
+  );
+}
+
+async function getCocktailIngredientRows(connection, orderNumber, parentItemCode) {
+  const [customRows] = await connection.query(
+    `
+      SELECT item_code, SUM(pegs) AS pegs
+      FROM (
+        SELECT item_code, pegs
+        FROM xxafmc_custom_cocktails_mocktails_details
+        WHERE order_number = ?
+          AND inventory_item_code = ?
+
+        UNION
+
+        SELECT item_code, pegs
+        FROM xxafmc_custom_cocktails_mocktails_details_dummy
+        WHERE order_number = ?
+          AND inventory_item_code = ?
+      ) ingredient_rows
+      GROUP BY item_code
+    `,
+    [orderNumber, parentItemCode, orderNumber, parentItemCode]
+  );
+
+  if (customRows.length > 0) return customRows;
+
+  const [legacyRows] = await connection.query(
+    `
+      SELECT item_code, SUM(pegs) AS pegs
+      FROM xxafmc_cocktails_mocktails_details
+      WHERE inventory_item_code = ?
+      GROUP BY item_code
+    `,
+    [parentItemCode]
+  );
+
+  return legacyRows;
+}
+
+async function releaseReservationsForCancelledRows(connection, orderRows) {
+  for (const row of orderRows) {
+    const itemId = Number(row.ITEM_ID ?? row.item_id ?? 0);
+    const quantity = Number(row.QUANTITY ?? row.quantity ?? 0);
+    const subcategory = Number(row.SUBCATEGORY ?? row.subcategory ?? 0);
+    const orderNumber = row.ORDER_ID ?? row.order_id;
+
+    if (!Number.isFinite(itemId) || itemId <= 0) continue;
+    if (!Number.isFinite(quantity) || quantity <= 0) continue;
+
+    if (![14, 15].includes(subcategory)) {
+      // Normal inventory items reserve against the ordered item itself.
+      // eslint-disable-next-line no-await-in-loop
+      await releaseReservedQty(connection, itemId, quantity);
+      continue;
+    }
+
+    const ingredientRows = await getCocktailIngredientRows(connection, orderNumber, itemId);
+    for (const ingredient of ingredientRows) {
+      const ingredientCode = Number(ingredient.item_code || 0);
+      const pegsPerUnit = Number(ingredient.pegs || 0);
+      const reservedQuantity = pegsPerUnit * quantity;
+
+      if (!Number.isFinite(reservedQuantity) || reservedQuantity <= 0) continue;
+      // eslint-disable-next-line no-await-in-loop
+      await releaseReservedQty(connection, ingredientCode, reservedQuantity);
+    }
+  }
+}
+
 async function validateScansBeforeComplete(connection, req, orderNumber, kitchen) {
   const { categoryId } = getKitchenConfig(kitchen);
   const sessionKey = getScanSessionKey(req, orderNumber);
@@ -1539,12 +1634,44 @@ exports.getCancelledOrders = async (req, res) => {
 };
 
 exports.cancelBarOrderItem = async (req, res) => {
+  const connection = await pool.getConnection();
+
   try {
     const { ORDER_LINE_ID, ORDERNUMBER, KITCHEN = "Bar" } = req.body;
     const { categoryId } = getKitchenConfig(KITCHEN);
-console.log("Cancel request received with:", { ORDER_LINE_ID, ORDERNUMBER, KITCHEN, categoryId });
+    console.log("Cancel request received with:", { ORDER_LINE_ID, ORDERNUMBER, KITCHEN, categoryId });
+
+    if (!ORDER_LINE_ID && !ORDERNUMBER) {
+      return res.status(400).json({
+        success: false,
+        message: "Order line ID or order number is required",
+      });
+    }
+
+    await connection.beginTransaction();
+
     if (ORDERNUMBER) {
-      const [updateResult] = await pool.query(
+      const [reservationRows] = await connection.query(
+        `
+        SELECT
+          xod.ORDER_LINE_ID,
+          xod.ORDER_ID,
+          xod.ITEM_ID,
+          xod.QUANTITY,
+          xod.SUBCATEGORY,
+          xod.ORDER_STATUS
+        FROM xxafmc_order_details xod
+        JOIN (${inventorySummarySql}) inv ON inv.item_code = xod.item_id
+        WHERE xod.ORDER_ID = ?
+          AND inv.category_id = ?
+          AND (xod.ORDER_STATUS IS NULL OR TRIM(xod.ORDER_STATUS) = '')
+        `,
+        [ORDERNUMBER, categoryId]
+      );
+
+      await releaseReservationsForCancelledRows(connection, reservationRows);
+
+      const [updateResult] = await connection.query(
         `
         UPDATE xxafmc_order_details xod
         JOIN (${inventorySummarySql}) inv ON inv.item_code = xod.item_id
@@ -1556,7 +1683,7 @@ console.log("Cancel request received with:", { ORDER_LINE_ID, ORDERNUMBER, KITCH
         [ORDERNUMBER, categoryId]
       );
 
-      await pool.query(
+      await connection.query(
         `
         UPDATE xxafmc_kitchen_notification kn
         JOIN (${inventorySummarySql}) inv ON inv.item_code = kn.item_id
@@ -1568,6 +1695,8 @@ console.log("Cancel request received with:", { ORDER_LINE_ID, ORDERNUMBER, KITCH
         [ORDERNUMBER, categoryId]
       );
 
+      await connection.commit();
+
       return res.status(200).json({
         success: true,
         message: updateResult.affectedRows > 0
@@ -1576,26 +1705,42 @@ console.log("Cancel request received with:", { ORDER_LINE_ID, ORDERNUMBER, KITCH
       });
     }
 
-    if (!ORDER_LINE_ID) {
-      return res.status(400).json({
-        success: false,
-        message: "Order line ID or order number is required",
-      });
-    }
+    const [reservationRows] = await connection.query(
+      `
+      SELECT
+        ORDER_LINE_ID,
+        ORDER_ID,
+        ITEM_ID,
+        QUANTITY,
+        SUBCATEGORY,
+        ORDER_STATUS
+      FROM xxafmc_order_details
+      WHERE ORDER_LINE_ID = ?
+      LIMIT 1
+      `,
+      [ORDER_LINE_ID]
+    );
 
-    const [updateResult] = await pool.query(
+    const cancellableReservationRows = reservationRows.filter((row) =>
+      isCancellableOrderStatus(row.ORDER_STATUS)
+    );
+
+    await releaseReservationsForCancelledRows(connection, cancellableReservationRows);
+
+    const [updateResult] = await connection.query(
       `UPDATE xxafmc_order_details SET ORDER_STATUS = 'CANCELLED' WHERE ORDER_LINE_ID = ?`,
       [ORDER_LINE_ID]
     );
 
     if (updateResult.affectedRows === 0) {
+      await connection.rollback();
       return res.status(404).json({
         success: false,
         message: "Order item not found",
       });
     }
 
-    await pool.query(
+    await connection.query(
       `UPDATE xxafmc_kitchen_notification kn
        SET kn.status = 'Cancelled'
        WHERE EXISTS (
@@ -1605,17 +1750,22 @@ console.log("Cancel request received with:", { ORDER_LINE_ID, ORDERNUMBER, KITCH
       [ORDER_LINE_ID]
     );
 
+    await connection.commit();
+
     return res.status(200).json({
       success: true,
       message: "Order item cancelled successfully",
     });
   } catch (error) {
+    await connection.rollback();
     console.error("Error cancelling bar order item:", error);
     return res.status(500).json({
       success: false,
       message: "Failed to cancel order item",
       error: error.message,
     });
+  } finally {
+    connection.release();
   }
 };
 
