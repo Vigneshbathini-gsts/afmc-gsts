@@ -174,6 +174,7 @@ export default function UserEdit() {
       const successMessage = response.data?.message || "User updated successfully.";
       setSuccess(successMessage);
       toast.success(successMessage);
+      navigate("/admin/users");
     } catch (saveError) {
       console.error("Failed to update user:", saveError);
       const updateErrorMessage =

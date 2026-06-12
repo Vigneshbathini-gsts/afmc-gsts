@@ -343,7 +343,7 @@ export default function PriceUpdate() {
                 onClick={startScanner}
                 className="px-5 rounded-2xl bg-afmc-maroon hover:bg-afmc-maroon2 text-white shadow-md transition flex items-center gap-2"
               >
-                <FaCamera />
+                <FaCamera size={20}/>
                 <span className="hidden sm:inline">Scan</span>
               </button>
             </div>
