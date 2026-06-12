@@ -823,8 +823,7 @@ exports.processBarcodeScan = async (req, res) => {
       return res.status(400).json({
         success: false,
         message:
-          `Scanned Barcode ${BARCODE} has no stock` +
-          (alternatives.length ? `. Try another barcode for this item: ${alternatives.join(", ")}` : ""),
+          `Scanned Barcode ${BARCODE} has no stock`
       });
     }
 

@@ -15,6 +15,7 @@ import { barOrdersAPI } from "../../services/api";
 import { Html5Qrcode } from "html5-qrcode";
 import { toInitCap } from "../../utils/textFormat";
 import { formatDisplayDate } from "../../utils/dateUtils";
+import { toast } from "react-toastify";
 
 export default function OutletOrderDetails() {
   const location = useLocation();
@@ -186,12 +187,25 @@ export default function OutletOrderDetails() {
   //   }
   // };
 
+//   const handleBarcodeKeyPress = async (e) => {
+//   if (
+//     e.key === "Enter" &&
+//     e.target.value.trim() &&
+//     !processingScanRef.current
+//   ) {
+//     e.preventDefault();
+//     await autoProcessScan(e.target.value.trim());
+//   }
+  // };
+  
   const handleBarcodeKeyPress = async (e) => {
   if (
     e.key === "Enter" &&
     e.target.value.trim() &&
     !processingScanRef.current
   ) {
+    console.log("Manual Barcode:", e.target.value.trim());
+
     e.preventDefault();
     await autoProcessScan(e.target.value.trim());
   }
@@ -208,14 +222,13 @@ export default function OutletOrderDetails() {
       setPrice("");
     }
   };
-
-
   
   const autoProcessScan = useCallback(async (scannedBarcode) => {
     if (!scannedBarcode || processingScanRef.current) return;
     const scanQuantity = Number(qty);
     if (!Number.isInteger(scanQuantity) || scanQuantity <= 0) {
-      setScanError("Enter a valid quantity before confirming the scan.");
+      // setScanError("Enter a valid quantity before confirming the scan.");
+      toast.error("Enter a valid quantity before confirming the scan.");
       return;
     }
 
@@ -243,7 +256,13 @@ export default function OutletOrderDetails() {
         const scannedData = scannedRes.data?.data || [];
         setScannedItems(scannedData);
 
-        setScanMessage(`✓ ${scanData.itemName || 'Item'} scanned successfully.`);
+        toast.success(
+  `${scanData.itemName || "Item"} scanned successfully.`,
+  {
+    position: "top-right",
+    autoClose: 3000,
+  }
+);
         setItemCode(scanData.itemCode || "");
         setItemName(scanData.itemName || "");
         setPrice(scanData.calculatedPrice || "");
@@ -256,24 +275,70 @@ export default function OutletOrderDetails() {
         }, 800);
       }
       // Backend returned error (400, etc.)
-      else {
-        const message = scanData.message || res.data?.message || "Scan failed";
-        setScanError(message);
-        if (
-          typeof message === "string" &&
-          (message.toLowerCase().includes("morethan order quantity") ||
-            message.toLowerCase().includes("duplicate bottle scan") ||
-            message.toLowerCase().includes("morethen stock"))
-        ) {
-          window.alert(message);
-        }
-      }
+      // else {
+      //   const message = scanData.message || res.data?.message || "Scan failed";
+      //   setScanError(message);
+      //   if (
+      //     typeof message === "string" &&
+      //     (message.toLowerCase().includes("morethan order quantity") ||
+      //       message.toLowerCase().includes("duplicate bottle scan") ||
+      //       message.toLowerCase().includes("morethen stock"))
+      //   ) {
+      //     window.alert(message);
+      //   }
+      // }
 
-    } catch (error) {
-      const errMsg = error.response?.data?.error || error.response?.data?.message || error.message || "Failed to process scan.";
-      setScanError(errMsg);
-      console.error("Process Scan Error:", error);
-    } finally {
+      else {
+  const message =
+    scanData.message ||
+    res.data?.message ||
+    "Scan failed";
+
+  setScanError(message);
+
+  // Show popup for all errors
+        // window.alert(message);
+         toast.error(message, {
+    position: "top-right",
+    autoClose: 4000,
+  });
+}
+
+    }
+//    catch (error) {
+//   const errMsg =
+//     error.response?.data?.error ||
+//     error.response?.data?.message ||
+//     error.message ||
+//     "Failed to process scan.";
+
+//   setScanError(errMsg);
+
+//   // Popup for API errors too
+//   window.alert(errMsg);
+
+//   console.error("Process Scan Error:", error);
+    // }
+    
+
+    catch (error) {
+  const errMsg =
+    error.response?.data?.error ||
+    error.response?.data?.message ||
+    error.message ||
+    "Failed to process scan.";
+
+  setScanError(errMsg);
+
+  toast.error(errMsg, {
+    position: "top-right",
+    autoClose: 4000,
+  });
+
+  console.error("Process Scan Error:", error);
+}
+    
+    finally {
       setProcessingScan(false);
       processingScanRef.current = false;
       setTimeout(() => {
@@ -288,7 +353,8 @@ export default function OutletOrderDetails() {
   const confirmScan = useCallback(async () => {
     const trimmedBarcode = String(barcode || "").trim();
     if (!trimmedBarcode) {
-      setScanError("Scan or enter a barcode before confirming.");
+      //setScanError("Scan or enter a barcode before confirming.");
+      toast.error("Scan or enter a barcode before confirming.");
       return;
     }
     await autoProcessScan(trimmedBarcode);
@@ -735,7 +801,7 @@ export default function OutletOrderDetails() {
                     )}
                   </div>
                   <div>
-                    <div className="rounded-lg border border-gray-200 bg-black p-0 overflow-hidden">
+                    {/* <div className="rounded-lg border border-gray-200 overflow-hidden">
                       <div className="relative w-full aspect-video min-h-[240px]">
                         <div id="qr-reader" className="absolute inset-0 w-full h-full" />
                         {!scanSuccess && scanning && (
@@ -744,7 +810,24 @@ export default function OutletOrderDetails() {
                           </div>
                         )}
                       </div>
-                    </div>
+                    </div> */}
+
+                    <div className="rounded-lg border border-gray-200 bg-white p-0 overflow-hidden">
+  <div className="relative w-full aspect-video min-h-[240px]">
+    <div id="qr-reader" className="absolute inset-0 w-full h-full" />
+
+    {/* White Barcode Frame */}
+    {/* <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+      <div className="w-[85%] h-[80px] border-2 border-white rounded-lg"></div>
+    </div> */}
+
+    {!scanSuccess && scanning && (
+      <div className="absolute bottom-4 left-0 right-0 text-center text-white text-sm font-medium">
+        Place barcode inside frame
+      </div>
+    )}
+  </div>
+</div>
                   </div>
                 </div>
               </div>
