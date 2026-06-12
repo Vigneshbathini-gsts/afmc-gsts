@@ -671,10 +671,10 @@ const styles = {
     animation: "crestPulse 4s ease-in-out infinite",
   },
  crestImg: {
-  position: "absolute",   // ✅ force perfect centering
+  position: "absolute",   //  force perfect centering
   top: "50%",
   left: "50%",
-  transform: "translate(-50%, -50%)", // ✅ true center
+  transform: "translate(-50%, -50%)", //  true center
   width: "70%",           // adjust visually (try 65–75%)
   height: "70%",
   objectFit: "contain",

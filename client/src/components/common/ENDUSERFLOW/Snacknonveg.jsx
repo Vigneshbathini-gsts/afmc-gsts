@@ -72,7 +72,7 @@ function Snacknonveg() {
             <div>
               <div style={styles.itemName}>{item.item_name}</div>
 
-              {/* ✅ Stock Status */}
+              {/*  Stock Status */}
               {item.stock_status === "Out Of Stock" && (
                 <div style={styles.outOfStock}>Out Of Stock</div>
               )}

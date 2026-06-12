@@ -34,7 +34,7 @@ function Drinkharddrink() {
   return (
     <div style={{ padding: "20px", background: "#f5f5f5" }}>
     
-      {/* ✅ Category Tabs */}
+      {/*  Category Tabs */}
       <div style={styles.categoryTabs}>
         {categories.map((cat) => (
           <span
@@ -101,7 +101,7 @@ function Drinkharddrink() {
 export default Drinkharddrink;
 
 
-// ✅ Category Mapping (IMPORTANT)
+//  Category Mapping (IMPORTANT)
 const categories = [
   { label: "Beer", value: "beer" },
   { label: "Brandy", value: "brandy" },

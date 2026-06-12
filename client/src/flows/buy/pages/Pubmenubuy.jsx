@@ -1050,7 +1050,7 @@ export default function Pubmenubuy({
       setItems(ensureOfferFreeRows(normalized));
       setError("");
       
-      // ✅ SUCCESS TOAST FOR QUANTITY UPDATE
+      //  SUCCESS TOAST FOR QUANTITY UPDATE
       const action = delta > 0 ? "increased" : "decreased";
       const itemName = items.find((item) => item.orderLineId === numericOrderLineId)?.item_name || "Item";
       showToast(`${itemName} quantity ${action} to ${nextQuantity}`, "success");

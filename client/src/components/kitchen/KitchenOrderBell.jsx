@@ -17,7 +17,7 @@ export default function KitchenOrderBell({ kitchen = "Bar" }) {
   const basePath =
     String(user?.outletType || "").toUpperCase() === "KITCHEN" ? "/kitchen" : "/bar";
 
-  // ✅ Fetch Orders
+  //   Fetch Orders
   const fetchOrders = useCallback(async () => {
     try {
       const res = await barOrdersAPI.getActiveOrders(kitchen);
@@ -34,14 +34,14 @@ export default function KitchenOrderBell({ kitchen = "Bar" }) {
     }
   }, [kitchen]);
 
-  // ✅ Polling
+  //   Polling
   useEffect(() => {
     fetchOrders();
     const interval = setInterval(fetchOrders, 10000);
     return () => clearInterval(interval);
   }, [fetchOrders]);
 
-  // ✅ Close dropdown on outside click
+  //   Close dropdown on outside click
   useEffect(() => {
     const handleOutsideClick = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -67,7 +67,7 @@ export default function KitchenOrderBell({ kitchen = "Bar" }) {
 
   // compute mobile dropdown position to sit below header
 
-  // ✅ Mark as read
+  //   Mark as read
   const handleMarkAsRead = async (notificationId) => {
     console.log("Marking notification as read:", notificationId);
     try {
@@ -106,7 +106,7 @@ export default function KitchenOrderBell({ kitchen = "Bar" }) {
     setShowClearConfirm(false);
   };
 
-  // ✅ Handle click
+  //   Handle click
   const handleOrderClick = async (order) => {
     const orderNumber = order?.ORDERNUMBER ?? order?.orderNumber;
     if (!orderNumber) return;
@@ -130,7 +130,7 @@ export default function KitchenOrderBell({ kitchen = "Bar" }) {
 
   return (
     <div className="relative inline-flex" ref={dropdownRef}>
-      {/* 🔔 Bell Icon */}
+      {/*   Bell Icon */}
       <button
         onClick={() => setOpen(!open)}
         className="relative inline-flex items-center justify-center p-3 rounded-xl bg-gray-100 hover:bg-afmc-maroon/10 transition"

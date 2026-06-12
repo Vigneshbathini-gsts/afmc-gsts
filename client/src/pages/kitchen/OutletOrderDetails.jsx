@@ -179,6 +179,10 @@ export default function OutletOrderDetails() {
     return Math.floor(rawIngredientScans / unitFactor);
   }, [scannedItems]);
 
+  const normalizeBarcode = useCallback((rawBarcode) => {
+    return String(rawBarcode || "").replace(/\s+/g, "").trim();
+  }, []);
+
   // const handleBarcodeKeyPress = async (e) => {
   //   if (e.key === "Enter" && barcode && barcode.trim() !== "" && !processingScanRef.current && !scanning) {
   //     e.preventDefault();
@@ -187,15 +191,13 @@ export default function OutletOrderDetails() {
   // };
 
   const handleBarcodeKeyPress = async (e) => {
-  if (
-    e.key === "Enter" &&
-    e.target.value.trim() &&
-    !processingScanRef.current
-  ) {
+    if (e.key !== "Enter" || processingScanRef.current) return;
+    const normalized = normalizeBarcode(barcode);
+    if (!normalized) return;
     e.preventDefault();
-    await autoProcessScan(e.target.value.trim());
-  }
-};
+    setBarcode(normalized);
+    await autoProcessScan(normalized);
+  };
   
   const handleBarcodeChange = (value) => {
     setBarcode(value);
@@ -371,7 +373,13 @@ export default function OutletOrderDetails() {
             if (hasScannedRef.current || processingScanRef.current) return;
             hasScannedRef.current = true;
 
-            const scannedBarcode = String(decodedText || "").trim();
+            const scannedBarcode = normalizeBarcode(decodedText);
+            if (!scannedBarcode) {
+              setScanError("Scanned barcode is empty or invalid.");
+              hasScannedRef.current = false;
+              return;
+            }
+
             setScanSuccess(true);
             setBarcode(scannedBarcode);
             isManualScanRef.current = false;
@@ -720,6 +728,14 @@ export default function OutletOrderDetails() {
                       />
                     </div>
                     {cameraError && <div className="text-sm text-red-600">{cameraError}</div>}
+                    {scanError && (
+                      <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+                        <div className="flex items-center gap-2">
+                          <FaTimesCircle />
+                          <span>{scanError}</span>
+                        </div>
+                      </div>
+                    )}
                     {processingScan && (
                       <div className="flex items-center gap-2 text-sm text-blue-600">
                         <FaSpinner className="animate-spin" /> Processing scan...
@@ -729,9 +745,6 @@ export default function OutletOrderDetails() {
                       <div className="flex items-center gap-2 text-sm text-green-600 bg-green-50 p-3 rounded-lg">
                         <FaCheckCircle /> {scanMessage}
                       </div>
-                    )}
-                    {scanError && (
-                      <div className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">{scanError}</div>
                     )}
                   </div>
                   <div>

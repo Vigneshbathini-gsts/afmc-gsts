@@ -212,7 +212,7 @@ exports.updateOffer = async (req, res) => {
       return res.status(404).json({ message: "Offer not found" });
     }
 
-    // ✅ ONLY update END_DATE (NO STATUS)
+    //  ONLY update END_DATE (NO STATUS)
     await db.query(
       `UPDATE xxafmc_offers 
        SET END_DATE = ?,
