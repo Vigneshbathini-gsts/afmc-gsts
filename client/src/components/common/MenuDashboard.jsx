@@ -660,14 +660,16 @@ function MenuPopupCompact({ item, loading, onClose, onBuy }) {
                     </div>
 
                     <div className="text-[14px] font-semibold leading-5 text-stone-600">
-                      {toInitCap("Qty")}
+                      {toInitCap("Quantity")}
                     </div>
                     <div>
                       <input
                         type="number"
                         min="1"
                         value={qty}
-                        onChange={(e) => setQty(e.target.value)}
+                        onChange={(e) =>
+                          Number(e.target.value) <= 999 && setQty(e.target.value)
+                        }
                         className="h-11 w-full rounded border border-stone-300 bg-white px-3 text-[15px] font-medium text-stone-900 outline-none transition focus:border-afmc-maroon focus:ring-2 focus:ring-afmc-maroon/20"
                         inputMode="numeric"
                       />

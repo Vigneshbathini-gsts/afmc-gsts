@@ -525,6 +525,51 @@ export default function Pubmenubuy({
     else toast.success(message);
   };
 
+  // Track per-item out-of-stock toast cooldowns (timestamps) without causing re-renders.
+  // Structure: { [itemKey]: { [normalizedMessage]: timestampMillis } }
+  const outOfStockCooldownRef = useRef({});
+
+  const isOutOfStockMessage = (msg) => /out\s*of\s*stock/i.test(String(msg || ""));
+
+  const showToastWithCooldown = (message, type = "success", rowOrKey = null) => {
+    if (type !== "error" || !isOutOfStockMessage(message)) {
+      showToast(message, type);
+      return;
+    }
+
+    let key = null;
+    if (typeof rowOrKey === "string") {
+      key = String(rowOrKey);
+    } else if (rowOrKey) {
+      try {
+        key = getStockLimitImageKey(rowOrKey);
+      } catch {
+        key = null;
+      }
+    }
+
+    // If we don't have an item-specific key, don't suppress (avoid global suppression).
+    if (!key) {
+      showToast(message, type);
+      return;
+    }
+
+    const now = Date.now();
+    const normalized = String(message || "").trim().toLowerCase();
+    const map = outOfStockCooldownRef.current || (outOfStockCooldownRef.current = {});
+    if (!map[key]) map[key] = {};
+
+    const lastTs = map[key][normalized] || 0;
+    const COOLDOWN_MS = 5000;
+    if (now - lastTs < COOLDOWN_MS) {
+      // suppressed
+      return;
+    }
+
+    map[key][normalized] = now;
+    showToast(message, type);
+  };
+
   const confirmAction = (title, text, confirmButtonText = "Yes", cancelButtonText = "No") => {
     return new Promise((resolve) => {
       confirmResolveRef.current = resolve;
@@ -834,6 +879,7 @@ export default function Pubmenubuy({
     let validationMessage = "";
     let nextQuantity = null;
     let previousQuantity = null;
+    let validationKey = null;
 
     setItems((current) => {
       const targetItem = current.find((item) => item.orderLineId === numericOrderLineId) || null;
@@ -844,6 +890,7 @@ export default function Pubmenubuy({
 
       if (targetItem.isFreeItem) {
         validationMessage = "Free items cannot be updated.";
+        validationKey = getStockLimitImageKey(targetItem);
         return current;
       }
 
@@ -853,11 +900,13 @@ export default function Pubmenubuy({
 
       if (nextQtyCandidate < 1) {
         validationMessage = "Quantity cannot be less than 1.";
+        validationKey = getStockLimitImageKey(targetItem);
         return current;
       }
 
       if (nextQtyCandidate > MAX_QTY) {
         validationMessage = `Quantity cannot be more than ${MAX_QTY}.`;
+        validationKey = getStockLimitImageKey(targetItem);
         return current;
       }
 
@@ -870,10 +919,12 @@ export default function Pubmenubuy({
             validationMessage =
               cocktailOverride.stockIssueMessage ||
               "Out of stock for cocktail/mocktail ingredients. Please reduce quantity or update selection.";
+            validationKey = getStockLimitImageKey(targetItem);
             return current;
           }
         } else if (String(targetItem.stockIssueMessage || "").trim().length > 0) {
           validationMessage = String(targetItem.stockIssueMessage || "").trim();
+          validationKey = getStockLimitImageKey(targetItem);
           return current;
         }
       }
@@ -887,6 +938,7 @@ export default function Pubmenubuy({
               (availableQty !== null && availableQty !== undefined
                 ? `Out of stock. Available quantity: ${availableQty}`
                 : "Out of stock.");
+            validationKey = getStockLimitImageKey(targetItem);
             return current;
           }
         }
@@ -937,6 +989,7 @@ export default function Pubmenubuy({
 
       if (freeAvailableQty !== null && expectedFreeQty > Number(freeAvailableQty)) {
         validationMessage = `Out of stock for free item. Available quantity: ${freeAvailableQty}`;
+        validationKey = getStockLimitImageKey(targetItem);
         return current;
       }
 
@@ -1030,7 +1083,7 @@ export default function Pubmenubuy({
 
     setError(validationMessage);
     if (validationMessage) {
-      showToast(validationMessage, "error");
+      showToastWithCooldown(validationMessage, "error", validationKey);
       setUpdatingLineId(null);
       return;
     }
@@ -1171,7 +1224,7 @@ export default function Pubmenubuy({
         const validation = await validateCocktailNextQuantity(liveItem, nextQtyCandidate);
         if (!validation.ok) {
           const message = validation.message || "Out of stock for cocktail/mocktail ingredients.";
-          showToast(message, "error");
+          showToastWithCooldown(message, "error", liveItem);
           showStockLimitOnImage(liveItem, "Out of Stock");
           return;
         }
@@ -1183,7 +1236,7 @@ export default function Pubmenubuy({
           const message =
             cocktailOverride.stockIssueMessage ||
             "Out of stock for cocktail/mocktail ingredients. Please reduce quantity or update selection.";
-          showToast(message, "error");
+          showToastWithCooldown(message, "error", liveItem);
           showStockLimitOnImage(liveItem, "Out of Stock");
           return;
         }
@@ -1191,7 +1244,7 @@ export default function Pubmenubuy({
         const stockMessage = String(liveItem?.stockIssueMessage || "").trim();
 
         if (stockMessage) {
-          showToast(stockMessage, "error");
+          showToastWithCooldown(stockMessage, "error", liveItem);
           showStockLimitOnImage(liveItem, "Out of Stock");
           return;
         }
@@ -1206,7 +1259,7 @@ export default function Pubmenubuy({
       Number.isFinite(Number(availableQty))
     ) {
       if (nextQtyCandidate > Number(availableQty)) {
-        showToast(`Out of stock. Available quantity: ${availableQty}`, "error");
+        showToastWithCooldown(`Out of stock. Available quantity: ${availableQty}`, "error", liveItem);
         return;
       }
     }
@@ -1255,9 +1308,10 @@ export default function Pubmenubuy({
       }
 
       if (freeAvailableQty !== null && expectedFreeQty > Number(freeAvailableQty)) {
-        showToast(
+        showToastWithCooldown(
           `Out of stock for free item. Available quantity: ${freeAvailableQty}`,
-          "error"
+          "error",
+          liveItem
         );
         showStockLimitOnImage(liveItem, "Out of Stock");
         return;
@@ -1720,7 +1774,7 @@ export default function Pubmenubuy({
                                   <ul className="space-y-0.5">
                                     {details.slice(0, 6).map((ing, idx) => (
                                       <li key={`${ing.ITEM_CODE || ing.itemCode || idx}`} className="flex justify-between gap-2">
-                                        <span className="truncate">{ing.ITEM_NAME || ing.itemName || "Item"}</span>
+                                        <span className="truncate">{toInitCap(ing.ITEM_NAME || ing.itemName || "Item")}</span>
                                         <span className="shrink-0 text-stone-600">
                                           {Number(ing.PEGS ?? ing.pegs ?? ing.QUANTITY ?? ing.quantity ?? 0) || 0}
                                         </span>

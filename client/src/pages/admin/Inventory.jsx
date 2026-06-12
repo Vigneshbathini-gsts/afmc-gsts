@@ -1165,7 +1165,7 @@ export default function Inventory() {
                           </button>
                         </td>
                         <td className="px-4 py-3 font-medium text-gray-800">
-                          {row.item_name}
+                          {toInitCap(row.item_name)}
                         </td>
                         <td className="px-4 py-3 text-gray-700">Nos</td>
                         <td className="px-4 py-3 text-gray-700">{row.stock_quantity}</td>

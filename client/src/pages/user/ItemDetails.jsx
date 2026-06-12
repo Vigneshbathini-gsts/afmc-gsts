@@ -1,9 +1,10 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { inventoryAPI, cartAPI } from "../../services/api";
 import { FaArrowLeft, FaPlus, FaMinus, FaTrash, FaSearch, FaSave } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { useAuth } from "../../context/AuthContext";
+import { toInitCap } from '../../utils/textFormat';
 
 const getDetailItemCode = (detail) => detail?.itemCode ?? detail?.ITEM_CODE;
 const getDetailItemName = (detail) => detail?.itemName ?? detail?.ITEM_NAME;
@@ -47,7 +48,52 @@ export default function ItemDetails() {
     const [lovData, setLovData] = useState([]);
     const [lovLoading, setLovLoading] = useState(false);
 
+    // Track per-item out-of-stock toast cooldowns (timestamps) without causing re-renders.
+    // Structure: { [itemKey]: { [normalizedMessage]: timestampMillis } }
+    const outOfStockCooldownRef = useRef({});
+
+    const isOutOfStockMessage = (msg) => /out\s*of\s*stock|available\s+quantity/i.test(String(msg || ""));
+
+    const showToastWithCooldown = (message, type = "success", itemIdentifier = null) => {
+        if (type !== "error" || !isOutOfStockMessage(message)) {
+            if (type === "error") toast.error(message);
+            else if (type === "warning") toast.warning(message);
+            else toast.success(message);
+            return;
+        }
+
+        // Generate key from item identifier (string or index number or itemCode)
+        let key = null;
+        if (typeof itemIdentifier === "string") {
+            key = String(itemIdentifier);
+        } else if (typeof itemIdentifier === "number") {
+            key = String(itemIdentifier);
+        }
+
+        // If we don't have a key, don't suppress (avoid global suppression).
+        if (!key) {
+            toast.error(message);
+            return;
+        }
+
+        const now = Date.now();
+        const normalized = String(message || "").trim().toLowerCase();
+        const map = outOfStockCooldownRef.current || (outOfStockCooldownRef.current = {});
+        if (!map[key]) map[key] = {};
+
+        const lastTs = map[key][normalized] || 0;
+        const COOLDOWN_MS = 5000;
+        if (now - lastTs < COOLDOWN_MS) {
+            // suppressed
+            return;
+        }
+
+        map[key][normalized] = now;
+        toast.error(message);
+    };
+
     const draftScope = fromBuyFlow && buyOrderNumber ? `buy:${buyOrderNumber}` : "default";
+
     const draftKey = `afmc-custom-item-draft:${user?.userId || "anon"}:${draftScope}:${id}`;
 
     const buildCustomizationPayload = useCallback((details, quantitiesState) => {
@@ -267,7 +313,7 @@ export default function ItemDetails() {
                 const requiredNext = Number(newVal) * effectiveCartQty;
                 if (requiredNext > stockQuantity) {
                     const itemName = getDetailItemName(currentDetail);
-                    toast.error(`${itemName} available quantity: ${stockQuantity}`);
+                    showToastWithCooldown(`${itemName} available quantity: ${stockQuantity}`, "error", index);
                     return;
                 }
             }
@@ -375,7 +421,7 @@ export default function ItemDetails() {
                 const requiredNext = newQty * effectiveCartQty;
                 if (requiredNext > stockQuantity) {
                     const itemName = getDetailItemName(existingDetail);
-                    toast.error(`${itemName} available quantity: ${stockQuantity}`);
+                    showToastWithCooldown(`${itemName} available quantity: ${stockQuantity}`, "error", existingIngredientIndex);
                     return;
                 }
             }
@@ -564,7 +610,7 @@ export default function ItemDetails() {
                                 if (!Number.isFinite(available) || available < 0) continue;
                                 const required = Number(ing.quantity || 0) * desiredQty;
                                 if (required > available) {
-                                    toast.error(`${ing.itemName || code} available quantity: ${available}`);
+                                    showToastWithCooldown(`${ing.itemName || code} available quantity: ${available}`, "error", code);
                                     return;
                                 }
                             }
@@ -585,7 +631,7 @@ export default function ItemDetails() {
                             if (rawAvailable !== undefined && rawAvailable !== null && rawAvailable !== "") {
                                 const available = Number(rawAvailable);
                                 if (Number.isFinite(available) && available >= 0 && desiredQty > available) {
-                                    toast.error(`Out of stock. Available quantity: ${available}`);
+                                    showToastWithCooldown(`Out of stock. Available quantity: ${available}`, "error", parentCode);
                                     return;
                                 }
                             }
@@ -754,9 +800,9 @@ export default function ItemDetails() {
                                         <tr key={index} className="border-b border-stone-100 transition last:border-b-0 hover:bg-afmc-gold/5">
                                             <td className="px-5 py-3 text-sm text-stone-600">{getDetailItemCode(detail) || "728"}</td>
                                             <td className="px-5 py-3">
-                                                <span className="text-sm font-semibold text-stone-900">{getDetailItemName(detail)}</span>
+                                                <span className="text-sm font-semibold text-stone-900">{toInitCap(getDetailItemName(detail))}</span>
                                             </td>
-                                            <td className="px-5 py-3 text-sm text-stone-600">{pegs || 1}</td>
+                                            <td className="px-5 py-3 text-sm text-stone-700">{currentQty || 1}</td>
                                             <td className="px-5 py-3">
                                                 {hasQuantity ? (
                                                     <div className="inline-flex items-center gap-1 rounded-xl bg-stone-50 px-2 py-1">
@@ -766,7 +812,7 @@ export default function ItemDetails() {
                                                         >
                                                             <FaMinus className="text-xs" />
                                                         </button>
-                                                        <span className="min-w-[32px] text-center text-sm font-semibold text-stone-900">{currentQty}</span>
+                                                        {/* <span className="min-w-[32px] text-center text-sm font-semibold text-stone-900">{currentQty}</span> */}
                                                         <button
                                                             onClick={() => updateQuantity(index, 1)}
                                                             className="flex h-7 w-7 items-center justify-center rounded-md bg-afmc-maroon text-white shadow-sm transition hover:bg-afmc-maroon2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-afmc-gold/50 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-50"

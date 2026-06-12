@@ -43,9 +43,7 @@ const validateCreatePayload = (payload) => {
     return "Last name must be between 1 and 50 characters";
   }
 
-  if (!/^[A-Za-z0-9._-]{3,50}$/.test(payload.userName)) {
-    return "User name must be 3 to 50 characters and can only include letters, numbers, dot, underscore, and hyphen";
-  }
+  
 
   if (payload.password.length < 6) {
     return "Password must be at least 6 characters";
@@ -212,8 +210,8 @@ const validateBulkRows = (rows) => {
       errors.push(`Row ${row.rowNumber}: invalid email address`);
     }
 
-    if (!/^[A-Za-z0-9._-]{3,50}$/.test(row.userName)) {
-      errors.push(`Row ${row.rowNumber}: invalid user name`);
+     if (!EMAIL_REGEX.test(row.userName)) {
+      errors.push(`Row ${row.rowNumber}: user name must be a valid email address`);
     }
   });
 

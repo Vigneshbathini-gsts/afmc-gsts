@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import {
   ChevronsLeft,
   Eye,
+  EyeOff,
   X,
   PlusCircle,
   Search,
@@ -36,9 +37,7 @@ const validateCreateForm = (formData) => {
     return "First name must be at least 2 characters.";
   if (!formData.lastName.trim()) return "Last name is required.";
   if (!formData.userName.trim()) return "User name is required.";
-  if (!/^[A-Za-z0-9._-]{3,50}$/.test(formData.userName.trim())) {
-    return "User name must be 3 to 50 characters and can only include letters, numbers, dot, underscore, and hyphen.";
-  }
+  
   if (!formData.password) return "Password is required.";
   if (formData.password.length < 6)
     return "Password must be at least 6 characters.";
@@ -47,6 +46,9 @@ const validateCreateForm = (formData) => {
   }
   if (!formData.email.trim()) return "Email is required.";
   if (!EMAIL_REGEX.test(formData.email.trim()))
+    return "Please enter a valid email address.";
+   if (!formData.userName.trim()) return "User name is required.";
+  if (!EMAIL_REGEX.test(formData.userName.trim()))
     return "Please enter a valid email address.";
   if (!formData.phoneNumber.trim()) return "Phone number is required.";
   if (!PHONE_REGEX.test(formData.phoneNumber.trim()))
@@ -66,6 +68,8 @@ export default function UserManagement() {
   const [formError, setFormError] = useState("");
   const [formSuccess, setFormSuccess] = useState("");
   const [saving, setSaving] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [uploadFile, setUploadFile] = useState(null);
   const [uploadError, setUploadError] = useState("");
   const [uploadSuccess, setUploadSuccess] = useState("");
@@ -299,6 +303,16 @@ export default function UserManagement() {
       <div className="absolute bottom-20 right-20 h-80 w-80 rounded-full bg-afmc-maroon2/10 blur-3xl" />
 
       <div className="relative z-10 p-8">
+        <style>{`
+          .password-field::-ms-reveal,
+          .password-field::-ms-clear {
+            display: none;
+          }
+          .password-field::-webkit-textfield-decoration-container,
+          .password-field::-webkit-credentials-auto-fill-button {
+            display: none !important;
+          }
+        `}</style>
         <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
           <h1 className="text-2xl font-semibold text-gray-800">User Management</h1>
           <button
@@ -519,7 +533,7 @@ export default function UserManagement() {
                     name="firstName"
                     value={formData.firstName}
                     onChange={handleFormChange}
-                    maxLength={50}
+                     maxLength={25}
                     placeholder="Enter first name"
                     className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-2 text-sm text-gray-800 outline-none transition focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
                   />
@@ -534,7 +548,7 @@ export default function UserManagement() {
                     name="lastName"
                     value={formData.lastName}
                     onChange={handleFormChange}
-                    maxLength={50}
+                    maxLength={25}
                     placeholder="Enter last name"
                     className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-2 text-sm text-gray-800 outline-none transition focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
                   />
@@ -545,11 +559,11 @@ export default function UserManagement() {
                     User Name
                   </label>
                   <input
-                    type="text"
+                    type="email"
                     name="userName"
                     value={formData.userName}
                     onChange={handleFormChange}
-                    maxLength={50}
+                     maxLength={25}
                     placeholder="Enter username same as email"
                     className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-2 text-sm text-gray-800 outline-none transition focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
                   />
@@ -574,30 +588,52 @@ export default function UserManagement() {
                   <label className="mb-1 block text-sm font-medium text-gray-700">
                     Password
                   </label>
-                  <input
-                    type="password"
-                    name="password"
-                    value={formData.password}
-                    onChange={handleFormChange}
-                    minLength={6}
-                    placeholder="Enter password"
-                    className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-2 text-sm text-gray-800 outline-none transition focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
-                  />
+                  <div className="relative">
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      name="password"
+                      value={formData.password}
+                      onChange={handleFormChange}
+                      minLength={6}
+                      maxLength={20}
+                      placeholder="Enter password"
+                      className="password-field w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-2 pr-10 text-sm text-gray-800 outline-none transition focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((prev) => !prev)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 transition hover:text-gray-700"
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
                 </div>
 
                 <div>
                   <label className="mb-1 block text-sm font-medium text-gray-700">
                     Confirm Password
                   </label>
-                  <input
-                    type="password"
-                    name="confirmPassword"
-                    value={formData.confirmPassword}
-                    onChange={handleFormChange}
-                    minLength={6}
-                    placeholder="Re-enter password"
-                    className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-2 text-sm text-gray-800 outline-none transition focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
-                  />
+                  <div className="relative">
+                    <input
+                      type={showConfirmPassword ? "text" : "password"}
+                      name="confirmPassword"
+                      value={formData.confirmPassword}
+                      onChange={handleFormChange}
+                      minLength={6}
+                      maxLength={20}
+                      placeholder="Re-enter password"
+                      className="password-field w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-2 pr-10 text-sm text-gray-800 outline-none transition focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword((prev) => !prev)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 transition hover:text-gray-700"
+                      aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+                    >
+                      {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
                 </div>
 
                 <div>

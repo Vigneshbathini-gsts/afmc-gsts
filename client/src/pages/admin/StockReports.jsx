@@ -3,6 +3,7 @@ import { FaSearch, FaArrowLeft, FaDownload } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { inventoryAPI } from "../../services/api";
 import { exportTableToPdf } from "../../utils/pdfExport";
+import { toInitCap } from "../../utils/textFormat";
 
 const toInputDate = (date) => {
   const d = date instanceof Date ? date : new Date(date);
@@ -352,7 +353,7 @@ export default function StockReports() {
                   rows.map((row, idx) => (
                     <tr key={`${row.item_code}-${idx}`} className="border-t border-gray-100">
                       <td className="px-4 py-3">{row.item_code}</td>
-                      <td className="px-4 py-3">{row.item_name}</td>
+                      <td className="px-4 py-3">{toInitCap(row.item_name)}</td>
                       {/* {activeTab === "in" && (
                         <td className="px-4 py-3">{row.batch_id || "-"}</td>
                       )} */}
