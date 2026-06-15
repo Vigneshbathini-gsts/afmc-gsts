@@ -12,7 +12,7 @@ const INVENTORY_PAGE_SIZE = 20;
 const STOCK_TYPE_OPTIONS = ["Purchased", "Free"];
 const INVENTORY_IMAGE_BASE_URL = "https://afmc.globalsparkteksolutions.com/AFMCIMAGES/";
 
-const isValidBarcode = (value) => /^\d{4,32}$/.test(String(value || "").trim());
+const isValidBarcode = (value) => /^\d{4,15}$/.test(String(value || "").trim());
 const JPG_IMAGE_ERROR = "Only JPG image files are allowed.";
 const isJpgImageFile = (file) => {
   if (!file) return true;
@@ -620,7 +620,7 @@ export default function Inventory() {
     }
 
     if (!isValidBarcode(normalizedBarcode)) {
-      setStockError("Barcode must be 4 to 32 digits.");
+      setStockError("Barcode must be 4 to 15 digits.");
       return;
     }
 
@@ -897,13 +897,14 @@ export default function Inventory() {
                 {isCategoryDropdownOpen && (
                   <div className="absolute z-30 mt-2 w-full rounded-2xl border border-gray-200 bg-white shadow-2xl overflow-hidden">
                     <div className="border-b border-gray-100 p-3">
-                      <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2">
+                        <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2">
                         <FaSearch className="text-gray-400" />
                         <input
                           type="text"
                           value={categoryFilter}
                           onChange={(e) => setCategoryFilter(e.target.value)}
                           placeholder="Search category name"
+                          maxLength={100}
                           className="w-full bg-transparent text-sm text-gray-800 outline-none placeholder:text-gray-400"
                         />
                       </div>
@@ -972,13 +973,14 @@ export default function Inventory() {
                 {isItemDropdownOpen && (
                   <div className="absolute z-30 mt-2 w-full rounded-2xl border border-gray-200 bg-white shadow-2xl overflow-hidden">
                     <div className="border-b border-gray-100 p-3">
-                      <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2">
+                        <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2">
                         <FaSearch className="text-gray-400" />
                         <input
                           type="text"
                           value={itemFilter}
                           onChange={(e) => setItemFilter(e.target.value)}
                           placeholder="Search item name"
+                          maxLength={100}
                           className="w-full bg-transparent text-sm text-gray-800 outline-none placeholder:text-gray-400"
                         />
                       </div>
@@ -1040,7 +1042,8 @@ export default function Inventory() {
                     value={inventorySearchInput}
                     onChange={(e) => setInventorySearchInput(e.target.value)}
                     placeholder="Search item"
-                    className="w-full min-w-0 bg-transparent outline-none text-gray-800 placeholder:text-gray-400"
+                    maxLength={100}
+                    className="w-full bg-transparent outline-none text-gray-800 placeholder:text-gray-400"
                   />
                 </div>
 
@@ -1255,16 +1258,19 @@ export default function Inventory() {
                   Unit Selling Rate
                 </label>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
                   min="0"
                   step="any"
                   value={stockForm.rate}
+                  maxLength={12}
                   onChange={(e) => {
                     let v = String(e.target.value || "");
                     v = v.replace(/e/gi, "");
                     v = v.replace(/[^0-9.]/g, "");
                     const parts = v.split('.');
                     if (parts.length > 2) v = parts[0] + '.' + parts.slice(1).join('');
+                    v = v.slice(0, 12);
                     setStockForm((prev) => ({ ...prev, rate: v }));
                   }}
                   className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-700"
@@ -1281,9 +1287,11 @@ export default function Inventory() {
                   pattern="[0-9]*"
                   min="0"
                   value={stockForm.volume}
+                  maxLength={10}
                   onChange={(e) => {
                     let v = String(e.target.value || "");
                     v = v.replace(/[^0-9]/g, "");
+                    v = v.slice(0, 10);
                     setStockForm((prev) => ({ ...prev, volume: v }));
                   }}
                   placeholder="e.g., 750"
@@ -1299,9 +1307,13 @@ export default function Inventory() {
                   <input
                     type="text"
                     value={stockForm.barcode}
-                    onChange={(e) =>
-                      setStockForm((prev) => ({ ...prev, barcode: e.target.value }))
-                    }
+                    inputMode="text"
+                    pattern="[0-9]*"
+                    maxLength={15}
+                    onChange={(e) => {
+                      const v = String(e.target.value || "").slice(0, 15); //slice for maxlength
+                      setStockForm((prev) => ({ ...prev, barcode: v }));
+                    }}
                     placeholder="Scan or type barcode"
                     className="flex-1 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-700"
                   />
@@ -1368,13 +1380,14 @@ export default function Inventory() {
                 </button>
               </div>
 
-              <div className="flex items-center gap-3 border-t border-gray-100 px-4 py-3">
+                <div className="flex items-center gap-3 border-t border-gray-100 px-4 py-3">
                 <FaSearch className="text-gray-400" />
                 <input
                   type="text"
                   value={stockRowSearch}
                   onChange={(e) => setStockRowSearch(e.target.value)}
                   placeholder="Search staged rows"
+                  maxLength={100}
                   className="w-40 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 outline-none"
                 />
                 <button
@@ -1472,6 +1485,7 @@ export default function Inventory() {
                   onChange={(e) =>
                     setFormValues((prev) => ({ ...prev, itemName: e.target.value }))
                   }
+                  maxLength={100}
                   className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-800"
                 />
               </div>
@@ -1486,6 +1500,7 @@ export default function Inventory() {
                   onChange={(e) =>
                     setFormValues((prev) => ({ ...prev, description: e.target.value }))
                   }
+                  maxLength={250}
                   className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-800"
                 />
               </div>
@@ -1579,6 +1594,7 @@ export default function Inventory() {
                               value={subCategoryFilter}
                               onChange={(e) => setSubCategoryFilter(e.target.value)}
                               placeholder="Search sub category"
+                              maxLength={100}
                               className="w-full bg-transparent text-sm text-gray-800 outline-none placeholder:text-gray-400"
                             />
                           </div>
