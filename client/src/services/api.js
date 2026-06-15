@@ -1,5 +1,6 @@
 // axios instance goes here
 import axios from "axios";
+import { clearAuthData, getToken } from "../utils/authStorage";
 
 const clearOrderHistoryFilters = () => {
   try {
@@ -53,7 +54,7 @@ const api = axios.create({
 // ================================
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem("token");
+    const token = getToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -72,8 +73,8 @@ api.interceptors.response.use(
       err.response?.status === 401 &&
       !window.location.pathname.includes("/login")
     ) {
-      localStorage.removeItem("token");
-      localStorage.removeItem("authUser");
+      // Clear all authentication data when 401 Unauthorized is received
+      clearAuthData();
       clearOrderHistoryFilters();
       window.location.href = "/login";
     }
@@ -85,7 +86,7 @@ api.interceptors.response.use(
 // Auth-aware fetch helper (for legacy fetch usage)
 // ================================
 export async function authFetchJson(input, init = {}) {
-  const token = localStorage.getItem("token");
+  const token = getToken();
   const headers = new Headers(init.headers || {});
 
   if (token && !headers.has("Authorization")) {
@@ -99,8 +100,8 @@ export async function authFetchJson(input, init = {}) {
   });
 
   if (res.status === 401 && !window.location.pathname.includes("/login")) {
-    localStorage.removeItem("token");
-    localStorage.removeItem("authUser");
+    // Clear all authentication data when 401 Unauthorized is received
+    clearAuthData();
     clearOrderHistoryFilters();
     window.location.href = "/login";
     throw new Error("Unauthorized");

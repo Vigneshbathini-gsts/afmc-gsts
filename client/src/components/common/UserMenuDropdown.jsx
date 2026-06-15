@@ -8,6 +8,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import ChangePasswordModal from "./ChangePasswordModal";
 import { useAuth } from "../../context/AuthContext";
+import { clearAuthData } from "../../utils/authStorage";
 
 export default function UserMenuDropdown({ username }) {
   const [open, setOpen] = useState(false);
@@ -22,7 +23,8 @@ export default function UserMenuDropdown({ username }) {
 
   // Logout
   const handleLogout = () => {
-    localStorage.removeItem("token");
+    // Clear all authentication data
+    clearAuthData();
     clearUser();
     navigate("/login");
   };

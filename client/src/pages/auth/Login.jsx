@@ -16,6 +16,7 @@ import { useLocation } from "react-router-dom";
 import { useRef } from "react";
 import { authAPI } from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
+import { storeAuthData, storeRememberedEmail, getRememberedEmail, getRememberMePreference } from "../../utils/authStorage";
 import logo from "../../assets/AFMC_Logo.png";
 
 const AFMCLogo = logo;
@@ -66,8 +67,8 @@ export default function Login() {
 
   // Load saved credentials
   useEffect(() => {
-    const savedEmail = localStorage.getItem("afmc_remembered_email");
-    const savedRemember = localStorage.getItem("afmc_remember_me") === "true";
+    const savedEmail = getRememberedEmail();
+    const savedRemember = getRememberMePreference();
     if (savedEmail && savedRemember) {
       setEmail(savedEmail);
       setRememberMe(true);
@@ -158,16 +159,17 @@ export default function Login() {
       });
       // console.log("Login response:", response.data);
       if (response.data?.success) {
-        // Handle remember me
+        // Handle remember me - store email and token
         if (rememberMe) {
-          localStorage.setItem("afmc_remembered_email", email.trim());
-          localStorage.setItem("afmc_remember_me", "true");
+          storeRememberedEmail(email.trim());
         } else {
-          localStorage.removeItem("afmc_remembered_email");
-          localStorage.setItem("afmc_remember_me", "false");
+          storeRememberedEmail(null);
         }
 
-        localStorage.setItem("token", response.data.token);
+        // Store token and user data in localStorage
+        storeAuthData(response.data.token, response.data.user, rememberMe);
+        
+        // Update auth context with user data
         setUser(response.data.user);
         
         setTimeout(() => {

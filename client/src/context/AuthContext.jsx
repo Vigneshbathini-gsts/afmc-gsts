@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { cartAPI } from "../services/api";
+import { storeAuthData, clearAuthData, getStoredUser } from "../utils/authStorage";
 
 const AuthContext = createContext(null);
 const AUTH_USER_STORAGE_KEY = "authUser";
@@ -39,7 +40,7 @@ export function AuthProvider({ children }) {
   };
 
   useEffect(() => {
-    const storedUser = localStorage.getItem(AUTH_USER_STORAGE_KEY);
+    const storedUser = getStoredUser();
 
     if (!storedUser) {
       setUser(null);
@@ -48,9 +49,9 @@ export function AuthProvider({ children }) {
     }
 
     try {
-      setUser(JSON.parse(storedUser));
+      setUser(storedUser);
     } catch (error) {
-      localStorage.removeItem(AUTH_USER_STORAGE_KEY);
+      clearAuthData();
       setUser(null);
     }
     setIsLoading(false);
@@ -62,7 +63,7 @@ export function AuthProvider({ children }) {
 
   const setAuthenticatedUser = (userData) => {
     if (!userData) {
-      localStorage.removeItem(AUTH_USER_STORAGE_KEY);
+      clearAuthData();
       setUser(null);
       setCartCount(0);
       setIsLoading(false);
@@ -81,14 +82,14 @@ export function AuthProvider({ children }) {
       outletType: userData.outletType || null,
     };
 
-    localStorage.setItem(AUTH_USER_STORAGE_KEY, JSON.stringify(normalizedUser));
+    storeAuthData(null, normalizedUser);
     setUser(normalizedUser);
     setIsLoading(false);
   };
 
   const clearUser = () => {
     clearOrderHistoryFilters();
-    localStorage.removeItem(AUTH_USER_STORAGE_KEY);
+    clearAuthData();
     setUser(null);
     setIsLoading(false);
   };
