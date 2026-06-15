@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
 import {
@@ -10,6 +10,7 @@ import {
   Search,
   UploadCloud,
 } from "lucide-react";
+import { useAuth } from "../../context/AuthContext";
 import { userAPI } from "../../services/api";
 
 const STATUS_STYLES = {
@@ -68,12 +69,14 @@ export default function UserManagement() {
   const [formError, setFormError] = useState("");
   const [formSuccess, setFormSuccess] = useState("");
   const [saving, setSaving] = useState(false);
+  const { user } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [uploadFile, setUploadFile] = useState(null);
   const [uploadError, setUploadError] = useState("");
   const [uploadSuccess, setUploadSuccess] = useState("");
   const [uploading, setUploading] = useState(false);
+  const uploadInputRef = useRef(null);
 
   const fetchUsers = useCallback(async (searchValue = "") => {
     try {
@@ -105,14 +108,27 @@ export default function UserManagement() {
   const visibleUsers = useMemo(() => users || [], [users]);
 
   const currentUser = useMemo(() => {
+    if (user) {
+      return user?.username || user?.email || user?.user_name || user?.name || "SYSTEM";
+    }
+
     try {
-      const storedUser = localStorage.getItem("user");
+      const storedUser =
+        localStorage.getItem("authUser") ;
+        console.log("auth user",storedUser)
       const parsed = storedUser ? JSON.parse(storedUser) : null;
-      return parsed?.username || parsed?.email || "SYSTEM";
+      console.log("parsed",parsed)
+      return (
+        parsed?.username ||
+        parsed?.email ||
+        parsed?.user_name ||
+        parsed?.name ||
+        "SYSTEM"
+      );
     } catch (parseError) {
       return "SYSTEM";
     }
-  }, []);
+  }, [user]);
 
   const resetForm = () => {
     setFormData(INITIAL_FORM);
@@ -129,12 +145,16 @@ export default function UserManagement() {
     setIsCreateModalOpen(false);
     setSaving(false);
     resetForm();
+    isUploadModalOpen(false)
   };
 
   const openUploadModal = () => {
     setUploadFile(null);
     setUploadError("");
     setUploadSuccess("");
+    if (uploadInputRef.current) {
+      uploadInputRef.current.value = "";
+    }
     setIsUploadModalOpen(true);
   };
 
@@ -143,6 +163,9 @@ export default function UserManagement() {
     setUploadError("");
     setUploadSuccess("");
     setUploading(false);
+    if (uploadInputRef.current) {
+      uploadInputRef.current.value = "";
+    }
     setIsUploadModalOpen(false);
   };
 
@@ -193,9 +216,15 @@ export default function UserManagement() {
 
       await fetchUsers(search);
 
+      
+
       setTimeout(() => {
         closeCreateModal();
+        
+        
       }, 900);
+
+
     } catch (saveError) {
       console.error("Failed to create user:", saveError);
       const createErrorMessage =
@@ -279,9 +308,15 @@ export default function UserManagement() {
           result?.skippedCount || 0
         }${skippedMessages ? ` (${skippedMessages})` : ""}`;
       setUploadSuccess(uploadSuccessMessage);
+      setUploadFile(null);
+      if (uploadInputRef.current) {
+        uploadInputRef.current.value = "";
+      }
       toast.success(uploadSuccessMessage);
-
       await fetchUsers(search);
+      setTimeout(() => {
+        closeUploadModal();
+      }, 1200);
     } catch (uploadSaveError) {
       console.error("Failed to bulk upload users:", uploadSaveError);
       const backendErrors = uploadSaveError.response?.data?.errors;
@@ -725,6 +760,7 @@ export default function UserManagement() {
                       Upload File:
                     </label>
                     <input
+                      ref={uploadInputRef}
                       type="file"
                       accept=".csv"
                       onChange={handleUploadFileChange}
