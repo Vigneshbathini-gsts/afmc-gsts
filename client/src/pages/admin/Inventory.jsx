@@ -864,7 +864,7 @@ export default function Inventory() {
           <button
             type="button"
             onClick={() => navigate("/admin/dashboard")}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-white shadow hover:shadow-md border border-afmc-gold/30 text-gray-700 hover:text-afmc-maroon hover:bg-afmc-maroon/5 transition"
+            className="flex items-center gap-2 px-4 py-2 rounded-full bg-white shadow hover:shadow-md border border-afmc-gold/30 text-gray-700 hover:text-afmc-maroon hover:bg-afmc-maroon/5 transition"
           >
             <FaArrowLeft />
             Go To Dashboard
@@ -873,12 +873,11 @@ export default function Inventory() {
 
         <div className="bg-white/80 border border-afmc-gold/15 rounded-3xl shadow-xl backdrop-blur-sm p-5 md:p-6">
           <div className="mb-5 md:mb-6 h-1 w-full rounded-full bg-gradient-to-r from-afmc-maroon via-afmc-gold to-afmc-maroon2" />
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 md:gap-6 items-end">
-            <div>
+<div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1.2fr_1.8fr] gap-5 md:gap-6 items-end">           <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Category Name
               </label>
-              <div className="relative" ref={categoryDropdownRef}>
+              <div className="relative" ref={categoryDropdownRef} >
                 <button
                   type="button"
                   onClick={() =>
@@ -1028,65 +1027,20 @@ export default function Inventory() {
               </div>
             </div>
 
-            <div className="flex flex-col gap-3">
-
-              {/* 🔼 Move this block to TOP (no style change) */}
-             <button
-  type="button"
-  onClick={openAddModal}
-  className="group relative inline-flex items-center gap-3 overflow-hidden rounded-xl 
-  bg-afmc-maroon px-6 py-2.5 font-semibold text-white shadow-md 
-  transition-all duration-300 ease-out
-  hover:shadow-lg hover:-translate-y-[1px]
-  focus:outline-none focus:ring-2 focus:ring-afmc-gold/60 focus:ring-offset-2"
->
-  {/* Gold sheen overlay */}
-  <span className="absolute inset-0 opacity-0 transition-opacity duration-500 
-  group-hover:opacity-100 bg-gradient-to-r from-transparent via-afmc-gold/20 to-transparent" />
-
-  {/* Border glow */}
-  <span className="absolute inset-0 rounded-xl ring-1 ring-afmc-gold/20 
-  group-hover:ring-afmc-gold/40 transition-all duration-300" />
-
-  {/* Icon container */}
-  <span className="relative flex h-9 w-9 items-center justify-center rounded-lg 
-  bg-white/10 text-afmc-gold backdrop-blur-sm
-  transition-all duration-300 group-hover:bg-white/20">
-    <svg
-      viewBox="0 0 24 24"
-      className="h-5 w-5 transition-transform duration-300 group-hover:rotate-90"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <path
-        d="M12 5v14M5 12h14"
-        stroke="currentColor"
-        strokeWidth="2.2"
-        strokeLinecap="round"
-      />
-    </svg>
-  </span>
-
-  {/* Text */}
-  <span className="relative tracking-wide text-sm letter-spacing-wide">
-    Add New Item
-  </span>
-</button>
-              {/* Existing Search Label */}
+            <div className="flex flex-col gap-2 w-full">
               <label className="block text-sm font-medium text-gray-700">
                 Search
               </label>
 
-              {/* Existing Search Input + Button */}
-              <div className="flex items-center gap-3">
-                <div className="flex-1 flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3">
+              <div className="flex flex-col gap-2 w-full sm:flex-row sm:items-center sm:justify-end">
+                <div className="min-w-0 flex-1 flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3">
                   <FaSearch className="text-gray-400" />
                   <input
                     type="text"
                     value={inventorySearchInput}
                     onChange={(e) => setInventorySearchInput(e.target.value)}
                     placeholder="Search item"
-                    className="w-full bg-transparent outline-none text-gray-800 placeholder:text-gray-400"
+                    className="w-full min-w-0 bg-transparent outline-none text-gray-800 placeholder:text-gray-400"
                   />
                 </div>
 
@@ -1096,13 +1050,35 @@ export default function Inventory() {
                     setSearch(inventorySearchInput.trim());
                     fetchInventory({ search: inventorySearchInput.trim() });
                   }}
-                  className="px-5 py-3 rounded-2xl bg-afmc-maroon text-white font-semibold flex items-center gap-2 shadow-afmc hover:bg-afmc-maroon2 focus:outline-none focus:ring-2 focus:ring-afmc-gold/50 transition"
+                  className="w-full sm:w-auto h-12 px-4 sm:px-5 rounded-2xl bg-afmc-maroon text-white font-semibold flex items-center justify-center gap-2 shadow-afmc hover:bg-afmc-maroon2 focus:outline-none focus:ring-2 focus:ring-afmc-gold/50 transition whitespace-nowrap"
                 >
                   <FaSearch />
                   Search
                 </button>
-              </div>
 
+                <button
+                  type="button"
+                  onClick={openAddModal}
+                  className="w-full sm:w-auto inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-afmc-maroon px-4 sm:px-5 text-sm font-semibold text-white shadow-md transition-all duration-200 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-afmc-gold/60 whitespace-nowrap"
+                >
+                  <span className="relative flex h-6 w-6 items-center justify-center rounded-md bg-white/10 text-afmc-gold">
+                    <svg
+                      viewBox="0 0 24 24"
+                      className="h-4 w-4"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M12 5v14M5 12h14"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                  </span>
+                  <span className="relative tracking-wide">Add Item</span>
+                </button>
+              </div>
             </div>
           </div>
 
@@ -1468,8 +1444,8 @@ export default function Inventory() {
       )}
 
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-4xl rounded-3xl bg-white/95 shadow-2xl border border-white/70 backdrop-blur-md p-8 relative">
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 px-4 py-6">
+          <div className="w-full max-w-full sm:max-w-4xl rounded-3xl bg-white/95 shadow-2xl border border-white/70 backdrop-blur-md p-4 sm:p-8 relative">
             <button
               type="button"
               onClick={() => setShowAddModal(false)}
@@ -1757,11 +1733,11 @@ export default function Inventory() {
               </div>
             </div>
 
-            <div className="mt-8 flex items-center justify-between">
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <button
                 type="button"
                 onClick={() => setShowAddModal(false)}
-                className="px-6 py-3 rounded-full bg-gray-600 text-white"
+                className="w-full sm:w-auto px-6 py-3 rounded-full bg-gray-600 text-white"
               >
                 Back
               </button>
@@ -1769,7 +1745,7 @@ export default function Inventory() {
                 type="button"
                 onClick={handleCreateItem}
                 disabled={saving}
-                className="px-8 py-3 rounded-full bg-afmc-maroon text-white font-semibold shadow-afmc hover:bg-afmc-maroon2 focus:outline-none focus:ring-2 focus:ring-afmc-gold/50 disabled:opacity-70"
+                className="w-full sm:w-auto px-8 py-3 rounded-full bg-afmc-maroon text-white font-semibold shadow-afmc hover:bg-afmc-maroon2 focus:outline-none focus:ring-2 focus:ring-afmc-gold/50 disabled:opacity-70"
               >
                 {saving ? "Creating..." : "Create"}
               </button>
