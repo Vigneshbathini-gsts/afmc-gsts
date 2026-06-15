@@ -47,7 +47,7 @@ async function getInventoryStockForUpdate(connection, itemCode) {
   };
 }
 
-async function reserveInventoryQty(connection, itemCode, quantity) {
+async function reserveInventoryQty(connection, itemCode, quantity, itemName = null) {
   const qty = Number(quantity || 0);
   if (!Number.isFinite(qty) || qty <= 0) return;
 
@@ -58,7 +58,8 @@ async function reserveInventoryQty(connection, itemCode, quantity) {
   const availableQty = Math.max(0, actualQty - reservedQty);
 
   if (qty > availableQty) {
-    throw createValidationError(`Out of stock. Available quantity: ${availableQty}`);
+    const namePart = itemName ? ` for ${itemName}` : "";
+    throw createValidationError(`Out of stock${namePart}. Available quantity: ${availableQty}`);
   }
 
   await connection.execute(
@@ -390,9 +391,10 @@ async function syncFreeItemForOrderItem(connection, { orderNumber, itemCode, qua
   const freeQtyDelta = computedFreeQty - currentExistingQty;
   if (Number.isFinite(freeItemCode) && freeItemCode > 0) {
     if (freeQtyDelta > 0) {
-      await reserveInventoryQty(connection, freeItemCode, freeQtyDelta);
+      await reserveInventoryQty(connection, freeItemCode, freeQtyDelta, "free item");
     } else if (freeQtyDelta < 0) {
-      await releaseInventoryQty(connection, freeItemCode, Math.abs(freeQtyDelta));
+      // do not release reserved qty when free item quantity decreases
+      // await releaseInventoryQty(connection, freeItemCode, Math.abs(freeQtyDelta));
     }
   }
 
@@ -1163,7 +1165,7 @@ async function cancelOrder(orderNumber) {
       if (!Number.isFinite(itemId) || itemId <= 0) continue;
       if (!Number.isFinite(qty) || qty <= 0) continue;
       if ([14, 15].includes(subCategory)) continue;
-      await releaseInventoryQty(connection, itemId, qty);
+      // await releaseInventoryQty(connection, itemId, qty);
     }
 
     await connection.execute(
@@ -1279,7 +1281,8 @@ async function updateOrderItemQuantity(orderNumber, itemCode, delta, authUser = 
     });
 
     if (!isMocktailItem && normalizedDelta < 0) {
-      await releaseInventoryQty(connection, normalizedItemCode, Math.abs(normalizedDelta));
+      // do not release reserved qty when quantity decreases
+      // await releaseInventoryQty(connection, normalizedItemCode, Math.abs(normalizedDelta));
     }
 
     await connection.commit();
@@ -1333,7 +1336,8 @@ async function deleteOrderItem(orderNumber, itemCode) {
     const isMocktailItem = [14, 15].includes(itemSubCategory);
 
     if (!isMocktailItem && existingQty > 0) {
-      await releaseInventoryQty(connection, normalizedItemCode, existingQty);
+      // do not release reserved qty when order item is deleted
+      // await releaseInventoryQty(connection, normalizedItemCode, existingQty);
     }
 
     const [freeRows] = await connection.execute(
@@ -1352,7 +1356,8 @@ async function deleteOrderItem(orderNumber, itemCode) {
     const freeItemId = Number(freeRows[0]?.item_id || 0);
     const freeQty = Number(freeRows[0]?.quantity || 0);
     if (freeItemId > 0 && freeQty > 0) {
-      await releaseInventoryQty(connection, freeItemId, freeQty);
+      // do not release reserved qty for associated free item when deleting parent
+      // await releaseInventoryQty(connection, freeItemId, freeQty);
     }
 
     await connection.execute(
@@ -1535,7 +1540,8 @@ async function createOrder(payload = {}, authUser = {}) {
       const reservedQty = Number(resRow?.reserved_qty || 0);
       const availableQty = Math.max(0, stockQty - reservedQty);
       if (quantity > availableQty) {
-        throw createValidationError(`Out of stock. Available quantity: ${availableQty}`);
+        const itemName = inventoryItem?.item_name || itemCode;
+        throw createValidationError(`Out of stock for ${itemName}. Available quantity: ${availableQty}`);
       }
     }
 
@@ -2044,6 +2050,7 @@ async function updateOrderLineQuantity(orderNumber, orderLineId, userId, quantit
     const [[invRow]] = await connection.execute(
       `
         SELECT
+          xi.item_name,
           xi.sub_category AS subcategory,
           IFNULL(xi.stock_quantity, 0) AS stock_quantity,
           IFNULL(xi.reserved_qty, 0) AS reserved_qty
@@ -2281,9 +2288,10 @@ async function updateOrderLineQuantity(orderNumber, orderLineId, userId, quantit
         freeItemCode > 0
       ) {
         if (freeQtyDelta > 0) {
-          await reserveInventoryQty(connection, freeItemCode, freeQtyDelta);
+          await reserveInventoryQty(connection, freeItemCode, freeQtyDelta, "free item");
         } else if (freeQtyDelta < 0) {
-          await releaseInventoryQty(connection, freeItemCode, Math.abs(freeQtyDelta));
+          // do not release reserved qty when free item quantity decreases
+          // await releaseInventoryQty(connection, freeItemCode, Math.abs(freeQtyDelta));
         }
       }
 
@@ -2385,7 +2393,8 @@ async function updateOrderLineQuantity(orderNumber, orderLineId, userId, quantit
 
     const deltaQty = normalizedQuantity - currentQty;
     if (!isCocktailOrMocktail && deltaQty < 0) {
-      await releaseInventoryQty(connection, itemId, Math.abs(deltaQty));
+      // do not release reserved qty when quantity decreases
+      // await releaseInventoryQty(connection, itemId, Math.abs(deltaQty));
     }
 
     await connection.commit();

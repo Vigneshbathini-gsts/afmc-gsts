@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useRef, useState } from "react";
+﻿﻿import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { CheckCircle2, ChevronLeft, Minus, Pencil, Plus, Trash2, XCircle } from "lucide-react";
 import Pubmenubuyservice from "../services/Pubmenubuyservice";
@@ -283,6 +283,7 @@ export default function Pubmenubuy({
   const [confirming, setConfirming] = useState(false);
   const [updatingLineId, setUpdatingLineId] = useState(null);
   const [error, setError] = useState("");
+  const [temporaryStockMessage, setTemporaryStockMessage] = useState("");
   const [cocktailDetailsByItemCode, setCocktailDetailsByItemCode] = useState({});
   const [cocktailOverrideIssues, setCocktailOverrideIssues] = useState({});
   const [stockLimitImageMessages, setStockLimitImageMessages] = useState({});
@@ -294,6 +295,7 @@ export default function Pubmenubuy({
     cancelText: "No",
   });
   const confirmResolveRef = useRef(null);
+  const temporaryStockTimerRef = useRef(null);
 
   const closeConfirmModal = (confirmed) => {
     setConfirmModal((prev) => ({ ...prev, open: false }));
@@ -524,6 +526,29 @@ export default function Pubmenubuy({
     if (type === "error") toast.error(message);
     else toast.success(message);
   };
+
+  const showTemporaryStockMessage = (message) => {
+    const text = String(message || "").trim();
+    if (!text) return;
+
+    if (temporaryStockTimerRef.current) {
+      clearTimeout(temporaryStockTimerRef.current);
+    }
+
+    setTemporaryStockMessage(text);
+    temporaryStockTimerRef.current = setTimeout(() => {
+      setTemporaryStockMessage("");
+      temporaryStockTimerRef.current = null;
+    }, 4500);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (temporaryStockTimerRef.current) {
+        clearTimeout(temporaryStockTimerRef.current);
+      }
+    };
+  }, []);
 
   // Track per-item out-of-stock toast cooldowns (timestamps) without causing re-renders.
   // Structure: { [itemKey]: { [normalizedMessage]: timestampMillis } }
@@ -1472,6 +1497,7 @@ export default function Pubmenubuy({
 
     // Check for stock issues
     if (stockIssueMessage) {
+      showTemporaryStockMessage(stockIssueMessage);
       showToast(stockIssueMessage, "error");
       return;
     }
@@ -1544,7 +1570,16 @@ export default function Pubmenubuy({
       const errorMessage = confirmError?.response?.data?.message ||
         confirmError?.message ||
         "Unable to confirm this order. Please try again.";
-      setError(errorMessage);
+      if (isOutOfStockMessage(errorMessage)) {
+        setError("");
+        showTemporaryStockMessage(errorMessage);
+      } else {
+        setError(errorMessage);
+      }
+      
+      // Refresh data to get actual stock levels from the server
+      await refreshOrderSummary();
+      
       showToast(errorMessage, "error");
     } finally {
       setConfirming(false);
@@ -1647,21 +1682,29 @@ export default function Pubmenubuy({
             </div>
           ) : (
             <div className="space-y-4">
-              {stockIssueMessage ? (
+              {temporaryStockMessage ? (
                 <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                  {stockIssueMessage}
+                  {temporaryStockMessage}
                 </div>
               ) : null}
               {/* Products */}
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {items
-                  .filter((item) => Number(item.quantity || 0) > 0)
                   .map((item) => {
                     const missingCocktailIngredients = hasMissingCocktailIngredients(orderNumber, item, cocktailDetailsByItemCode);
                     const isCocktailItem = isCocktailOrMocktail(item);
+                    
+                    // Determine if the item is out of stock based on current availableQuantity vs requested quantity
+                    const isStandardOutOfStock = !isCocktailItem && !item.isFreeItem && item.availableQuantity !== null && Number(item.quantity) > Number(item.availableQuantity);
+                    const isCardOutOfStock =
+                      isCocktailItem
+                        ? Boolean(getCocktailOverrideForItem(item)?.isOutOfStock || item.stockIssueMessage || isOutOfStock(item))
+                        : Boolean(isStandardOutOfStock || Number(item.availableQuantity) === 0);
+                    
                     const imageStockMessage = isCocktailItem
-                      ? ""
-                      : stockLimitImageMessages[getStockLimitImageKey(item)] || "";
+                      ? (isCardOutOfStock ? "Out of Stock" : "")
+                      : (isStandardOutOfStock || Number(item.availableQuantity) === 0 ? "Out of Stock" : (stockLimitImageMessages[getStockLimitImageKey(item)] || ""));
+                      
                     const disablePlusForStock =
                       isCocktailItem
                         ? (() => {
@@ -1670,11 +1713,12 @@ export default function Pubmenubuy({
                           return String(item.stockIssueMessage || "").trim().length > 0 || isOutOfStock(item);
                         })()
                         : false;
+                    const disableQuantityControls = disableEdit || updatingLineId === Number(item.orderLineId ?? item.id) || isCardOutOfStock;
 
                     return (
                       <div
                         key={item.orderLineId ?? item.id}
-                        className="group overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-afmc-gold/40 hover:shadow-md focus-within:ring-2 focus-within:ring-afmc-gold/40 focus-within:ring-offset-2 focus-within:ring-offset-stone-50"
+                        className={`group overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm transition focus-within:ring-2 focus-within:ring-afmc-gold/40 focus-within:ring-offset-2 focus-within:ring-offset-stone-50 ${isCardOutOfStock ? "border-red-200 bg-red-50/20" : "hover:-translate-y-0.5 hover:border-afmc-gold/40 hover:shadow-md"}`}
                       >
                         {/* Image */}
                         <div className="relative flex h-40 items-center justify-center overflow-hidden bg-stone-50 p-4">
@@ -1808,9 +1852,9 @@ export default function Pubmenubuy({
                                 <button
                                   type="button"
                                   onClick={() => handleQtyClick(item, -1)}
-                                  aria-disabled={disableEdit || updatingLineId === Number(item.orderLineId ?? item.id) || item.quantity <= 1}
-                                  disabled={disableEdit || updatingLineId === Number(item.orderLineId ?? item.id) || item.quantity <= 1}
-                                  className={`rounded-md bg-white p-1.5 text-stone-700 shadow-sm transition hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-afmc-gold/40 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-50 ${updatingLineId === Number(item.orderLineId ?? item.id) || item.quantity <= 1
+                                  aria-disabled={disableQuantityControls || item.quantity <= 1}
+                                  disabled={disableQuantityControls || item.quantity <= 1}
+                                  className={`rounded-md bg-white p-1.5 text-stone-700 shadow-sm transition hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-afmc-gold/40 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-50 ${disableQuantityControls || item.quantity <= 1
                                     ? "opacity-50"
                                     : ""
                                     }`}
@@ -1826,19 +1870,17 @@ export default function Pubmenubuy({
                                   type="button"
                                   onClick={() => handleQtyClick(item, 1)}
                                   aria-disabled={
-                                    disableEdit ||
-                                    updatingLineId === Number(item.orderLineId ?? item.id) ||
+                                    disableQuantityControls ||
                                     disablePlusForStock ||
                                     item.quantity >= MAX_QTY
                                   }
                                   disabled={
-                                    disableEdit ||
-                                    updatingLineId === Number(item.orderLineId ?? item.id) ||
-                                    disablePlusForStock ||
+                                    disableQuantityControls ||
+                                    disablePlusForStock || isStandardOutOfStock ||
                                     item.quantity >= MAX_QTY
                                   }
                                   className={`rounded-md bg-afmc-maroon p-1.5 text-white shadow-sm transition hover:bg-afmc-maroon2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-afmc-gold/50 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-50 ${updatingLineId === Number(item.orderLineId ?? item.id) ||
-                                    disablePlusForStock ||
+                                    disablePlusForStock || isStandardOutOfStock ||
                                     item.quantity >= MAX_QTY
                                     ? "opacity-60"
                                     : ""

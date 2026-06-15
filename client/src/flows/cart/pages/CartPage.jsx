@@ -376,11 +376,11 @@ export default function CartPage({ isAttendant = false }) {
                 </div>
             )}
 
-            {error && (
+            {/* {error && (
                 <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                     {error}
                 </div>
-            )}
+            )} */}
 
             {!loading && cartItems.length === 0 && (
                 <div className="rounded-lg border border-gray-200 bg-white p-6 text-center text-gray-600">
