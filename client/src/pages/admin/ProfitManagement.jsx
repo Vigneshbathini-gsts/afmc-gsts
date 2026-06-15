@@ -156,16 +156,25 @@ export default function ProfitManagement() {
 
                             <div className="mb-3">
                                 <label className="block mb-1 text-sm font-medium text-slate-700">
-                                    Profit
+                                    Member Profit
                                 </label>
                                 <input
-                                    type="number"
+                                    type="text"
+                                    inputMode="decimal"
                                     name="profit"
                                     value={memberForm.profit}
-                                    onChange={handleMemberChange}
+                                    onChange={(e) => {
+                                        const value = e.target.value;
+
+                                        // Max 5 chars, allow decimal
+                                        if (value.length <= 5 && /^\d*\.?\d*$/.test(value)) {
+                                            handleMemberChange(e);
+                                        }
+                                    }}
                                     className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
                                     required
                                     min="0"
+                                    placeholder="Enter profit percentage (e.g 10)"
                                 />
                             </div>
 
@@ -175,12 +184,21 @@ export default function ProfitManagement() {
                                         Food PR Charges
                                     </label>
                                     <input
-                                        type="number"
+                                        type="text"
+                                        inputMode="decimal"
                                         name="foodPrCharges"
                                         value={memberForm.foodPrCharges}
-                                        onChange={handleMemberChange}
+                                        onChange={(e) => {
+                                            const value = e.target.value;
+
+                                            if (value.length <= 5 && /^\d*\.?\d{0,2}$/.test(value)) {
+                                                handleMemberChange(e);
+                                            }
+                                        }}
                                         className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
-                                        min="0"
+
+                                        placeholder="Enter Food PR Charges"
+
                                     />
                                 </div>
                             )}
@@ -225,13 +243,21 @@ export default function ProfitManagement() {
                                     Non-Member Profit
                                 </label>
                                 <input
-                                    type="number"
+                                    type="text"
+                                    inputMode="decimal"
                                     name="profit"
-                                    min="0"
                                     value={nonMemberForm.profit}
-                                    onChange={handleNonMemberChange}
+                                    onChange={(e) => {
+                                        const value = e.target.value;
+
+                                        // Allow decimal, max 5 characters total
+                                        if (value.length <= 5 && /^\d*\.?\d{0,2}$/.test(value)) {
+                                            handleNonMemberChange(e);
+                                        }
+                                    }}
                                     className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
                                     required
+                                    placeholder="Enter profit percentage (e.g 10)"
                                 />
                             </div>
 
@@ -241,12 +267,19 @@ export default function ProfitManagement() {
                                         PR Charges
                                     </label>
                                     <input
-                                        type="number"
+                                        type="text"
+                                        inputMode="decimal"
                                         name="prCharges"
-                                        min="0"
                                         value={nonMemberForm.prCharges}
-                                        onChange={handleNonMemberChange}
+                                        onChange={(e) => {
+                                            const value = e.target.value;
+
+                                            if (value.length <= 5 && /^\d*\.?\d{0,2}$/.test(value)) {
+                                                handleNonMemberChange(e);
+                                            }
+                                        }}
                                         className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
+                                         placeholder="Enter PR Charges"
                                     />
                                 </div>
                             )}

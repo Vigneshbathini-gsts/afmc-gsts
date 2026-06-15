@@ -505,7 +505,9 @@ export default function CocktailEdit() {
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
             <input
+              type="number"
               value={form.memberProfit}
+              
               onChange={(event) =>
                 updateField("memberProfit", event.target.value)
               }
@@ -513,6 +515,7 @@ export default function CocktailEdit() {
               className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 outline-none focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
             />
             <input
+              type="number"
               value={form.memberPrCharges}
               onChange={(event) =>
                 updateField("memberPrCharges", event.target.value)
@@ -521,6 +524,7 @@ export default function CocktailEdit() {
               className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 outline-none focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
             />
             <input
+               type="number"
               value={form.nonMemberProfit}
               onChange={(event) =>
                 updateField("nonMemberProfit", event.target.value)
@@ -529,6 +533,7 @@ export default function CocktailEdit() {
               className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 outline-none focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
             />
             <input
+               type="number"
               value={form.nonMemberPrCharges}
               onChange={(event) =>
                 updateField("nonMemberPrCharges", event.target.value)

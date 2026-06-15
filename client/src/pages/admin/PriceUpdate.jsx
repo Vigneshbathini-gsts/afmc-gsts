@@ -39,30 +39,30 @@ export default function PriceUpdate() {
   // Input Change
   // =========================
   const handleChange = (e) => {
-  const { name, value } = e.target;
+    const { name, value } = e.target;
 
-  // 🔥 If barcode is cleared → reset everything
-  if (name === "barcode" && value.trim() === "") {
-    setFormData({
-      barcode: "",
-      itemCode: "",
-      itemName: "",
-      unitPrice: "",
-    });
+    // 🔥 If barcode is cleared → reset everything
+    if (name === "barcode" && value.trim() === "") {
+      setFormData({
+        barcode: "",
+        itemCode: "",
+        itemName: "",
+        unitPrice: "",
+      });
+
+      setError("");
+      setMessage("");
+      return;
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
 
     setError("");
     setMessage("");
-    return;
-  }
-
-  setFormData((prev) => ({
-    ...prev,
-    [name]: value,
-  }));
-
-  setError("");
-  setMessage("");
-};
+  };
 
   // =========================
   // Fetch Item By Barcode
@@ -313,7 +313,7 @@ export default function PriceUpdate() {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-800">Price Update</h1>
-         
+
         </div>
 
         {/* Form Card */}
@@ -344,7 +344,7 @@ export default function PriceUpdate() {
                 onClick={startScanner}
                 className="px-5 rounded-2xl bg-afmc-maroon hover:bg-afmc-maroon2 text-white shadow-md transition flex items-center gap-2"
               >
-                <FaCamera size={20}/>
+                <FaCamera size={20} />
                 <span className="hidden sm:inline">Scan</span>
               </button>
             </div>
@@ -377,13 +377,20 @@ export default function PriceUpdate() {
               <FaRupeeSign className="text-gray-400 mr-3" />
               <input
                 type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                min="0"  
-                maxLength={20}
+                inputMode="decimal"
+                maxLength={10}
                 name="unitPrice"
                 value={formData.unitPrice}
-                onChange={handleChange}
+                onChange={(e) => {
+                  const value = e.target.value;
+
+                  if (value === "" || /^\d*\.?\d{0,2}$/.test(value)) {
+                    setFormData((prev) => ({
+                      ...prev,
+                      unitPrice: value,
+                    }));
+                  }
+                }}
                 placeholder="Enter updated price"
                 className="w-full outline-none text-gray-700 bg-transparent"
               />
