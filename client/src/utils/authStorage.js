@@ -10,6 +10,11 @@ const AUTH_KEYS = {
   REMEMBERED_EMAIL: "afmc_remembered_email",
 };
 
+const USER_SPECIFIC_PREFIXES = [
+  "afmc-custom-item-draft:",
+  "afmc-buyflow-custom:",
+];
+
 /**
  * Store authentication data after successful login
  * @param {string} token - JWT token from server
@@ -60,6 +65,14 @@ export const clearAuthData = () => {
     localStorage.removeItem(AUTH_KEYS.TOKEN);
     localStorage.removeItem(AUTH_KEYS.USER);
     localStorage.removeItem(AUTH_KEYS.REMEMBER_ME);
+
+    // Remove user-specific draft data keys as well
+    Object.keys(localStorage).forEach((key) => {
+      if (USER_SPECIFIC_PREFIXES.some((prefix) => key.startsWith(prefix))) {
+        localStorage.removeItem(key);
+      }
+    });
+
     // Don't remove remembered email - user might want to log in again with same credentials
   } catch (error) {
     console.error("Error clearing auth data:", error);

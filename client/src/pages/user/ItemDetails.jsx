@@ -647,7 +647,7 @@ export default function ItemDetails() {
             const response = isEditingCartItem
                 ? await cartAPI.customizeCocktail(cartId, { ingredients: selectedIngredients })
                 : await cartAPI.addNewItem(payload);
-
+            console.log('response', response.data);
             if (response?.data?.success) {
                 const newCartId = response.data?.data?.cartId;
                 if (!isEditingCartItem && newCartId) {
