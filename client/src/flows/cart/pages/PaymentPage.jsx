@@ -6,6 +6,7 @@ import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../../context/AuthContext";
 import orderService from "../../../services/orderService";
 import { toInitCap } from "../../../utils/textFormat";
+import afmcqrcode from "../../../assets/afmcqrcode.png"
 
 const getPaymentModesForRole = ({ modes, roleId, pathname }) => {
     const apiModes = Array.isArray(modes) && modes.length > 0 ? modes : ["IMMEDIATE"];
@@ -274,6 +275,13 @@ const PaymentPage = () => {
                                     placeholder={toInitCap("Enter Transaction ID")}
                                     className="h-12 w-full rounded-2xl border border-stone-300 bg-white px-4 text-sm font-medium text-stone-800 outline-none transition focus:border-afmc-maroon focus:ring-2 focus:ring-afmc-maroon/15"
                                 />
+                                <div className="mt-3 flex justify-center">
+                                 <img
+                                 src={afmcqrcode}
+                                 alt="Payment QR"
+                                   className="w-48 h-48 object-contain rounded-lg border"
+                                    />
+                                </div>
                             </div>
                         )}
 
