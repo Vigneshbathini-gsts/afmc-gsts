@@ -328,6 +328,7 @@ export default function PriceUpdate() {
                 <FaBarcode className="text-gray-400 mr-3" />
                 <input
                   type="text"
+                  maxLength={50}
                   name="barcode"
                   value={formData.barcode}
                   onChange={handleChange}
@@ -375,7 +376,11 @@ export default function PriceUpdate() {
             <div className="flex items-center rounded-2xl border border-gray-200 bg-white px-4 py-3 shadow-sm focus-within:ring-2 focus-within:ring-afmc-maroon">
               <FaRupeeSign className="text-gray-400 mr-3" />
               <input
-                type="number"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                min="0"  
+                maxLength={20}
                 name="unitPrice"
                 value={formData.unitPrice}
                 onChange={handleChange}

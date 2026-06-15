@@ -354,13 +354,15 @@ return (
             <div className="flex items-center rounded-xl border border-gray-200 bg-white px-3 py-2 shadow-sm">
               <FaSortAmountUp className="text-gray-400 mr-2" />
               <input
-                type="number"
+                type="text"
+                inputMode="numeric"
                 name="offerQuantity"
                 value={formData.offerQuantity}
                 onChange={handleChange}
                 placeholder="Enter item quantity"
                 className="w-full outline-none text-gray-700 bg-transparent text-sm"
                 min="1"
+                maxLength={10}
               />
             </div>
           </div>
@@ -431,13 +433,15 @@ return (
             <div className="flex items-center rounded-xl border border-gray-200 bg-white px-3 py-2 shadow-sm">
               <FaSortAmountUp className="text-gray-400 mr-2" />
               <input
-                type="number"
+                type="text"
+                inputMode="numeric"
                 name="freeItemQuantity"
                 value={formData.freeItemQuantity}
                 onChange={handleChange}
                 placeholder="Enter free item quantity"
                 className="w-full outline-none text-gray-700 bg-transparent text-sm"
                 min="1"
+                maxLength={10}
               />
             </div>
           </div>
@@ -475,6 +479,7 @@ return (
               value={formData.message}
               onChange={handleChange}
               rows={3}
+              maxLength={100}
               placeholder="Enter offer message (optional)..."
               className="w-full outline-none text-gray-700 bg-transparent resize-none text-sm"
             />
