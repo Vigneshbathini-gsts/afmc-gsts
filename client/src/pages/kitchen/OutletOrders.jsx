@@ -196,7 +196,6 @@ export default function OutletOrders({ kitchenType = "Bar" }) {
         String(o.FIRST_NAME || "").toLowerCase().includes(search) ||
         String(o.STATUS || "").toLowerCase().includes(search);
 
-      // Status filter - if "All" show everything, otherwise filter by selected status
       const matchesStatus = statusFilter === "All" || o.STATUS === statusFilter;
 
       return matchesSearch && matchesStatus;
@@ -214,7 +213,6 @@ export default function OutletOrders({ kitchenType = "Bar" }) {
 
   useEffect(() => setCurrentPage(1), [searchTerm]);
 
-  // Clamp current page when filtered results change (prevents going to Page 2 of 1, etc.)
   useEffect(() => {
     setCurrentPage((prev) => {
       const next = Math.min(Math.max(prev, 1), safeTotalPages);
@@ -279,7 +277,6 @@ export default function OutletOrders({ kitchenType = "Bar" }) {
 
     if (order.CAN_CANCEL !== "Y" || cancellingOrder) return;
 
-    // Just set the selected order and show the confirmation modal
     setSelectedOrder(order);
     setShowConfirmModal(true);
   };
@@ -297,7 +294,6 @@ export default function OutletOrders({ kitchenType = "Bar" }) {
     }
   };
 
-  // Get status counts for display
   const getStatusCount = (status) => {
     if (status === "All") return orders.length;
     return orders.filter(o => o.STATUS === status).length;
@@ -460,29 +456,38 @@ export default function OutletOrders({ kitchenType = "Bar" }) {
         )}
       </div>
 
+      {/* UPDATED CONFIRMATION MODAL - Pubmenubuy style, same logic */}
       {showConfirmModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
-            <h3 className="text-lg font-semibold text-gray-800">
-              Cancel Order
-            </h3>
-
-            <p className="mt-3 text-sm text-gray-600">
-              Are you sure you want to cancel Order #
-              {selectedOrder?.ORDERNUMBER}?
-            </p>
-
-            <div className="mt-6 flex justify-end gap-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6">
+          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl ring-1 ring-black/10">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900">Cancel Order</h3>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  Are you sure you want to cancel Order #{selectedOrder?.ORDERNUMBER}?
+                </p>
+              </div>
               <button
+                type="button"
                 onClick={() => setShowConfirmModal(false)}
-                className="rounded-lg border px-4 py-2"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:bg-slate-50"
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setShowConfirmModal(false)}
+                className="inline-flex justify-center rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
               >
                 No
               </button>
-
               <button
+                type="button"
                 onClick={confirmCancelOrder}
-                className="rounded-lg bg-red-600 px-4 py-2 text-white"
+                className="inline-flex justify-center rounded-full bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700"
               >
                 Yes, Cancel
               </button>
@@ -491,25 +496,35 @@ export default function OutletOrders({ kitchenType = "Bar" }) {
         </div>
       )}
 
+      {/* UPDATED SUCCESS MODAL - Pubmenubuy style, same logic */}
       {showSuccessModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-sm rounded-xl bg-white p-6 text-center shadow-xl">
-            <div className="text-green-600 text-5xl">✓</div>
-
-            <h3 className="mt-3 text-lg font-semibold">
-              Order Cancelled
-            </h3>
-
-            <p className="mt-2 text-sm text-gray-600">
-              The order has been cancelled successfully.
-            </p>
-
-            <button
-              onClick={() => setShowSuccessModal(false)}
-              className="mt-5 rounded-lg bg-afmc-maroon px-5 py-2 text-white"
-            >
-              OK
-            </button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6">
+          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl ring-1 ring-black/10">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900">Order Cancelled</h3>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  The order has been cancelled successfully.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSuccessModal(false)}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:bg-slate-50"
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+            <div className="mt-6 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowSuccessModal(false)}
+                className="inline-flex justify-center rounded-full bg-afmc-maroon px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-afmc-maroon2"
+              >
+                OK
+              </button>
+            </div>
           </div>
         </div>
       )}
