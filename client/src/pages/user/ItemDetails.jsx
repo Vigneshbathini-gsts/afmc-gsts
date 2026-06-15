@@ -48,6 +48,8 @@ export default function ItemDetails() {
     const [lovData, setLovData] = useState([]);
     const [lovLoading, setLovLoading] = useState(false);
 
+    console.log("setSelectedIngredients", setSelectedIngredients);
+    console.log("selectedIngredients", selectedIngredients);
     // Track per-item out-of-stock toast cooldowns (timestamps) without causing re-renders.
     // Structure: { [itemKey]: { [normalizedMessage]: timestampMillis } }
     const outOfStockCooldownRef = useRef({});
