@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useRef, useState } from "react";
+﻿﻿import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { CheckCircle2, ChevronLeft, Minus, Pencil, Plus, Trash2, XCircle } from "lucide-react";
 import Pubmenubuyservice from "../services/Pubmenubuyservice";
@@ -1545,6 +1545,10 @@ export default function Pubmenubuy({
         confirmError?.message ||
         "Unable to confirm this order. Please try again.";
       setError(errorMessage);
+      
+      // Refresh data to get actual stock levels from the server
+      await refreshOrderSummary();
+      
       showToast(errorMessage, "error");
     } finally {
       setConfirming(false);
@@ -1659,9 +1663,14 @@ export default function Pubmenubuy({
                   .map((item) => {
                     const missingCocktailIngredients = hasMissingCocktailIngredients(orderNumber, item, cocktailDetailsByItemCode);
                     const isCocktailItem = isCocktailOrMocktail(item);
+                    
+                    // Determine if the item is out of stock based on current availableQuantity vs requested quantity
+                    const isStandardOutOfStock = !isCocktailItem && !item.isFreeItem && item.availableQuantity !== null && Number(item.quantity) > Number(item.availableQuantity);
+                    
                     const imageStockMessage = isCocktailItem
-                      ? ""
-                      : stockLimitImageMessages[getStockLimitImageKey(item)] || "";
+                      ? (getCocktailOverrideForItem(item)?.isOutOfStock ? "Out of Stock" : "")
+                      : (isStandardOutOfStock || Number(item.availableQuantity) === 0 ? "Out of Stock" : (stockLimitImageMessages[getStockLimitImageKey(item)] || ""));
+                      
                     const disablePlusForStock =
                       isCocktailItem
                         ? (() => {
@@ -1834,11 +1843,11 @@ export default function Pubmenubuy({
                                   disabled={
                                     disableEdit ||
                                     updatingLineId === Number(item.orderLineId ?? item.id) ||
-                                    disablePlusForStock ||
+                                    disablePlusForStock || isStandardOutOfStock ||
                                     item.quantity >= MAX_QTY
                                   }
                                   className={`rounded-md bg-afmc-maroon p-1.5 text-white shadow-sm transition hover:bg-afmc-maroon2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-afmc-gold/50 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-50 ${updatingLineId === Number(item.orderLineId ?? item.id) ||
-                                    disablePlusForStock ||
+                                    disablePlusForStock || isStandardOutOfStock ||
                                     item.quantity >= MAX_QTY
                                     ? "opacity-60"
                                     : ""
