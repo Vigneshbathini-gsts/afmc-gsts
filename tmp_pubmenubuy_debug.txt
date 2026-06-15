@@ -1,0 +1,243 @@
+760:       if (nextQtyCandidate > MAX_QTY) {
+761:         validationMessage = `Quantity cannot be more than ${MAX_QTY}.`;
+762:         return current;
+763:       }
+764: 
+765:       const availableQty = targetItem.availableQuantity;
+766:       if (delta > 0 && String(targetItem.stockIssueMessage || "").trim().length > 0) {
+767:         validationMessage = String(targetItem.stockIssueMessage || "").trim();
+768:         return current;
+769:       }
+770: 
+771:       const stockValidation = validateNextQuantity(targetItem, nextQtyCandidate);
+772:       if (!stockValidation.ok) {
+773:         validationMessage =
+774:           stockValidation.message ||
+775:           (availableQty !== null && availableQty !== undefined
+776:             ? `Out of stock. Available quantity: ${availableQty}`
+777:             : "Out of stock.");
+778:         return current;
+779:       }
+780: 
+781:       const expectedFreeQty = calculateFreeQuantity(
+782:         nextQtyCandidate,
+783:         targetItem.offer_quantity,
+784:         targetItem.free_item_quantity
+785:       );
+786: 
+787:       const targetCode = String(targetItem.item_code || "").trim();
+788:       const linkedFreeItems = targetCode
+789:         ? current.filter(
+790:           (item) => item.isFreeItem && String(item.parentCode || "").trim() === targetCode
+791:         )
+792:         : [];
+793: 
+794:       for (const freeItem of linkedFreeItems) {
+795:         // Ignore stale/placeholder/generated free rows
+796:         if (
+797:           Number(freeItem?.quantity || 0) <= 0 ||
+798:           Number(freeItem?.orderLineId || 0) <= 0
+799:         ) {
+800:           continue;
+801:         }
+802: 
+803:         const freeAvailableQty = freeItem?.availableQuantity;
+804: 
+805:         // Ignore invalid backend stock responses for free items
+806:         if (
+807:           freeAvailableQty === null ||
+808:           freeAvailableQty === undefined ||
+809:           Number(freeAvailableQty) <= 0
+810:         ) {
+811:           continue;
+812:         }
+813: 
+814:         if (expectedFreeQty > Number(freeAvailableQty)) {
+815:           showToast(
+816:             `Out of stock for free item. Available quantity: ${freeAvailableQty}`,
+817:             "error"
+818:           );
+819:           return;
+820:         }
+821:       }
+822: 
+823:       nextQuantity = nextQtyCandidate;
+824: 
+825:       const nextItems = current
+826:         .map((item) => {
+827:           // Update parent item
+828:           if (item.orderLineId === numericOrderLineId) {
+829:             const unitPrice = Number(
+830:               item.unitPrice || (currentQty > 0 ? item.subtotal / currentQty : 0) || 0
+831:             );
+832: 
+833:             const nextSubtotal = Number((unitPrice * nextQtyCandidate).toFixed(2));
+834: 
+835:             return {
+836:               ...item,
+837:               quantity: nextQtyCandidate,
+838:               unitPrice,
+839:               subtotal: nextSubtotal,
+840:             };
+841:           }
+842: 
+843:           // Update linked free items
+844:           if (
+845:             item.isFreeItem &&
+846:             String(item.parentCode || "").trim() === targetCode
+847:           ) {
+848:             // REMOVE FREE ITEM COMPLETELY
+849:             if (expectedFreeQty <= 0) {
+850:               return null;
+851:             }
+852: 
+853:             return {
+854:               ...item,
+855:               quantity: expectedFreeQty,
+856:             };
+857:           }
+858: 
+859:           return item;
+860:         })
+---
+920:     try {
+921:       const response = await Pubmenubuyservice.updateLineQuantity(orderNumber, numericOrderLineId, nextQuantity);
+922:       const data = response?.data?.data || {};
+923:       const rows = Array.isArray(data?.items) ? data.items : [];
+924:       console.log("[updateLineQuantity] UPDATED RESPONSE", response.data);
+925:       setOrderHeader(data?.header || null);
+926:       const normalized = rows.map((item, index) => normalizeItem(item, index));
+927:       setItems(ensureOfferFreeRows(normalized));
+928:       setError("");
+929:       showToast("Quantity updated successfully", "success");
+930:       // The backend response already returns an updated order summary (including offer-linked free items).
+931:       // Avoid an immediate refetch here; it can briefly reintroduce stale quantities in slow networks.
+932:       await syncFreeItemQuantities();
+933:     } catch (updateError) {
+934:       const message = updateError?.response?.data?.message || "Unable to update quantity.";
+935:       setError(message);
+936:       showToast(message, "error");
+937:       try {
+938:         const response = await Pubmenubuyservice.getByOrderNumber(orderNumber);
+939:         const data = response?.data?.data || {};
+940:         const rows = Array.isArray(data?.items) ? data.items : [];
+941:         console.log("[adjustQuantity error] FETCH RESPONSE", response.data);
+942:         setOrderHeader(data?.header || null);
+943:         setItems(ensureOfferFreeRows(rows.map((item, index) => normalizeItem(item, index))));
+944:       } catch {
+945:         // ignore refresh failure
+946:       }
+947:     } finally {
+948:       setUpdatingLineId(null);
+949:     }
+950:   };
+951: 
+952:   const handleQtyClick = (item, delta) => {
+953:     const lineId = Number(item?.orderLineId ?? item?.id);
+954:     if (!Number.isFinite(lineId) || lineId <= 0) {
+955:       showToast("Unable to identify order item for quantity update.", "error");
+956:       return;
+957:     }
+958: 
+959:     if (updatingLineId === lineId) {
+960:       showToast("Please waitΓÇª updating quantity.", "error");
+961:       return;
+962:     }
+963: 
+964:     const liveItem = items.find((row) => Number(row?.orderLineId ?? row?.id) === lineId) || item;
+965: 
+966:     if (liveItem?.isFreeItem) {
+967:       showToast("Free items cannot be updated.", "error");
+968:       return;
+969:     }
+970: 
+971:     const currentQty = Number(liveItem?.quantity || 1);
+972:     if (delta < 0 && currentQty <= 1) {
+973:       showToast("Quantity cannot be less than 1.", "error");
+974:       return;
+975:     }
+976: 
+977:     if (delta > 0 && currentQty >= MAX_QTY) {
+978:       showToast(`Quantity cannot be more than ${MAX_QTY}.`, "error");
+979:       return;
+980:     }
+981: 
+982:     const nextQtyCandidate = currentQty + delta;
+983: 
+984:     // Cocktail/mocktail stock validation (mirrors CartPage behavior)
+985:     if (delta > 0) {
+986:       const stockMessage = String(liveItem?.stockIssueMessage || "").trim();
+987: 
+988:       // Backend may return ingredient-level stock issues via message only (often for cocktail/mocktail),
+989:       // without reliable subcategory/stockStatus in this screen's payload.
+990:       if (stockMessage) {
+991:         showToast(stockMessage, "error");
+992:         return;
+993:       }
+994: 
+995:       // Fallback: cocktail/mocktail sometimes marks overall status as out-of-stock.
+996:       if (
+997:         isCocktailOrMocktail(liveItem) &&
+998:         String(liveItem?.stockStatus || "").toLowerCase() === "out of stock"
+999:       ) {
+1000:         showToast(
+1001:           "Out of stock for cocktail/mocktail ingredients. Please reduce quantity or update selection.",
+1002:           "error"
+1003:         );
+1004:         return;
+1005:       }
+1006:     }
+1007: 
+1008:     const availableQty = liveItem?.availableQuantity;
+1009:     if (
+1010:   !isCocktailOrMocktail(liveItem) &&
+1011:   availableQty !== null &&
+1012:   availableQty !== undefined &&
+1013:   Number.isFinite(Number(availableQty))
+1014: ) {
+1015:   if (nextQtyCandidate > Number(availableQty)) {
+1016:     showToast(`Out of stock. Available quantity: ${availableQty}`, "error");
+1017:   }
+1018: }
+1019: 
+1020:     // Offer/free-item stock validation (same messaging as cart)
+1021:     const expectedFreeQty = calculateFreeQuantity(
+1022:       nextQtyCandidate,
+1023:       liveItem?.offer_quantity,
+1024:       liveItem?.free_item_quantity
+1025:     );
+1026: 
+1027:     const parentCode = String(liveItem?.item_code || "").trim();
+1028:     if (parentCode && expectedFreeQty > 0) {
+1029:       const linkedFreeItems = items.filter(
+1030:         (row) => row?.isFreeItem && String(row?.parentCode || "").trim() === parentCode
+1031:       );
+1032: 
+1033:       for (const freeItem of linkedFreeItems) {
+1034:         // Ignore stale/placeholder/generated free rows
+1035:         if (
+1036:           Number(freeItem?.quantity || 0) <= 0 ||
+1037:           Number(freeItem?.orderLineId || 0) <= 0
+1038:         ) {
+1039:           continue;
+1040:         }
+1041: 
+1042:         const freeAvailableQty = freeItem?.availableQuantity;
+1043: 
+1044:         // Ignore invalid backend stock responses for free items
+1045:         if (
+1046:           freeAvailableQty === null ||
+1047:           freeAvailableQty === undefined ||
+1048:           Number(freeAvailableQty) <= 0
+1049:         ) {
+1050:           continue;
+1051:         }
+1052: 
+1053:         if (expectedFreeQty > Number(freeAvailableQty)) {
+1054:           showToast(
+1055:             `Out of stock for free item. Available quantity: ${freeAvailableQty}`,
+1056:             "error"
+1057:           );
+1058:           return;
+1059:         }
+1060:       }
