@@ -24,7 +24,7 @@ exports.confirmOrder = async (req, res) => {
       data,
     });
   } catch (error) {
-    console.error("Confirm order error:", error);
+    console.error(" :", error);
     res.status(error.statusCode || 500).json({
       success: false,
       message: error.message || "Unable to confirm order",

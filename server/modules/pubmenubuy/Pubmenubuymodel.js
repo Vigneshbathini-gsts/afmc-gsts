@@ -1425,6 +1425,7 @@ async function deleteOrderItem(orderNumber, itemCode) {
 }
 
 async function createOrder(payload = {}, authUser = {}) {
+
   const itemCode = Number(payload.itemCode);
   const rawQuantity = payload.quantity;
   const quantity = Number(rawQuantity || 1);
