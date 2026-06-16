@@ -763,22 +763,11 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
           xi.category_id,
           xi.sub_category,
           c.category_name,
-          CASE
-            WHEN xi.category_id = 10 THEN (
-              SELECT IFNULL(SUM(stock_quantity), 0)
-              FROM xxafmc_stock_out so
-              WHERE so.item_code = xi.item_code
-            )
-            ELSE COALESCE(
-              NULLIF(xi.stock_quantity, 0),
-              (
-                SELECT IFNULL(SUM(stock_quantity), 0)
-                FROM xxafmc_stock_out so
-                WHERE so.item_code = xi.item_code
-              ),
-              0
-            )
-          END AS stock_quantity
+          (
+  SELECT IFNULL(SUM(stock_quantity), 0)
+  FROM xxafmc_stock_out so
+  WHERE so.item_code = xi.item_code
+) AS stock_quantity
         FROM xxafmc_order_details od
         JOIN xxafmc_inventory xi
           ON od.item_id = xi.item_code
@@ -789,42 +778,43 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
       `,
       [normalizedOrderNumber]
     );
-
-      // If the frontend provided updated item quantities, persist them before proceeding.
-      // Expected payload format: { items: [{ item_id: <id>, quantity: <qty> }, ...] }
-      try {
-        const payloadItems = Array.isArray(payload?.items) ? payload.items : [];
-        if (payloadItems.length > 0) {
-          for (const p of payloadItems) {
-            const iid = Number(p?.item_id ?? p?.itemId ?? p?.ITEM_ID);
-            const orderLineId = Number(p?.order_line_id ?? p?.orderLineId ?? p?.ORDER_LINE_ID);
-            const isFreePayloadItem = Boolean(p?.is_free_item ?? p?.isFreeItem);
-            const qty = Number(p?.quantity ?? p?.QUANTITY ?? p?.qty ?? 0);
-            if (!Number.isFinite(iid) || iid <= 0) continue;
-            if (!Number.isFinite(qty) || qty < 0) continue;
-            if (isFreePayloadItem) continue;
-            if (Number.isFinite(orderLineId) && orderLineId > 0) {
-              await connection.execute(
-                `UPDATE xxafmc_order_details SET quantity = ? WHERE order_id = ? AND order_line_id = ?`,
-                [qty, normalizedOrderNumber, orderLineId]
-              );
-            } else {
-              await connection.execute(
-                `
+// console.log("DETAIL ROWS");
+// console.log(JSON.stringify(detailRows, null, 2));
+    // If the frontend provided updated item quantities, persist them before proceeding.
+    // Expected payload format: { items: [{ item_id: <id>, quantity: <qty> }, ...] }
+    try {
+      const payloadItems = Array.isArray(payload?.items) ? payload.items : [];
+      if (payloadItems.length > 0) {
+        for (const p of payloadItems) {
+          const iid = Number(p?.item_id ?? p?.itemId ?? p?.ITEM_ID);
+          const orderLineId = Number(p?.order_line_id ?? p?.orderLineId ?? p?.ORDER_LINE_ID);
+          const isFreePayloadItem = Boolean(p?.is_free_item ?? p?.isFreeItem);
+          const qty = Number(p?.quantity ?? p?.QUANTITY ?? p?.qty ?? 0);
+          if (!Number.isFinite(iid) || iid <= 0) continue;
+          if (!Number.isFinite(qty) || qty < 0) continue;
+          if (isFreePayloadItem) continue;
+          if (Number.isFinite(orderLineId) && orderLineId > 0) {
+            await connection.execute(
+              `UPDATE xxafmc_order_details SET quantity = ? WHERE order_id = ? AND order_line_id = ?`,
+              [qty, normalizedOrderNumber, orderLineId]
+            );
+          } else {
+            await connection.execute(
+              `
                   UPDATE xxafmc_order_details
                   SET quantity = ?
                   WHERE order_id = ?
                     AND item_id = ?
                     AND NOT (IFNULL(price, 0) = 0 AND IFNULL(subtotal, 0) = 0)
                 `,
-                [qty, normalizedOrderNumber, iid]
-              );
-            }
+              [qty, normalizedOrderNumber, iid]
+            );
           }
+        }
 
-          // Refresh detailRows to reflect updated quantities
-          const [refreshedRows] = await connection.execute(
-            `
+        // Refresh detailRows to reflect updated quantities
+        const [refreshedRows] = await connection.execute(
+          `
             SELECT
               od.item_id,
               od.quantity,
@@ -837,22 +827,11 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
               xi.category_id,
               xi.sub_category,
               c.category_name,
-              CASE
-                WHEN xi.category_id = 10 THEN (
-                  SELECT IFNULL(SUM(stock_quantity), 0)
-                  FROM xxafmc_stock_out so
-                  WHERE so.item_code = xi.item_code
-                )
-                ELSE COALESCE(
-                  NULLIF(xi.stock_quantity, 0),
-                  (
-                    SELECT IFNULL(SUM(stock_quantity), 0)
-                    FROM xxafmc_stock_out so
-                    WHERE so.item_code = xi.item_code
-                  ),
-                  0
-                )
-              END AS stock_quantity
+              (
+  SELECT IFNULL(SUM(stock_quantity), 0)
+  FROM xxafmc_stock_out so
+  WHERE so.item_code = xi.item_code
+) AS stock_quantity
             FROM xxafmc_order_details od
             JOIN xxafmc_inventory xi
               ON od.item_id = xi.item_code
@@ -861,15 +840,15 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
             WHERE od.order_id = ?
             ORDER BY od.order_line_id ASC
           `,
-            [normalizedOrderNumber]
-          );
+          [normalizedOrderNumber]
+        );
 
-          detailRows.splice(0, detailRows.length, ...refreshedRows);
-        }
-      } catch (qtyErr) {
-        // Non-fatal: if applying quantities fails, rollback will happen later if needed.
-        console.error("Failed to apply frontend item quantities:", qtyErr);
+        detailRows.splice(0, detailRows.length, ...refreshedRows);
       }
+    } catch (qtyErr) {
+      // Non-fatal: if applying quantities fails, rollback will happen later if needed.
+      console.error("Failed to apply frontend item quantities:", qtyErr);
+    }
 
     if (!detailRows.length) {
       const error = new Error("No order items found");
@@ -901,22 +880,11 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
             xi.category_id,
             xi.sub_category,
             c.category_name,
-            CASE
-              WHEN xi.category_id = 10 THEN (
-                SELECT IFNULL(SUM(stock_quantity), 0)
-                FROM xxafmc_stock_out so
-                WHERE so.item_code = xi.item_code
-              )
-              ELSE COALESCE(
-                NULLIF(xi.stock_quantity, 0),
-                (
-                  SELECT IFNULL(SUM(stock_quantity), 0)
-                  FROM xxafmc_stock_out so
-                  WHERE so.item_code = xi.item_code
-                ),
-                0
-              )
-            END AS stock_quantity
+           (
+  SELECT IFNULL(SUM(stock_quantity), 0)
+  FROM xxafmc_stock_out so
+  WHERE so.item_code = xi.item_code
+) AS stock_quantity
           FROM xxafmc_order_details od
           JOIN xxafmc_inventory xi
             ON od.item_id = xi.item_code
@@ -954,22 +922,11 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
             xi.category_id,
             xi.sub_category,
             c.category_name,
-            CASE
-              WHEN xi.category_id = 10 THEN (
-                SELECT IFNULL(SUM(stock_quantity), 0)
-                FROM xxafmc_stock_out so
-                WHERE so.item_code = xi.item_code
-              )
-              ELSE COALESCE(
-                NULLIF(xi.stock_quantity, 0),
-                (
-                  SELECT IFNULL(SUM(stock_quantity), 0)
-                  FROM xxafmc_stock_out so
-                  WHERE so.item_code = xi.item_code
-                ),
-                0
-              )
-            END AS stock_quantity
+           (
+  SELECT IFNULL(SUM(stock_quantity), 0)
+  FROM xxafmc_stock_out so
+  WHERE so.item_code = xi.item_code
+) AS stock_quantity
           FROM xxafmc_order_details od
           JOIN xxafmc_inventory xi
             ON od.item_id = xi.item_code
@@ -1031,6 +988,23 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
         return map;
       }, {});
 
+      // console.log("reservedMap", reservedMap);
+
+      detailRows.forEach(row => {
+        const stockQuantity = Number(row.stock_quantity || 0);
+        const reservedQuantity = Number(reservedMap[String(row.item_id)] || 0);
+
+        console.log({
+          item: row.item_name,
+          item_id: row.item_id,
+          orderQty: row.quantity,
+          stockQuantity,
+          reservedQuantity,
+          available: stockQuantity - reservedQuantity
+        });
+      });
+      // console.log("FINAL detailRows BEFORE STOCK CHECK");
+      // console.log("FINAL detailRows", JSON.stringify(detailRows, null, 2));
       const outOfStockItem = detailRows.find((row) => {
         const isCocktailOrMocktail = [14, 15].includes(Number(row.sub_category));
         if (isCocktailOrMocktail) {
@@ -1049,10 +1023,10 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
         const availableQuantity = isCocktailOrMocktail
           ? Number(cocktailMaxMap.get(Number(outOfStockItem.item_id)) ?? 0)
           : (() => {
-              const stockQuantity = Number(outOfStockItem.stock_quantity || 0);
-              const reservedQuantity = Number(reservedMap[String(outOfStockItem.item_id)] || 0);
-              return Math.max(0, stockQuantity - reservedQuantity);
-            })();
+            const stockQuantity = Number(outOfStockItem.stock_quantity || 0);
+            const reservedQuantity = Number(reservedMap[String(outOfStockItem.item_id)] || 0);
+            return Math.max(0, stockQuantity - reservedQuantity);
+          })();
         const isFreeItem = Number(outOfStockItem.price || 0) === 0 && Number(outOfStockItem.subtotal || 0) === 0;
         const error = new Error(
           isFreeItem
