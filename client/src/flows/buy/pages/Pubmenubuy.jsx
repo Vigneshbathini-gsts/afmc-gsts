@@ -1567,7 +1567,7 @@ export default function Pubmenubuy({
         });
       }
     } catch (confirmError) {
-      console.error("Confirm order error:", confirmError);
+      console.error(" :", confirmError);
       const errorMessage = confirmError?.response?.data?.message ||
         confirmError?.message ||
         "Unable to confirm this order. Please try again.";

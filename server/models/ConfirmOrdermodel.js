@@ -778,8 +778,8 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
       `,
       [normalizedOrderNumber]
     );
-// console.log("DETAIL ROWS");
-// console.log(JSON.stringify(detailRows, null, 2));
+    // console.log("DETAIL ROWS");
+    // console.log(JSON.stringify(detailRows, null, 2));
     // If the frontend provided updated item quantities, persist them before proceeding.
     // Expected payload format: { items: [{ item_id: <id>, quantity: <qty> }, ...] }
     try {
