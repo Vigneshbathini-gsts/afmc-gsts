@@ -1,54 +1,61 @@
 const pool = require("../config/db");
 
 exports.getInventory = async (itemCode, subCategory) => {
-    const query = `
- SELECT
-     inv.item_code,
-     inv.item_name,
-     inv.image,
-     inv.sub_category,
-     sc.SUB_CATEGORY_NAME AS sub_category_name,
-     MIN(inv.item_id) AS item_id,
- 
-     (
-         SELECT
-             CASE
-                 WHEN COALESCE(NULLIF(inv.STOCK_QUANTITY, 0), SUM(IFNULL(xso.stock_quantity, 0)), 0) = 0 THEN 'Out Of Stock'
-                 ELSE NULL
-             END
-         FROM xxafmc_stock_out xso
-         WHERE xso.item_code = inv.item_code
-         GROUP BY xso.item_code
-     ) AS stock_status
- 
- FROM xxafmc_inventory inv
- LEFT JOIN xxafmc_sub_categories sc
-   ON sc.SUB_CATEGORY_ID = inv.sub_category
- 
- WHERE
-     (
-       IFNULL(inv.STOCK_QUANTITY, 0) > 0
-       OR EXISTS (SELECT 1 FROM xxafmc_stock_out xso2 WHERE xso2.item_code = inv.item_code)
-     )
- 
-     AND inv.category_id = 10
-     AND inv.sub_category IN (4, 6, 9, 18)
-     AND inv.item_code = IFNULL(?, inv.item_code)
-     AND inv.sub_category = IFNULL(?, inv.sub_category)
+  const query = `
+    SELECT
+        inv.item_code,
+        inv.item_name,
+        inv.image,
+        inv.sub_category,
+        sc.SUB_CATEGORY_NAME AS sub_category_name,
+        MIN(inv.item_id) AS item_id,
 
-GROUP BY
-    inv.item_code,
-    inv.item_name,
-    inv.image,
-    inv.sub_category,
-    sc.SUB_CATEGORY_NAME
+        GREATEST(
+            IFNULL(SUM(xso.STOCK_QUANTITY), 0) -
+            IFNULL(MAX(srt.reserved_qty), 0),
+            0
+        ) AS available_qty,
 
-ORDER BY
-    item_id ASC`;
+        CASE
+            WHEN GREATEST(
+                IFNULL(SUM(xso.STOCK_QUANTITY), 0) -
+                IFNULL(MAX(srt.reserved_qty), 0),
+                0
+            ) = 0
+            THEN 'Out Of Stock'
+            ELSE NULL
+        END AS stock_status
 
-    const [rows] = await pool.execute(query, [itemCode, subCategory]);
-    // console.log("Inventory Data:", rows);
-    return rows;
+    FROM xxafmc_inventory inv
+
+    LEFT JOIN xxafmc_sub_categories sc
+        ON sc.SUB_CATEGORY_ID = inv.sub_category
+
+    INNER JOIN xxafmc_stock_out xso
+        ON xso.ITEM_CODE = inv.item_code
+
+    LEFT JOIN xxafmc_stock_reservation_totals srt
+        ON srt.item_code = inv.item_code
+
+    WHERE
+        inv.category_id = 10
+        AND inv.sub_category IN (4, 6, 9, 18)
+        AND inv.item_code = IFNULL(?, inv.item_code)
+        AND inv.sub_category = IFNULL(?, inv.sub_category)
+
+    GROUP BY
+        inv.item_code,
+        inv.item_name,
+        inv.image,
+        inv.sub_category,
+        sc.SUB_CATEGORY_NAME
+
+    ORDER BY item_id ASC
+  `;
+
+  const [rows] = await pool.execute(query, [itemCode, subCategory]);
+//   console.log("Fetched inventory data:", rows);
+  return rows;
 };
 
 

@@ -13,7 +13,7 @@ exports.getInventory = async (req,res) => {
             success: true,
             data
         })
-        
+        // console.log("data", data);
     } catch(error) {
         console.log("error", error);
         res.status(500).json({
@@ -25,6 +25,7 @@ exports.getInventory = async (req,res) => {
 
 
 exports.fetchmenubar = async (req, res) => {
+   
     try {
          const { itemcode } = req.query;
     const data = await Menuservicebeer.fetchmocktail(itemcode || null);

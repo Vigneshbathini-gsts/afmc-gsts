@@ -868,7 +868,7 @@ function ProgressiveMenuGrid({
         ...item,
         availableQuantity,
         stockQuantity: availableQuantity,
-        stock_status: availableQuantity === 0 ? "Out Of Stock" : item.stock_status,
+        stock_status: item.stock_status,
       };
     });
   }, [availabilityByCode, ignoreStockStatus, slice]);
@@ -1114,6 +1114,7 @@ function EnduserOtherSection({ onItemClick }) {
       setLoading(true);
       try {
         const result = await authFetchJson(`${API_BASE_URL}/menubar`);
+        // console.log("Fetched menu data:", result.data);
         setData(result?.data || []);
       } catch (fetchError) {
         setError(fetchError.message);
