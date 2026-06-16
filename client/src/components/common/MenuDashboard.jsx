@@ -344,11 +344,11 @@ function MenuGrid({ items, showStockStatus = false, ignoreStockStatus = false, o
                 {/* <p> {item.stock_status} </p> */}
               </div>
 
-              {outOfStock ? (
+              {/* {outOfStock ? (
                 <div className="rounded-md bg-red-50 px-2 py-1 text-xs font-bold text-red-700 ring-1 ring-red-200">
                   {toInitCap("Out Of Stock")}
                 </div>
-              ) : null}
+              ) : null} */}
 
               <div className="h-0.5 rounded-full bg-gradient-to-r from-afmc-maroon/70 via-afmc-gold/70 to-transparent" />
 
