@@ -256,6 +256,14 @@ const replaceCartCustomization = async (conn, cartId, ingredients) => {
         lineTotal,
       ]
     );
+//     console.log("Inserting ingredient:", {
+//   cartId,
+//   itemCode: ingredient.itemCode,
+//   itemName: ingredient.itemName,
+//   quantity: ingredient.quantity,
+//   unitPrice: ingredient.unitPrice,
+//   lineTotal: lineTotal,
+// });
   }
 };
 
@@ -443,6 +451,7 @@ const updateCartCustomization = async (cartId, userId, updates) => {
     );
 
     const cartItem = cartRows[0];
+    // console.log(cartItem);
     if (!cartItem) {
       const error = new Error("Cart item not found");
       error.status = 404;
@@ -462,7 +471,23 @@ const updateCartCustomization = async (cartId, userId, updates) => {
     }
 
     await validateCustomizationStock(conn, ingredients, cartQuantity);
+    // console.log("validateCustomizationStock", validateCustomizationStock)
+    // console.log("ingredients", ingredients);
+
+//     console.log("Cart ID:", cartId);
+// console.log("User ID:", userId);
+// console.log("Ingredients received from UI:");
+// console.log(JSON.stringify(ingredients, null, 2));
     await replaceCartCustomization(conn, cartId, ingredients);
+
+//     console.log("Saving ingredients into xxafmc_cart_customization table:");
+// ingredients.forEach((ing) => {
+//   console.log(
+//     `ItemCode=${ing.itemCode}, Name=${ing.itemName}, Qty=${ing.quantity}, UnitPrice=${ing.unitPrice}`
+//   );
+// });
+
+
 
     const unitPrice = Number(ingredients.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0).toFixed(2));
     await conn.execute(
@@ -1088,6 +1113,8 @@ const deleteCartItem = async (cartId, userId) => {
     const price = item[0].price;
 
     await conn.execute(`DELETE FROM ${CUSTOMIZATION_TABLE} WHERE cart_id = ?`, [cartId]);
+
+    // console.log(`Deleting old ingredients for Cart ID: ${cartId}`);
 
     // Delete the item
     const [result] = await conn.execute(
