@@ -1142,7 +1142,7 @@ export default function Pubmenubuy({
       try {
         const response = await Pubmenubuyservice.getByOrderNumber(orderNumber);
         const data = response?.data?.data || {};
-        // console.log("data", data);
+        console.log("data", data);
         const rows = Array.isArray(data?.items) ? data.items : [];
         console.log("[adjustQuantity error] FETCH RESPONSE", response.data);
         setOrderHeader(data?.header || null);
