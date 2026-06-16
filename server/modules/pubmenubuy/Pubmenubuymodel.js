@@ -801,7 +801,7 @@ async function getCocktailStockStatusMap(connection, orderNumber, cocktailItemId
 
 async function getOrderSummary(orderNumber) {
   const normalizedOrderNumber = Number(orderNumber);
-  console.log("getOrderSummary called with orderNumber:", orderNumber, "normalizedOrderNumber:", normalizedOrderNumber);
+  //console.log("getOrderSummary called with orderNumber:", orderNumber, "normalizedOrderNumber:", normalizedOrderNumber);
   if (!Number.isFinite(normalizedOrderNumber) || normalizedOrderNumber <= 0) {
     const error = new Error("Valid order number is required");
     error.statusCode = 400;
@@ -1063,15 +1063,15 @@ async function getOrderSummary(orderNumber) {
     if (!Number.isFinite(Number(expected))) return row;
     return { ...row, quantity: Number(expected) };
   });
-   console.log("getOrderSummary response", {
-    header: {
-      ...headerRows[0], 
-      item_id: itemIdRows[0]?.item_id || null,
-      order_total: Number(orderTotal.toFixed(2)),
-      food_pr_charges: foodPrCharges,
-    },
-    items: reconciledItems,
-  });
+  //  console.log("getOrderSummary response", {
+  //   header: {
+  //     ...headerRows[0], 
+  //     item_id: itemIdRows[0]?.item_id || null,
+  //     order_total: Number(orderTotal.toFixed(2)),
+  //     food_pr_charges: foodPrCharges,
+  //   },
+  //   items: reconciledItems,
+  // });
 
   return {
     header: {
