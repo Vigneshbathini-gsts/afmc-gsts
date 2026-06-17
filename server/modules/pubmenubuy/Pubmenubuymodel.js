@@ -893,12 +893,12 @@ async function getOrderSummary(orderNumber) {
         LENGTH(XXINV.IMAGE) AS card_title,
         XXINV.ITEM_CODE AS item_code,
         CASE
-  WHEN XXINV.SUB_CATEGORY IN (14, 15) THEN NULL
-  ELSE (
-    SELECT IFNULL(SUM(so.stock_quantity), 0)
-    FROM xxafmc_stock_out so
-    WHERE so.item_code = XXINV.ITEM_CODE
-  )
+          WHEN XXINV.SUB_CATEGORY IN (14, 15) THEN NULL
+        ELSE (
+        SELECT IFNULL(SUM(so.stock_quantity), 0)
+        FROM xxafmc_stock_out so
+          WHERE so.item_code = XXINV.ITEM_CODE
+          )
        END AS stock_quantity,
         '#' AS card_link,
         CASE

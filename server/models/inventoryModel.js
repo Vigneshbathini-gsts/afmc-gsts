@@ -356,7 +356,11 @@ const getItemById = async (itemId) => {
       NON_MEMBER_PROFIT,
       PR_CHARGES,
       \`A/C_UNIT\`,
-      STOCK_QUANTITY,
+      (
+  SELECT IFNULL(SUM(xso.STOCK_QUANTITY),0)
+  FROM xxafmc_stock_out xso
+  WHERE xso.ITEM_CODE = xxafmc_inventory.ITEM_CODE
+) AS STOCK_QUANTITY,
       CASE
         WHEN IFNULL(TRIM(IMAGE), '') = '' THEN NULL
         WHEN IMAGE LIKE 'http%' THEN IMAGE

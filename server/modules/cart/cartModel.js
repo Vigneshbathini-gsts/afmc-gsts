@@ -1369,11 +1369,11 @@ const getIngredientStockMap = async (itemCodes, excludeOrderNumber = null) => {
     const query = `
       SELECT
         xi.item_code AS itemCode,
-        GREATEST(
-          GREATEST(IFNULL(xi.stock_quantity, 0), IFNULL(stock_summary.stock_quantity, 0))
-            - GREATEST(IFNULL(reserved_summary.reserved_quantity, 0) - (${excludedReservedCase}), 0),
-          0
-        ) AS stockQuantity
+       GREATEST(
+  IFNULL(stock_summary.stock_quantity, 0)
+    - GREATEST(IFNULL(reserved_summary.reserved_quantity, 0) - (${excludedReservedCase}), 0),
+  0
+) AS stockQuantity
       FROM xxafmc_inventory xi
       LEFT JOIN (
         SELECT item_code, IFNULL(SUM(stock_quantity), 0) AS stock_quantity

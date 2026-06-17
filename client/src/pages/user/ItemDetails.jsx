@@ -8,6 +8,7 @@ import { toInitCap } from '../../utils/textFormat';
 
 const getDetailItemCode = (detail) => detail?.itemCode ?? detail?.ITEM_CODE;
 const getDetailItemName = (detail) => detail?.itemName ?? detail?.ITEM_NAME;
+// console.log("getDetailItemName",getDetailItemName);
 const getDetailPegs = (detail) => detail?.pegs ?? detail?.PEGS;
 const getDetailStockQuantity = (detail) => detail?.stockQuantity ?? detail?.STOCK_QUANTITY ?? detail?.stock_quantity ?? null;
 const getDetailStockStatus = (detail) => detail?.stockStatus ?? detail?.STOCK_STATUS ?? detail?.stock_status;
@@ -38,7 +39,8 @@ export default function ItemDetails() {
     const fromBuyFlow = Boolean(location.state?.fromBuyFlow);
     const buyOrderNumber = location.state?.orderNumber;
     const [item, setItem] = useState(null);
-    console.log("item", item);
+    console.log("itemss", item);
+    // console.log("setItem", setItem);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [quantities, setQuantities] = useState({});
@@ -48,8 +50,8 @@ export default function ItemDetails() {
     const [lovData, setLovData] = useState([]);
     const [lovLoading, setLovLoading] = useState(false);
 
-    console.log("setSelectedIngredients", setSelectedIngredients);
-    console.log("selectedIngredients", selectedIngredients);
+    // console.log("setSelectedIngredients", setSelectedIngredients);
+    // console.log("selectedIngredients", selectedIngredients);
     // Track per-item out-of-stock toast cooldowns (timestamps) without causing re-renders.
     // Structure: { [itemKey]: { [normalizedMessage]: timestampMillis } }
     const outOfStockCooldownRef = useRef({});
@@ -159,9 +161,12 @@ export default function ItemDetails() {
             try {
                 setLoading(true);
                 const response = await inventoryAPI.getById(id);
+                
                 if (response.data.success) {
                     const fetchedItem = response.data.data;
                     let details = fetchedItem.details || [];
+                    console.log("inventoryAPI", details);
+                    console.log("inventoryAPIwwww", fetchedItem);
                     let initialQuantities = {};
 
                     if (!isEditingCartItem && Array.isArray(prefillDetails) && prefillDetails.length > 0) {
@@ -244,6 +249,7 @@ export default function ItemDetails() {
                                     fromBuyFlow ? buyOrderNumber : undefined
                                 );
                                 const stockMap = stockRes?.data?.data || {};
+                                console.log("stockMap3",stockMap)
                                 details = details.map((detail, idx) => {
                                     const itemCode = Number(getDetailItemCode(detail));
                                     const stockQuantity = stockMap?.[String(itemCode)];
@@ -359,7 +365,7 @@ export default function ItemDetails() {
             const response = await cartAPI.getLovIngredients(item.SUB_CATEGORY);
             if (response.data.success) {
                 setLovData(response.data.data);
-                console.log("ingre",response.data.data)
+              //  console.log("ingre",response.data.data)
                 
             }
             
@@ -603,6 +609,7 @@ export default function ItemDetails() {
                         try {
                             const stockRes = await cartAPI.getIngredientStocks(codes, buyOrderNumber);
                             const stockMap = stockRes?.data?.data || {};
+                            console.log("stockMap1", stockMap);
                             for (const ing of selectedIngredients) {
                                 const code = Number(ing.itemCode);
                                 if (!Number.isFinite(code) || code <= 0) continue;
@@ -629,6 +636,7 @@ export default function ItemDetails() {
                         try {
                             const stockRes = await cartAPI.getIngredientStocks([parentCode], buyOrderNumber);
                             const stockMap = stockRes?.data?.data || {};
+                            console.log("stockMap2",stockMap);
                             const rawAvailable = stockMap?.[String(parentCode)];
                             if (rawAvailable !== undefined && rawAvailable !== null && rawAvailable !== "") {
                                 const available = Number(rawAvailable);
@@ -649,7 +657,7 @@ export default function ItemDetails() {
             const response = isEditingCartItem
                 ? await cartAPI.customizeCocktail(cartId, { ingredients: selectedIngredients })
                 : await cartAPI.addNewItem(payload);
-            console.log('response', response.data);
+           // console.log('response', response.data);
             if (response?.data?.success) {
                 const newCartId = response.data?.data?.cartId;
                 if (!isEditingCartItem && newCartId) {
@@ -784,9 +792,11 @@ export default function ItemDetails() {
                             <tbody>
                                 {item.details && item.details.map((detail, index) => {
                                     const pegs = getDetailPegs(detail);
+                                  //  console.log("pegs", pegs);
                                     const hasQuantity = pegs !== 0 && pegs !== null;
                                     const currentQty = quantities[index] || 1;
                                     const stockQuantity = getDetailStockQuantity(detail);
+                                  //  console.log("stockQuantity", stockQuantity);
                                     const requiredQuantity = getDetailRequiredQuantity(detail);
                                     const explicitStatus = getDetailStockStatus(detail);
                                     const effectiveRequired = (!isEditingCartItem && fromBuyFlow)
