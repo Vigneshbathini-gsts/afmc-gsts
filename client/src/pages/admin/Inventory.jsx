@@ -1093,15 +1093,15 @@ export default function Inventory() {
             )}
 
             <div className="overflow-hidden rounded-2xl border border-afmc-gold/25 bg-white">
-              <div className="max-h-[70vh] overflow-auto" onScroll={handleInventoryScroll}>
-              <table className="w-full text-sm">
+              <div className="max-h-[70vh] overflow-x-auto overflow-y-auto" onScroll={handleInventoryScroll}>
+              <table className="w-full min-w-[720px] text-sm table-auto">
                 <thead className="bg-afmc-maroon/5 text-afmc-maroon">
                   <tr>
-                    <th className="px-4 py-3 text-left font-medium">Add Stock</th>
-                    <th className="px-4 py-3 text-left font-medium">Update Image</th>
-                    <th className="px-4 py-3 text-left font-medium">Item Name</th>
-                    <th className="px-4 py-3 text-left font-medium">A/C Unit</th>
-                    <th className="px-4 py-3 text-left font-medium">Stock</th>
+                    <th className="px-3 py-3 text-left font-medium whitespace-nowrap">Add Stock</th>
+                    <th className="px-3 py-3 text-left font-medium whitespace-nowrap">Update Image</th>
+                    <th className="px-3 py-3 text-left font-medium whitespace-nowrap">Item Name</th>
+                    <th className="px-3 py-3 text-left font-medium whitespace-nowrap">A/C Unit</th>
+                    <th className="px-3 py-3 text-left font-medium whitespace-nowrap">Stock</th>
                   </tr>
                 </thead>
                 <tbody>

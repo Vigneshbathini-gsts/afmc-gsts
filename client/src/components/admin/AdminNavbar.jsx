@@ -17,31 +17,31 @@ export default function AdminNavbar({ onMenuClick }) {
 
   return (
     <header className="bg-white shadow-md sticky top-0 z-30 border-b border-afmc-maroon/10">
-      <div className="flex items-center justify-between px-4 md:px-6 py-4">
+      <div className="flex items-center justify-between px-4 md:px-6 py-4 gap-3 min-w-0 flex-nowrap">
         {/* Left */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 min-w-0">
           <button
             onClick={onMenuClick}
-            className="text-2xl text-gray-700 hover:text-afmc-maroon transition"
+            className="text-2xl text-gray-700 hover:text-afmc-maroon transition p-2 rounded-lg"
           >
             <FaBars />
           </button>
 
-          <div className="flex items-center gap-3">
-            <div className="rounded-xl">
+          <div className="flex items-center gap-3 min-w-0 overflow-hidden">
+            <div className="rounded-xl flex-shrink-0">
               <img src={afmclogo} alt="AFMC Logo" className="w-8 h-10" />
             </div>
-            <div className="min-w-0">
-              <h1 className="text-lg md:text-xl font-bold text-gray-800 truncate">
+            <div className="min-w-0 overflow-hidden">
+              <h1 className="text-base md:text-xl font-bold text-gray-800 truncate">
                 AFMC MESS
               </h1>
-              <p className="text-sm text-gray-500 truncate">Admin Dashboard</p>
+              <p className="text-xs sm:text-sm text-gray-500 truncate">Admin Dashboard</p>
             </div>
           </div>
         </div>
 
         {/* Right */}
-        <div className="flex items-center gap-3 md:gap-4">
+        <div className="flex items-center gap-2 sm:gap-4 justify-end min-w-0">
           {showNotificationBell && <StockNotificationBell />}
           <UserMenuDropdown />
         </div>

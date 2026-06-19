@@ -33,7 +33,7 @@ export default function AdminSidebar({ isOpen, onClose }) {
 
       {/* Sidebar Drawer */}
       <aside
-        className={`fixed top-0 left-0 h-screen w-72 bg-white shadow-2xl z-50 transform transition-transform duration-300 ${
+        className={`fixed top-0 left-0 h-screen w-72 max-w-[85vw] bg-white shadow-2xl z-50 transform transition-transform duration-300 ${
           isOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >

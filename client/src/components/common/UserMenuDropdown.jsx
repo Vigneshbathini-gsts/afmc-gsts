@@ -50,10 +50,10 @@ export default function UserMenuDropdown({ username }) {
       {/* User Button */}
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 bg-gray-100 hover:bg-afmc-maroon/10 px-4 py-2 rounded-xl transition"
+        className="flex items-center gap-2 bg-gray-100 hover:bg-afmc-maroon/10 px-3 py-2 sm:px-4 rounded-xl transition min-w-0"
       >
-        <FaUserCircle className="text-xl text-afmc-maroon" />
-        <span className="font-medium text-gray-800">
+        <FaUserCircle className="text-xl text-afmc-maroon flex-shrink-0" />
+        <span className="font-medium text-gray-800 text-sm sm:text-base truncate max-w-[130px]">
           {displayName}
         </span>
         <FaChevronDown className="text-sm text-gray-500" />
