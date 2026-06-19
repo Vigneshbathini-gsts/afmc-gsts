@@ -302,8 +302,8 @@ export default function AddItem() {
             </div>
           )}
 
-          <div className="mt-8 overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm">
-            <table className="w-full text-sm">
+          <div className="mt-8 rounded-3xl border border-gray-200 bg-white shadow-sm overflow-x-auto">
+  <table className="min-w-[1200px] text-sm">
               <thead className="bg-gray-50 text-gray-600">
                 <tr>
                   <th className="px-4 py-3 text-left font-medium">S.No</th>

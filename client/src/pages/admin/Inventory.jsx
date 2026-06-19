@@ -1457,8 +1457,8 @@ export default function Inventory() {
       )}
 
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 px-4 py-6">
-          <div className="w-full max-w-full sm:max-w-4xl rounded-3xl bg-white/95 shadow-2xl border border-white/70 backdrop-blur-md p-4 sm:p-8 relative">
+        <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center overflow-y-auto bg-black/40 px-4 py-6">
+          <div className="w-full max-w-full sm:max-w-4xl rounded-3xl bg-white/95 shadow-2xl border border-white/70 backdrop-blur-md p-4 sm:p-8 relative max-h-[calc(100vh-3rem)] overflow-y-auto">
             <button
               type="button"
               onClick={() => setShowAddModal(false)}

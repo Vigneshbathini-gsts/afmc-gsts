@@ -97,11 +97,7 @@ export default function CancelledOrders() {
     };
 
     setFilters(nextFilters);
-
-    // Fetch immediately after reset
-    setTimeout(() => {
-      fetchCancelledOrders(nextFilters);
-    }, 100);
+    fetchCancelledOrders(nextFilters);
   };
 
   const handleDownload = () => {
@@ -175,234 +171,211 @@ export default function CancelledOrders() {
   };
 
   return (
-    <div className="p-4 min-h-screen bg-gradient-to-br from-afmc-bg via-white to-afmc-bg2">
-      {/* Back Button */}
-      <div className="flex justify-end mb-4 gap-3">
-        <button
-          onClick={handleDownload}
-          className="flex items-center gap-2 px-3 py-1.5 text-sm bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg shadow-md transition duration-300"
-        >
-          <FaDownload size={14} />
-          Download Pdf
-        </button>
-        <button
-          onClick={() => navigate("/admin/dashboard")}
-          className="flex items-center gap-2 px-3 py-1.5 text-sm bg-gradient-to-r from-afmc-maroon to-afmc-maroon2 hover:from-afmc-maroon2 hover:to-afmc-maroon text-white font-medium rounded-lg shadow-md transition duration-300"
-        >
-          <FaArrowLeft size={14} />
-          Back
-        </button>
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-afmc-bg via-white to-afmc-bg2 relative">
+      <div className="absolute top-16 left-12 h-72 w-72 rounded-full bg-afmc-maroon/10 blur-3xl" />
+      <div className="absolute bottom-20 right-20 h-80 w-80 rounded-full bg-afmc-maroon2/10 blur-3xl" />
 
-      {/* Header */}
-      <div className="mb-5">
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <FaBan />
-          Cancelled Orders Report
-        </h1>
-        <p className="text-sm text-white/80 mt-1">
-          View Fully Cancelled Food Orders
-        </p>
-      </div>
-
-      {/* Filters */}
-      <form
-        onSubmit={handleSearch}
-        className="bg-white rounded-2xl shadow-sm p-4 mb-5"
-      >
-        <div className="grid md:grid-cols-4 gap-4 items-end">
-          <div>
-            <label className="block mb-1 text-sm font-medium text-slate-700">
-              From Date
-            </label>
-            <input
-              type="date"
-              name="fromDate"
-              value={filters.fromDate}
-              onChange={handleDateChange}
-              className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-afmc-maroon"
-            />
-          </div>
-
-          <div>
-            <label className="block mb-1 text-sm font-medium text-slate-700">
-              To Date
-            </label>
-            <input
-              type="date"
-              name="toDate"
-              value={filters.toDate}
-              onChange={handleDateChange}
-              className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-afmc-maroon"
-            />
-          </div>
-
-          <div className="flex gap-2">
+      <div className="relative z-10 p-8">
+        <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
+          <h1 className="text-2xl font-semibold text-gray-800">Cancelled Orders</h1>
+          <div className="flex flex-wrap items-center gap-3">
             <button
-              type="submit"
-              className="bg-afmc-maroon hover:bg-afmc-maroon2 text-white text-sm px-4 py-2 rounded-md transition flex items-center gap-2"
+              onClick={handleDownload}
+              className="flex items-center gap-2 rounded-2xl bg-afmc-maroon px-5 py-3 text-sm font-semibold text-white shadow transition hover:bg-afmc-maroon2"
             >
-              <FaSearch />
-              Search
+              <FaDownload size={14} />
+              Download Pdf
             </button>
-
             <button
-              type="button"
-              onClick={handleReset}
-              className="bg-slate-500 hover:bg-slate-600 text-white text-sm px-4 py-2 rounded-md transition flex items-center gap-2"
+              onClick={() => navigate("/admin/dashboard")}
+              className="flex items-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-semibold text-gray-700 shadow border border-white/60 transition hover:shadow-md"
             >
-              <FaUndoAlt />
-              Reset
+              <FaArrowLeft size={14} />
+              Back
             </button>
           </div>
         </div>
-      </form>
 
-      {/* Report Table */}
-      <div className="bg-white rounded-2xl shadow-sm p-4">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-3 gap-2">
-          <h2 className="text-lg font-semibold text-slate-700">
-            Cancelled Orders List
-          </h2>
+        <div className="rounded-3xl border border-white/60 bg-white/80 p-6 shadow-xl backdrop-blur-sm mb-6">
+          <form onSubmit={handleSearch} className="mb-6 flex flex-wrap items-end gap-4">
+            <label className="min-w-[160px] w-full md:w-auto">
+              <span className="mb-2 block text-sm font-medium text-gray-700">From</span>
+              <div className="flex items-center rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
+                <input
+                  type="date"
+                  name="fromDate"
+                  value={filters.fromDate}
+                  onChange={handleDateChange}
+                  className="w-full bg-transparent text-gray-800 outline-none [color-scheme:light]"
+                />
+              </div>
+            </label>
 
-          {/* Combined Search Input with Cancel Icon */}
-          <div className="relative w-full md:w-80">
-            <input
-              type="text"
-              name="searchTerm"
-              value={searchFilters.searchTerm}
-              onChange={handleSearchChange}
-              placeholder="Search by Order Number or Customer Name..."
-              className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-afmc-maroon pr-10"
-            />
-            {searchFilters.searchTerm && (
-              <button
-                type="button"
-                onClick={handleClearSearch}
-                className="absolute right-2 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"
-              >
-                <FaTimes size={16} />
-              </button>
-            )}
-          </div>
-        </div>
+            <label className="min-w-[160px] w-full md:w-auto">
+              <span className="mb-2 block text-sm font-medium text-gray-700">To</span>
+              <div className="flex items-center rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
+                <input
+                  type="date"
+                  name="toDate"
+                  value={filters.toDate}
+                  onChange={handleDateChange}
+                  className="w-full bg-transparent text-gray-800 outline-none [color-scheme:light]"
+                />
+              </div>
+            </label>
 
-        {/* Records Info - Below the title and search */}
-        <div className="mb-3">
-          <p className="text-sm text-slate-500">
-            Showing {filteredOrders.length === 0 ? 0 : startIndex + 1} to{" "}
-            {Math.min(endIndex, filteredOrders.length)} of {filteredOrders.length} Records
-            {orders.length !== filteredOrders.length && (
-              <span className="text-slate-400 ml-2">
-                (filtered from {orders.length} total)
-              </span>
-            )}
-          </p>
-        </div>
-
-        {loading ? (
-          <p className="text-sm text-slate-600">Loading Report...</p>
-        ) : (
-          <>
-            <div className="overflow-x-auto">
-              <table className="w-full border border-slate-200 text-sm">
-                <thead className="bg-slate-100">
-                  <tr>
-                    <th className="border px-3 py-2 text-left">Order No</th>
-                    <th className="border px-3 py-2 text-left">Status</th>
-                    <th className="border px-3 py-2 text-left">Order Date</th>
-                    <th className="border px-3 py-2 text-left">Customer Name</th>
-                    <th className="border px-3 py-2 text-left">Pubmed</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {currentOrders.length > 0 ? (
-                    currentOrders.map((row, index) => (
-                      <tr key={index} className="hover:bg-slate-50">
-                        <td
-                          className="border px-3 py-2 text-afmc-maroon font-semibold cursor-pointer hover:underline"
-                          onClick={() => openOrderDetails(row.ORDER_NUM)}
-                        >
-                          {row.ORDER_NUM}
-                        </td>
-                        <td className="border px-3 py-2">
-                          <span className="bg-red-100 text-red-700 text-xs font-semibold px-2 py-1 rounded-full">
-                            {toInitCap(row.status)}
-                          </span>
-                        </td>
-                        <td className="border px-3 py-2">
-                          {formatDisplayDate(row.ORDER_DATE)}
-                        </td>                      
-                          <td className="border px-3 py-2">{toInitCap(row.FIRST_NAME)}</td>
-                        <td className="border px-3 py-2">{toInitCap(row.pubmed_name)}</td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td
-                        colSpan="5"
-                        className="border px-3 py-4 text-center text-slate-500"
-                      >
-                        No Cancelled Orders Found
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+            <div className="min-w-[240px] w-full md:flex-1">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Search by Order Number or Customer Name
+              </label>
+              <div className="flex items-center rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
+                <input
+                  type="text"
+                  name="searchTerm"
+                  value={searchFilters.searchTerm}
+                  onChange={handleSearchChange}
+                  placeholder="Search by order number or customer name"
+                  className="w-full bg-transparent text-gray-800 outline-none placeholder:text-gray-400"
+                />
+                {searchFilters.searchTerm && (
+                  <button
+                    type="button"
+                    onClick={handleClearSearch}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    <FaTimes size={16} />
+                  </button>
+                )}
+              </div>
             </div>
 
-            {/* Pagination */}
-            {filteredOrders.length > 0 && (
-              <div className="flex flex-col md:flex-row items-center justify-between gap-4 mt-5">
-                <p className="text-sm text-slate-500">
-                  Page {currentPage} of {totalPages || 1}
-                </p>
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="submit"
+                className="flex items-center gap-2 rounded-2xl bg-[#5b5b5b] px-6 py-3 text-sm font-semibold text-white shadow hover:shadow-md"
+              >
+                <FaSearch size={14} />
+                Search
+              </button>
+              <button
+                type="button"
+                onClick={handleReset}
+                className="flex items-center gap-2 rounded-2xl bg-slate-500 px-6 py-3 text-sm font-semibold text-white shadow hover:shadow-md"
+              >
+                <FaUndoAlt size={14} />
+                Reset
+              </button>
+            </div>
+          </form>
+        </div>
 
-                <div className="flex items-center gap-2 flex-wrap">
-                  {/* Previous */}
-                  <button
-                    onClick={handlePrevious}
-                    disabled={currentPage === 1}
-                    className="px-3 py-2 rounded-lg border text-sm bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                  >
-                    <FaChevronLeft size={12} />
-                    Prev
-                  </button>
+        <div className="rounded-3xl border border-white/60 bg-white/80 p-6 shadow-xl backdrop-blur-sm">
+          <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-800">Cancelled Orders List</h2>
+              <p className="text-sm text-gray-500">
+                Showing {filteredOrders.length === 0 ? 0 : startIndex + 1} to {Math.min(endIndex, filteredOrders.length)} of {filteredOrders.length} Records
+                {orders.length !== filteredOrders.length && (
+                  <span className="text-gray-400 ml-2">(filtered from {orders.length} total)</span>
+                )}
+              </p>
+            </div>
 
-                  {/* Page Numbers */}
-                  {[...Array(totalPages)].map((_, index) => {
-                    const pageNumber = index + 1;
-                    return (
-                      <button
-                        key={pageNumber}
-                        onClick={() => handlePageChange(pageNumber)}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium border transition ${currentPage === pageNumber
-                          ? "bg-afmc-maroon text-white border-afmc-maroon"
-                          : "bg-white text-slate-700 hover:bg-slate-50 border-slate-300"
-                          }`}
-                      >
-                        {pageNumber}
-                      </button>
-                    );
-                  })}
+            {/* <button
+              onClick={handleDownload}
+              className="inline-flex items-center gap-2 rounded-2xl bg-afmc-maroon px-5 py-3 text-sm font-semibold text-white shadow transition hover:bg-afmc-maroon2"
+            >
+              <FaDownload size={16} />
+              Download Pdf
+            </button> */}
+          </div>
 
-                  {/* Next */}
-                  <button
-                    onClick={handleNext}
-                    disabled={currentPage === totalPages || totalPages === 0}
-                    className="px-3 py-2 rounded-lg border text-sm bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                  >
-                    Next
-                    <FaChevronRight size={12} />
-                  </button>
-                </div>
+          {loading ? (
+            <p className="text-sm text-gray-600">Loading report...</p>
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[780px] text-sm">
+                  <thead className="bg-gray-50 text-gray-600">
+                    <tr>
+                      <th className="px-4 py-3 text-left font-medium">Order No</th>
+                      <th className="px-4 py-3 text-left font-medium">Status</th>
+                      <th className="px-4 py-3 text-left font-medium">Order Date</th>
+                      <th className="px-4 py-3 text-left font-medium">Customer Name</th>
+                      <th className="px-4 py-3 text-left font-medium">Pubmed</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {currentOrders.length > 0 ? (
+                      currentOrders.map((row, index) => (
+                        <tr key={index} className="border-t border-gray-100 hover:bg-gray-50 text-gray-700">
+                          <td
+                            className="px-4 py-3 text-afmc-maroon font-semibold cursor-pointer hover:underline"
+                            onClick={() => openOrderDetails(row.ORDER_NUM)}
+                          >
+                            {row.ORDER_NUM}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="inline-flex rounded-full bg-red-100 px-2 py-1 text-xs font-semibold text-red-700">
+                              {toInitCap(row.status)}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">{formatDisplayDate(row.ORDER_DATE)}</td>
+                          <td className="px-4 py-3">{toInitCap(row.FIRST_NAME)}</td>
+                          <td className="px-4 py-3">{toInitCap(row.pubmed_name)}</td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="5" className="px-4 py-8 text-center text-gray-500">
+                          No Cancelled Orders Found
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
-            )}
-          </>
-        )}
+
+              {filteredOrders.length > 0 && (
+                <div className="mt-5 flex flex-col gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600 sm:flex-row sm:items-center sm:justify-between">
+                  <div>Page {currentPage} of {totalPages || 1}</div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      onClick={handlePrevious}
+                      disabled={currentPage === 1}
+                      className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm transition hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <FaChevronLeft size={12} />
+                      Prev
+                    </button>
+                    {[...Array(totalPages)].map((_, index) => {
+                      const pageNumber = index + 1;
+                      return (
+                        <button
+                          key={pageNumber}
+                          onClick={() => handlePageChange(pageNumber)}
+                          className={`px-4 py-2 rounded-lg text-sm font-medium border transition ${currentPage === pageNumber ? "bg-afmc-maroon text-white border-afmc-maroon" : "bg-white text-gray-700 hover:bg-gray-50 border-gray-300"}`}
+                        >
+                          {pageNumber}
+                        </button>
+                      );
+                    })}
+                    <button
+                      onClick={handleNext}
+                      disabled={currentPage === totalPages || totalPages === 0}
+                      className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm transition hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Next
+                      <FaChevronRight size={12} />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </div>
 
-      {/* Modal */}
       <OrderDetailsModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
@@ -411,3 +384,4 @@ export default function CancelledOrders() {
     </div>
   );
 }
+
