@@ -70,6 +70,14 @@ api.interceptors.response.use(
   (res) => res,
   (err) => {
     if (
+      err.response?.status === 403 &&
+      err.response?.data?.code === "BAR_CLOSED" &&
+      !window.location.pathname.includes("/bar-closed")
+    ) {
+      window.location.href = "/bar-closed";
+    }
+
+    if (
       err.response?.status === 401 &&
       !window.location.pathname.includes("/login")
     ) {
@@ -115,6 +123,14 @@ export async function authFetchJson(input, init = {}) {
   }
 
   if (!res.ok) {
+    if (
+      res.status === 403 &&
+      data?.code === "BAR_CLOSED" &&
+      !window.location.pathname.includes("/bar-closed")
+    ) {
+      window.location.href = "/bar-closed";
+    }
+
     const message =
       (data && (data.message || data.error)) || `Request failed (${res.status})`;
     throw new Error(message);
@@ -404,6 +420,11 @@ export const invoiceReportAPI = {
 
 export const cancelledOrdersAPI = {
   getCancelledOrders: (params) => api.get("/cancelled-orders", { params }),
+};
+
+export const barStatusAPI = {
+  getStatus: () => api.get("/bar-status"),
+  updateStatus: (status) => api.put("/bar-status", { status }),
 };
 
 

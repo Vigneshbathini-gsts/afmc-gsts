@@ -8,6 +8,7 @@ import {
   FaHistory,
   FaBan,
   FaTimes,
+  FaClock,
 } from "react-icons/fa";
 
 export default function AdminSidebar({ isOpen, onClose }) {
@@ -102,6 +103,17 @@ export default function AdminSidebar({ isOpen, onClose }) {
             >
               <FaBan />
               Cancelled Orders
+            </NavLink>
+          )}
+
+          {!isInventoryOnlyUser && (
+            <NavLink
+              to="/admin/bar-status"
+              className={navLinkClass}
+              onClick={onClose}
+            >
+              <FaClock />
+              Bar Status
             </NavLink>
           )}
         </div>

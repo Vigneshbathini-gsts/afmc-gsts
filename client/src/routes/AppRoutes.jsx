@@ -2,6 +2,7 @@ import React from "react";
 import { Routes, Route } from "react-router-dom";
 import { Navigate } from "react-router-dom";
 import ProtectedRoute from "../components/ProtectedRoute";
+import BarStatusGuard from "../components/BarStatusGuard";
 // Common Pages
 import Home from "../pages/common/Home";
 import NotFound from "../pages/common/NotFound";
@@ -36,6 +37,7 @@ import AdminOrderHistory from "../pages/admin/OrderHistory";
 import CancelledOrders from "../pages/admin/CancelledOrders";
 import OfferCreate from "../pages/admin/OfferCreate";
 import OfferEdit from "../pages/admin/OfferEdit";
+import BarStatus from "../pages/admin/BarStatus";
 
 // Attendant Pages
 import AttendantDashboard from "../pages/attendant/Dashboard";
@@ -102,7 +104,8 @@ import BarClosed from "../pages/common/BarClosed";
 
 export default function AppRoutes() {
   return (
-    <Routes>
+    <BarStatusGuard>
+      <Routes>
       {/* Public Routes */}
       <Route path="/" element={<Home />} />
       <Route path="/login" element={<Login />} />
@@ -154,6 +157,7 @@ export default function AppRoutes() {
         <Route path="cocktail-edit" element={<CocktailEdit />} />
         <Route path="order-history" element={<AdminOrderHistory />} />
         <Route path="cancelled-orders" element={<CancelledOrders />} />
+        <Route path="bar-status" element={<BarStatus />} />
       </Route>
 
       {/* ================= ATTENDANT ================= */}
@@ -300,6 +304,7 @@ export default function AppRoutes() {
 
       {/* 404 */}
       <Route path="*" element={<NotFound />} />
-    </Routes>
+      </Routes>
+    </BarStatusGuard>
   );
 }

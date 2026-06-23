@@ -1,4 +1,11 @@
+import { clearAuthData } from "../../utils/authStorage";
+
 const BarClosed = () => {
+  const handleLogout = () => {
+    clearAuthData();
+    window.location.href = "/login";
+  };
+
   return (
     <div
       style={{
@@ -6,16 +13,11 @@ const BarClosed = () => {
         marginTop: "100px",
       }}
     >
-      <h1>⏰ Time is Up!</h1>
+      <h1>Time is Up!</h1>
 
       <h2>Bar is closed.</h2>
 
-      <button
-        onClick={() => {
-          localStorage.clear();
-          window.location.href = "/";
-        }}
-      >
+      <button onClick={handleLogout}>
         Logout
       </button>
     </div>

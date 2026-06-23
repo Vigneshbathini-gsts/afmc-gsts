@@ -23,8 +23,6 @@ const barStatusMiddleware = async (
       0
     );
 
-    console.log("role id bar status mid",roleId)
-
     const isBarClosed =
       barStatus.bar_status ===
       "Bar Is Close";

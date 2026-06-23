@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
-import { barStatusAPI } from "../services/api";
+import { barStatusAPI } from "../../services/api";
 
 const BarStatus = () => {
   const [status, setStatus] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [message, setMessage] = useState("");
 
   const loadStatus = async () => {
     try {
@@ -14,6 +16,7 @@ const BarStatus = () => {
       );
     } catch (error) {
       console.error(error);
+      setMessage("Unable to load bar status");
     }
   };
 
@@ -23,15 +26,18 @@ const BarStatus = () => {
 
   const handleSave = async () => {
     try {
+      setIsSaving(true);
+      setMessage("");
       await barStatusAPI.updateStatus(
         status
       );
 
-      alert(
-        "Bar status updated successfully"
-      );
+      setMessage("Bar status updated successfully");
     } catch (error) {
       console.error(error);
+      setMessage("Unable to update bar status");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -69,9 +75,11 @@ const BarStatus = () => {
 
       <br />
 
-      <button onClick={handleSave}>
-        Save
+      <button onClick={handleSave} disabled={!status || isSaving}>
+        {isSaving ? "Saving..." : "Save"}
       </button>
+
+      {message && <p>{message}</p>}
     </div>
   );
 };
