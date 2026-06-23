@@ -8,9 +8,11 @@ import {
   FaSave,
   FaSyncAlt,
   FaWineGlassAlt,
+  FaArrowLeft,
 } from "react-icons/fa";
 import { barStatusAPI } from "../../services/api";
 import { toast } from "react-toastify";
+
 
 const formatISTDateTime = (value) => {
   if (!value) return "Not available";
@@ -117,7 +119,9 @@ const BarStatus = () => {
             </p>
           </div>
 
-          <button
+
+
+          {/* <button
             type="button"
             onClick={loadStatus}
             disabled={isLoading || isSaving}
@@ -125,6 +129,14 @@ const BarStatus = () => {
           >
             <FaSyncAlt className={isLoading ? "animate-spin" : ""} />
             Refresh
+          </button> */}
+
+          <button
+            onClick={() => navigate("/admin/dashboard")}
+            className="flex items-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-semibold text-gray-700 shadow border border-white/60 transition hover:shadow-md"
+          >
+            <FaArrowLeft size={14} />
+            Back
           </button>
         </div>
 
@@ -141,11 +153,10 @@ const BarStatus = () => {
               </div>
 
               <span
-                className={`inline-flex w-fit items-center gap-2 rounded-full px-3 py-1 text-sm font-bold ${
-                  isClosed
+                className={`inline-flex w-fit items-center gap-2 rounded-full px-3 py-1 text-sm font-bold ${isClosed
                     ? "bg-red-50 text-red-700 ring-1 ring-red-200"
                     : "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
-                }`}
+                  }`}
               >
                 {isClosed ? <FaLock /> : <FaDoorOpen />}
                 {isClosed ? "Closed" : "Open"}
@@ -156,11 +167,10 @@ const BarStatus = () => {
               <button
                 type="button"
                 onClick={() => setStatus("Bar Is Open")}
-                className={`group rounded-3xl border p-5 text-left shadow-sm transition ${
-                  status === "Bar Is Open"
+                className={`group rounded-3xl border p-5 text-left shadow-sm transition ${status === "Bar Is Open"
                     ? "border-emerald-300 bg-emerald-50 ring-2 ring-emerald-200"
                     : "border-gray-100 bg-white hover:border-emerald-200 hover:bg-emerald-50/50"
-                }`}
+                  }`}
               >
                 <div className="flex items-center justify-between gap-3">
                   <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700">
@@ -181,11 +191,10 @@ const BarStatus = () => {
               <button
                 type="button"
                 onClick={() => setStatus("Bar Is Close")}
-                className={`group rounded-3xl border p-5 text-left shadow-sm transition ${
-                  status === "Bar Is Close"
+                className={`group rounded-3xl border p-5 text-left shadow-sm transition ${status === "Bar Is Close"
                     ? "border-red-300 bg-red-50 ring-2 ring-red-200"
                     : "border-gray-100 bg-white hover:border-red-200 hover:bg-red-50/50"
-                }`}
+                  }`}
               >
                 <div className="flex items-center justify-between gap-3">
                   <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-100 text-red-700">
@@ -206,11 +215,10 @@ const BarStatus = () => {
 
             {message && (
               <div
-                className={`mt-5 rounded-2xl border px-4 py-3 text-sm font-semibold ${
-                  messageType === "success"
+                className={`mt-5 rounded-2xl border px-4 py-3 text-sm font-semibold ${messageType === "success"
                     ? "border-emerald-200 bg-emerald-50 text-emerald-700"
                     : "border-red-200 bg-red-50 text-red-700"
-                }`}
+                  }`}
               >
                 {message}
               </div>
