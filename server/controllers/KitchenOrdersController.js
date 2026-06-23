@@ -40,7 +40,7 @@ async function releaseReservationRows(connection, reservationRows) {
     const itemCode = String(row.item_code || "").trim();
     const quantity = Number(row.release_qty || 0);
     if (!itemCode || !Number.isFinite(quantity) || quantity <= 0) {
-      console.log("Skipping invalid row:", { itemCode, quantity });
+      // console.log("Skipping invalid row:", { itemCode, quantity });
       continue;
     }
 
@@ -61,7 +61,7 @@ async function releaseReservationRows(connection, reservationRows) {
       [quantity, itemCode]
     );
 
-    console.log(`Released ${quantity} for item ${itemCode}. Update result:`, result.affectedRows);
+    // console.log(`Released ${quantity} for item ${itemCode}. Update result:`, result.affectedRows);
   }
 }
 
