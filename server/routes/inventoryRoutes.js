@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const inventoryController = require("../controllers/inventoryController");
+const addStockController = require("../controllers/addStockController");
 const upload = require("../utils/uploadMiddleware");
 
 router.get("/", inventoryController.getInventory);
@@ -16,7 +17,7 @@ router.get("/today-stock-out-details", inventoryController.getTodayStockOutDetai
 router.get("/:id", inventoryController.getItemById);
 router.post("/", upload.single("image"), inventoryController.createItem);
 router.put("/:itemCode/image", upload.single("image"), inventoryController.updateItemImage);
-router.post("/add-stock", inventoryController.addStock);
+router.post("/add-stock", addStockController.addStock);
 router.post("/stock-out", inventoryController.addStockOut);
 
 module.exports = router;

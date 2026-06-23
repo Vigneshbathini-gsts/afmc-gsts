@@ -1,5 +1,5 @@
 const db = require("../config/db");
-const { formatToSql, getStartOfDay, getEndOfDay, parseDate, toISO } = require("../utils/dateUtils");
+const { formatToSql, getStartOfDay, getEndOfDay, parseDate } = require("../utils/dateUtils");
 
 const ID_LOCKS = {
   inventory: "xxafmc_inventory_item_id_lock",
@@ -34,16 +34,25 @@ const buildInventoryQuery = ({ categoryId, itemCode, search }) => {
         xi.ITEM_ID AS item_id,
         xi.ITEM_CODE AS item_code,
         xi.ITEM_NAME AS item_name,
+        xi.CATEGORY_ID AS category_id,
+        xi.SUB_CATEGORY AS sub_category,
+        xs.SUB_CATEGORY_NAME AS item_group,
         COALESCE(NULLIF(xi.\`A/C_UNIT\`, ''), 'Nos') AS ac_unit,
         IFNULL(xi.STOCK_QUANTITY, 0) AS stock_quantity,
+        IFNULL(xi.PROFIT, 0) AS profit,
         xi.ITEM_CODE AS itemid,
         xi.FILE_NAME AS file_name,
         xi.MIME_TYPE AS mime_type
     FROM xxafmc_inventory xi
+    LEFT JOIN xxafmc_sub_categories xs ON xs.SUB_CATEGORY_ID = xi.SUB_CATEGORY
     ${whereClause}
     GROUP BY xi.ITEM_CODE,
              xi.ITEM_NAME,
+             xi.CATEGORY_ID,
+             xi.SUB_CATEGORY,
+             xs.SUB_CATEGORY_NAME,
              xi.STOCK_QUANTITY,
+             xi.PROFIT,
              xi.\`A/C_UNIT\`,
              xi.ITEM_ID,
              xi.FILE_NAME,
@@ -177,27 +186,6 @@ const getDefaultServingVolume = (subCategory, acUnit) => {
   if (sub === 6 && unit === "glass") return "200";
   if (sub === 9 && unit === "glass") return "250";
   return "";
-};
-
-const validateStockInItem = (item) => {
-  const numericRate = Number(item.rate);
-  const normalizedBarcode = sanitizeBarcode(item.barcode);
-
-  if (
-    !item.itemCode ||
-    !Number.isFinite(numericRate) ||
-    numericRate <= 0 ||
-    !item.transactionDate ||
-    !normalizedBarcode
-  ) {
-    return false;
-  }
-
-  if (!/^\d{4,32}$/.test(normalizedBarcode)) {
-    return false;
-  }
-
-  return true;
 };
 
 const validateStockOutItem = (item) => {
@@ -484,190 +472,9 @@ const stockOutBarcodeExistsInDb = async (barcode) => {
   return transactionExists || stockOutExists;
 };
 
-const parseVolumeToNumber = (volume) => {
-  if (!volume) return null;
-  const match = String(volume).match(/(\d+(\.\d+)?)/);
-  return match ? Number(match[1]) : null;
-};
-
 const normalizeTransactionDate = (value) => {
   const parsed = parseDate(value);
   return parsed ? parsed.toISOString().split('T')[0] : null;
-};
-
-const normalizeReportDate = (value) => normalizeTransactionDate(value);
-
-const calculatePegs = ({ subCategory, typeId, volume, acQuantity }) => {
-  const volumeNumber = parseVolumeToNumber(volume);
-  if (!volumeNumber || !acQuantity) return 0;
-
-  const subCat = Number(subCategory);
-  const type = Number(typeId);
-  const eligibleSubCats = [2, 4, 5, 8, 11, 12, 16, 17];
-  const eligibleTypes = [3, 4, 5, 6];
-
-  if (eligibleSubCats.includes(subCat) || eligibleTypes.includes(type)) {
-    return volumeNumber / acQuantity;
-  }
-
-  if (subCat === 6 && type === 5) {
-    return volumeNumber / acQuantity;
-  }
-
-  return 0;
-};
-
-const getBarLookupUnit = (subCategory, acUnit) => {
-  const sub = Number(subCategory);
-  const unit = String(acUnit || "").trim();
-
-  if (sub === 9 && unit.toLowerCase() === "glass") return "glass";
-  return unit;
-};
-
-const addStockTransactions = async (payload) => {
-  const items = Array.isArray(payload) ? payload : [payload];
-
-  const barcodes = items
-    .map((item) => item.barcode)
-    .filter((barcode) => barcode !== undefined && barcode !== null && barcode !== "");
-
-  const uniqueBarcodes = new Set(barcodes);
-  if (uniqueBarcodes.size !== barcodes.length) {
-    const error = new Error("DUPLICATE_BARCODE");
-    error.code = "DUPLICATE_BARCODE";
-    throw error;
-  }
-
-  const connection = await db.getConnection();
-  let transactionLockAcquired = false;
-  try {
-    await connection.beginTransaction();
-    transactionLockAcquired = await acquireNamedLock(connection, ID_LOCKS.transactions);
-    if (!transactionLockAcquired) {
-      throw new Error("Unable to acquire transaction ID lock");
-    }
-
-    for (const barcode of barcodes) {
-      const exists = await barcodeExists(connection, barcode);
-      if (exists) {
-        const error = new Error("DUPLICATE_BARCODE");
-        error.code = "DUPLICATE_BARCODE";
-        throw error;
-      }
-    }
-
-    let nextId = await getTransactionNextId(connection);
-
-    for (const item of items) {
-      const {
-        itemCode,
-        quantity,
-        transactionDate,
-        volume,
-        barcode,
-        rate,
-        batchId,
-        createdBy,
-        acUnit,
-      } = item;
-
-      const normalizedBarcode = sanitizeBarcode(barcode);
-      const numericQuantity = 1;
-
-      if (!validateStockInItem({ ...item, barcode: normalizedBarcode })) {
-        const error = new Error("INVALID_DATA");
-        error.code = "INVALID_DATA";
-        throw error;
-      }
-
-      const normalizedTransactionDate = normalizeTransactionDate(transactionDate);
-      if (!normalizedTransactionDate) {
-        const error = new Error("INVALID_DATA");
-        error.code = "INVALID_DATA";
-        throw error;
-      }
-
-      const inventoryItem = await getInventoryItemByCode(itemCode);
-      if (!inventoryItem) {
-        const error = new Error("ITEM_NOT_FOUND");
-        error.code = "ITEM_NOT_FOUND";
-        throw error;
-      }
-
-      const effectiveAcUnit = acUnit || inventoryItem.ac_unit || "Nos";
-      if (requiresVolume(effectiveAcUnit) && !String(volume || "").trim()) {
-        const error = new Error("INVALID_DATA");
-        error.code = "INVALID_DATA";
-        throw error;
-      }
-      const barLookupUnit = getBarLookupUnit(inventoryItem.sub_category, effectiveAcUnit);
-      const [barRows] = await connection.execute(
-        "SELECT AC_QUANTITY AS ac_quantity, TYPE_ID AS type_id FROM xxafmc_bar WHERE TYPE = ? LIMIT 1",
-        [barLookupUnit]
-      );
-      const barRow = barRows && barRows.length ? barRows[0] : null;
-
-      const pegs = calculatePegs({
-        subCategory: inventoryItem.sub_category,
-        typeId: barRow?.type_id,
-        volume,
-        acQuantity: barRow?.ac_quantity,
-      });
-
-      const batchName = `${inventoryItem.item_name}-${numericQuantity}-${volume || ""}-${transactionDate}`;
-
-      const insertSql = `
-        INSERT INTO xxafmc_items_transactions
-          (TRANSACTION_ID, ITEM_CODE, \`A/C_UNIT\`, RATE, STOCK, BATCH_NAME, VOLUME,
-           TRANSACTION_DATE, FLAG, BATCH_ID, BARCODE, PEGS, CREATED_BY, CREATION_DATE)
-        VALUES
-          (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `;
-
-      await connection.execute(insertSql, [
-        nextId,
-        Number(itemCode),
-        effectiveAcUnit,
-        Number(rate),
-        numericQuantity,
-        batchName,
-        volume || "",
-        normalizedTransactionDate,
-        "IN",
-        batchId || "",
-        normalizedBarcode,
-        Math.round(Number(pegs || 0)),
-        createdBy || "SYSTEM",
-        formatToSql(new Date()),
-      ]);
-
-      const updateSql = `
-        UPDATE xxafmc_inventory
-        SET STOCK_QUANTITY = IFNULL(STOCK_QUANTITY, 0) + ?,
-            UNIT_PRICE = ?
-        WHERE ITEM_CODE = ?
-      `;
-      await connection.execute(updateSql, [
-        numericQuantity,
-        Number(rate),
-        Number(itemCode),
-      ]);
-
-      nextId += 1;
-    }
-
-    await connection.commit();
-    return { count: items.length };
-  } catch (error) {
-    await connection.rollback();
-    throw error;
-  } finally {
-    if (transactionLockAcquired) {
-      await releaseNamedLock(connection, ID_LOCKS.transactions);
-    }
-    connection.release();
-  }
 };
 
 const getStockOutNextId = async (connection) => {
@@ -944,7 +751,6 @@ module.exports = {
   getStockOutItemByBarcode,
   barcodeExistsInDb,
   stockOutBarcodeExistsInDb,
-  addStockTransactions,
   addStockOutTransactions,
   getItemImageInfo,
   updateItemImage,
