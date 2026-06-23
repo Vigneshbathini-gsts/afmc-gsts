@@ -10,6 +10,7 @@ import {
   FaWineGlassAlt,
 } from "react-icons/fa";
 import { barStatusAPI } from "../../services/api";
+import { toast } from "react-toastify";
 
 const formatISTDateTime = (value) => {
   if (!value) return "Not available";
@@ -81,6 +82,7 @@ const BarStatus = () => {
       }
       setMessage("Bar status updated successfully");
       setMessageType("success");
+      toast.success("Bar status updated successfully");
       navigate("/admin/dashboard");
     } catch (error) {
       console.error(error);
