@@ -108,6 +108,7 @@ const InvoiceReportroute = require("./modules/invoice-report/InvoiceReportroute"
 const orderHistoryRoutes = require("./routes/orderHistoryRoutes");
 const paymentRoutes = require("./modules/payment/paymentRoutes");
 const orderEvents = require("./utils/orderEvents");
+const barStatusRoutes = require("./routes/BarStatusRoutes")
 
 const apiPrefixes = ["/api", API_BASE_PATH];
 for (const prefix of apiPrefixes) {
@@ -134,6 +135,7 @@ for (const prefix of apiPrefixes) {
   app.use(`${prefix}/order-history`, orderHistoryRoutes);
   app.use(`${prefix}/payment`, paymentRoutes);
   app.get(`${prefix}/order-events`, orderEvents.authenticateEventRequest, orderEvents.subscribe);
+  app.use(`${prefix}/bar-status`, barStatusRoutes);
 }
 
 app.use((err, req, res, next) => {

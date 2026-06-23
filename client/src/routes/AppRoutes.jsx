@@ -96,6 +96,9 @@ import Ordertransactiondetails from "../pages/admin/StockReportspages/Ordertrans
 import Orderitemdetails from "../pages/admin/StockReportspages/Orderitemdetails";
 import OutletOrderDetails from "../pages/kitchen/OutletOrderDetails";
 
+//Bar status
+import BarClosed from "../pages/common/BarClosed";
+
 
 export default function AppRoutes() {
   return (
@@ -292,6 +295,8 @@ export default function AppRoutes() {
           </ProtectedRoute>
         }
       />
+
+      <Route path="/bar-closed" element={<BarClosed />}/>
 
       {/* 404 */}
       <Route path="*" element={<NotFound />} />
