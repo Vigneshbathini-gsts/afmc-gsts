@@ -243,7 +243,8 @@ exports.getStockInReport = async (req, res) => {
   try {
     const { fromDate, toDate, limit, offset } = req.query;
     const rows = await inventoryModel.getStockInReport({ fromDate, toDate, limit, offset });
-    res.status(200).json({ success: true, data: rows });
+    const summary = await inventoryModel.getStockInReportSummary({ fromDate, toDate });
+    res.status(200).json({ success: true, data: rows, summary });
   } catch (error) {
     console.error("Error fetching stock-in report:", error);
     res.status(500).json({ success: false, message: "Failed to load stock-in report" });
@@ -254,7 +255,8 @@ exports.getStockOutReport = async (req, res) => {
   try {
     const { fromDate, toDate, limit, offset } = req.query;
     const rows = await inventoryModel.getStockOutReport({ fromDate, toDate, limit, offset });
-    res.status(200).json({ success: true, data: rows });
+    const summary = await inventoryModel.getStockOutReportSummary({ fromDate, toDate });
+    res.status(200).json({ success: true, data: rows, summary });
   } catch (error) {
     console.error("Error fetching stock-out report:", error);
     res.status(500).json({ success: false, message: "Failed to load stock-out report" });
