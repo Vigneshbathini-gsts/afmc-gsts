@@ -1,7 +1,20 @@
 const BarStatusModel = require("../models/BarStatusModel");
 
+let cachedStatus = null;
+let cachedAt = 0;
+const CACHE_TTL_MS = 5000;
+
 const getBarStatus = async () => {
-    return await BarStatusModel.getBarStatus();
+    const now = Date.now();
+
+    if (cachedStatus && now - cachedAt < CACHE_TTL_MS) {
+        return cachedStatus;
+    }
+
+    cachedStatus = await BarStatusModel.getBarStatus();
+    cachedAt = now;
+
+    return cachedStatus;
 };
 
 const updateBarStatus = async ({
@@ -17,10 +30,15 @@ const updateBarStatus = async ({
         throw new Error("Invalid bar status");
     }
 
-    return await BarStatusModel.updateBarStatus({
+    await BarStatusModel.updateBarStatus({
         status,
         updatedBy,
     });
+
+    cachedStatus = await BarStatusModel.getBarStatus();
+    cachedAt = Date.now();
+
+    return cachedStatus;
 };
 
 module.exports = {

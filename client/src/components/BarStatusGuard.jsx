@@ -1,11 +1,11 @@
 import { useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { barStatusAPI } from "../services/api";
+import { API_BASE_URL, barStatusAPI } from "../services/api";
 import { getToken } from "../utils/authStorage";
 
 const EXEMPT_ROLES = [10, 40];
-const POLL_INTERVAL_MS = 2000;
+const FALLBACK_POLL_INTERVAL_MS = 60000;
 
 function isPublicPath(pathname) {
   return (
@@ -23,7 +23,9 @@ export default function BarStatusGuard({ children }) {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (isLoading || !getToken() || !user || isPublicPath(location.pathname)) {
+    const token = getToken();
+
+    if (isLoading || !token || !user || isPublicPath(location.pathname)) {
       return undefined;
     }
 
@@ -33,15 +35,19 @@ export default function BarStatusGuard({ children }) {
     }
 
     let cancelled = false;
+    let source;
+    let fallbackIntervalId;
 
-    const checkBarStatus = async () => {
+    const handleStatus = (barStatus) => {
+      if (!cancelled && barStatus?.bar_status === "Bar Is Close") {
+        navigate("/bar-closed", { replace: true });
+      }
+    };
+
+    const checkBarStatusOnce = async () => {
       try {
         const response = await barStatusAPI.getStatus();
-        const currentStatus = response.data?.data?.bar_status;
-
-        if (!cancelled && currentStatus === "Bar Is Close") {
-          navigate("/bar-closed", { replace: true });
-        }
+        handleStatus(response.data?.data);
       } catch (error) {
         if (error.response?.data?.code !== "BAR_CLOSED") {
           console.error("Unable to check bar status:", error);
@@ -49,12 +55,32 @@ export default function BarStatusGuard({ children }) {
       }
     };
 
-    checkBarStatus();
-    const intervalId = window.setInterval(checkBarStatus, POLL_INTERVAL_MS);
+    checkBarStatusOnce();
+
+    if (typeof EventSource !== "undefined") {
+      source = new EventSource(
+        `${API_BASE_URL}/bar-status/events?token=${encodeURIComponent(token)}`,
+        { withCredentials: true }
+      );
+
+      source.addEventListener("bar-status", (event) => {
+        try {
+          handleStatus(JSON.parse(event.data || "{}"));
+        } catch {
+          // Ignore invalid event payloads.
+        }
+      });
+    } else {
+      fallbackIntervalId = window.setInterval(
+        checkBarStatusOnce,
+        FALLBACK_POLL_INTERVAL_MS
+      );
+    }
 
     return () => {
       cancelled = true;
-      window.clearInterval(intervalId);
+      if (source) source.close();
+      if (fallbackIntervalId) window.clearInterval(fallbackIntervalId);
     };
   }, [isLoading, location.pathname, navigate, user]);
 

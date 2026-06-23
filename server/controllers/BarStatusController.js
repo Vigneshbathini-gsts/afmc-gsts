@@ -1,4 +1,5 @@
 const BarStatusService = require('../services/BarStatusService')
+const { broadcastBarStatus } = require("../utils/barStatusEvents");
 
 const getBarStatus = async (req, res) => {
     try {
@@ -24,17 +25,22 @@ const updateBarStatus = async (req, res) => {
     try {
         const { status } = req.body;
 
-        await BarStatusService.updateBarStatus({
+        const data = await BarStatusService.updateBarStatus({
             status,
             updatedBy:
+                req.user?.email ||
                 req.user?.USER_NAME ||
                 req.user?.userName ||
+                req.user?.username ||
                 "SYSTEM",
         })
+
+        broadcastBarStatus(data);
 
         return res.status(200).json({
             success: true,
             message: "Bar status updated successfully",
+            data,
         });
     }
     catch (error) {

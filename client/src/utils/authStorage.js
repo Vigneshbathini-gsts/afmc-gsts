@@ -50,6 +50,7 @@ export const getAuthData = () => {
       user: userStr ? JSON.parse(userStr) : null,
       rememberMe,
     };
+    
   } catch (error) {
     console.error("Error retrieving auth data:", error);
     return { token: null, user: null, rememberMe: false };

@@ -9,9 +9,9 @@ const getBarStatus = async()=>{
         bar_status,
         active_flag,
         created_by,
-        creation_date,
+        DATE_FORMAT(creation_date, '%Y-%m-%d %H:%i:%s') AS creation_date,
         last_updated_by,
-        last_updated_date
+        DATE_FORMAT(last_updated_date, '%Y-%m-%d %H:%i:%s') AS last_updated_date
       FROM xxafmc_mess_timings
       WHERE id = 1
     `

@@ -157,7 +157,14 @@ export default function AppRoutes() {
         <Route path="cocktail-edit" element={<CocktailEdit />} />
         <Route path="order-history" element={<AdminOrderHistory />} />
         <Route path="cancelled-orders" element={<CancelledOrders />} />
-        <Route path="bar-status" element={<BarStatus />} />
+        <Route
+          path="bar-status"
+          element={
+            <ProtectedRoute allowedRoles={[10]}>
+              <BarStatus />
+            </ProtectedRoute>
+          }
+        />
       </Route>
 
       {/* ================= ATTENDANT ================= */}

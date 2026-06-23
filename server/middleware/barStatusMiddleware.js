@@ -1,5 +1,5 @@
-const BarStatusModel = require(
-  "../models/BarStatusModel"
+const BarStatusService = require(
+  "../services/BarStatusService"
 );
 
 const EXEMPT_ROLES = [10, 40];
@@ -11,7 +11,7 @@ const barStatusMiddleware = async (
 ) => {
   try {
     const barStatus =
-      await BarStatusModel.getBarStatus();
+      await BarStatusService.getBarStatus();
 
     if (!barStatus) {
       return next();

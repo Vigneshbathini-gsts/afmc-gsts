@@ -1,5 +1,6 @@
 const db = require("../config/db");
 
+
 exports.getStockReport = async (req, res) => {
   try {
     const { itemName, itemCode, limit, offset } = req.query;
