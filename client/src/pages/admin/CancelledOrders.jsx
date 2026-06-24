@@ -175,7 +175,7 @@ export default function CancelledOrders() {
       <div className="absolute top-16 left-12 h-72 w-72 rounded-full bg-afmc-maroon/10 blur-3xl" />
       <div className="absolute bottom-20 right-20 h-80 w-80 rounded-full bg-afmc-maroon2/10 blur-3xl" />
 
-      <div className="relative z-10 p-8">
+      <div className="relative z-10 px-0 py-4 md:p-8">
         <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
           <h1 className="text-2xl font-semibold text-gray-800">Cancelled Orders</h1>
           <div className="flex flex-wrap items-center gap-3">

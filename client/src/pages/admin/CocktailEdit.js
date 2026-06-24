@@ -426,7 +426,7 @@ export default function CocktailEdit() {
       <div className="absolute top-16 left-12 w-72 h-72 bg-afmc-maroon/10 rounded-full blur-3xl"></div>
       <div className="absolute bottom-20 right-20 w-80 h-80 bg-afmc-maroon2/10 rounded-full blur-3xl"></div>
 
-      <div className="p-6 md:p-8 relative z-10">
+      <div className="px-0 py-4 md:p-8 relative z-10">
         <div className="flex flex-wrap items-center justify-between gap-4 mb-6 md:mb-8">
           <h1 className="text-2xl font-semibold text-afmc-maroon">
             Edit Cocktail/Mocktail

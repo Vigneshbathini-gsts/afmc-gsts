@@ -304,7 +304,7 @@ export default function PriceUpdate() {
   }, [showScanner]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-afmc-bg via-white to-afmc-bg2 relative p-6 md:p-10 overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-afmc-bg via-white to-afmc-bg2 relative px-0 py-4 md:p-10 overflow-hidden">
       {/* Background Blobs */}
       <div className="absolute top-20 left-20 w-72 h-72 bg-afmc-maroon/10 rounded-full blur-3xl"></div>
       <div className="absolute bottom-20 right-20 w-80 h-80 bg-afmc-maroon2/10 rounded-full blur-3xl"></div>

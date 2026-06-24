@@ -337,7 +337,7 @@ export default function UserManagement() {
       <div className="absolute top-16 left-12 h-72 w-72 rounded-full bg-afmc-maroon/10 blur-3xl" />
       <div className="absolute bottom-20 right-20 h-80 w-80 rounded-full bg-afmc-maroon2/10 blur-3xl" />
 
-      <div className="relative z-10 p-8">
+      <div className="relative z-10 px-0 py-4 md:p-8">
         <style>{`
           .password-field::-ms-reveal,
           .password-field::-ms-clear {

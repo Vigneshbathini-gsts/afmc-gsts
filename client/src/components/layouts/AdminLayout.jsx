@@ -7,6 +7,7 @@ export default function AdminLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
   const isStockReportsPage = location.pathname.startsWith("/admin/stock-reports");
+  const isInventoryPage = location.pathname === "/admin/inventory";
 
   return (
     <div className="h-screen w-full overflow-hidden bg-afmc-bg">
@@ -22,7 +23,7 @@ export default function AdminLayout() {
 
         <main
           className={`flex-1 min-h-0 w-full overflow-y-auto ${
-            isStockReportsPage ? "p-0 md:p-6" : "p-4 md:p-6"
+            isStockReportsPage || isInventoryPage ? "p-0 md:p-6" : "p-4 md:p-6"
           }`}
         >
           <Outlet />

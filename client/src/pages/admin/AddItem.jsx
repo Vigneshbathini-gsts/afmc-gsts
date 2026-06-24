@@ -219,7 +219,7 @@ export default function AddItem() {
       <div className="absolute top-16 left-12 w-72 h-72 rounded-full bg-afmc-maroon/10 blur-3xl"></div>
       <div className="absolute bottom-20 right-20 w-80 h-80 rounded-full bg-afmc-maroon2/10 blur-3xl"></div>
 
-      <div className="relative z-10 p-8">
+      <div className="relative z-10 px-0 py-4 md:p-8">
         <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold text-gray-800">Barcode Reader</h1>
