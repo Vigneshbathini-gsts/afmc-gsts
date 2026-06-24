@@ -18,11 +18,11 @@ export default function AdminLayout() {
       />
 
       {/* Main Content */}
-      <div className="flex flex-col h-full min-h-0 w-full">
+      <div className="flex flex-col h-full min-h-0 min-w-0 w-full">
         <AdminNavbar onMenuClick={() => setSidebarOpen(true)} />
 
         <main
-          className={`flex-1 min-h-0 w-full overflow-y-auto ${
+          className={`flex-1 min-h-0 min-w-0 w-full overflow-y-auto ${
             isStockReportsPage || isInventoryPage ? "p-0 md:p-6" : "p-4 md:p-6"
           }`}
         >
