@@ -32,6 +32,15 @@ const INITIAL_FORM = {
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_REGEX = /^\d{10}$/;
 
+const formatRoleName = (roleName) =>
+  roleName
+    ? String(roleName)
+        .replace(/_/g, " ")
+        .replace(/\w\S*/g, (word) =>
+          `${word.charAt(0).toUpperCase()}${word.slice(1).toLowerCase()}`
+        )
+    : "-";
+
 const validateCreateForm = (formData) => {
   if (!formData.firstName.trim()) return "First name is required.";
   if (formData.firstName.trim().length < 2)
@@ -145,7 +154,7 @@ export default function UserManagement() {
     setIsCreateModalOpen(false);
     setSaving(false);
     resetForm();
-    isUploadModalOpen(false)
+    setIsUploadModalOpen(false);
   };
 
   const openUploadModal = () => {
@@ -493,7 +502,7 @@ export default function UserManagement() {
                           </span>
                         </td>
                         <td className="px-4 py-3 text-gray-700">
-                          {user.Role || "-"}
+                          {formatRoleName(user.Role)}
                         </td>
                         <td className="px-4 py-3 text-gray-700">
                           {user.LOGIN_TYPE

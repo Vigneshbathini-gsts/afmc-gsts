@@ -17,6 +17,15 @@ const INITIAL_FORM = {
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_REGEX = /^\d{10}$/;
 
+const formatRoleName = (roleName) =>
+  roleName
+    ? String(roleName)
+        .replace(/_/g, " ")
+        .replace(/\w\S*/g, (word) =>
+          `${word.charAt(0).toUpperCase()}${word.slice(1).toLowerCase()}`
+        )
+    : "";
+
 const STATUS_STYLES = {
   Active: "bg-[#ebf7ef] text-[#1f7a3d] border-[#cbe8d3]",
   Inactive: "bg-[#fff1f1] text-[#b04444] border-[#f1c8c8]",
@@ -68,6 +77,8 @@ export default function UserEdit() {
 
         const response = await userAPI.getById(id);
         const user = response.data?.data;
+
+        console.log("Fetched user data:", user);
 
         setFormData({
           userName: user?.USER_NAME || "",
@@ -313,7 +324,7 @@ export default function UserEdit() {
                       >
                         {roles.map((role) => (
                           <option key={role.ROLE_ID} value={role.ROLE_ID}>
-                            {role.ROLE_NAME}
+                            {formatRoleName(role.ROLE_NAME)}
                           </option>
                         ))}
                       </select>
