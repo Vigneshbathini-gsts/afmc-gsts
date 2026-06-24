@@ -106,7 +106,7 @@ export default function ActiveOrdersView({
       <div className="absolute top-16 left-10 h-72 w-72 rounded-full bg-afmc-maroon/10 blur-3xl"></div>
       <div className="absolute bottom-10 right-10 h-80 w-80 rounded-full bg-afmc-maroon2/10 blur-3xl"></div>
 
-      <div className="relative z-10 p-6 md:p-8">
+      <div className="relative z-10 px-0 py-4 md:p-8">
         <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold text-gray-800">{title}</h1>

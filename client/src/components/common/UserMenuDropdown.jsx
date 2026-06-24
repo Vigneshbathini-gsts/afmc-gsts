@@ -61,7 +61,7 @@ export default function UserMenuDropdown({ username }) {
 
       {/* Dropdown */}
       {open && (
-        <div className="absolute right-0 mt-2 w-52 bg-white rounded-xl shadow-xl border z-50 overflow-hidden">
+        <div className="absolute right-0 mt-2 w-52 max-w-[90vw] bg-white rounded-xl shadow-xl border z-50 overflow-hidden">
           <button
             onClick={() => {
               setPasswordModalOpen(true);

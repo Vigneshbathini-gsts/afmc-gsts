@@ -699,7 +699,7 @@ export default function ItemDetails() {
     if (error || !item) {
         return (
             <div className="flex min-h-screen items-center justify-center bg-stone-50 px-4">
-                <div className="max-w-md rounded-2xl border border-stone-200 bg-white p-8 text-center shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
+                <div className="max-w-md rounded-2xl border border-stone-200 bg-white p-6 md:p-8 text-center shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
                     <h2 className="mb-4 text-2xl font-semibold text-stone-900">Item Not Found</h2>
                     <p className="mb-6 text-sm text-stone-600">{error || "The requested item could not be found."}</p>
                     <button

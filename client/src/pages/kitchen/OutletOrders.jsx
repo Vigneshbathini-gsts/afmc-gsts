@@ -300,7 +300,7 @@ export default function OutletOrders({ kitchenType = "Bar" }) {
   };
 
   return (
-    <div className="p-6">
+    <div className="px-0 py-4 md:p-6">
       {/* HEADER */}
       <div
         className="rounded-2xl p-5 mb-5 text-white"

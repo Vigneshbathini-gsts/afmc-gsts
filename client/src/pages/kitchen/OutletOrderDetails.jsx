@@ -597,7 +597,7 @@ export default function OutletOrderDetails() {
       <div className="absolute top-16 left-12 w-72 h-72 bg-afmc-maroon/10 rounded-full blur-3xl"></div>
       <div className="absolute bottom-20 right-20 w-80 h-80 bg-afmc-maroon2/10 rounded-full blur-3xl"></div>
 
-      <div className="relative z-10 p-4 md:p-6 space-y-6">
+      <div className="relative z-10 px-0 py-4 md:p-6 space-y-6">
         <style>{`
           #qr-reader video, #qr-reader canvas {
             width: 100% !important;

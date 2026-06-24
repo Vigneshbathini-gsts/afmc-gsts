@@ -274,7 +274,7 @@ const KitchenOrderHistory = () => {
       <div className="absolute top-16 left-12 w-72 h-72 bg-afmc-maroon/10 rounded-full blur-3xl"></div>
       <div className="absolute bottom-20 right-20 w-80 h-80 bg-afmc-maroon2/10 rounded-full blur-3xl"></div>
 
-      <div className="relative z-10 p-6 md:p-8 space-y-6">
+      <div className="relative z-10 px-0 py-4 md:p-8 space-y-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-2xl font-semibold text-afmc-maroon">
             Kitchen Order History
