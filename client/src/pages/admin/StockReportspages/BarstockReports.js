@@ -188,12 +188,12 @@ export default function BarstockReports() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-afmc-bg via-white to-afmc-bg2 relative">
-      <div className="absolute top-16 left-12 w-72 h-72 bg-afmc-maroon/10 rounded-full blur-3xl"></div>
-      <div className="absolute bottom-20 right-20 w-80 h-80 bg-afmc-maroon2/10 rounded-full blur-3xl"></div>
+    <div className="min-h-screen w-full overflow-hidden bg-gradient-to-br from-afmc-bg via-white to-afmc-bg2 relative">
+      <div className="absolute top-16 left-0 md:left-12 w-72 h-72 bg-afmc-maroon/10 rounded-full blur-3xl"></div>
+      <div className="absolute bottom-20 right-0 md:right-20 w-80 h-80 bg-afmc-maroon2/10 rounded-full blur-3xl"></div>
 
-      <div className="relative z-10 p-8">
-        <div className="flex items-center justify-between mb-6 md:mb-8">
+      <div className="relative z-10 w-full p-0 md:p-8">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-3 pt-4 mb-6 md:mb-8 md:px-0 md:pt-0">
           <h1 className="text-2xl font-semibold text-afmc-maroon">
             Stock Reports
           </h1>
@@ -209,7 +209,7 @@ export default function BarstockReports() {
 
         <Stackreporttab showTopBar={false} showReportTitle={false} />
 
-        <div className="mt-8 bg-white/80 border border-white/60 rounded-3xl shadow-xl backdrop-blur-sm p-6">
+        <div className="mt-6 md:mt-8 bg-white/80 border border-white/60 rounded-none md:rounded-3xl shadow-xl backdrop-blur-sm p-3 md:p-6">
           <div className="flex flex-col gap-4 mb-6 md:flex-row md:items-end md:flex-wrap">
             <div className="w-full md:w-auto">
               <label className="block text-sm font-medium text-gray-700 mb-2">
