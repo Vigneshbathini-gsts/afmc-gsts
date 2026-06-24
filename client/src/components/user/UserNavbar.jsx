@@ -54,10 +54,10 @@ export default function UserNavbar({ onMenuClick }) {
           </div>
         </div>
 
-        <div className="flex items-center gap-3 md:gap-4">
+        <div className="flex shrink-0 items-center gap-2 md:gap-4">
           {!hideCartIcon && (
             <button
-              className="relative p-3 rounded-xl bg-gray-100 hover:bg-afmc-maroon/10 transition"
+              className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-gray-100 hover:bg-afmc-maroon/10 transition sm:h-11 sm:w-11"
               onClick={() => navigate("/user/cart")}
               aria-label="Open cart"
             >
