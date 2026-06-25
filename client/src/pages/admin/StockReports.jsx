@@ -177,7 +177,7 @@ export default function StockReports() {
         ? [
             row.item_code,
             row.item_name,
-            row.batch_id || "-",
+            // row.batch_id || "-",
             formatReportDate(row.transaction_date || row.creation_date),
             row.ac_unit || "Nos",
             row.stock,
@@ -203,7 +203,7 @@ export default function StockReports() {
         ? [
             "Item Code",
             "Item Name",
-            "Batch ID",
+            // "Batch ID",
             "Transaction Date",
             "A/c Unit",
             "Stock",

@@ -18,6 +18,12 @@ const STATUS_STYLES = {
   Inactive: "bg-[#fff1f1] text-[#b04444] border-[#f1c8c8]",
 };
 
+const formatRoleLabel = (role) => {
+  if (!role) return "-";
+  if (role === "Order") return "Order Attendent";
+  return role.replace(/_/g, " ");
+};
+
 const INITIAL_FORM = {
   loginType: "Member",
   firstName: "",
@@ -493,7 +499,7 @@ export default function UserManagement() {
                           </span>
                         </td>
                         <td className="px-4 py-3 text-gray-700">
-                          {user.Role || "-"}
+                          {formatRoleLabel(user.Role)}
                         </td>
                         <td className="px-4 py-3 text-gray-700">
                           {user.LOGIN_TYPE
