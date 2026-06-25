@@ -302,65 +302,67 @@ export default function AddItem() {
             </div>
           )}
 
-          <div className="mt-8 rounded-3xl border border-gray-200 bg-white shadow-sm overflow-x-auto">
-  <table className="min-w-[1200px] text-sm">
-              <thead className="bg-gray-50 text-gray-600">
-                <tr>
-                  <th className="px-4 py-3 text-left font-medium">S.No</th>
-                  <th className="px-4 py-3 text-left font-medium">Item Code</th>
-                  <th className="px-4 py-3 text-left font-medium">Item Name</th>
-                  <th className="px-4 py-3 text-left font-medium">Quantity</th>
-                  <th className="px-4 py-3 text-left font-medium">Unit Price</th>
-                  <th className="px-4 py-3 text-left font-medium">Transaction Date</th>
-                  <th className="px-4 py-3 text-left font-medium">Barcode</th>
-                  <th className="px-4 py-3 text-left font-medium">Volume</th>
-                  <th className="px-4 py-3 text-left font-medium">Batch Name</th>
-                  <th className="px-4 py-3 text-left font-medium">Del</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.length === 0 ? (
+          <div className="mt-8 overflow-hidden rounded-2xl border border-gray-200 bg-white">
+            <div className="overflow-x-auto">
+              <table className="min-w-[1200px] w-full text-left text-sm">
+                <thead className="bg-gray-50 text-gray-600">
                   <tr>
-                    <td colSpan="10" className="px-4 py-8 text-center text-gray-500">
-                      No staged stock-out items yet.
-                    </td>
+                    <th className="px-4 py-3 text-left font-medium">S.No</th>
+                    <th className="px-4 py-3 text-left font-medium">Item Code</th>
+                    <th className="px-4 py-3 text-left font-medium">Item Name</th>
+                    <th className="px-4 py-3 text-left font-medium">Quantity</th>
+                    <th className="px-4 py-3 text-left font-medium">Unit Price</th>
+                    <th className="px-4 py-3 text-left font-medium">Transaction Date</th>
+                    <th className="px-4 py-3 text-left font-medium">Barcode</th>
+                    <th className="px-4 py-3 text-left font-medium">Volume</th>
+                    <th className="px-4 py-3 text-left font-medium">Batch Name</th>
+                    <th className="px-4 py-3 text-left font-medium">Del</th>
                   </tr>
-                ) : (
-                  rows.map((row, index) => (
-                    <tr key={`${row.barcode}-${index}`} className="border-t border-gray-100">
-                      <td className="px-4 py-3">{index + 1}</td>
-                      <td className="px-4 py-3">{row.itemCode}</td>
-                      <td className="px-4 py-3 font-medium text-gray-800">{row.itemName}</td>
-                      <td className="px-4 py-3">
-                        <input
-                          type="number"
-                          value={row.displayQuantity ?? row.quantity}
-                          readOnly
-                          title={`${row.displayQuantity ?? row.quantity} ${row.acUnit || "Nos"}`}
-                          className="w-24 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2"
-                        />
-                      </td>
-                      <td className="px-4 py-3">{row.unitPrice}</td>
-                      <td className="px-4 py-3">{row.transactionDate}</td>
-                      <td className="px-4 py-3">{row.barcode}</td>
-                      <td className="px-4 py-3">{row.volume || "-"}</td>
-                      <td className="max-w-[180px] truncate px-4 py-3" title={row.batchName}>
-                        {row.batchName || "-"}
-                      </td>
-                      <td className="px-4 py-3">
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteRow(index)}
-                          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-red-200 text-red-600 hover:bg-red-50"
-                        >
-                          <FaTrash />
-                        </button>
+                </thead>
+                <tbody>
+                  {rows.length === 0 ? (
+                    <tr>
+                      <td colSpan="10" className="px-4 py-8 text-center text-gray-500">
+                        No staged stock-out items yet.
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    rows.map((row, index) => (
+                      <tr key={`${row.barcode}-${index}`} className="border-t border-gray-100">
+                        <td className="px-4 py-3">{index + 1}</td>
+                        <td className="px-4 py-3">{row.itemCode}</td>
+                        <td className="px-4 py-3 font-medium text-gray-800">{row.itemName}</td>
+                        <td className="px-4 py-3">
+                          <input
+                            type="number"
+                            value={row.displayQuantity ?? row.quantity}
+                            readOnly
+                            title={`${row.displayQuantity ?? row.quantity} ${row.acUnit || "Nos"}`}
+                            className="w-24 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2"
+                          />
+                        </td>
+                        <td className="px-4 py-3">{row.unitPrice}</td>
+                        <td className="px-4 py-3">{row.transactionDate}</td>
+                        <td className="px-4 py-3">{row.barcode}</td>
+                        <td className="px-4 py-3">{row.volume || "-"}</td>
+                        <td className="max-w-[180px] truncate px-4 py-3" title={row.batchName}>
+                          {row.batchName || "-"}
+                        </td>
+                        <td className="px-4 py-3">
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteRow(index)}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-red-200 text-red-600 hover:bg-red-50"
+                          >
+                            <FaTrash />
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           <div className="mt-8 flex flex-wrap items-center justify-between gap-4">

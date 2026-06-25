@@ -145,7 +145,7 @@ export default function UserManagement() {
     setIsCreateModalOpen(false);
     setSaving(false);
     resetForm();
-    isUploadModalOpen(false)
+    setIsUploadModalOpen(false);
   };
 
   const openUploadModal = () => {

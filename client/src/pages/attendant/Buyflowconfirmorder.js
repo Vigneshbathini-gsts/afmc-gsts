@@ -258,7 +258,7 @@ return (
         ) : (
           <div className="p-5">
             {/* Table */}
-            <div className="overflow-hidden rounded-2xl border border-stone-200">
+            <div className="overflow-x-auto rounded-2xl border border-stone-200">
               <table className="min-w-full">
                 <thead className="bg-[#faf7f2]">
                   <tr>
@@ -340,14 +340,14 @@ return (
                 )}
               </div>
 
-              <button
+              {/* <button
                 type="button"
                 onClick={() => navigate(`${currentBasePath}/menudash`)}
                 className="inline-flex items-center gap-2 rounded-full border border-stone-300 bg-white px-5 py-2 text-sm font-medium text-[#6b0f1a] transition hover:bg-stone-100"
               >
                 <ChevronLeft className="h-4 w-4" />
                 {toInitCap("Go Back")}
-              </button>
+              </button> */}
             </div>
           </div>
         )}

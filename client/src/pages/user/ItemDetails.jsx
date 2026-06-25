@@ -870,13 +870,13 @@ export default function ItemDetails() {
                 {/* Add Ingredients Modal */}
                 {showModal && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-                        <div className="max-h-[90vh] w-full max-w-4xl overflow-hidden rounded-2xl border border-afmc-gold/20 bg-white shadow-2xl">
+                        <div className="max-h-[90vh] w-full max-w-4xl overflow-hidden rounded-2xl border border-afmc-gold/20 bg-white shadow-2xl flex flex-col">
                             <div className="bg-afmc-maroon px-6 py-5 text-white">
                                 <h2 className="text-xl font-semibold">Add Ingredients</h2>
                                 <p className="mt-1 text-sm text-white/75">Only items that have stock are displayed here.</p>
                             </div>
 
-                            <div className="p-6">
+                            <div className="p-6 overflow-y-auto min-h-0">
                                 <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                                     {/* Left side - Item Name Input and Selected Ingredients */}
                                     <div>

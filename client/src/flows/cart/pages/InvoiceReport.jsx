@@ -211,7 +211,7 @@ export default function InvoiceReport() {
                 </div>
               </div>
 
-              <div className="mt-6 overflow-hidden rounded-2xl border border-stone-200">
+              <div className="mt-6 overflow-x-auto rounded-2xl border border-stone-200">
                 <table className="min-w-full">
                   <thead className="bg-[#faf7f2]">
                     <tr>

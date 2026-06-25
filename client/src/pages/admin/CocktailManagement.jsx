@@ -90,14 +90,14 @@ export default function CocktailManagement() {
       <div className="absolute bottom-20 right-20 w-80 h-80 bg-afmc-maroon2/10 rounded-full blur-3xl"></div>
 
       <div className="px-0 py-4 md:p-8 relative z-10">
-        <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-8">
           <h1 className="text-2xl font-semibold text-gray-800">
             Cocktail Management
           </h1>
           <button
             type="button"
             onClick={() => navigate("/admin/dashboard")}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-white shadow hover:shadow-md border border-white/60 text-gray-700"
+            className="flex w-full items-center justify-center gap-2 rounded-full bg-white px-5 py-2.5 shadow hover:shadow-md border border-white/60 text-gray-700 sm:w-auto"
           >
             <ChevronsLeft size={18} />
             Go To Dashboard

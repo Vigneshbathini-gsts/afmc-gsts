@@ -300,7 +300,7 @@ export default function OrderHistory() {
             className="flex items-center gap-2 rounded-full border border-white/60 bg-white px-5 py-2.5 text-gray-700 shadow hover:shadow-md"
           >
             <ArrowLeft size={16} />
-            Go To Dashboard
+            Back
           </button>
         </div>
 

@@ -10,7 +10,10 @@ import ChangePasswordModal from "./ChangePasswordModal";
 import { useAuth } from "../../context/AuthContext";
 import { clearAuthData } from "../../utils/authStorage";
 
-export default function UserMenuDropdown({ username }) {
+export default function UserMenuDropdown({
+  username,
+  compact = false,
+}) {
   const [open, setOpen] = useState(false);
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
 
@@ -19,11 +22,16 @@ export default function UserMenuDropdown({ username }) {
 
   const dropdownRef = useRef(null);
 
-  const displayName = username || user?.username || "User";
+  const fullName = username || user?.username || "User";
+
+  const displayName = compact
+    ? fullName.includes("@")
+      ? fullName.split("@")[0]
+      : fullName.split(" ")[0]
+    : fullName;
 
   // Logout
   const handleLogout = () => {
-    // Clear all authentication data
     clearAuthData();
     clearUser();
     navigate("/login");
@@ -40,9 +48,17 @@ export default function UserMenuDropdown({ username }) {
       }
     };
 
-    document.addEventListener("mousedown", handleOutsideClick);
-    return () =>
-      document.removeEventListener("mousedown", handleOutsideClick);
+    document.addEventListener(
+      "mousedown",
+      handleOutsideClick
+    );
+
+    return () => {
+      document.removeEventListener(
+        "mousedown",
+        handleOutsideClick
+      );
+    };
   }, []);
 
   return (
@@ -53,10 +69,16 @@ export default function UserMenuDropdown({ username }) {
         className="flex items-center gap-2 bg-gray-100 hover:bg-afmc-maroon/10 px-3 py-2 sm:px-4 rounded-xl transition min-w-0"
       >
         <FaUserCircle className="text-xl text-afmc-maroon flex-shrink-0" />
-        <span className="font-medium text-gray-800 text-sm sm:text-base truncate max-w-[130px]">
+
+        <span
+          className={`font-medium text-gray-800 text-sm sm:text-base truncate ${
+            compact ? "max-w-[70px]" : "max-w-[130px]"
+          }`}
+        >
           {displayName}
         </span>
-        <FaChevronDown className="text-sm text-gray-500" />
+
+        <FaChevronDown className="text-sm text-gray-500 flex-shrink-0" />
       </button>
 
       {/* Dropdown */}

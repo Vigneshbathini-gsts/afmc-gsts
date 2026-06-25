@@ -109,14 +109,14 @@ export default function ProfitManagement() {
             <div className="absolute bottom-20 right-20 w-80 h-80 bg-afmc-maroon2/10 rounded-full blur-3xl"></div>
 
             <div className="px-0 py-4 md:p-8 relative z-10">
-                <div className="flex items-center justify-between mb-6 md:mb-8">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6 md:mb-8">
                     <h1 className="text-2xl font-semibold text-afmc-maroon">
                         Profit Management
                     </h1>
                     <button
                         type="button"
                         onClick={() => navigate("/admin/dashboard")}
-                        className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-white shadow hover:shadow-md border border-afmc-gold/30 text-gray-700 hover:text-afmc-maroon hover:bg-afmc-maroon/5 transition"
+                        className="flex w-full items-center justify-center gap-2 rounded-full bg-white px-5 py-2.5 shadow hover:shadow-md border border-afmc-gold/30 text-gray-700 hover:text-afmc-maroon hover:bg-afmc-maroon/5 transition sm:w-auto"
                     >
                         <FaArrowLeft />
                         Go To Dashboard
