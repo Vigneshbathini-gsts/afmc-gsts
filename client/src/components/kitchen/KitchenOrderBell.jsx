@@ -149,38 +149,40 @@ export default function KitchenOrderBell({ kitchen = "Bar" }) {
             onClick={() => setOpen(false)}
           />
           <div
-            className="fixed inset-x-4 top-20 bottom-4 overflow-hidden bg-white rounded-3xl shadow-2xl border border-gray-200 z-50 sm:absolute sm:inset-auto sm:top-full sm:mt-2 sm:right-0 sm:w-[min(24rem,calc(100vw-1rem))] sm:max-w-[24rem]"
+            className="fixed inset-x-4 top-20 bottom-auto max-h-[70vh] overflow-hidden bg-white rounded-3xl shadow-2xl border border-gray-200 z-50 sm:absolute sm:inset-auto sm:top-full sm:mt-2 sm:right-0 sm:w-[min(24rem,calc(100vw-1rem))] sm:max-w-[24rem]"
           >
-            <div className="flex flex-col gap-2 px-4 py-3 bg-gradient-to-r from-afmc-maroon to-afmc-maroon2 text-white sm:flex-row sm:items-center sm:justify-between">
-              <div className="w-full flex items-center justify-between">
-                <div>
-                  <h3 className="font-semibold text-sm">
-                    New Orders - {kitchen}
-                  </h3>
-                  <p className="text-xs text-white/80">
-                    {notifications.length} pending order(s)
-                  </p>
-                </div>
+            <div className="flex items-start justify-between gap-3 px-4 py-3 bg-gradient-to-r from-afmc-maroon to-afmc-maroon2 text-white">
+            <div className="min-w-0">
+              <h3 className="font-semibold text-sm">New Orders - {kitchen}</h3>
+              <p className="text-xs text-white/80">
+                {notifications.length} pending order(s)
+              </p>
+            </div>
 
-                <FaTimesCircle
-                  className="cursor-pointer text-white/80 hover:text-white transition-colors text-xl"
-                  onClick={handleCloseModel}
-                />
-              </div>
-
+            <div className="flex items-center gap-2">
               {notifications.length > 0 && (
                 <button
                   type="button"
                   onClick={handleClearAll}
                   disabled={clearingAll}
-                  className="shrink-0 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white ring-1 ring-white/30 transition hover:bg-white/25 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white ring-1 ring-white/30 transition hover:bg-white/25 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {clearingAll ? "Clearing..." : "Clear all"}
                 </button>
               )}
-            </div>
 
-            <div className="max-h-[70vh] overflow-y-auto">
+              <button
+                type="button"
+                onClick={handleCloseModel}
+                className="rounded-full border border-white/30 bg-white/10 p-2 text-white transition hover:bg-white/20 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/40"
+                aria-label="Close notifications"
+              >
+                <FaTimesCircle className="text-base" />
+              </button>
+            </div>
+          </div>
+
+            <div className="max-h-[calc(70vh-6rem)] overflow-y-auto">
               {notifications.length > 0 ? (
                 notifications.map((order) => (
                   <div

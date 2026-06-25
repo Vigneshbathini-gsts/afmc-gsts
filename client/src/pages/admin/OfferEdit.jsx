@@ -194,10 +194,10 @@ export default function OfferEdit() {
 
             <button
               onClick={handleDashboard}
-              className="px-4 py-2 md:px-5 md:py-3 rounded-2xl bg-white border border-gray-200 hover:bg-gray-50 text-gray-800 font-semibold shadow-sm transition flex items-center gap-2 text-sm md:text-base"
+              className="self-end sm:self-auto inline-flex items-center gap-2 px-4 py-2 md:px-5 md:py-3 rounded-full bg-white shadow hover:shadow-md border border-afmc-gold/30 text-gray-700 hover:text-afmc-maroon hover:bg-afmc-maroon/5 transition flex text-sm md:text-base"
             >
               <FaHome className="text-xs md:text-sm" />
-              Dashboard
+              Go To Dashboard
             </button>
           </div>
         </div>

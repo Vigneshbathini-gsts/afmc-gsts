@@ -229,14 +229,14 @@ const KitchenCancelledOrder = () => {
             <div className="absolute bottom-20 right-20 w-80 h-80 bg-afmc-maroon2/10 rounded-full blur-3xl"></div>
 
             <div className="relative z-10 px-0 py-4 md:p-8 space-y-6">
-                <div className="flex items-center justify-between gap-4">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <h1 className="text-2xl font-semibold text-afmc-maroon">
                         Cancelled Orders
                     </h1>
                     <button
                         type="button"
                         onClick={() => navigate(dashboardPath)}
-                        className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-white shadow hover:shadow-md border border-afmc-gold/30 text-gray-700 hover:text-afmc-maroon hover:bg-afmc-maroon/5 transition"
+                        className="self-end sm:self-auto inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white shadow hover:shadow-md border border-afmc-gold/30 text-gray-700 hover:text-afmc-maroon hover:bg-afmc-maroon/5 transition max-w-max"
                       >
                         <FaArrowLeft />
                         Go To Dashboard

@@ -188,7 +188,7 @@ export default function CancelledOrders() {
             </button>
             <button
               onClick={() => navigate("/admin/dashboard")}
-              className="flex items-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-semibold text-gray-700 shadow border border-white/60 transition hover:shadow-md"
+              className="self-end sm:self-auto inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white shadow hover:shadow-md border border-afmc-gold/30 text-gray-700 hover:text-afmc-maroon hover:bg-afmc-maroon/5 transition max-w-max"
             >
               <FaArrowLeft size={14} />
               Back

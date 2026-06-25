@@ -2,6 +2,7 @@
 
 import React from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { FaArrowLeft } from "react-icons/fa";
 
 export default function Stackreporttab({
   showTopBar = true,
@@ -36,8 +37,9 @@ export default function Stackreporttab({
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-4">
           <button
             onClick={() => navigate("/admin/dashboard")}
-            className="w-full md:w-auto px-4 py-2 bg-gray-200 rounded-full hover:bg-gray-300"
+            className="self-end sm:self-auto inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white shadow hover:shadow-md border border-afmc-gold/30 text-gray-700 hover:text-afmc-maroon hover:bg-afmc-maroon/5 transition max-w-max"
           >
+            <FaArrowLeft />
             Go To Dashboard
           </button>
 

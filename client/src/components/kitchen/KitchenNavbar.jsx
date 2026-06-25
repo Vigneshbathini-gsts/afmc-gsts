@@ -16,7 +16,7 @@ export default function KitchenNavbar({ onMenuClick }) {
 
   return (
     <header className="bg-white shadow-md sticky top-0 z-30 border-b border-afmc-maroon/10">
-      <div className="px-3 md:px-6 py-3">
+      <div className="px-3 md:px-6 py-3 relative">
         {/* Mobile Layout */}
         <div className="flex items-center justify-between sm:hidden">
           {/* Left */}
@@ -44,15 +44,14 @@ export default function KitchenNavbar({ onMenuClick }) {
               </p>
             </div>
           </div>
+        </div>
 
-          {/* Right */}
-          <div className="flex items-center gap-2 ml-2 flex-shrink-0">
-            <KitchenOrderBell
-              kitchen={isBar ? "Bar" : "Kitchen"}
-            />
+        <div className="absolute right-3 top-3 flex items-center gap-2 z-10 sm:hidden">
+          <KitchenOrderBell
+            kitchen={isBar ? "Bar" : "Kitchen"}
+          />
 
-            <UserMenuDropdown compact />
-          </div>
+          <UserMenuDropdown compact iconOnly />
         </div>
 
         {/* Desktop Layout */}

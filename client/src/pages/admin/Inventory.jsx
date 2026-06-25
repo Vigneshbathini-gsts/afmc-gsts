@@ -864,7 +864,7 @@ export default function Inventory() {
           <button
             type="button"
             onClick={() => navigate("/admin/dashboard")}
-            className="flex w-full items-center justify-center gap-2 rounded-full bg-white px-4 py-3 text-gray-700 shadow hover:shadow-md border border-afmc-gold/30 hover:text-afmc-maroon hover:bg-afmc-maroon/5 transition md:w-auto"
+            className="self-end sm:self-auto inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white shadow hover:shadow-md border border-afmc-gold/30 text-gray-700 hover:text-afmc-maroon hover:bg-afmc-maroon/5 transition max-w-max"
           >
             <FaArrowLeft />
             Go To Dashboard

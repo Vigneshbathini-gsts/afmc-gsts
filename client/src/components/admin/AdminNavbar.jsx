@@ -14,7 +14,7 @@ export default function AdminNavbar({ onMenuClick }) {
 
   return (
     <header className="bg-white shadow-md sticky top-0 z-30 border-b border-afmc-maroon/10">
-      <div className="px-3 md:px-6 py-3">
+      <div className="px-3 md:px-6 py-3 relative">
         {/* Mobile Layout */}
         <div className="flex justify-between items-start sm:hidden">
           {/* Left */}
@@ -42,17 +42,16 @@ export default function AdminNavbar({ onMenuClick }) {
               </p>
             </div>
           </div>
+        </div>
 
-          {/* Right */}
-          <div className="flex flex-col items-end ml-2">
-            {isDashboard && (
-              <div className="mb-2">
-                <StockNotificationBell />
-              </div>
-            )}
+        <div className="absolute right-3 top-3 flex items-center gap-2 z-10 sm:hidden">
+          {isDashboard && (
+            <div>
+              <StockNotificationBell />
+            </div>
+          )}
 
-            <UserMenuDropdown compact={!isDashboard} />
-          </div>
+          <UserMenuDropdown compact={!isDashboard} iconOnly />
         </div>
 
         {/* Desktop Layout */}

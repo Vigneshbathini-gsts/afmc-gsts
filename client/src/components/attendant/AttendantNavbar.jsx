@@ -84,14 +84,10 @@ export default function AttendantNavbar({ onMenuClick }) {
           </div>
 
           {/* Right */}
-          <div className="flex flex-col items-end ml-2">
-            {!hideCartIcon && (
-              <div className="mb-2">
-                <CartButton />
-              </div>
-            )}
+          <div className="flex items-center gap-2 ml-2">
+            {!hideCartIcon && <CartButton />}
 
-            <UserMenuDropdown compact />
+            <UserMenuDropdown compact iconOnly />
           </div>
         </div>
 
