@@ -178,7 +178,7 @@ export default function CancelledOrders() {
       <div className="relative z-10 px-0 py-4 md:p-8">
         <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
           <h1 className="text-2xl font-semibold text-gray-800">Cancelled Orders</h1>
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center justify-end gap-3">
             <button
               onClick={handleDownload}
               className="flex items-center gap-2 rounded-2xl bg-afmc-maroon px-5 py-3 text-sm font-semibold text-white shadow transition hover:bg-afmc-maroon2"
@@ -188,7 +188,7 @@ export default function CancelledOrders() {
             </button>
             <button
               onClick={() => navigate("/admin/dashboard")}
-              className="self-end sm:self-auto inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white shadow hover:shadow-md border border-afmc-gold/30 text-gray-700 hover:text-afmc-maroon hover:bg-afmc-maroon/5 transition max-w-max"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white shadow hover:shadow-md border border-afmc-gold/30 text-gray-700 hover:text-afmc-maroon hover:bg-afmc-maroon/5 transition"
             >
               <FaArrowLeft size={14} />
               Back
@@ -197,73 +197,76 @@ export default function CancelledOrders() {
         </div>
 
         <div className="rounded-3xl border border-white/60 bg-white/80 p-6 shadow-xl backdrop-blur-sm mb-6">
-          <form onSubmit={handleSearch} className="mb-6 flex flex-wrap items-end gap-4">
-            <label className="min-w-[160px] w-full md:w-auto">
+          <form onSubmit={handleSearch} className="mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[auto_auto_1fr_auto] items-end gap-3 md:flex md:flex-wrap md:gap-4">
+            {/* From Date */}
+            <label className="w-full sm:w-auto min-w-0">
               <span className="mb-2 block text-sm font-medium text-gray-700">From</span>
-              <div className="flex items-center rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
+              <div className="flex items-center rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 w-full">
                 <input
                   type="date"
                   name="fromDate"
                   value={filters.fromDate}
                   onChange={handleDateChange}
-                  className="w-full bg-transparent text-gray-800 outline-none [color-scheme:light]"
+                  className="w-full bg-transparent text-gray-800 outline-none [color-scheme:light] text-sm"
                 />
               </div>
             </label>
 
-            <label className="min-w-[160px] w-full md:w-auto">
+            {/* To Date */}
+            <label className="w-full sm:w-auto min-w-0">
               <span className="mb-2 block text-sm font-medium text-gray-700">To</span>
-              <div className="flex items-center rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
+              <div className="flex items-center rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 w-full">
                 <input
                   type="date"
                   name="toDate"
                   value={filters.toDate}
                   onChange={handleDateChange}
-                  className="w-full bg-transparent text-gray-800 outline-none [color-scheme:light]"
+                  className="w-full bg-transparent text-gray-800 outline-none [color-scheme:light] text-sm"
                 />
               </div>
             </label>
 
-            <div className="min-w-[240px] w-full md:flex-1">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Search by Order Number or Customer Name
-              </label>
+            {/* Search Input - Reduced width */}
+            <div className="w-full sm:w-auto lg:w-48 xl:w-56">
+              <span className="mb-2 block text-sm font-medium text-gray-700">Search</span>
               <div className="flex items-center rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
                 <input
                   type="text"
                   name="searchTerm"
                   value={searchFilters.searchTerm}
                   onChange={handleSearchChange}
-                  placeholder="Search by order number or customer name"
-                  className="w-full bg-transparent text-gray-800 outline-none placeholder:text-gray-400"
+                  placeholder="Order or customer"
+                  className="w-full bg-transparent text-gray-800 outline-none placeholder:text-gray-400 text-sm"
                 />
                 {searchFilters.searchTerm && (
                   <button
                     type="button"
                     onClick={handleClearSearch}
-                    className="text-gray-400 hover:text-gray-600"
+                    className="text-gray-400 hover:text-gray-600 ml-2 flex-shrink-0"
                   >
-                    <FaTimes size={16} />
+                    <FaTimes size={14} />
                   </button>
                 )}
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-3">
+            {/* Action Buttons - Right aligned */}
+            <div className="flex flex-wrap items-center justify-end gap-3 w-full sm:w-auto col-span-2 sm:col-span-1">
               <button
                 type="submit"
-                className="flex items-center gap-2 rounded-2xl bg-[#5b5b5b] px-6 py-3 text-sm font-semibold text-white shadow hover:shadow-md"
+                className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-[#5b5b5b] text-sm font-semibold text-white shadow hover:shadow-md px-4 md:px-6 py-3 flex-1 sm:flex-none min-w-[60px]"
+                aria-label="Search cancelled orders"
               >
                 <FaSearch size={14} />
-                Search
+                <span className="hidden sm:inline">Search</span>
               </button>
               <button
                 type="button"
                 onClick={handleReset}
-                className="flex items-center gap-2 rounded-2xl bg-slate-500 px-6 py-3 text-sm font-semibold text-white shadow hover:shadow-md"
+                className="flex items-center justify-center gap-2 rounded-2xl bg-slate-500 px-4 md:px-6 py-3 text-sm font-semibold text-white shadow hover:shadow-md flex-1 sm:flex-none min-w-[60px]"
               >
                 <FaUndoAlt size={14} />
-                Reset
+                <span className="hidden sm:inline">Reset</span>
               </button>
             </div>
           </form>
@@ -280,14 +283,6 @@ export default function CancelledOrders() {
                 )}
               </p>
             </div>
-
-            {/* <button
-              onClick={handleDownload}
-              className="inline-flex items-center gap-2 rounded-2xl bg-afmc-maroon px-5 py-3 text-sm font-semibold text-white shadow transition hover:bg-afmc-maroon2"
-            >
-              <FaDownload size={16} />
-              Download Pdf
-            </button> */}
           </div>
 
           {loading ? (
@@ -384,4 +379,3 @@ export default function CancelledOrders() {
     </div>
   );
 }
-

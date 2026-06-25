@@ -282,7 +282,7 @@ export default function Orderitemdetails() {
         <Stackreporttab showTopBar={false} showReportTitle={false} />
 
         <div className="mt-8 bg-white/80 border border-white/60 rounded-3xl shadow-xl backdrop-blur-sm p-6">
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 From
@@ -345,7 +345,7 @@ export default function Orderitemdetails() {
               />
             </div>
 
-            <div>
+            <div className="col-start-2 md:col-start-auto">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 User Name
               </label>
@@ -398,55 +398,8 @@ export default function Orderitemdetails() {
           ) : (
             <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
               <div className="max-h-[70vh] overflow-auto" onScroll={handleTableScroll}>
-                <div className="sm:hidden p-4 space-y-4">
-                  {loading ? (
-                    <div className="text-center py-8 text-gray-500">
-                      <div className="inline-flex items-center gap-2 animate-pulse">
-                        <span className="h-8 w-8 rounded-full border-b-2 border-afmc-maroon"></span>
-                        Loading data...
-                      </div>
-                    </div>
-                  ) : displayRows.length ? (
-                    displayRows.map((row, i) => (
-                      <div
-                        key={row.item_id || `${row.item_name || "row"}-${i}`}
-                        className={`rounded-3xl border border-gray-200 bg-gray-50 p-4 shadow-sm ${
-                          !row.item_id ? "border-red-200 text-red-700" : ""
-                        }`}
-                      >
-                        <div className="flex items-center justify-between gap-3 mb-3">
-                          <div className="text-sm font-semibold text-gray-900">
-                            {toInitCap(getRowValue(row, "item_name", "ITEM_NAME") || "-")}
-                          </div>
-                          <div className="rounded-full bg-afmc-maroon/10 px-3 py-1 text-xs font-semibold text-afmc-maroon">
-                            {formatQuantity(getRowValue(row, "quantity", "QUANTITY"))}
-                          </div>
-                        </div>
-                        <div className="space-y-2 text-sm text-gray-700">
-                          <div>
-                            <span className="block text-xs text-gray-500">Total Profit</span>
-                            <span>{formatRowNumber(row, ["total_profit", "TOTAL_PROFIT", "totalProfit"])}</span>
-                          </div>
-                          <div>
-                            <span className="block text-xs text-gray-500">Prep Charges</span>
-                            <span>{formatRowNumber(row, ["food_pr_charges", "FOOD_PR_CHARGES", "foodPrCharges"])}</span>
-                          </div>
-                          <div>
-                            <span className="block text-xs text-gray-500">Total</span>
-                            <span>{formatRowNumber(row, ["subtotal", "SUBTOTAL", "total", "TOTAL"])}</span>
-                          </div>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-6 text-center text-gray-500">
-                      No records found.
-                    </div>
-                  )}
-                </div>
-
-                <div className="hidden sm:block overflow-x-auto">
-                <table className="w-full text-sm">
+                <div className="overflow-x-auto">
+                <table className="min-w-[640px] w-full text-sm">
                   <thead className="bg-gray-50 text-gray-600">
                     <tr>
                       <th className="px-4 py-3 text-left font-medium whitespace-nowrap">

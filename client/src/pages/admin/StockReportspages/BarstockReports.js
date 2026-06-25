@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { FaArrowLeft, FaDownload } from "react-icons/fa";
+import { FaArrowLeft, FaDownload, FaSearch } from "react-icons/fa";
 import api from "../../../services/api";
 import Stackreporttab from "./Stackreporttab";
 import { toInitCap } from "../../../utils/textFormat";
@@ -210,8 +210,8 @@ export default function BarstockReports() {
         <Stackreporttab showTopBar={false} showReportTitle={false} />
 
         <div className="mt-6 md:mt-8 bg-white/80 border border-white/60 rounded-none md:rounded-3xl shadow-xl backdrop-blur-sm p-3 md:p-6">
-          <div className="flex flex-col gap-4 mb-6 md:flex-row md:items-end md:flex-wrap">
-            <div className="w-full md:w-auto">
+          <div className="flex flex-wrap items-end gap-3 mb-6 md:gap-4">
+            <div className="min-w-0 flex-1 md:flex-none md:w-auto">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Item Name
               </label>
@@ -227,21 +227,25 @@ export default function BarstockReports() {
             <button
               type="button"
               onClick={handleSearch}
-              className="w-full md:w-auto px-6 py-3 rounded-2xl bg-[#5b5b5b] text-white font-semibold flex items-center justify-center gap-2 shadow hover:shadow-md"
+              className="h-12 w-12 md:w-auto md:px-6 md:py-3 rounded-2xl bg-[#5b5b5b] text-white font-semibold flex items-center justify-center gap-2 shadow hover:shadow-md"
+              aria-label="Search bar stock"
             >
-              Search
+              <FaSearch size={16} />
+              <span className="hidden md:inline">Search</span>
             </button>
 
-            <button
-              type="button"
-              onClick={handleDownload}
-              disabled={downloading}
-              className="w-full md:w-auto px-6 py-3 rounded-2xl bg-afmc-maroon hover:bg-afmc-maroon2 text-white font-semibold flex items-center justify-center gap-2 shadow hover:shadow-md transition disabled:opacity-60 disabled:cursor-not-allowed"
-              title="Download PDF"
-            >
-              <FaDownload size={16} />
-              {downloading ? "Downloading..." : "Download"}
-            </button>
+            <div className="w-full md:w-auto">
+              <button
+                type="button"
+                onClick={handleDownload}
+                disabled={downloading}
+                className="w-auto px-5 py-3 rounded-2xl bg-afmc-maroon hover:bg-afmc-maroon2 text-white font-semibold flex items-center justify-center gap-2 shadow hover:shadow-md transition disabled:opacity-60 disabled:cursor-not-allowed"
+                title="Download PDF"
+              >
+                <FaDownload size={16} />
+                {downloading ? "Downloading..." : "Download"}
+              </button>
+            </div>
           </div>
 
           <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">

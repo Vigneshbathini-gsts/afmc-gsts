@@ -108,7 +108,7 @@ export default function ActiveOrdersView({
 
       <div className="relative z-10 w-full max-w-full px-0 py-4 md:p-8">
         <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
-          <div>
+          <div className="flex-1">
             <h1 className="text-2xl font-semibold text-gray-800">{title}</h1>
             <p className="mt-1 text-sm text-gray-500">
               View current order status and open any order to inspect item-level progress.
@@ -118,52 +118,52 @@ export default function ActiveOrdersView({
           <button
             type="button"
             onClick={() => navigate(backPath)}
-            className="flex items-center gap-2 rounded-full border border-white/60 bg-white px-5 py-2.5 text-gray-700 shadow hover:shadow-md"
+            className="flex items-center gap-2 rounded-full border border-white/60 bg-white px-5 py-2.5 text-gray-700 shadow hover:shadow-md ml-auto"
           >
             <FaArrowLeft />
-            Back
+            <span className="hidden sm:inline">Back</span>
           </button>
         </div>
 
         <div className="rounded-[28px] border border-white/70 bg-white/85 p-6 shadow-xl backdrop-blur-sm">
-          <div className="mb-6 flex flex-wrap items-end gap-4">
-            <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">
+          <div className="mb-6 flex flex-wrap items-end gap-2 md:gap-4">
+            <div className="flex-[2] min-w-[100px] md:flex-none">
+              <label className="mb-1 md:mb-2 block text-xs md:text-sm font-medium text-gray-700">
                 From
               </label>
               <input
                 type="date"
                 value={fromDate}
                 onChange={(event) => setFromDate(event.target.value)}
-                className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-800"
+                className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-2 md:px-4 py-2.5 md:py-3 text-sm md:text-base text-gray-800"
               />
             </div>
 
-            <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">
+            <div className="flex-[2] min-w-[100px] md:flex-none">
+              <label className="mb-1 md:mb-2 block text-xs md:text-sm font-medium text-gray-700">
                 To
               </label>
               <input
                 type="date"
                 value={toDate}
                 onChange={(event) => setToDate(event.target.value)}
-                className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-800"
+                className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-2 md:px-4 py-2.5 md:py-3 text-sm md:text-base text-gray-800"
               />
             </div>
 
             <button
               type="button"
               onClick={loadOrders}
-              className="flex items-center gap-2 rounded-2xl bg-[#5b5b5b] px-6 py-3 font-semibold text-white shadow hover:shadow-md"
+              className="flex items-center justify-center rounded-2xl bg-[#5b5b5b] text-white shadow hover:shadow-md flex-1 md:flex-none min-w-[40px] md:min-w-[100px] px-2 md:px-6 py-2.5 md:py-3"
             >
-              <FaSearch />
-              Search
+              <FaSearch className="text-sm md:text-base" />
+              <span className="hidden md:inline ml-2">Search</span>
             </button>
           </div>
 
           <div className="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-4 border-b border-gray-200 px-4 py-4">
-              <div className="flex flex-1 items-center gap-3">
+              <div className="flex flex-1 items-center gap-3 w-full md:w-auto">
                 <FaSearch className="text-gray-400" />
                 <input
                   type="text"
@@ -176,7 +176,7 @@ export default function ActiveOrdersView({
                     }
                   }}
                   placeholder={searchPlaceholder}
-                  className="w-full max-w-sm rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-gray-700 outline-none"
+                  className="flex-1 rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-gray-700 outline-none"
                 />
                 <button
                   type="button"

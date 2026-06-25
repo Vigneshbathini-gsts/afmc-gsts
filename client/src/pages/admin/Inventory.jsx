@@ -1314,16 +1314,17 @@ export default function Inventory() {
                       setStockForm((prev) => ({ ...prev, barcode: v }));
                     }}
                     placeholder="Scan or type barcode"
-                    className="flex-1 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-700"
+                    className="min-w-0 flex-1 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-700"
                   />
                   <button
                     type="button"
                     onClick={() => setScannerOpen(true)}
-                    className="inline-flex items-center gap-2 rounded-2xl bg-[#d70652] px-5 py-3 font-semibold text-white shadow hover:shadow-md"
+                    className="inline-flex h-12 w-12 items-center justify-center gap-2 rounded-2xl bg-[#d70652] font-semibold text-white shadow hover:shadow-md md:w-auto md:px-5"
                     title="Open scanner"
+                    aria-label="Open scanner"
                   >
                     <FaCamera />
-                    Scan
+                    <span className="hidden md:inline">Scan</span>
                   </button>
                 </div>
                 <p className="mt-2 text-xs text-gray-500">

@@ -356,7 +356,7 @@ export default function OrderTransactionUI() {
         <Stackreporttab showTopBar={false} showReportTitle={false} />
 
         <div className="mt-8 bg-white/80 border border-white/60 rounded-3xl shadow-xl backdrop-blur-sm p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 From Date <span className="text-red-500">*</span>
@@ -495,57 +495,8 @@ export default function OrderTransactionUI() {
           ) : (
             <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
               <div className="max-h-[70vh] overflow-auto" onScroll={handleTableScroll}>
-                <div className="sm:hidden p-4 space-y-4">
-                  {loading ? (
-                    <div className="text-center py-8 text-gray-500">
-                      <div className="inline-flex items-center gap-2 animate-pulse">
-                        <span className="h-8 w-8 rounded-full border-b-2 border-afmc-maroon"></span>
-                        Loading data...
-                      </div>
-                    </div>
-                  ) : data.length === 0 ? (
-                    <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-6 text-center text-gray-500">
-                      No records found for the selected criteria.
-                    </div>
-                  ) : (
-                    data.map((row, index) => (
-                      <div
-                        key={row.ORDER_LINE_ID || `row-${index}`}
-                        className="rounded-3xl border border-gray-200 bg-gray-50 p-4 shadow-sm"
-                      >
-                        <div className="flex items-center justify-between gap-3 mb-3">
-                          <span className="text-sm font-semibold text-afmc-maroon">
-                            Order #{row.ORDER_NUM || "-"}
-                          </span>
-                          <span className="rounded-full bg-afmc-maroon/10 px-3 py-1 text-xs font-semibold text-afmc-maroon">
-                            {row.QUANTITY || "-"} qty
-                          </span>
-                        </div>
-                        <div className="space-y-2 text-sm text-gray-700">
-                          <div>
-                            <span className="block text-xs text-gray-500">Item</span>
-                            <span>{toInitCap(stripHtml(row.ITEM_NAME || "-"))}</span>
-                          </div>
-                          <div>
-                            <span className="block text-xs text-gray-500">Total Profit</span>
-                            <span>{row.TOTAL_PROFIT || "0.00"}</span>
-                          </div>
-                          <div>
-                            <span className="block text-xs text-gray-500">Preparation Charges</span>
-                            <span>{row.FOOD_PR_CHARGES || "0.00"}</span>
-                          </div>
-                          <div>
-                            <span className="block text-xs text-gray-500">Subtotal</span>
-                            <span>{row.SUBTOTAL || "0.00"}</span>
-                          </div>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-
-                <div className="hidden sm:block overflow-x-auto">
-                  <table className="w-full text-sm">
+                <div className="overflow-x-auto">
+                  <table className="min-w-[720px] w-full text-sm">
                     <thead className="bg-gray-50 text-gray-600">
                       <tr>
                         <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
