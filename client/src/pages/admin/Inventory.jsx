@@ -873,24 +873,22 @@ export default function Inventory() {
 
         <div className="bg-white/80 border border-afmc-gold/15 rounded-3xl shadow-xl backdrop-blur-sm p-5 md:p-6">
           <div className="mb-5 md:mb-6 h-1 w-full rounded-full bg-gradient-to-r from-afmc-maroon via-afmc-gold to-afmc-maroon2" />
-<div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1.2fr_1.8fr] gap-5 md:gap-6 items-end">           <div>
+          <div className="grid grid-cols-2 gap-4 sm:gap-5 lg:grid-cols-[1.2fr_1.2fr_1.6fr_auto] items-end">
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Category Name
               </label>
-              <div className="relative" ref={categoryDropdownRef} >
+              <div className="relative" ref={categoryDropdownRef}>
                 <button
                   type="button"
-                  onClick={() =>
-                    setIsCategoryDropdownOpen((prev) => !prev)
-                  }
+                  onClick={() => setIsCategoryDropdownOpen((prev) => !prev)}
                   className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-left text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20 flex items-center justify-between"
                 >
                   <span className="truncate">
                     {selectedCategory?.category_name || "All Categories"}
                   </span>
                   <FaChevronDown
-                    className={`text-gray-400 transition-transform ${isCategoryDropdownOpen ? "rotate-180" : ""
-                      }`}
+                    className={`text-gray-400 transition-transform ${isCategoryDropdownOpen ? "rotate-180" : ""}`}
                   />
                 </button>
 
@@ -973,7 +971,7 @@ export default function Inventory() {
                 {isItemDropdownOpen && (
                   <div className="absolute z-30 mt-2 w-full rounded-2xl border border-gray-200 bg-white shadow-2xl overflow-hidden">
                     <div className="border-b border-gray-100 p-3">
-                        <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2">
+                      <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2">
                         <FaSearch className="text-gray-400" />
                         <input
                           type="text"
@@ -1029,14 +1027,13 @@ export default function Inventory() {
               </div>
             </div>
 
-            <div className="flex flex-col gap-2 w-full">
+            <div className="col-span-2 lg:col-span-1 flex flex-col gap-3 w-full">
               <label className="block text-sm font-medium text-gray-700">
                 Search
               </label>
-
-              <div className="flex flex-col gap-2 w-full sm:flex-row sm:items-center sm:justify-end">
+              <div className="flex items-center gap-2">
                 <div className="min-w-0 flex-1 flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3">
-                  <FaSearch className="text-gray-400" />
+                  <FaSearch className="text-afmc-gold/70" />
                   <input
                     type="text"
                     value={inventorySearchInput}
@@ -1053,35 +1050,37 @@ export default function Inventory() {
                     setSearch(inventorySearchInput.trim());
                     fetchInventory({ search: inventorySearchInput.trim() });
                   }}
-                  className="w-full sm:w-auto h-12 px-4 sm:px-5 rounded-2xl bg-afmc-maroon text-white font-semibold flex items-center justify-center gap-2 shadow-afmc hover:bg-afmc-maroon2 focus:outline-none focus:ring-2 focus:ring-afmc-gold/50 transition whitespace-nowrap"
+                  className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-afmc-maroon text-white shadow-afmc hover:bg-afmc-maroon2 focus:outline-none focus:ring-2 focus:ring-afmc-gold/50 transition"
+                  aria-label="Search inventory"
                 >
-                  <FaSearch />
-                  Search
-                </button>
-
-                <button
-                  type="button"
-                  onClick={openAddModal}
-                  className="w-full sm:w-auto inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-afmc-maroon px-4 sm:px-5 text-sm font-semibold text-white shadow-md transition-all duration-200 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-afmc-gold/60 whitespace-nowrap"
-                >
-                  <span className="relative flex h-6 w-6 items-center justify-center rounded-md bg-white/10 text-afmc-gold">
-                    <svg
-                      viewBox="0 0 24 24"
-                      className="h-4 w-4"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <path
-                        d="M12 5v14M5 12h14"
-                        stroke="currentColor"
-                        strokeWidth="2.5"
-                        strokeLinecap="round"
-                      />
-                    </svg>
-                  </span>
-                  <span className="relative tracking-wide">Add Item</span>
+                  <FaSearch className="text-white/90" />
                 </button>
               </div>
+            </div>
+
+            <div className="col-span-2 flex justify-end lg:col-span-1">
+              <button
+                type="button"
+                onClick={openAddModal}
+                className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-afmc-maroon px-4 sm:px-5 text-sm font-semibold text-white shadow-md transition-all duration-200 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-afmc-gold/60 whitespace-nowrap"
+              >
+                <span className="relative flex h-6 w-6 items-center justify-center rounded-md bg-white/10 text-afmc-gold">
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="h-4 w-4"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M12 5v14M5 12h14"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                </span>
+                <span className="relative tracking-wide">Add Item</span>
+              </button>
             </div>
           </div>
 
