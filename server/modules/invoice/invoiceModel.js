@@ -6,6 +6,53 @@ const createValidationError = (message) => {
   return error;
 };
 
+async function calculateOrderAmount(connection, orderNumber) {
+  const [[row]] = await connection.execute(
+    `
+      SELECT ROUND(SUM(
+        CASE
+          WHEN COALESCE(line_scans.scanned_total, item_scans.scanned_total) > 0
+            AND (od.price IS NULL OR od.price <> 0)
+          THEN COALESCE(line_scans.scanned_total, item_scans.scanned_total)
+          ELSE IFNULL(od.subtotal, 0)
+        END
+      ), 2) AS amount
+      FROM xxafmc_order_details od
+      LEFT JOIN (
+        SELECT
+          order_number,
+          inventory_item_code,
+          ROUND(SUM(IFNULL(scan_quantity, 0) * IFNULL(item_price, 0)), 2) AS scanned_total
+        FROM order_scan_collection
+        WHERE collection_name = 'S_COLLECTION'
+          AND JSON_EXTRACT(extra_data, '$.orderLineId') IS NULL
+        GROUP BY order_number, inventory_item_code
+      ) item_scans
+        ON item_scans.order_number = od.order_id
+       AND item_scans.inventory_item_code = od.item_id
+      LEFT JOIN (
+        SELECT
+          order_number,
+          inventory_item_code,
+          CAST(JSON_UNQUOTE(JSON_EXTRACT(extra_data, '$.orderLineId')) AS UNSIGNED) AS order_line_id,
+          ROUND(SUM(IFNULL(scan_quantity, 0) * IFNULL(item_price, 0)), 2) AS scanned_total
+        FROM order_scan_collection
+        WHERE collection_name = 'S_COLLECTION'
+          AND JSON_EXTRACT(extra_data, '$.orderLineId') IS NOT NULL
+        GROUP BY order_number, inventory_item_code, order_line_id
+      ) line_scans
+        ON line_scans.order_number = od.order_id
+       AND line_scans.inventory_item_code = od.item_id
+       AND line_scans.order_line_id = od.order_line_id
+      WHERE od.order_id = ?
+        AND TRIM(UPPER(IFNULL(od.order_status, ''))) != 'CANCELLED'
+    `,
+    [orderNumber]
+  );
+
+  return Number(row?.amount || 0);
+}
+
 async function getInvoiceDetails(orderNumber) {
   const normalizedOrderNumber = Number(orderNumber);
   if (!Number.isFinite(normalizedOrderNumber) || normalizedOrderNumber <= 0) {
@@ -222,7 +269,7 @@ const updateInvoicePayment = async ({
           paymentReference || null,
           resolvedStatus,
           orderRows[0].invoice_date,
-          orderRows[0].order_total || 0,
+          await calculateOrderAmount(connection, normalizedOrderNumber) || orderRows[0].order_total || 0,
           createdBy,
         ]
       );

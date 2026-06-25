@@ -194,11 +194,9 @@ export default function OutletOrderDetails() {
         .reduce((sum, si) => sum + Number(si.scanQuantity || 0), 0);
     }
     const normalizedItemCode = String(item.ITEM_ID ?? item.item_code ?? item.itemCode ?? "").trim();
-    const unitFactor = Number(item.ingredientsPerUnit || 1);
-    const rawIngredientScans = scannedItems
+    return scannedItems
       .filter(si => String(si.parentItem ?? si.itemCode ?? "").trim() === normalizedItemCode)
       .reduce((sum, si) => sum + Number(si.scanQuantity || 0), 0);
-    return Math.floor(rawIngredientScans / unitFactor);
   }, [scannedItems]);
 
   const handleBarcodeKeyPress = async (e) => {
@@ -675,7 +673,8 @@ export default function OutletOrderDetails() {
                     ) : (
                       items.map((item, idx) => {
                         const scannedQty = getScannedQuantityByItemCode(item);
-                        const remainingQty = item.quantity - scannedQty;
+                        const requiredScans = Number(item.quantity || 0) * Number(item.ingredientsPerUnit || 1);
+                        const remainingQty = Math.max(0, requiredScans - scannedQty);
                         return (
                           <tr key={item.ORDER_LINE_ID || idx} className="hover:bg-gray-50">
                             <td className="px-6 py-4 text-sm text-gray-800">
@@ -692,6 +691,11 @@ export default function OutletOrderDetails() {
                               {item.freeQty > 0 && (
                                 <span className="text-xs text-gray-500 ml-1">
                                   ({item.paidQty}P + {item.freeQty}F)
+                                </span>
+                              )}
+                              {Number(item.ingredientsPerUnit || 1) > 1 && (
+                                <span className="text-xs text-gray-500 ml-1">
+                                  ({requiredScans} scans)
                                 </span>
                               )}
                             </td>

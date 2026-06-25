@@ -49,7 +49,12 @@ exports.getStockReport = async (req, res) => {
       LEFT JOIN (
         SELECT
           xod.item_id,
-          IFNULL(SUM(xod.quantity), 0) AS reserved_stock
+          IFNULL(SUM(
+            CASE
+              WHEN UPPER(TRIM(COALESCE(xod.type, ''))) = 'LARGE' THEN 2
+              ELSE 1
+            END * xod.quantity
+          ), 0) AS reserved_stock
         FROM xxafmc_order_details xod
         LEFT JOIN xxafmc_invoices xi
           ON xi.order_num = xod.order_id

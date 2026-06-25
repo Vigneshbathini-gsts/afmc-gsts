@@ -83,7 +83,12 @@ async function getReservationReleaseRowsForCancel(connection, { orderNumber, ord
       FROM (
         SELECT
           xod.item_id AS item_code,
-          SUM(COALESCE(xod.quantity, 0)) AS release_qty
+          SUM(
+            CASE
+              WHEN UPPER(TRIM(COALESCE(xod.type, ''))) = 'LARGE' THEN 2
+              ELSE 1
+            END * COALESCE(xod.quantity, 0)
+          ) AS release_qty
         FROM xxafmc_order_details xod
         JOIN (${inventorySummarySql}) inv ON inv.item_code = xod.item_id
         WHERE ${filterSql}
@@ -183,8 +188,9 @@ async function validateScansBeforeComplete(connection, req, orderNumber, kitchen
   const [orderRows] = await connection.query(
     `
     SELECT
+      MIN(xod.ORDER_LINE_ID) AS order_line_id,
       xod.item_id,
-      SUM(COALESCE(xod.quantity, 0)) AS quantity,
+      COALESCE(xod.quantity, 0) AS quantity,
       MAX(xod.subcategory) AS subcategory,
       xod.type,
       MAX(inv.item_name) AS item_name
@@ -195,7 +201,7 @@ async function validateScansBeforeComplete(connection, req, orderNumber, kitchen
       AND xod.barcode IS NULL
       AND (xod.order_status IS NULL OR xod.order_status = '')
       AND inv.category_id = ?
-    GROUP BY xod.item_id, xod.type
+    GROUP BY xod.ORDER_LINE_ID, xod.item_id, xod.type, xod.quantity
     `,
     [orderNumber, categoryId]
   );
@@ -210,11 +216,22 @@ async function validateScansBeforeComplete(connection, req, orderNumber, kitchen
     if (![14, 15].includes(subcategory)) {
       const pegMultiplier = String(row.type || "").trim().toUpperCase() === "LARGE" ? 2 : 1;
       const expected = Number(row.quantity || 0) * pegMultiplier;
-      const scanned = scannedQty(
+      const orderLineId = Number(row.order_line_id || 0);
+      const hasLineAwareScans = scannedItems.some(
+        (item) =>
+          Number(item.orderLineId || 0) > 0 &&
+          sameCode(item.itemCode, parentItem) &&
+          sameCode(item.parentItem || item.itemCode, parentItem)
+      );
+      const scannedForLine = orderLineId > 0
+        ? scannedQty((item) => Number(item.orderLineId || 0) === orderLineId)
+        : 0;
+      const scannedForItem = scannedQty(
         (item) =>
           sameCode(item.itemCode, parentItem) &&
           sameCode(item.parentItem || item.itemCode, parentItem)
       );
+      const scanned = hasLineAwareScans ? scannedForLine : scannedForItem;
 
       if (scanned !== expected) {
         errors.push(
@@ -517,6 +534,7 @@ exports.updateBarOrderStatus = async (req, res) => {
               isCocktailIngredient: item.isCocktailIngredient,
               ingredients: item.ingredients,
               pegs: item.pegs,
+              orderLineId: item.orderLineId,
               roleId: item.roleId,
               acUnit: item.acUnit,
               scannedAt: item.scannedAt,
@@ -566,21 +584,24 @@ exports.updateBarOrderStatus = async (req, res) => {
             }
           }
 
-        // Update prices specifically by order_line_id for standard items
-        const linePrices = new Map();
+        // Update prices/subtotals specifically by order_line_id for standard items.
+        const lineTotals = new Map();
         scannedItems.forEach(si => {
           if (si.orderLineId) {
-            const current = linePrices.get(si.orderLineId) || 0;
-            if (Number(si.itemPrice) > 0 || current === 0) {
-              linePrices.set(si.orderLineId, Number(si.itemPrice));
-            }
+            const current = lineTotals.get(si.orderLineId) || { price: 0, total: 0 };
+            const itemPrice = Number(si.itemPrice || 0);
+            const scanQuantity = Number(si.scanQuantity || 0);
+            lineTotals.set(si.orderLineId, {
+              price: itemPrice > 0 || current.price === 0 ? itemPrice : current.price,
+              total: current.total + (scanQuantity * itemPrice),
+            });
           }
         });
 
-        for (const [lineId, price] of linePrices.entries()) {
+        for (const [lineId, lineTotal] of lineTotals.entries()) {
           await connection.query(
-            `UPDATE xxafmc_order_details SET price = ?, subtotal = ROUND(? * quantity, 2), ORDER_STATUS = 'COMPLETED' WHERE ORDER_LINE_ID = ?`,
-            [price, price, lineId]
+            `UPDATE xxafmc_order_details SET price = ?, subtotal = ROUND(?, 2), ORDER_STATUS = 'COMPLETED' WHERE ORDER_LINE_ID = ?`,
+            [lineTotal.price, lineTotal.total, lineId]
           );
         }
       }
@@ -982,8 +1003,42 @@ exports.processBarcodeScan = async (req, res) => {
     const orderedQty = Number(orderQtyRows[0]?.total_quantity || 0);
 
     if (orderedQty <= 0) {
+      const [expectedRows] = await connection.query(
+        `
+        SELECT
+          MAX(inv.item_name) AS item_name,
+          xod.item_id,
+          GROUP_CONCAT(DISTINCT so.barcode ORDER BY IFNULL(so.stock_quantity, 0) DESC SEPARATOR ', ') AS barcodes
+        FROM xxafmc_order_details xod
+        JOIN (${inventorySummarySql}) inv
+          ON inv.item_code = xod.item_id
+        LEFT JOIN xxafmc_stock_out so
+          ON so.item_code = xod.item_id
+         AND IFNULL(so.stock_quantity, 0) > 0
+        WHERE xod.order_id = ?
+          AND (xod.order_status IS NULL OR xod.order_status = '')
+          AND inv.category_id = ?
+        GROUP BY xod.item_id
+        ORDER BY MIN(xod.order_line_id)
+        LIMIT 3
+        `,
+        [ORDERNUMBER, categoryId]
+      );
+
+      const expectedText = expectedRows
+        .map((row) => {
+          const barcodes = String(row.barcodes || "").trim();
+          return `${row.item_name || row.item_id}${barcodes ? ` (barcode: ${barcodes})` : ""}`;
+        })
+        .join("; ");
+
       await connection.rollback();
-      return res.status(400).json({ success: false, message: `Scanned item does not belong to order ${ORDERNUMBER}` });
+      return res.status(400).json({
+        success: false,
+        message: expectedText
+          ? `Scanned barcode belongs to ${item.ITEM_NAME || scanItemCode}, but order ${ORDERNUMBER} contains ${expectedText}.`
+          : `Scanned item does not belong to order ${ORDERNUMBER}`,
+      });
     }
 
     // === Collection metrics (like apex_collections) ===

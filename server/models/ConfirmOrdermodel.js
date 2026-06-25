@@ -758,6 +758,7 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
           od.subtotal,
           od.barcode,
           od.type_id,
+          od.type,
           xi.item_name,
           xi.description,
           xi.category_id,
@@ -822,6 +823,7 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
               od.subtotal,
               od.barcode,
               od.type_id,
+              od.type,
               xi.item_name,
               xi.description,
               xi.category_id,
@@ -875,6 +877,7 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
             od.subtotal,
             od.barcode,
             od.type_id,
+            od.type,
             xi.item_name,
             xi.description,
             xi.category_id,
@@ -917,6 +920,7 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
             od.subtotal,
             od.barcode,
             od.type_id,
+            od.type,
             xi.item_name,
             xi.description,
             xi.category_id,
@@ -1015,7 +1019,10 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
         const stockQuantity = Number(row.stock_quantity || 0);
         const reservedQuantity = Number(reservedMap[String(row.item_id)] || 0);
         const availableQuantity = Math.max(0, stockQuantity - reservedQuantity);
-        return Number(row.quantity || 0) > availableQuantity;
+        const requiredQuantity =
+          (String(row.type || "").trim().toUpperCase() === "LARGE" ? 2 : 1) *
+          Number(row.quantity || 0);
+        return requiredQuantity > availableQuantity;
       });
 
       if (outOfStockItem) {
@@ -1040,7 +1047,9 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
       // Reserve quantities now (confirmed orders only)
       for (const row of detailRows) {
         const itemId = Number(row.item_id || 0);
-        const qty = Number(row.quantity || 0);
+        const qty =
+          (String(row.type || "").trim().toUpperCase() === "LARGE" ? 2 : 1) *
+          Number(row.quantity || 0);
         if (!Number.isFinite(itemId) || itemId <= 0) continue;
         if (!Number.isFinite(qty) || qty <= 0) continue;
 
