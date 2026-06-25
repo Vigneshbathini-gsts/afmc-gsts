@@ -22,9 +22,25 @@
 
   body {
     font-family: theme("fontFamily.sans");
-    background: theme("colors.afmc.bg");
+    background-color: theme("colors.afmc.bg");
     color: theme("colors.afmc.ink");
+    min-height: 100vh;
     text-rendering: optimizeLegibility;
+    position: relative;
+  }
+
+  body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9999;
+    background-image: url("./assets/AFMC_Logo.png");
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 25%;
+    opacity: 0.08;
+    mix-blend-mode: multiply;
   }
 
   img,
