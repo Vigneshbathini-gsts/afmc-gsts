@@ -637,7 +637,7 @@ async function getUserOrderHistory({ fromDate, toDate, username, appUser }) {
           od.order_id,
           ROUND(SUM(
             CASE
-              WHEN scanned_totals.scanned_total > 0 AND (od.price IS NULL OR od.price <> 0) THEN scanned_totals.scanned_total
+              WHEN COALESCE(scanned_totals.scanned_total, item_scanned_totals.scanned_total) > 0 AND (od.price IS NULL OR od.price <> 0) THEN COALESCE(scanned_totals.scanned_total, item_scanned_totals.scanned_total)
               WHEN custom_totals.unit_custom_total > 0 THEN custom_totals.unit_custom_total * od.quantity
               ELSE IFNULL(od.subtotal, 0)
             END
@@ -650,10 +650,25 @@ async function getUserOrderHistory({ fromDate, toDate, username, appUser }) {
             ROUND(SUM(IFNULL(scan_quantity, 0) * IFNULL(item_price, 0)), 2) AS scanned_total
           FROM order_scan_collection
           WHERE collection_name = 'S_COLLECTION'
+            AND JSON_EXTRACT(extra_data, '$.orderLineId') IS NULL
           GROUP BY order_number, inventory_item_code
+        ) item_scanned_totals
+          ON item_scanned_totals.order_number = od.order_id
+          AND item_scanned_totals.inventory_item_code = od.item_id
+        LEFT JOIN (
+          SELECT
+            order_number,
+            inventory_item_code,
+            CAST(JSON_UNQUOTE(JSON_EXTRACT(extra_data, '$.orderLineId')) AS UNSIGNED) AS order_line_id,
+            ROUND(SUM(IFNULL(scan_quantity, 0) * IFNULL(item_price, 0)), 2) AS scanned_total
+          FROM order_scan_collection
+          WHERE collection_name = 'S_COLLECTION'
+            AND JSON_EXTRACT(extra_data, '$.orderLineId') IS NOT NULL
+          GROUP BY order_number, inventory_item_code, order_line_id
         ) scanned_totals
           ON scanned_totals.order_number = od.order_id
           AND scanned_totals.inventory_item_code = od.item_id
+          AND scanned_totals.order_line_id = od.order_line_id
         LEFT JOIN (
           SELECT
             cm.order_number,

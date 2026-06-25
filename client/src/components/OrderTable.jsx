@@ -2,6 +2,11 @@
 import { FaPencilAlt } from "react-icons/fa";
 import { toInitCap } from "../utils/textFormat";
 
+const parseAmount = (value) => {
+    const numericValue = Number(String(value || 0).replace(/,/g, ""));
+    return Number.isFinite(numericValue) ? numericValue : 0;
+};
+
 const formatOrderDate = (dateStr) => {
     if (!dateStr) return "-";
 
@@ -116,7 +121,7 @@ const OrderTable = ({
                                             {toInitCap(paymentStatus)}
                                         </span>
                                     </td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-gray-600">₹ {amount}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-gray-600">₹ {parseAmount(amount).toFixed(2)}</td>
                                     <td className="px-4 py-3 flex flex-wrap gap-2">
                                         <FaPencilAlt
                                             onClick={() => {

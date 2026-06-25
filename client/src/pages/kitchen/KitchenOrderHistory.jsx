@@ -206,10 +206,26 @@ const KitchenOrderHistory = () => {
   // Format date for display
   const formatDate = (dateString) => formatDisplayDate(dateString);
 
-  const formatCurrency = (value) => {
-    const numericValue = Number(String(value ?? 0).replace(/,/g, ""));
-    return Number.isNaN(numericValue) ? "0.00" : numericValue.toFixed(2);
-  };
+const parseNumber = (value) => {
+  const numericValue = Number(String(value ?? 0).replace(/,/g, ""));
+  return Number.isFinite(numericValue) ? numericValue : 0;
+};
+
+const formatCurrency = (value) => {
+  return parseNumber(value).toFixed(2);
+};
+
+const getLineTotal = (item) => {
+  const quantity = Math.max(0, Number(item?.quantity || 0));
+  const subtotal = parseNumber(item?.subtotal ?? item?.total ?? item?.TOTAL ?? 0);
+  const price = parseNumber(item?.price ?? item?.PRICE ?? 0);
+
+  if (subtotal > 0) {
+    return subtotal;
+  }
+
+  return price * quantity;
+};
 
   // Download PDF using exportTableToPdf utility
   const downloadPDF = () => {
@@ -425,7 +441,7 @@ const KitchenOrderHistory = () => {
                       <td className="hidden sm:table-cell px-6 py-3 text-gray-600">{order.phone_number || 'N/A'}</td>
                       <td className="px-6 py-3">
                         <span className="text-sm font-medium text-gray-900">
-                          Rs. {formatCurrency(order.subtotal)}
+                          Rs. {formatCurrency(order.subtotal ?? order.order_total ?? order.total_amount ?? order.totalAmount ?? 0)}
                         </span>
                       </td>
                       <td className="px-6 py-3">
@@ -519,7 +535,7 @@ const KitchenOrderHistory = () => {
                               Rs. {formatCurrency(item.pr_charges)}
                             </td>
                             <td className="px-4 py-3 text-sm font-medium text-gray-900">
-                              Rs. {formatCurrency(isFree ? 0 : item.subtotal)}
+                              Rs. {formatCurrency(isFree ? 0 : getLineTotal(item))}
                             </td>
                             <td className="px-4 py-3">
                               <span className={`px-2 py-1 rounded-full text-xs font-medium ${item.status?.toUpperCase() === 'CANCELLED' ? 'bg-red-100 text-red-800' :
@@ -540,11 +556,10 @@ const KitchenOrderHistory = () => {
                       <div className="flex justify-between items-center pt-2 border-t border-gray-200">
                         <span className="text-lg font-bold text-gray-900">Grand Total:</span>
                         <span className="text-xl font-bold text-afmc-maroon">
-                          Rs. {formatCurrency(orderItemDetails[selectedOrder.order_num].items
-                              .reduce((sum, item) => {
-                                const isFree = String(item.type || "").toLowerCase() === "free item" || Number(item.price) === 0;
-                                return sum + (isFree ? 0 : (parseFloat(item.subtotal) || 0));
-                              }, 0))}
+                          Rs. {formatCurrency(orderItemDetails[selectedOrder.order_num]?.summary?.totalAmount ?? orderItemDetails[selectedOrder.order_num]?.items?.reduce((sum, item) => {
+                            const isFree = String(item.type || "").toLowerCase() === "free item" || Number(item.price) === 0;
+                            return sum + (isFree ? 0 : parseNumber(item.subtotal || 0));
+                          }, 0) ?? 0)}
                         </span>
                       </div>
                     </div>
