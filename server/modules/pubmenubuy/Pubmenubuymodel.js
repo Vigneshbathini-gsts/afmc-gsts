@@ -544,6 +544,12 @@ async function getIngredientReservedQuantities(connection, ingredientCodes) {
 }
 
 async function getIngredientReservedQuantitiesExcludingOrder(connection, ingredientCodes, orderNumber, userId = null) {
+  console.log({
+  "connection":  connection,
+  "ingredientCodes":ingredientCodes,
+  "orderNumber":orderNumber,
+ "userId": userId
+});
   const normalizedCodes = [...new Set((Array.isArray(ingredientCodes) ? ingredientCodes : [])
     .map((code) => Number(code))
     .filter((code) => Number.isFinite(code) && code > 0))];
@@ -913,7 +919,7 @@ async function getOrderSummary(orderNumber) {
     `,
     [normalizedOrderNumber]
   );
-
+   
   const itemCodes = itemRows
     .map((row) => Number(row.item_code))
     .filter((code) => Number.isFinite(code) && code > 0);
