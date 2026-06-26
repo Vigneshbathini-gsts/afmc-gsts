@@ -106,6 +106,26 @@ export default function OutletOrderDetails() {
   const isManualScanRef = useRef(false);
   const processingScanRef = useRef(false);
   const autoStartedScannerRef = useRef(false);
+  const qtyRef = useRef(qty);
+  const orderDataRef = useRef(orderData);
+  const departmentRef = useRef(department);
+  const activeRecipeParentItemRef = useRef(activeRecipeParentItem);
+
+  useEffect(() => {
+    qtyRef.current = qty;
+  }, [qty]);
+
+  useEffect(() => {
+    orderDataRef.current = orderData;
+  }, [orderData]);
+
+  useEffect(() => {
+    departmentRef.current = department;
+  }, [department]);
+
+  useEffect(() => {
+    activeRecipeParentItemRef.current = activeRecipeParentItem;
+  }, [activeRecipeParentItem]);
 
   const getScanLinePrice = (item) => {
     const explicitTotal = Number(item?.lineTotalPrice);
@@ -227,7 +247,9 @@ export default function OutletOrderDetails() {
 
   const autoProcessScan = useCallback(async (scannedBarcode) => {
     if (!scannedBarcode || processingScanRef.current) return;
-    const scanQuantity = Number(qty);
+    const currentOrderData = orderDataRef.current;
+    const currentDepartment = departmentRef.current;
+    const scanQuantity = Number(qtyRef.current);
     if (!Number.isInteger(scanQuantity) || scanQuantity <= 0) {
       toast.error("Enter a valid quantity before confirming the scan.");
       return;
@@ -240,17 +262,17 @@ export default function OutletOrderDetails() {
 
     try {
       const res = await barOrdersAPI.processScan({
-        ORDERNUMBER: orderData?.ORDERNUMBER,
+        ORDERNUMBER: currentOrderData?.ORDERNUMBER,
         BARCODE: scannedBarcode,
         QUANTITY: scanQuantity,
-        KITCHEN: department,
-        PARENT_ITEM: activeRecipeParentItem || "",
+        KITCHEN: currentDepartment,
+        PARENT_ITEM: activeRecipeParentItemRef.current || "",
       });
 
       const scanData = res.data?.data || {};
 
       if (res.data?.success === true) {
-        const scannedRes = await barOrdersAPI.getScannedItems(orderData.ORDERNUMBER);
+        const scannedRes = await barOrdersAPI.getScannedItems(currentOrderData.ORDERNUMBER);
         const scannedData = scannedRes.data?.data || [];
         setScannedItems(scannedData);
 
@@ -298,7 +320,7 @@ export default function OutletOrderDetails() {
         }
       }, 4000);
     }
-  }, [orderData, department, qty, activeRecipeParentItem]);
+  }, []);
 
   const confirmScan = useCallback(async () => {
     const trimmedBarcode = String(barcode || "").trim();
