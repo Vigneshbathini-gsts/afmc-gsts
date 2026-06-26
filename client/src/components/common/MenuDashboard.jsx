@@ -686,7 +686,6 @@ function MenuPopupCompact({ item, loading, onClose, onBuy }) {
                             onChange={(e) => setPegType(e.target.value)}
                             className="h-11 w-full rounded border border-stone-300 bg-white px-3 text-[15px] font-medium text-stone-800 outline-none transition focus:border-afmc-maroon focus:ring-2 focus:ring-afmc-maroon/20"
                           >
-                            <option value="">{toInitCap("Select type")}</option>
                             <option value="Small">{toInitCap("Small")}</option>
                             <option value="Large">{toInitCap("Large")}</option>
                           </select>
