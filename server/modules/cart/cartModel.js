@@ -602,6 +602,22 @@ const addCartItem = async (userId, itemData) => {
     // -------------------------------
     const selectedType = String(type || "").trim();
     const cartDescription = selectedType || "NA";
+
+    if (selectedType) {
+      const [differentTypeRows] = await conn.execute(
+        `SELECT cart_id, description FROM xxafmc_cart_items
+         WHERE user_id = ?
+           AND item_id = ?
+           AND price != 0
+           AND UPPER(IFNULL(description, '')) != UPPER(?)`,
+        [userId, resolvedItemCode, selectedType]
+      );
+
+      if (differentTypeRows.length > 0) {
+        throw createValidationError("Item already added. Visit the cart to increase the quantity.");
+      }
+    }
+
     const existingSql = selectedType
       ? `SELECT cart_id, quantity FROM xxafmc_cart_items
          WHERE user_id = ? AND item_id = ? AND price != 0 AND UPPER(description) = UPPER(?)`
