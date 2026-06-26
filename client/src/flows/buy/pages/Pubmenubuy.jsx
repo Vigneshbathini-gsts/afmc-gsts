@@ -1642,29 +1642,29 @@ export default function Pubmenubuy({
           </div>
 
           {/* Summary */}
-          <div className="grid gap-3 border-t border-stone-200 bg-white p-4 md:grid-cols-3">
-            <div className="rounded-xl border border-stone-200 bg-white p-3">
-              <p className="text-xs text-stone-500">{toInitCap("Order Number")}</p>
-              <h3 className="mt-1 text-xl font-semibold text-stone-900">
-                {orderHeader?.order_num || orderNumber}
-              </h3>
-            </div>
+         <div className="grid gap-3 border-t border-stone-200 bg-white p-4 grid-cols-2 md:grid-cols-3">
+    <div className="rounded-xl border border-stone-200 bg-white p-3">
+        <p className="text-xs text-stone-500">{toInitCap("Order Number")}</p>
+        <h3 className="mt-1 text-xl font-semibold text-stone-900">
+            {orderHeader?.order_num || orderNumber}
+        </h3>
+    </div>
 
-            <div className="rounded-xl border border-stone-200 bg-white p-3">
-              <p className="text-xs text-stone-500">{toInitCap("Order Date")}</p>
-              <h3 className="mt-1 text-xl font-semibold text-stone-900">
-                {formatDate(orderHeader?.order_date)}
-              </h3>
-            </div>
+    <div className="rounded-xl border border-stone-200 bg-white p-3">
+        <p className="text-xs text-stone-500">{toInitCap("Order Date")}</p>
+        <h3 className="mt-1 text-xl font-semibold text-stone-900">
+            {formatDate(orderHeader?.order_date)}
+        </h3>
+    </div>
 
-            <div className="rounded-xl border border-afmc-gold/20 bg-gradient-to-br from-white to-afmc-gold/5 p-3">
-              <p className="text-xs text-stone-500">{toInitCap("Items")}</p>
-              <h3 className="mt-1 text-xl font-semibold text-afmc-maroon">
-                {items.filter((row) => Number(row?.quantity || 0) > 0).length}
-              </h3>
-              <p className="mt-0.5 text-xs text-stone-500">{toInitCap("Review before confirm")}</p>
-            </div>
-          </div>
+    <div className="rounded-xl border border-afmc-gold/20 bg-gradient-to-br from-white to-afmc-gold/5 p-3 col-span-2 md:col-span-1 md:col-start-3">
+        <p className="text-xs text-stone-500">{toInitCap("Items")}</p>
+        <h3 className="mt-1 text-xl font-semibold text-afmc-maroon">
+            {items.filter((row) => Number(row?.quantity || 0) > 0).length}
+        </h3>
+        <p className="mt-0.5 text-xs text-stone-500">{toInitCap("Review before confirm")}</p>
+    </div>
+</div>
         </div>
 
         {/* Content */}
@@ -1916,41 +1916,41 @@ export default function Pubmenubuy({
       </div>
 
       {confirmModal.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6">
-          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl ring-1 ring-black/10">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6">
+        <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl ring-1 ring-black/10">
             <div className="flex items-start justify-between gap-4">
-              <div>
-                <h3 className="text-lg font-semibold text-slate-900">{confirmModal.title}</h3>
-                <p className="mt-2 text-sm leading-6 text-slate-600">{confirmModal.text}</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => closeConfirmModal(false)}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:bg-slate-50"
-                aria-label="Close"
-              >
-                ×
-              </button>
+                <div>
+                    <h3 className="text-lg font-semibold text-slate-900">{confirmModal.title}</h3>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">{confirmModal.text}</p>
+                </div>
+                <button
+                    type="button"
+                    onClick={() => closeConfirmModal(false)}
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:bg-slate-50"
+                    aria-label="Close"
+                >
+                    ×
+                </button>
             </div>
-            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
-              <button
-                type="button"
-                onClick={() => closeConfirmModal(false)}
-                className="inline-flex justify-center rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-              >
-                {confirmModal.cancelText}
-              </button>
-              <button
-                type="button"
-                onClick={() => closeConfirmModal(true)}
-                className="inline-flex justify-center rounded-full bg-afmc-maroon px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-afmc-maroon2"
-              >
-                {confirmModal.confirmText}
-              </button>
+            <div className="mt-6 flex flex-row gap-3 justify-end">
+                <button
+                    type="button"
+                    onClick={() => closeConfirmModal(false)}
+                    className="flex-1 sm:flex-none inline-flex justify-center rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                >
+                    {confirmModal.cancelText}
+                </button>
+                <button
+                    type="button"
+                    onClick={() => closeConfirmModal(true)}
+                    className="flex-1 sm:flex-none inline-flex justify-center rounded-full bg-afmc-maroon px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-afmc-maroon2"
+                >
+                    {confirmModal.confirmText}
+                </button>
             </div>
-          </div>
         </div>
-      )}
+    </div>
+)}
     </div>
   );
 }

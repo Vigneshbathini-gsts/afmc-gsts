@@ -37,18 +37,18 @@ const ConfirmModal = ({ isOpen, onClose, onConfirm, title, message, confirmLabel
                         ×
                     </button>
                 </div>
-                <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
+                <div className="mt-6 flex flex-row gap-3 justify-end">
                     <button
                         type="button"
                         onClick={onClose}
-                        className="inline-flex justify-center rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                        className="flex-1 sm:flex-none inline-flex justify-center rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
                     >
                         {cancelLabel}
                     </button>
                     <button
                         type="button"
                         onClick={onConfirm}
-                        className="inline-flex justify-center rounded-full bg-afmc-maroon px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-afmc-maroon2"
+                        className="flex-1 sm:flex-none inline-flex justify-center rounded-full bg-afmc-maroon px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-afmc-maroon2"
                     >
                         {confirmLabel}
                     </button>
