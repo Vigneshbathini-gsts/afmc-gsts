@@ -64,7 +64,7 @@ export default function OrderHistory() {
   const navigate = useNavigate();
   const [filters, setFilters] = useState(getInitialFilters);
   const [searchValue, setSearchValue] = useState("");
-  const [quickSearch, setQuickSearch] = useState("");
+  const [quickSearch] = useState("");
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -297,7 +297,7 @@ export default function OrderHistory() {
           <button
             type="button"
             onClick={() => navigate("/admin/dashboard")}
-            className="flex items-center gap-2 rounded-full border border-white/60 bg-white px-5 py-2.5 text-gray-700 shadow hover:shadow-md"
+            className="self-end sm:self-auto inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white shadow hover:shadow-md border border-afmc-gold/30 text-gray-700 hover:text-afmc-maroon hover:bg-afmc-maroon/5 transition max-w-max"
           >
             <ArrowLeft size={16} />
             Back
@@ -305,8 +305,8 @@ export default function OrderHistory() {
         </div>
 
         <div className="rounded-3xl border border-white/60 bg-white/80 p-6 shadow-xl backdrop-blur-sm">
-          <div className="mb-6 flex flex-wrap items-end gap-4">
-            <label>
+          <div className="mb-6 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-end gap-2 md:flex md:flex-wrap md:gap-4">
+            <label className="min-w-0 md:flex-none">
               <span className="mb-2 block text-sm font-medium text-gray-700">From</span>
               <div className="flex items-center rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
                 <input
@@ -319,7 +319,7 @@ export default function OrderHistory() {
               </div>
             </label>
 
-            <label>
+            <label className="min-w-0 md:flex-none">
               <span className="mb-2 block text-sm font-medium text-gray-700">To</span>
               <div className="flex items-center rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
                 <input
@@ -332,7 +332,7 @@ export default function OrderHistory() {
               </div>
             </label>
 
-            <label className="min-w-[220px] max-w-[320px] w-full">
+            <label className="col-span-2 min-w-0 md:col-span-1 md:min-w-[220px] md:max-w-[320px] md:w-full">
               <span className="mb-2 block text-sm font-medium text-gray-700">User Name</span>
               <div className="flex items-center rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
                 <input
@@ -354,20 +354,23 @@ export default function OrderHistory() {
             <button
               type="button"
               onClick={handleSearch}
-              className="flex items-center gap-2 rounded-2xl bg-[#5b5b5b] px-6 py-3 font-semibold text-white shadow hover:shadow-md"
+              className="flex h-12 w-10 items-center justify-center gap-2 rounded-2xl bg-[#5b5b5b] font-semibold text-white shadow hover:shadow-md md:w-auto md:px-6 md:py-3"
+              aria-label="Search order history"
             >
               <Search size={16} />
-              Search
+              <span className="hidden md:inline">Search</span>
             </button>
 
-            <button
-              type="button"
-              onClick={handleDownload}
-              className="ml-auto flex items-center gap-2 rounded-2xl bg-afmc-maroon px-6 py-3 font-semibold text-white shadow transition hover:bg-afmc-maroon2 hover:shadow-md"
-            >
-              <Download size={16} />
-              Download PDF
-            </button>
+            <div className="col-span-3 flex w-full justify-end md:col-span-1 md:w-auto md:ml-auto">
+              <button
+                type="button"
+                onClick={handleDownload}
+                className="flex w-auto items-center gap-2 rounded-2xl bg-afmc-maroon px-5 md:px-6 py-3 font-semibold text-white shadow transition hover:bg-afmc-maroon2 hover:shadow-md"
+              >
+                <Download size={16} />
+                Download PDF
+              </button>
+            </div>
           </div>
 
           {error ? (
@@ -375,17 +378,6 @@ export default function OrderHistory() {
               {error}
             </div>
           ) : null}
-
-          <div className="mb-6 flex max-w-[520px] items-center gap-3 rounded-2xl border border-gray-200 bg-white px-4 py-3">
-            <Search size={16} className="text-gray-400" />
-            <input
-              type="text"
-              value={quickSearch}
-              onChange={(event) => setQuickSearch(event.target.value)}
-              placeholder="Quick search in results"
-              className="w-full bg-transparent text-sm text-gray-800 outline-none placeholder:text-gray-400"
-            />
-          </div>
 
           <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
             <div className="overflow-x-auto">

@@ -49,7 +49,7 @@ export default function UserNavbar({ onMenuClick }) {
 
   return (
     <header className="bg-white shadow-md sticky top-0 z-30 border-b border-afmc-maroon/10">
-      <div className="px-3 md:px-6 py-3">
+      <div className="px-3 md:px-6 py-3 relative">
         {/* Mobile Layout */}
         <div className="flex justify-between items-start sm:hidden">
           <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -79,14 +79,10 @@ export default function UserNavbar({ onMenuClick }) {
           </div>
 
           {/* Right Side */}
-          <div className="flex flex-col items-end ml-2">
-            {!hideCartIcon && (
-              <div className="mb-2">
-                <CartButton />
-              </div>
-            )}
+          <div className="absolute right-3 top-3 flex items-center gap-2 z-10">
+            {!hideCartIcon && <CartButton />}
 
-            <UserMenuDropdown compact={!isDashboard} />
+            <UserMenuDropdown compact={!isDashboard} iconOnly />
           </div>
         </div>
 
