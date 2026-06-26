@@ -376,11 +376,13 @@ function MenuPopupCompact({ item, loading, onClose, onBuy }) {
   const { user, setCartCount } = useAuth();
   const [qty, setQty] = useState("1");
   const [remarks, setRemarks] = useState("Din");
-  const [pegType, setPegType] = useState("");
+  const [pegType, setPegType] = useState("Small");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const userId = user?.userId;
   const isMocktailItem = isCocktailOrMocktailItem(item);
+  const acUnit = item?.ac_unit || item?.["A/C_UNIT"] || "Nos";
+  const isPegsUnit = String(acUnit).trim().toLowerCase() === "pegs";
 
   const fetchCartCount = async () => {
     if (!userId) return;
@@ -560,16 +562,14 @@ function MenuPopupCompact({ item, loading, onClose, onBuy }) {
   }, [item, loading, onClose]);
 
   useEffect(() => {
-    setPegType("");
-  }, [item?.item_id, item?.item_code]);
+    setPegType(isPegsUnit ? "Small" : "");
+  }, [item?.item_id, item?.item_code, isPegsUnit]);
 
   if (!item && !loading) {
     return null;
   }
 
   const imageSrc = `${BASEAPI}${item?.image || "default.jpg"}`;
-  const acUnit = item?.ac_unit || item?.["A/C_UNIT"] || "Nos";
-  const isPegsUnit = String(acUnit).trim().toLowerCase() === "pegs";
   const itemName = toInitCap(item?.item_name) || "-";
 
   return (
@@ -686,7 +686,6 @@ function MenuPopupCompact({ item, loading, onClose, onBuy }) {
                             onChange={(e) => setPegType(e.target.value)}
                             className="h-11 w-full rounded border border-stone-300 bg-white px-3 text-[15px] font-medium text-stone-800 outline-none transition focus:border-afmc-maroon focus:ring-2 focus:ring-afmc-maroon/20"
                           >
-                            <option value="">{toInitCap("Select type")}</option>
                             <option value="Small">{toInitCap("Small")}</option>
                             <option value="Large">{toInitCap("Large")}</option>
                           </select>
