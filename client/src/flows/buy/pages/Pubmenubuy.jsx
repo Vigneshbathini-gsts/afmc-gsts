@@ -118,6 +118,15 @@ function parseCardText(cardText = "") {
   };
 }
 
+function getDisplayItemType(item) {
+  const rawType = item?.type ?? item?.TYPE ?? item?.description ?? item?.DESCRIPTION ?? "";
+  const itemType = String(rawType || "").trim();
+  if (!itemType || ["NA", "N/A", "NULL", "UNDEFINED"].includes(itemType.toUpperCase())) {
+    return "";
+  }
+  return itemType;
+}
+
 function normalizeItem(item, fallbackIndex = 0) {
   const parsed = parseCardText(item.card_text || item.CARD_TEXT);
   const quantity = Number(item.quantity || item.QUANTITY || parsed.quantity || 1);
@@ -209,6 +218,7 @@ function normalizeItem(item, fallbackIndex = 0) {
     item_code: item.item_code || item.ITEM_CODE || "",
     itemId: Number.isFinite(itemId) && itemId > 0 ? itemId : null,
     item_name: item.item_name || item.ITEM_NAME || parsed.item_name,
+    type: getDisplayItemType(item),
     quantity,
     unitPrice,
     subtotal,
@@ -1765,6 +1775,11 @@ export default function Pubmenubuy({
                                 </span>
                               ) : null}
                             </p>
+                            {getDisplayItemType(item) ? (
+                              <p className="mt-1 text-xs font-medium text-stone-500">
+                                {toInitCap("Type")}: <span className="font-semibold text-stone-700">{toInitCap(getDisplayItemType(item))}</span>
+                              </p>
+                            ) : null}
                             {isCocktailOrMocktail(item) && (() => {
                               const itemCode = String(item?.item_code || "").trim();
                               const override = itemCode ? cocktailOverrideIssues?.[itemCode] : null;

@@ -89,6 +89,31 @@ const getCartQuantity = async (conn, userId, itemCode, priceZero = false, parent
   return Number(rows[0]?.qty || 0);
 };
 
+const getTypeMultiplier = (type) =>
+  String(type || "").trim().toUpperCase() === "LARGE" ? 2 : 1;
+
+const getCartStockUnits = async (conn, userId, itemCode, excludeCartId = null) => {
+  let query = `
+    SELECT IFNULL(SUM(
+      quantity *
+      CASE WHEN UPPER(TRIM(IFNULL(description, ''))) = 'LARGE' THEN 2 ELSE 1 END
+    ), 0) AS units
+    FROM xxafmc_cart_items
+    WHERE user_id = ?
+      AND item_id = ?
+      AND price != 0
+  `;
+  const params = [userId, itemCode];
+
+  if (excludeCartId !== null) {
+    query += " AND cart_id != ?";
+    params.push(excludeCartId);
+  }
+
+  const [rows] = await conn.execute(query, params);
+  return Number(rows[0]?.units || 0);
+};
+
 const isCocktailOrMocktailInfo = (itemInfo) =>
   (Number(itemInfo?.category_id) === 10 && [14, 15].includes(Number(itemInfo?.sub_category))) ||
   Number(itemInfo?.has_recipe || 0) > 0;
@@ -573,8 +598,11 @@ const addCartItem = async (userId, itemData) => {
     // -------------------------------
     // 1. VALIDATE MAIN ITEM STOCK
     // -------------------------------
+    const selectedType = String(type || "").trim();
+    const cartDescription = selectedType || "NA";
+    const selectedTypeMultiplier = getTypeMultiplier(selectedType);
     const reservedQty = await getOrderReservedQuantity(conn, resolvedItemCode);
-    const existingCartQty = isCocktailOrMocktail ? 0 : await getCartQuantity(conn, userId, resolvedItemCode, false);
+    const existingCartUnits = isCocktailOrMocktail ? 0 : await getCartStockUnits(conn, userId, resolvedItemCode);
 
     let stockQty;
     if (!isCocktailOrMocktail) {
@@ -592,16 +620,16 @@ const addCartItem = async (userId, itemData) => {
 
     // For cocktails/mocktails, allow adding to cart even if ingredients are out of stock.
     // Users can adjust ingredients later via the cart edit flow, and stock will be validated at purchase time.
-    if (!isCocktailOrMocktail && existingCartQty + quantity + reservedQty > stockQty) {
-      const availableQty = Math.max(0, stockQty - reservedQty - existingCartQty);
+    const requestedUnits = Number(quantity || 0) * selectedTypeMultiplier;
+    if (!isCocktailOrMocktail && existingCartUnits + requestedUnits + reservedQty > stockQty) {
+      const availableUnits = Math.max(0, stockQty - reservedQty - existingCartUnits);
+      const availableQty = Math.floor(availableUnits / selectedTypeMultiplier);
       throw createValidationError(`Out of stock. Available quantity: ${availableQty}`);
     }
 
     // -------------------------------
     // 2. CHECK EXISTING CART ITEM
     // -------------------------------
-    const selectedType = String(type || "").trim();
-    const cartDescription = selectedType || "NA";
     const existingSql = selectedType
       ? `SELECT cart_id, quantity FROM xxafmc_cart_items
          WHERE user_id = ? AND item_id = ? AND price != 0 AND UPPER(description) = UPPER(?)`
@@ -871,6 +899,17 @@ const getCartItemsByUser = async (userId) => {
     }
   }
 
+  const paidCartUnitsByItem = rows.reduce((map, row) => {
+    const price = Number(row.price ?? row.inventory_price ?? 0);
+    if (price === 0) return map;
+
+    const itemCode = String(row.item_code);
+    const currentUnits = Number(map.get(itemCode) || 0);
+    const rowUnits = Number(row.quantity || 0) * getTypeMultiplier(row.description);
+    map.set(itemCode, currentUnits + rowUnits);
+    return map;
+  }, new Map());
+
   return rows.map((row) => {
     const quantity = Number(row.quantity || 0);
 
@@ -894,7 +933,12 @@ const getCartItemsByUser = async (userId) => {
       ? stockOutStock
       : Math.max(inventoryStock, stockOutStock);
     const reservedQty = Number(reservedMap.get(String(row.item_code)) || 0);
-    const availableQuantity = isCocktailItem ? null : Math.max(0, effectiveStockQty - reservedQty);
+    const typeMultiplier = getTypeMultiplier(row.description);
+    const currentLineUnits = quantity * typeMultiplier;
+    const paidCartUnits = Number(paidCartUnitsByItem.get(String(row.item_code)) || 0);
+    const otherCartUnits = Math.max(0, paidCartUnits - currentLineUnits);
+    const availableUnits = Math.max(0, effectiveStockQty - reservedQty - otherCartUnits);
+    const availableQuantity = isCocktailItem ? null : Math.floor(availableUnits / typeMultiplier);
 
     const stockStatus = isCocktailItem
       ? (cocktailStatusMap.get(Number(row.cart_id)) || "Unknown")
@@ -950,6 +994,7 @@ const updateCartItemQuantity = async (cartId, userId, quantity) => {
       `SELECT
          c.item_id,
          c.quantity,
+         c.description,
          xi.category_id,
          xi.sub_category,
          EXISTS (
@@ -970,6 +1015,7 @@ const updateCartItemQuantity = async (cartId, userId, quantity) => {
 
     const itemId = current[0].item_id;
     const isCocktailOrMocktail = isCocktailOrMocktailInfo(current[0]);
+    const typeMultiplier = getTypeMultiplier(current[0].description);
 
     // -------------------------------
     // 2. VALIDATE MAIN ITEM STOCK ON QUANTITY CHANGE
@@ -977,9 +1023,12 @@ const updateCartItemQuantity = async (cartId, userId, quantity) => {
     if (!isCocktailOrMocktail) {
       const stockQty = await getStockQuantity(conn, itemId, current[0].category_id);
       const reservedQty = await getOrderReservedQuantity(conn, itemId);
+      const otherCartUnits = await getCartStockUnits(conn, userId, itemId, cartId);
+      const requestedUnits = Number(quantity || 0) * typeMultiplier;
 
-      if (quantity + reservedQty > stockQty) {
-        const availableQty = Math.max(0, stockQty - reservedQty);
+      if (requestedUnits + otherCartUnits + reservedQty > stockQty) {
+        const availableUnits = Math.max(0, stockQty - reservedQty - otherCartUnits);
+        const availableQty = Math.floor(availableUnits / typeMultiplier);
         throw createValidationError(`Out of stock. Available quantity: ${availableQty}`);
       }
     }

@@ -7,6 +7,9 @@ const createValidationError = (message) => {
   return error;
 };
 
+const getTypeMultiplier = (type) =>
+  String(type || "").trim().toUpperCase() === "LARGE" ? 2 : 1;
+
 async function getReservedTotalsForUpdate(connection, itemCode) {
   // Ensure a totals row exists so we can lock it deterministically.
   await connection.execute(
@@ -881,6 +884,7 @@ async function getOrderSummary(orderNumber) {
         ) AS cart_id,
         xxod.ITEM_ID AS item_id,
         xxod.QUANTITY AS quantity,
+        xxod.TYPE AS type,
         xxod.PRICE AS price,
         xxod.BARCODE AS barcode,
         XXINV.SUB_CATEGORY AS subcategory,
@@ -992,7 +996,11 @@ async function getOrderSummary(orderNumber) {
 
     const reservedQuantity = Number(reservedMap.get(String(row.item_code)) || 0);
     const stockQuantity = row.stock_quantity == null ? null : Number(row.stock_quantity || 0);
-    const availableQuantity = stockQuantity == null ? null : Math.max(0, stockQuantity - reservedQuantity);
+    const availableUnits = stockQuantity == null ? null : Math.max(0, stockQuantity - reservedQuantity);
+    const typeMultiplier = getTypeMultiplier(row.type);
+    const availableQuantity = availableUnits == null
+      ? null
+      : Number(row.quantity || 0) + Math.floor(availableUnits / typeMultiplier);
 
     const cocktailStatus = isCocktailItem ? cocktailStatusMap.get(Number(row.item_id)) : null;
     const stockStatus = isCocktailItem
@@ -1733,6 +1741,7 @@ async function updateOrderLineQuantity(orderNumber, orderLineId, userId, quantit
           od.order_line_id,
           od.item_id,
           od.quantity,
+          od.type,
           od.price,
           od.subtotal,
           od.subcategory,
@@ -1838,7 +1847,20 @@ async function updateOrderLineQuantity(orderNumber, orderLineId, userId, quantit
     } else {
       const deltaQty = normalizedQuantity - currentQty;
       if (deltaQty > 0) {
-        await reserveInventoryQty(connection, itemId, deltaQty);
+        const typeMultiplier = getTypeMultiplier(detailRow.type);
+        const deltaUnits = deltaQty * typeMultiplier;
+        const stockRow = await getInventoryStockForUpdate(connection, itemId);
+        const availableUnits = Math.max(
+          0,
+          Number(stockRow.actual_qty || 0) - Number(stockRow.reserved_qty || 0)
+        );
+
+        if (deltaUnits > availableUnits) {
+          const availableQty = Math.floor(availableUnits / typeMultiplier);
+          throw createValidationError(`Out of stock. Available quantity: ${availableQty}`);
+        }
+
+        await reserveInventoryQty(connection, itemId, deltaUnits);
       }
     }
 

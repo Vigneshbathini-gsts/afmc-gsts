@@ -16,6 +16,15 @@ import {
 
 const BASEAPI = "https://afmc.globalsparkteksolutions.com/AFMCIMAGES/";
 
+const getCartItemType = (item) => {
+    const rawType = item?.type ?? item?.TYPE ?? item?.description ?? item?.DESCRIPTION ?? "";
+    const itemType = String(rawType || "").trim();
+    if (!itemType || ["NA", "N/A", "NULL", "UNDEFINED"].includes(itemType.toUpperCase())) {
+        return "";
+    }
+    return itemType;
+};
+
 // Confirmation Modal component
 const ConfirmModal = ({ isOpen, onClose, onConfirm, title, message, confirmLabel = "Confirm" }) => {
     if (!isOpen) return null;
@@ -483,6 +492,12 @@ export default function CartPage({ isAttendant = false }) {
                             <h2 className="text-sm font-semibold text-gray-900 overflow-hidden text-ellipsis whitespace-nowrap">
                                 {toInitCap(item.itemName) || toInitCap("Unnamed Item")}
                             </h2>
+
+                            {getCartItemType(item) && (
+                                <p className="mt-1 text-xs font-medium text-gray-600">
+                                    {toInitCap("Type")}: {toInitCap(getCartItemType(item))}
+                                </p>
+                            )}
 
                             <p
                                 className={`text-xs mt-1 ${String(stockStatusText || "").toLowerCase() === "out of stock"
