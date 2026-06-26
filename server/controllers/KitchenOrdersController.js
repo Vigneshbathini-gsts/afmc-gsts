@@ -2109,7 +2109,9 @@ exports.getOrderHistoryItemDetails = async (req, res) => {
         ROUND(
           CASE
             WHEN IFNULL(xo.price, 0) = 0 OR UPPER(TRIM(IFNULL(xo.type, ''))) = 'FREE ITEM' THEN 0
-            WHEN MAX(scanned_totals.scanned_total) > 0 THEN MAX(scanned_totals.scanned_total)
+            WHEN MAX(line_scanned_totals.scanned_total) > 0 THEN MAX(line_scanned_totals.scanned_total)
+            WHEN MAX(item_line_counts.line_count) = 1 AND MAX(item_scanned_totals.scanned_total) > 0
+              THEN MAX(item_scanned_totals.scanned_total)
             WHEN MAX(custom_totals.unit_custom_total) > 0 THEN MAX(custom_totals.unit_custom_total) * xo.quantity
             ELSE IFNULL(xo.subtotal, 0)
           END,
@@ -2117,7 +2119,9 @@ exports.getOrderHistoryItemDetails = async (req, res) => {
         ) AS subtotal,
         ROUND(
           CASE
-            WHEN MAX(scanned_totals.scanned_total) > 0 THEN MAX(scanned_totals.scanned_total) / NULLIF(xo.quantity, 0)
+            WHEN MAX(line_scanned_totals.scanned_total) > 0 THEN MAX(line_scanned_totals.scanned_total) / NULLIF(xo.quantity, 0)
+            WHEN MAX(item_line_counts.line_count) = 1 AND MAX(item_scanned_totals.scanned_total) > 0
+              THEN MAX(item_scanned_totals.scanned_total) / NULLIF(xo.quantity, 0)
             WHEN MAX(custom_totals.unit_custom_total) > 0 THEN MAX(custom_totals.unit_custom_total)
             ELSE COALESCE(xo.price, xo.subtotal / NULLIF(xo.quantity, 0), 0)
           END - IFNULL(xo.food_pr_charges, 0),
@@ -2152,15 +2156,42 @@ exports.getOrderHistoryItemDetails = async (req, res) => {
 
       LEFT JOIN (
         SELECT
+          order_id,
+          item_id,
+          COUNT(*) AS line_count
+        FROM xxafmc_order_details
+        GROUP BY order_id, item_id
+      ) item_line_counts
+        ON item_line_counts.order_id = xo.order_id
+       AND item_line_counts.item_id = xo.item_id
+
+      LEFT JOIN (
+        SELECT
           order_number,
           inventory_item_code,
           ROUND(SUM(IFNULL(scan_quantity, 0) * IFNULL(item_price, 0)), 2) AS scanned_total
         FROM order_scan_collection
         WHERE collection_name = 'S_COLLECTION'
+          AND JSON_EXTRACT(extra_data, '$.orderLineId') IS NULL
         GROUP BY order_number, inventory_item_code
-      ) scanned_totals
-        ON scanned_totals.order_number = xo.order_id
-       AND scanned_totals.inventory_item_code = xo.item_id
+      ) item_scanned_totals
+        ON item_scanned_totals.order_number = xo.order_id
+       AND item_scanned_totals.inventory_item_code = xo.item_id
+
+      LEFT JOIN (
+        SELECT
+          order_number,
+          inventory_item_code,
+          CAST(JSON_UNQUOTE(JSON_EXTRACT(extra_data, '$.orderLineId')) AS UNSIGNED) AS order_line_id,
+          ROUND(SUM(IFNULL(scan_quantity, 0) * IFNULL(item_price, 0)), 2) AS scanned_total
+        FROM order_scan_collection
+        WHERE collection_name = 'S_COLLECTION'
+          AND JSON_EXTRACT(extra_data, '$.orderLineId') IS NOT NULL
+        GROUP BY order_number, inventory_item_code, order_line_id
+      ) line_scanned_totals
+        ON line_scanned_totals.order_number = xo.order_id
+       AND line_scanned_totals.inventory_item_code = xo.item_id
+       AND line_scanned_totals.order_line_id = xo.order_line_id
 
       LEFT JOIN (
         SELECT
@@ -2224,7 +2255,9 @@ exports.getOrderHistoryItemDetails = async (req, res) => {
         ROUND(SUM(
           CASE
             WHEN IFNULL(xo.price, 0) = 0 OR UPPER(TRIM(IFNULL(xo.type, ''))) = 'FREE ITEM' THEN 0
-            WHEN scanned_totals.scanned_total > 0 THEN scanned_totals.scanned_total
+            WHEN line_scanned_totals.scanned_total > 0 THEN line_scanned_totals.scanned_total
+            WHEN item_line_counts.line_count = 1 AND item_scanned_totals.scanned_total > 0
+              THEN item_scanned_totals.scanned_total
             WHEN custom_totals.unit_custom_total > 0 THEN custom_totals.unit_custom_total * xo.quantity
             ELSE IFNULL(xo.subtotal, 0)
           END
@@ -2234,15 +2267,40 @@ exports.getOrderHistoryItemDetails = async (req, res) => {
         ON xo.item_id = xi.item_code
       LEFT JOIN (
         SELECT
+          order_id,
+          item_id,
+          COUNT(*) AS line_count
+        FROM xxafmc_order_details
+        GROUP BY order_id, item_id
+      ) item_line_counts
+        ON item_line_counts.order_id = xo.order_id
+        AND item_line_counts.item_id = xo.item_id
+      LEFT JOIN (
+        SELECT
           order_number,
           inventory_item_code,
           ROUND(SUM(IFNULL(scan_quantity, 0) * IFNULL(item_price, 0)), 2) AS scanned_total
         FROM order_scan_collection
         WHERE collection_name = 'S_COLLECTION'
+          AND JSON_EXTRACT(extra_data, '$.orderLineId') IS NULL
         GROUP BY order_number, inventory_item_code
-      ) scanned_totals
-        ON scanned_totals.order_number = xo.order_id
-        AND scanned_totals.inventory_item_code = xo.item_id
+      ) item_scanned_totals
+        ON item_scanned_totals.order_number = xo.order_id
+        AND item_scanned_totals.inventory_item_code = xo.item_id
+      LEFT JOIN (
+        SELECT
+          order_number,
+          inventory_item_code,
+          CAST(JSON_UNQUOTE(JSON_EXTRACT(extra_data, '$.orderLineId')) AS UNSIGNED) AS order_line_id,
+          ROUND(SUM(IFNULL(scan_quantity, 0) * IFNULL(item_price, 0)), 2) AS scanned_total
+        FROM order_scan_collection
+        WHERE collection_name = 'S_COLLECTION'
+          AND JSON_EXTRACT(extra_data, '$.orderLineId') IS NOT NULL
+        GROUP BY order_number, inventory_item_code, order_line_id
+      ) line_scanned_totals
+        ON line_scanned_totals.order_number = xo.order_id
+        AND line_scanned_totals.inventory_item_code = xo.item_id
+        AND line_scanned_totals.order_line_id = xo.order_line_id
       LEFT JOIN (
         SELECT
           cm.order_number,
