@@ -309,7 +309,6 @@ export default function Pubmenubuy({
   const currentBasePath = location.pathname.startsWith("/attendant")
     ? "/attendant"
     : "/user";
-  const MAX_QTY = 99;
 
   const getStockLimitImageKey = (row) => String(Number(row?.orderLineId ?? row?.id) || row?.id || row?.item_code || "");
 
@@ -930,12 +929,6 @@ export default function Pubmenubuy({
         return current;
       }
 
-      if (nextQtyCandidate > MAX_QTY) {
-        validationMessage = `Quantity cannot be more than ${MAX_QTY}.`;
-        validationKey = getStockLimitImageKey(targetItem);
-        return current;
-      }
-
       const availableQty = targetItem.availableQuantity;
 
       const cocktailOverride = getCocktailOverrideForItem(targetItem);
@@ -1237,11 +1230,6 @@ export default function Pubmenubuy({
 
     if (delta < 0) {
       clearStockLimitOnImage(liveItem);
-    }
-
-    if (delta > 0 && currentQty >= MAX_QTY) {
-      showToast(`Quantity cannot be more than ${MAX_QTY}.`, "error");
-      return;
     }
 
     const nextQtyCandidate = currentQty + delta;
@@ -1873,17 +1861,14 @@ export default function Pubmenubuy({
                                   onClick={() => handleQtyClick(item, 1)}
                                   aria-disabled={
                                     disableQuantityControls ||
-                                    disablePlusForStock ||
-                                    item.quantity >= MAX_QTY
+                                    disablePlusForStock
                                   }
                                   disabled={
                                     disableQuantityControls ||
-                                    disablePlusForStock || isStandardOutOfStock ||
-                                    item.quantity >= MAX_QTY
+                                    disablePlusForStock || isStandardOutOfStock
                                   }
                                   className={`rounded-md bg-afmc-maroon p-1.5 text-white shadow-sm transition hover:bg-afmc-maroon2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-afmc-gold/50 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-50 ${updatingLineId === Number(item.orderLineId ?? item.id) ||
-                                    disablePlusForStock || isStandardOutOfStock ||
-                                    item.quantity >= MAX_QTY
+                                    disablePlusForStock || isStandardOutOfStock
                                     ? "opacity-60"
                                     : ""
                                     }`}
