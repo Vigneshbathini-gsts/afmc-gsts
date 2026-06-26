@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { inventoryAPI, cartAPI } from "../../services/api";
+import Pubmenubuyservice from "../../flows/buy/services/Pubmenubuyservice";
 import { FaArrowLeft, FaPlus, FaMinus, FaTrash, FaSearch, FaSave } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { useAuth } from "../../context/AuthContext";
@@ -577,9 +578,16 @@ export default function ItemDetails() {
                             `afmc-buyflow-custom:${buyOrderNumber}:${itemCodeKey}`,
                             JSON.stringify({ details: normalizedDetails, savedAt: Date.now() })
                         );
+                        await Pubmenubuyservice.updateItemCustomization(
+                            buyOrderNumber,
+                            itemCodeKey,
+                            selectedIngredients
+                        );
                     }
                 } catch (err) {
                     console.warn("Could not persist buyflow customization override:", err);
+                    toast.error(err.response?.data?.message || err.message || "Failed to save ingredients");
+                    return;
                 }
                 toast.success(`Saved ${item.ITEM_NAME} customization`);
                 navigate(postSavePath);

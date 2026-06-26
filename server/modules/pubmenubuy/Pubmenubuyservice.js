@@ -24,6 +24,10 @@ const updateOrderLineQuantity = async (orderNumber, orderLineId, userId, quantit
   return Pubmenubuymodel.updateOrderLineQuantity(orderNumber, orderLineId, userId, quantity);
 };
 
+const updateOrderItemCustomization = async (orderNumber, itemCode, userId, ingredients, authUser) => {
+  return Pubmenubuymodel.updateOrderItemCustomization(orderNumber, itemCode, userId, ingredients, authUser);
+};
+
 module.exports = {
   createOrder,
   getOrderSummary,
@@ -31,4 +35,5 @@ module.exports = {
   updateOrderItemQuantity,
   deleteOrderItem,
   updateOrderLineQuantity,
+  updateOrderItemCustomization,
 };

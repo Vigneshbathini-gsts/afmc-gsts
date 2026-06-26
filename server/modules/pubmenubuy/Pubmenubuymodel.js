@@ -2160,6 +2160,177 @@ async function updateOrderLineQuantity(orderNumber, orderLineId, userId, quantit
   }
 }
 
+async function updateOrderItemCustomization(orderNumber, itemCode, userId, ingredients, authUser = {}) {
+  const normalizedOrderNumber = Number(orderNumber);
+  const normalizedItemCode = Number(itemCode);
+  const normalizedUserId = Number(userId);
+
+  if (!Number.isFinite(normalizedOrderNumber) || normalizedOrderNumber <= 0) {
+    throw createValidationError("Valid order number is required");
+  }
+
+  if (!Number.isFinite(normalizedItemCode) || normalizedItemCode <= 0) {
+    throw createValidationError("Valid item code is required");
+  }
+
+  if (!Number.isFinite(normalizedUserId) || normalizedUserId <= 0) {
+    throw createValidationError("User ID is required");
+  }
+
+  const normalizedIngredients = (Array.isArray(ingredients) ? ingredients : [])
+    .map((ingredient) => ({
+      itemCode: Number(ingredient?.itemCode ?? ingredient?.ITEM_CODE),
+      itemName: String(ingredient?.itemName ?? ingredient?.ITEM_NAME ?? "").trim(),
+      quantity: Number(ingredient?.quantity ?? ingredient?.QUANTITY ?? ingredient?.pegs ?? ingredient?.PEGS),
+      unitPrice:
+        ingredient?.unitPrice !== undefined && ingredient?.unitPrice !== null && ingredient?.unitPrice !== ""
+          ? Number(ingredient.unitPrice)
+          : null,
+      lineTotal:
+        ingredient?.lineTotal !== undefined && ingredient?.lineTotal !== null && ingredient?.lineTotal !== ""
+          ? Number(ingredient.lineTotal)
+          : null,
+    }))
+    .filter((ingredient) =>
+      Number.isFinite(ingredient.itemCode) &&
+      ingredient.itemCode > 0 &&
+      Number.isFinite(ingredient.quantity) &&
+      ingredient.quantity > 0
+    );
+
+  if (normalizedIngredients.length === 0) {
+    throw createValidationError("At least one valid ingredient is required");
+  }
+
+  const connection = await db.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    const [[orderRow]] = await connection.execute(
+      `
+        SELECT oh.user_id, od.quantity, od.subcategory
+        FROM xxafmc_order_header oh
+        INNER JOIN xxafmc_order_details od
+          ON od.order_id = oh.order_num
+        WHERE oh.order_num = ?
+          AND oh.user_id = ?
+          AND od.item_id = ?
+          AND NOT (IFNULL(od.price, 0) = 0 AND IFNULL(od.subtotal, 0) = 0)
+        LIMIT 1
+      `,
+      [normalizedOrderNumber, normalizedUserId, normalizedItemCode]
+    );
+
+    if (!orderRow) {
+      const error = new Error("Order item not found");
+      error.statusCode = 404;
+      throw error;
+    }
+
+    if (![14, 15].includes(Number(orderRow.subcategory))) {
+      throw createValidationError("Order item is not a cocktail or mocktail");
+    }
+
+    const ingredientCodes = [...new Set(normalizedIngredients.map((ingredient) => ingredient.itemCode))];
+    const placeholders = ingredientCodes.map(() => "?").join(",");
+    const [inventoryRows] = await connection.execute(
+      `
+        SELECT item_code, item_name, unit_price
+        FROM xxafmc_inventory
+        WHERE item_code IN (${placeholders})
+      `,
+      ingredientCodes
+    );
+
+    const inventoryMap = inventoryRows.reduce((map, row) => {
+      map.set(Number(row.item_code), row);
+      return map;
+    }, new Map());
+
+    await connection.execute(
+      `
+        DELETE FROM xxafmc_custom_cocktails_mocktails_details
+        WHERE order_number = ?
+          AND inventory_item_code = ?
+      `,
+      [normalizedOrderNumber, normalizedItemCode]
+    );
+
+    await connection.execute(
+      `
+        DELETE FROM xxafmc_custom_cocktails_mocktails_details_dummy
+        WHERE order_number = ?
+          AND inventory_item_code = ?
+      `,
+      [normalizedOrderNumber, normalizedItemCode]
+    );
+
+    const parentQuantity = Number(orderRow.quantity || 1);
+    const createdBy = authUser?.username || authUser?.user_name || String(normalizedUserId);
+    let customUnitTotal = 0;
+
+    for (const ingredient of normalizedIngredients) {
+      const inventoryRow = inventoryMap.get(ingredient.itemCode);
+      const itemName = inventoryRow?.item_name || ingredient.itemName || String(ingredient.itemCode);
+      const unitPrice = Number.isFinite(ingredient.unitPrice)
+        ? ingredient.unitPrice
+        : Number(inventoryRow?.unit_price || 0);
+      const lineTotal = Number.isFinite(ingredient.lineTotal)
+        ? ingredient.lineTotal
+        : unitPrice * ingredient.quantity;
+
+      customUnitTotal += Number(lineTotal || 0);
+
+      await connection.execute(
+        `
+          INSERT INTO xxafmc_custom_cocktails_mocktails_details
+            (item_code, item_name, pegs, inventory_item_code, user_id, quantity, order_number, created_by, creation_date)
+          VALUES
+            (?, ?, ?, ?, ?, ?, ?, ?, NOW())
+        `,
+        [
+          ingredient.itemCode,
+          itemName,
+          ingredient.quantity,
+          normalizedItemCode,
+          normalizedUserId,
+          parentQuantity,
+          normalizedOrderNumber,
+          createdBy,
+        ]
+      );
+    }
+
+    if (customUnitTotal > 0) {
+      await connection.execute(
+        `
+          UPDATE xxafmc_order_details
+          SET price = ?,
+              subtotal = ROUND(? * quantity, 2)
+          WHERE order_id = ?
+            AND item_id = ?
+            AND NOT (IFNULL(price, 0) = 0 AND IFNULL(subtotal, 0) = 0)
+        `,
+        [
+          Number(customUnitTotal.toFixed(2)),
+          Number(customUnitTotal.toFixed(2)),
+          normalizedOrderNumber,
+          normalizedItemCode,
+        ]
+      );
+    }
+
+    await connection.commit();
+    return getOrderSummary(normalizedOrderNumber);
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
 
 module.exports = {
   createOrder,
@@ -2168,4 +2339,5 @@ module.exports = {
   updateOrderItemQuantity,
   deleteOrderItem,
   updateOrderLineQuantity,
+  updateOrderItemCustomization,
 };

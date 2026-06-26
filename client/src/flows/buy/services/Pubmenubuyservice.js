@@ -5,6 +5,8 @@ export const Pubmenubuyservice = {
   getByOrderNumber: (orderNumber) => api.get(`/Pubmenubuy/${orderNumber}`),
   updateItemQuantity: (orderNumber, itemCode, delta) =>
     api.patch(`/Pubmenubuy/${orderNumber}/item/${itemCode}`, { delta }),
+  updateItemCustomization: (orderNumber, itemCode, ingredients) =>
+    api.put(`/Pubmenubuy/${orderNumber}/item/${itemCode}/customization`, { ingredients }),
   deleteItem: (orderNumber, itemCode) => api.delete(`/Pubmenubuy/${orderNumber}/item/${itemCode}`),
   cancelOrder: (orderNumber) => api.delete(`/Pubmenubuy/${orderNumber}`),
   updateLineQuantity: (orderNumber, orderLineId, quantity) =>

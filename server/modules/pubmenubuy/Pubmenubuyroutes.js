@@ -6,6 +6,11 @@ const PubmenubuyController = require("./PubmenubuyController");
 router.post("/Pubmenubuy/create", authMiddleware, PubmenubuyController.createPubMenuOrder);
 router.get("/Pubmenubuy/:ORDER_NUMBER", authMiddleware, PubmenubuyController.getPubMenuOrderSummary);
 router.patch("/Pubmenubuy/:ORDER_NUMBER/item/:ITEM_CODE", authMiddleware, PubmenubuyController.updatePubMenuOrderItemQuantity);
+router.put(
+  "/Pubmenubuy/:ORDER_NUMBER/item/:ITEM_CODE/customization",
+  authMiddleware,
+  PubmenubuyController.updatePubMenuOrderItemCustomization
+);
 router.delete("/Pubmenubuy/:ORDER_NUMBER/item/:ITEM_CODE", authMiddleware, PubmenubuyController.deletePubMenuOrderItem);
 router.delete("/Pubmenubuy/:ORDER_NUMBER", authMiddleware, PubmenubuyController.cancelPubMenuOrder);
 router.put(

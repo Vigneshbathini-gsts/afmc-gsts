@@ -169,3 +169,42 @@ exports.updatePubMenuOrderLineQuantity = async (req, res) => {
     });
   }
 };
+
+exports.updatePubMenuOrderItemCustomization = async (req, res) => {
+  try {
+    const { ORDER_NUMBER, ITEM_CODE } = req.params;
+    const userId = req.user?.userId || req.user?.user_id;
+    const { ingredients } = req.body || {};
+
+    if (!ORDER_NUMBER || !ITEM_CODE) {
+      return res.status(400).json({
+        success: false,
+        message: "ORDER_NUMBER and ITEM_CODE are required",
+      });
+    }
+
+    if (!userId) {
+      return res.status(400).json({ success: false, message: "User ID is required" });
+    }
+
+    const data = await Pubmenubuyservice.updateOrderItemCustomization(
+      ORDER_NUMBER,
+      ITEM_CODE,
+      userId,
+      ingredients,
+      req.user
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Order item customization updated",
+      data,
+    });
+  } catch (error) {
+    console.error("Update pub menu order item customization error:", error);
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || "Server error while updating customization",
+    });
+  }
+};
