@@ -17,35 +17,46 @@ import {
 const BASEAPI = "https://afmc.globalsparkteksolutions.com/AFMCIMAGES/";
 
 // Confirmation Modal component
-const ConfirmModal = ({ isOpen, onClose, onConfirm, title, message, confirmLabel = "Confirm" }) => {
+const ConfirmModal = ({ isOpen, onClose, onConfirm, title, message, confirmLabel = "Confirm", cancelLabel = "Cancel" }) => {
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-            <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 animate-scale-in">
-                <div className="p-6">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">{title}</h3>
-                    <p className="text-gray-600">{message}</p>
-                    <div className="flex gap-3 mt-6">
-                        <button
-                            onClick={onClose}
-                            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition"
-                        >
-                            {toInitCap("Cancel")}
-                        </button>
-                        <button
-                            onClick={onConfirm}
-                            className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
-                        >
-                            {toInitCap(confirmLabel)}
-                        </button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6">
+            <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl ring-1 ring-black/10">
+                <div className="flex items-start justify-between gap-4">
+                    <div>
+                        <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
+                        <p className="mt-2 text-sm leading-6 text-slate-600">{message}</p>
                     </div>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:bg-slate-50"
+                        aria-label="Close"
+                    >
+                        ×
+                    </button>
+                </div>
+                <div className="mt-6 flex flex-row gap-3 justify-end">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="flex-1 sm:flex-none inline-flex justify-center rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                    >
+                        {cancelLabel}
+                    </button>
+                    <button
+                        type="button"
+                        onClick={onConfirm}
+                        className="flex-1 sm:flex-none inline-flex justify-center rounded-full bg-afmc-maroon px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-afmc-maroon2"
+                    >
+                        {confirmLabel}
+                    </button>
                 </div>
             </div>
         </div>
     );
 };
-
 export default function CartPage({ isAttendant = false }) {
     const { user, setCartCount } = useAuth();
     const navigate = useNavigate();

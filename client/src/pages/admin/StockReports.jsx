@@ -235,7 +235,7 @@ export default function StockReports() {
           <button
             type="button"
             onClick={() => navigate("/admin/dashboard")}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-white shadow hover:shadow-md border border-white/60 text-gray-700"
+            className="self-end sm:self-auto inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white shadow hover:shadow-md border border-afmc-gold/30 text-gray-700 hover:text-afmc-maroon hover:bg-afmc-maroon/5 transition max-w-max"
           >
             <FaArrowLeft />
             Go To Dashboard
@@ -243,8 +243,8 @@ export default function StockReports() {
         </div>
 
         <div className="bg-white/80 border border-white/60 rounded-3xl shadow-xl backdrop-blur-sm p-6">
-          <div className="flex flex-col gap-4 mb-6 md:flex-row md:items-end md:flex-wrap">
-            <div className="w-full md:w-auto">
+          <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-end gap-2 mb-6 md:flex md:flex-wrap md:gap-4">
+            <div className="min-w-0 md:w-auto">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 From
               </label>
@@ -256,7 +256,7 @@ export default function StockReports() {
               />
             </div>
 
-            <div className="w-full md:w-auto">
+            <div className="min-w-0 md:w-auto">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 To
               </label>
@@ -271,20 +271,23 @@ export default function StockReports() {
             <button
               type="button"
               onClick={handleSearch}
-              className="w-full md:w-auto px-6 py-3 rounded-2xl bg-[#5b5b5b] text-white font-semibold flex items-center justify-center gap-2 shadow hover:shadow-md"
+              className="h-12 w-10 md:w-auto md:px-6 md:py-3 rounded-2xl bg-[#5b5b5b] text-white font-semibold flex items-center justify-center gap-2 shadow hover:shadow-md"
+              aria-label="Search stock report"
             >
               <FaSearch />
-              Search
+              <span className="hidden md:inline">Search</span>
             </button>
 
-            <button
-              type="button"
-              onClick={downloadPdf}
-              className="w-full md:w-auto px-6 py-3 rounded-2xl bg-afmc-maroon hover:bg-afmc-maroon2 text-white font-semibold flex items-center justify-center gap-2 shadow hover:shadow-md transition"
-            >
-              <FaDownload />
-              Download PDF
-            </button>
+            <div className="col-span-3 w-full flex justify-end md:w-auto md:ml-auto">
+              <button
+                type="button"
+                onClick={downloadPdf}
+                className="w-auto px-5 md:px-6 py-3 rounded-2xl bg-afmc-maroon hover:bg-afmc-maroon2 text-white font-semibold flex items-center justify-center gap-2 shadow hover:shadow-md transition"
+              >
+                <FaDownload />
+                Download PDF
+              </button>
+            </div>
           </div>
 
           <div className="flex rounded-2xl overflow-hidden border border-gray-200 bg-white mb-6">

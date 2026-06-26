@@ -267,10 +267,10 @@ return (
 
           <button
             onClick={handleDashboard}
-            className="px-4 py-2 rounded-xl bg-white border border-gray-200 hover:bg-gray-50 text-gray-800 font-semibold shadow-sm transition flex items-center gap-2 text-sm"
+            className="self-end sm:self-auto inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white shadow hover:shadow-md border border-afmc-gold/30 text-gray-700 hover:text-afmc-maroon hover:bg-afmc-maroon/5 transition max-w-max text-sm"
           >
             <FaHome />
-            Dashboard
+            Go To Dashboard
           </button>
         </div>
       </div>

@@ -323,14 +323,14 @@ export default function OutletOrders({ kitchenType = "Bar" }) {
       {/* CARD */}
       <div className="bg-white rounded-2xl shadow-lg border overflow-hidden" style={{ borderColor: 'rgba(107,26,79,0.1)' }}>
         {/* TOP BAR */}
-        <div className="p-4 border-b border-gray-100 flex justify-between gap-2.5 flex-wrap">
+        <div className="p-4 border-b border-gray-100 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h3 className="text-lg font-semibold m-0">Orders List</h3>
             <p className="text-xs text-gray-500 m-0">Active and completed orders</p>
           </div>
 
-          <div className="flex gap-2.5 items-center flex-wrap">
-            <div className="relative w-64">
+          <div className="flex gap-2.5 items-center flex-wrap justify-end w-full sm:w-auto">
+            <div className="relative flex-1 min-w-0 sm:w-72">
               <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm" />
               <input
                 placeholder="Search..."
@@ -344,7 +344,7 @@ export default function OutletOrders({ kitchenType = "Bar" }) {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 rounded-lg border text-sm bg-white cursor-pointer focus:outline-none focus:ring-2 transition-all"
+              className="px-3 py-2 rounded-lg border text-sm bg-white cursor-pointer focus:outline-none focus:ring-2 transition-all min-w-[8rem]"
               style={{
                 borderColor: "rgba(107,26,79,0.2)",
                 "--tw-ring-color": MAROON,

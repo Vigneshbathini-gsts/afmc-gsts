@@ -220,7 +220,7 @@ export default function AddItem() {
       <div className="absolute bottom-20 right-20 w-80 h-80 rounded-full bg-afmc-maroon2/10 blur-3xl"></div>
 
       <div className="relative z-10 px-0 py-4 md:p-8">
-        <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
+        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-800">Barcode Reader</h1>
             <p className="mt-1 text-sm text-gray-500">
@@ -228,14 +228,16 @@ export default function AddItem() {
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={() => navigate("/admin/dashboard")}
-            className="flex items-center gap-2 rounded-full bg-white px-5 py-2.5 text-gray-700 shadow hover:shadow-md border border-white/60"
-          >
-            <FaArrowLeft />
-            Go To Dashboard
-          </button>
+          <div className="w-full sm:w-auto flex justify-end">
+            <button
+              type="button"
+              onClick={() => navigate("/admin/dashboard")}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white shadow hover:shadow-md border border-afmc-gold/30 text-gray-700 hover:text-afmc-maroon hover:bg-afmc-maroon/5 transition max-w-max"
+            >
+              <FaArrowLeft />
+              Go To Dashboard
+            </button>
+          </div>
         </div>
 
         <div className="rounded-[32px] border border-white/70 bg-white/85 p-8 shadow-2xl backdrop-blur-md">

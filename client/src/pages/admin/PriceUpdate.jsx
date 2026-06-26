@@ -417,7 +417,7 @@ export default function PriceUpdate() {
           )}
 
           {/* Buttons */}
-          <div className="flex flex-col sm:flex-row gap-4 pt-4">
+          <div className="flex flex-row gap-3 sm:gap-4 pt-4">
             <button
               type="button"
               onMouseDown={() => {

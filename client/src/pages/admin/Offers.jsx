@@ -199,7 +199,7 @@ export default function Offers() {
             </p>
           </div>
 
-          <div className="flex flex-wrap gap-3">
+          <div className="flex w-full flex-wrap justify-end gap-3 lg:w-auto">
             <button
               onClick={handleBack}
               className="px-5 py-3 rounded-2xl bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold shadow-sm transition flex items-center gap-2"
