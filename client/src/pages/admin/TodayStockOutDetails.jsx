@@ -61,8 +61,8 @@ export default function TodayStockOutDetails() {
             </div>
           )}
 
-          <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto rounded-2xl border border-gray-200 bg-white">
+            <table className="min-w-max w-full text-sm">
               <thead className="bg-gray-50 text-gray-600">
                 <tr>
                   <th className="px-4 py-3 text-left font-medium">Item Code</th>

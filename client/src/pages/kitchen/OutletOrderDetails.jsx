@@ -107,6 +107,8 @@ export default function OutletOrderDetails() {
   const processingScanRef = useRef(false);
   const autoStartedScannerRef = useRef(false);
   const qtyRef = useRef(qty);
+  const barcodeInputRef = useRef(null);
+  const qtyInputRef = useRef(null);
   const orderDataRef = useRef(orderData);
   const departmentRef = useRef(department);
   const activeRecipeParentItemRef = useRef(activeRecipeParentItem);
@@ -230,6 +232,19 @@ export default function OutletOrderDetails() {
       console.log("Manual Barcode:", e.target.value.trim());
       e.preventDefault();
       await autoProcessScan(e.target.value.trim());
+    }
+  };
+
+  const handleQtyKeyPress = async (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const trimmedBarcode = String(barcode || "").trim();
+      if (trimmedBarcode) {
+        await confirmScan();
+        if (barcodeInputRef.current) barcodeInputRef.current.focus();
+      } else if (barcodeInputRef.current) {
+        barcodeInputRef.current.focus();
+      }
     }
   };
 
@@ -684,7 +699,7 @@ export default function OutletOrderDetails() {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Item Name</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Ordered (Paid + Free)</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Scanned</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Remaining</th>
+                      {/* <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Remaining</th> */}
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Type</th>
                       <th className="px-6 py-3 text-center text-xs font-medium text-gray-500">Cancel</th>
                     </tr>
@@ -718,7 +733,7 @@ export default function OutletOrderDetails() {
                               )}
                             </td>
                             <td className="px-6 py-4 text-sm text-green-600 font-medium">{scannedQty}</td>
-                            <td className="px-6 py-4 text-sm text-orange-600 font-medium">{remainingQty}</td>
+                            {/* <td className="px-6 py-4 text-sm text-orange-600 font-medium">{remainingQty}</td> */}
                             <td className="px-6 py-4 text-sm text-gray-600">{item.TYPE || "NA"}</td>
                             <td className="px-6 py-4 text-center">
                               <button
@@ -751,6 +766,7 @@ export default function OutletOrderDetails() {
                       <input
                         type="text"
                         value={barcode}
+                        ref={barcodeInputRef}
                         onChange={(e) => handleBarcodeChange(e.target.value)}
                         onKeyDown={handleBarcodeKeyPress}
                         placeholder="Scan or enter barcode"
@@ -765,7 +781,9 @@ export default function OutletOrderDetails() {
                         min="1"
                         step="1"
                         value={qty}
+                        ref={qtyInputRef}
                         onChange={(e) => setQty(e.target.value)}
+                        onKeyDown={handleQtyKeyPress}
                         placeholder="1"
                         className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm"
                         disabled={processingScan}

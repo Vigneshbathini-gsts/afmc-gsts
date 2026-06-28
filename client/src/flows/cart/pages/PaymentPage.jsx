@@ -345,10 +345,10 @@ const PaymentPage = () => {
                                                 {item.QUANTITY || item.quantity || 0}
                                             </td>
                                             <td className="px-4 py-3 text-center text-sm font-semibold text-stone-800">
-                                                ₹ {getDisplayMoney(isFreeItem(item) ? 0 : Number(item.PRICE || item.price || 0))}
+                                                <span className="whitespace-nowrap">₹{getDisplayMoney(isFreeItem(item) ? 0 : Number(item.PRICE || item.price || 0))}</span>
                                             </td>
                                             <td className="px-4 py-3 text-center text-sm font-semibold text-stone-800">
-                                                ₹ {getDisplayMoney(isFreeItem(item) ? 0 : Number(item.SUBTOTAL || item.subtotal || 0))}
+                                                <span className="whitespace-nowrap">₹{getDisplayMoney(isFreeItem(item) ? 0 : Number(item.SUBTOTAL || item.subtotal || 0))}</span>
                                             </td>
                                         </tr>
                                     ))

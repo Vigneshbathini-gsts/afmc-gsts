@@ -260,14 +260,34 @@ export default function OrderHistory() {
 
     try {
       setDetailsLoading(true);
-      const response = await barOrdersAPI.getOrderHistoryItemDetails(orderNumber);
-      const payload = response.data?.data || {};
+      // Fetch both Bar and Kitchen scoped details so admin modal shows all item types (including snacks)
+      const [barRes, kitchenRes] = await Promise.allSettled([
+        barOrdersAPI.getOrderHistoryItemDetails(orderNumber, "Bar"),
+        barOrdersAPI.getOrderHistoryItemDetails(orderNumber, "Kitchen"),
+      ]);
+
+      const barPayload = barRes.status === "fulfilled" ? barRes.value.data?.data || {} : { items: [], summary: { totalAmount: 0 } };
+      const kitchenPayload = kitchenRes.status === "fulfilled" ? kitchenRes.value.data?.data || {} : { items: [], summary: { totalAmount: 0 } };
+
+      // Merge items, prefer bar items first, then kitchen items; dedupe by order_line_id or item_id+index
+      const mergedMap = new Map();
+      (barPayload.items || []).forEach((it, i) => {
+        const key = it.order_line_id ?? `${it.item_id}::bar::${i}`;
+        mergedMap.set(key, it);
+      });
+      (kitchenPayload.items || []).forEach((it, i) => {
+        const key = it.order_line_id ?? `${it.item_id}::kitchen::${i}`;
+        if (!mergedMap.has(key)) mergedMap.set(key, it);
+      });
+
+      const mergedItems = Array.from(mergedMap.values());
+      const totalAmount = (Number(barPayload.summary?.totalAmount || 0) + Number(kitchenPayload.summary?.totalAmount || 0)) || mergedItems.reduce((s, it) => s + Number(it?.subtotal || 0), 0);
 
       setDetailsByOrder((prev) => ({
         ...prev,
         [orderNumber]: {
-          items: payload.items || [],
-          summary: payload.summary || null,
+          items: mergedItems,
+          summary: { totalAmount },
         },
       }));
     } catch (fetchError) {

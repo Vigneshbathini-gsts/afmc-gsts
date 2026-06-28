@@ -406,16 +406,28 @@ function MenuPopupCompact({ item, loading, onClose, onBuy }) {
     try {
       setIsSubmitting(true);
       const menuSearchParams = new URLSearchParams(window.location.search);
-      const selectedPubmed =
-        String(
-          window.history.state?.usr?.pubmed ||
-          menuSearchParams.get("pubmed") ||
-          window.history.state?.usr?.pubmedName ||
-          menuSearchParams.get("pubmedName") ||
-          ""
-        ).trim() || null;
+      const selectedPubmed = String(
+        window.history.state?.usr?.pubmed ||
+        menuSearchParams.get("pubmed") ||
+        window.history.state?.usr?.pubmedName ||
+        menuSearchParams.get("pubmedName") ||
+        sessionStorage.getItem("afmc:selectedPubmed") ||
+        ""
+      ).trim() || null;
+      const selectedPubmedName = String(
+        window.history.state?.usr?.pubmedName ||
+        menuSearchParams.get("pubmedName") ||
+        window.history.state?.usr?.pubmed ||
+        menuSearchParams.get("pubmed") ||
+        sessionStorage.getItem("afmc:selectedPubmedName") ||
+        ""
+      ).trim() || null;
+
       if (selectedPubmed) {
         sessionStorage.setItem("afmc:selectedPubmed", selectedPubmed);
+      }
+      if (selectedPubmedName) {
+        sessionStorage.setItem("afmc:selectedPubmedName", selectedPubmedName);
       }
       const cartData = {
         // Server cart module expects inventory ITEM_CODE in `item_id`.
@@ -1506,16 +1518,28 @@ function MenuDashboard() {
     try {
       const typeForBackend = selectedType || null;
       const menuSearchParams = new URLSearchParams(location.search);
-      const selectedPubmed =
-        String(
-          location.state?.pubmed ||
-          menuSearchParams.get("pubmed") ||
-          location.state?.pubmedName ||
-          menuSearchParams.get("pubmedName") ||
-          ""
-        ).trim() || null;
+      const selectedPubmed = String(
+        location.state?.pubmed ||
+        menuSearchParams.get("pubmed") ||
+        location.state?.pubmedName ||
+        menuSearchParams.get("pubmedName") ||
+        sessionStorage.getItem("afmc:selectedPubmed") ||
+        ""
+      ).trim() || null;
+      const selectedPubmedName = String(
+        location.state?.pubmedName ||
+        menuSearchParams.get("pubmedName") ||
+        location.state?.pubmed ||
+        menuSearchParams.get("pubmed") ||
+        sessionStorage.getItem("afmc:selectedPubmedName") ||
+        ""
+      ).trim() || null;
+
       if (selectedPubmed) {
         sessionStorage.setItem("afmc:selectedPubmed", selectedPubmed);
+      }
+      if (selectedPubmedName) {
+        sessionStorage.setItem("afmc:selectedPubmedName", selectedPubmedName);
       }
 
       const response = await Pubmenubuyservice.createOrder({
