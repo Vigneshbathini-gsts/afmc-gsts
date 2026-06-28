@@ -1458,6 +1458,7 @@ function SnackNonVegSection({ onItemClick }) {
 }
 
 function MenuDashboard() {
+  const { user, setCartCount } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [mainTab, setMainTab] = useState("drinks");
@@ -1482,6 +1483,22 @@ function MenuDashboard() {
       // ignore
     }
   }, []);
+
+  useEffect(() => {
+    // Refresh cart count when the menu dashboard mounts so badge state stays in sync.
+    const fetchCartCount = async () => {
+      if (!user?.userId || typeof setCartCount !== "function") return;
+      try {
+        const response = await cartAPI.getByUserId(user.userId);
+        const items = response?.data?.data || [];
+        setCartCount(items.length);
+      } catch (err) {
+        console.error("Error refreshing cart count on menu dashboard:", err);
+      }
+    };
+
+    fetchCartCount();
+  }, [user?.userId, setCartCount]);
 
   useEffect(() => {
     // If user presses browser Back immediately after landing on menu from invoice-like pages,
