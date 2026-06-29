@@ -21,6 +21,7 @@ export default function FilterDropdown({
   onMenuScroll,
   hasMore = false,
   loadingMore = false,
+  menuWidth = null,
 }) {
   const dropdownRef = useRef(null);
   const buttonRef = useRef(null);
@@ -72,10 +73,17 @@ export default function FilterDropdown({
 
       top = Math.max(safeGap, Math.min(top, window.innerHeight - safeGap));
 
+      const resolvedWidth =
+        menuWidth != null
+          ? typeof menuWidth === "number"
+            ? `${menuWidth}px`
+            : menuWidth
+          : rect.width;
+
       setMenuPosition({
         left: rect.left,
         top,
-        width: rect.width,
+        width: resolvedWidth,
       });
     };
 

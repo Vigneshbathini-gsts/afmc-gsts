@@ -614,6 +614,7 @@ export default function CocktailEdit() {
                             valueClassName="normal-case"
                             menuClassName="text-left"
                             usePortal
+                            menuWidth={250}
                             onMenuScroll={handleIngredientMenuScroll}
                             hasMore={ingredientHasMore}
                             loadingMore={ingredientsLoadingMore}
