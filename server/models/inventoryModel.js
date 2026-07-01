@@ -550,7 +550,6 @@ const addStockOutTransactions = async (payload) => {
         throw error;
       }
 
-      const divisor = Number(stockItem.pegs) > 0 ? Number(stockItem.pegs) : 1;
       const inventoryDelta = numericQuantity;
 
       if (Number(stockItem.available_stock || 0) < inventoryDelta) {
@@ -560,9 +559,8 @@ const addStockOutTransactions = async (payload) => {
       }
 
       const bottlePrice = Number(stockItem.unit_price || 0);
-      const pegPrice = bottlePrice / divisor;
-      const stockOutQuantity = numericQuantity * divisor;
-      const totalValue = pegPrice * stockOutQuantity;
+      const stockOutQuantity = numericQuantity;
+      const totalValue = bottlePrice * stockOutQuantity;
       const creationTimestamp = formatToSql(new Date());
 
       await connection.execute(

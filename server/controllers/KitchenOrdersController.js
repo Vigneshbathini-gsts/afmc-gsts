@@ -1001,28 +1001,56 @@ exports.processBarcodeScan = async (req, res) => {
 
     const l_barcode_scanned_qty = scannedCollection.filter(s => s.barcode === BARCODE).length;
 
-    // === Exact ac_unit validation from Oracle package ===
-    if (['Nos', 'Can', 'glass'].includes(acUnit)) {
+    // === Oracle package scan validation ===
+    // Batch/package-style items can scan the same barcode multiple times until
+    // either barcode stock or ordered quantity is exhausted. Other bottle/can
+    // items remain unique-barcode scans.
+    const normalizedAcUnit = String(acUnit || "").trim().toUpperCase();
+    const scanSubCategory = Number(item.SUB_CATEGORY) || 0;
+    const duplicateAllowedSubCategories = new Set([
+      2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 16, 17, 18, 1310,
+    ]);
+    const isTrackedAcUnit = ['NOS', 'CAN', 'GLASS', 'PEGS'].includes(normalizedAcUnit);
+    const isDuplicateAllowedScan =
+      duplicateAllowedSubCategories.has(scanSubCategory) ||
+      (scanSubCategory === 1 && normalizedAcUnit === 'GLASS');
+
+    if (isTrackedAcUnit && isDuplicateAllowedScan) {
+      if (l_total_scanned_qty + requestedQty > stockQuantity) {
+        await connection.rollback();
+        return res.status(400).json({
+          success: false,
+          message: `Error: Scanned Qty is more than stock for barcode ${BARCODE}`,
+        });
+      }
+      if (orderedQty < l_scan_item_qty + requestedQty) {
+        await connection.rollback();
+        return res.status(400).json({
+          success: false,
+          message: 'Error: Scanned Qty is more than Order quantity',
+        });
+      }
+    } else if (isTrackedAcUnit) {
       if (l_barcode_scanned_qty >= 1) {
         await connection.rollback();
-        return res.status(400).json({ success: false, message: `Alert: Duplicate bottle scan for ${BARCODE}` });
+        return res.status(400).json({
+          success: false,
+          message: `Error: Duplicate bottle scan for ${BARCODE}`,
+        });
       }
       if (requestedQty > stockQuantity) {
         await connection.rollback();
-        return res.status(400).json({ success: false, message: `Alert: Entered quantity is more than the stock ${BARCODE}` });
+        return res.status(400).json({
+          success: false,
+          message: 'Error: Entered quantity is more than stock',
+        });
       }
       if (orderedQty < l_scan_item_qty + requestedQty) {
         await connection.rollback();
-        return res.status(400).json({ success: false, message: 'Alert: Scanned quantity exceeds the ordered quantity' });
-      }
-    } else {
-      if (l_total_scanned_qty + requestedQty > stockQuantity) {
-        await connection.rollback();
-        return res.status(400).json({ success: false, message: `Alert: Scanned Quantity is more than stock for barcode ${BARCODE}` });
-      }
-      if (orderedQty < l_scan_item_qty + requestedQty) {
-        await connection.rollback();
-        return res.status(400).json({ success: false, message: 'Alert: Scanned quantity exceeds the ordered quantity' });
+        return res.status(400).json({
+          success: false,
+          message: 'Error: Scanned Qty is more than Order quantity',
+        });
       }
     }
 
