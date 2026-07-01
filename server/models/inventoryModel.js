@@ -842,6 +842,19 @@ const addStockOutTransactions = async (payload) => {
   }
 };
 
+const normalizeAcUnit = (value) => {
+  const unit = String(value || "").trim().toLowerCase();
+  if (unit.includes("can")) return "Can";
+  if (unit.includes("peg")) return "Pegs";
+  return "Nos";
+};
+
+const mapAcUnitRows = (rows) =>
+  rows.map((row) => ({
+    ...row,
+    ac_unit: normalizeAcUnit(row.ac_unit),
+  }));
+
 const getStockInReport = async ({ fromDate, toDate, limit, offset }) => {
   const start = getStartOfDay(fromDate);
   const end = getEndOfDay(toDate);
@@ -872,7 +885,24 @@ const getStockInReport = async ({ fromDate, toDate, limit, offset }) => {
     ${hasPagination ? `LIMIT ${limitNumber} OFFSET ${offsetNumber}` : ""}
   `;
   const [rows] = await db.execute(sql, [start, end]);
-  return rows;
+  return mapAcUnitRows(rows);
+};
+
+const getStockInReportSummary = async ({ fromDate, toDate }) => {
+  const start = getStartOfDay(fromDate);
+  const end = getEndOfDay(toDate);
+  const sql = `
+    SELECT
+      IFNULL(SUM(XIT.STOCK), 0) AS total_stock,
+      ROUND(SUM(IFNULL(XIT.RATE, 0) * IFNULL(XIT.STOCK, 0)), 2) AS total_price
+    FROM xxafmc_items_transactions XIT
+    JOIN xxafmc_inventory XI ON XIT.ITEM_CODE = XI.ITEM_CODE
+    WHERE XIT.TRANSACTION_DATE >= ? AND XIT.TRANSACTION_DATE <= ?
+      AND XIT.FLAG = 'IN'
+      AND XI.SUB_CATEGORY NOT IN (14, 15)
+  `;
+  const [rows] = await db.execute(sql, [start, end]);
+  return rows[0] || { total_stock: 0, total_price: 0 };
 };
 
 const getStockOutReport = async ({ fromDate, toDate, limit, offset }) => {
@@ -901,7 +931,22 @@ const getStockOutReport = async ({ fromDate, toDate, limit, offset }) => {
     ${hasPagination ? `LIMIT ${limitNumber} OFFSET ${offsetNumber}` : ""}
   `;
   const [rows] = await db.execute(sql, [start, end]);
-  return rows;
+  return mapAcUnitRows(rows);
+};
+
+const getStockOutReportSummary = async ({ fromDate, toDate }) => {
+  const start = getStartOfDay(fromDate);
+  const end = getEndOfDay(toDate);
+  const sql = `
+    SELECT
+      IFNULL(SUM(XSO.STOCK_QUANTITY), 0) AS total_stock,
+      ROUND(SUM(IFNULL(XSO.TOTAL_VALUE, 0)), 2) AS total_price
+    FROM xxafmc_stock_out XSO
+    JOIN xxafmc_inventory XI ON XSO.ITEM_CODE = XI.ITEM_CODE
+    WHERE XSO.CREATION_DATE >= ? AND XSO.CREATION_DATE <= ?
+  `;
+  const [rows] = await db.execute(sql, [start, end]);
+  return rows[0] || { total_stock: 0, total_price: 0 };
 };
 
 const getTodayStockOutDetails = async () => {
@@ -949,6 +994,8 @@ module.exports = {
   getItemImageInfo,
   updateItemImage,
   getStockInReport,
+  getStockInReportSummary,
   getStockOutReport,
+  getStockOutReportSummary,
   getTodayStockOutDetails,
 };

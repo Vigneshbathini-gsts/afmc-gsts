@@ -99,7 +99,7 @@ exports.getOfferById = async (req, res) => {
   }
 };
 
-// Create Offer (No end_date required, status defaults to 'Active')
+// Create Offer (end_date is now required)
 exports.createOffer = async (req, res) => {
   try {
     const {
@@ -108,6 +108,7 @@ exports.createOffer = async (req, res) => {
       free_item_code,
       free_item_quantity,
       offer_date,
+      end_date,
       message,
     } = req.body;
 
@@ -129,6 +130,12 @@ exports.createOffer = async (req, res) => {
     }
     if (!offer_date) {
       return res.status(400).json({ message: "Offer date is required" });
+    }
+    if (!end_date) {
+      return res.status(400).json({ message: "End date is required" });
+    }
+    if (offer_date && end_date && end_date < offer_date) {
+      return res.status(400).json({ message: "End date cannot be earlier than offer date" });
     }
 
     // Get item names from inventory
@@ -155,12 +162,13 @@ exports.createOffer = async (req, res) => {
           FREE_ITEM,
           FREE_ITEM_QUANTITY,
           OFFER_DATE,
+          END_DATE,
           MESSAGE,
           CREATED_BY,
           CREATION_DATE,
           LAST_UPDATED_BY,
           LAST_UPDATED_DATE
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, NOW())`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, NOW())`,
       [
         item_code,
         itemName,
@@ -169,6 +177,7 @@ exports.createOffer = async (req, res) => {
         freeItemName,
         free_item_quantity,
         offer_date,
+        end_date,
         message || null,
         username,
         username

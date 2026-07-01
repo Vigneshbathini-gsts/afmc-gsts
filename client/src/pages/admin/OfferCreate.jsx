@@ -45,6 +45,7 @@ export default function OfferCreate() {
     freeItemName: "",
     freeItemQuantity: "",
     offerDate: getTodayDate(), // Set default to today's date
+    endDate: "",
     message: "",
   });
 
@@ -200,6 +201,20 @@ export default function OfferCreate() {
         return;
       }
 
+      if (!formData.endDate) {
+        const message = "Please select End Date";
+        setError(message);
+        toast.error(message);
+        return;
+      }
+
+      if (formData.offerDate && formData.endDate < formData.offerDate) {
+        const message = "End Date cannot be earlier than Start Date";
+        setError(message);
+        toast.error(message);
+        return;
+      }
+
       // Prepare payload with snake_case for backend
       const payload = {
         item_code: formData.itemCode,
@@ -207,6 +222,7 @@ export default function OfferCreate() {
         free_item_code: formData.freeItemCode,
         free_item_quantity: parseInt(formData.freeItemQuantity, 10),
         offer_date: formData.offerDate,
+        end_date: formData.endDate,
         message: formData.message || "",
       };
 
@@ -461,6 +477,24 @@ return (
                 name="offerDate"
                 value={formData.offerDate}
                 onChange={handleChange}
+                className="w-full outline-none text-gray-700 bg-transparent text-sm"
+              />
+            </div>
+          </div>
+
+          {/* End Date */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              End Date <span className="text-red-500">*</span>
+            </label>
+            <div className="flex items-center rounded-xl border border-gray-200 bg-white px-3 py-2 shadow-sm">
+              <FaCalendarAlt className="text-gray-400 mr-2" />
+              <input
+                type="date"
+                name="endDate"
+                value={formData.endDate}
+                onChange={handleChange}
+                min={formData.offerDate || undefined}
                 className="w-full outline-none text-gray-700 bg-transparent text-sm"
               />
             </div>

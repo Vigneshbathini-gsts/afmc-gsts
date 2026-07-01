@@ -43,6 +43,8 @@ export default function StockReports() {
   const [error, setError] = useState("");
   const [stockInRows, setStockInRows] = useState([]);
   const [stockOutRows, setStockOutRows] = useState([]);
+  const [stockInSummary, setStockInSummary] = useState({ total_stock: 0, total_price: 0 });
+  const [stockOutSummary, setStockOutSummary] = useState({ total_stock: 0, total_price: 0 });
   const [stockInPage, setStockInPage] = useState(0);
   const [stockOutPage, setStockOutPage] = useState(0);
   const [stockInHasMore, setStockInHasMore] = useState(true);
@@ -62,7 +64,9 @@ export default function StockReports() {
         offset: nextPage * REPORT_PAGE_SIZE,
       });
       const rows = response.data.data || [];
+      const summary = response.data.summary || { total_stock: 0, total_price: 0 };
       setStockInRows((current) => (reset ? rows : [...current, ...rows]));
+      setStockInSummary(summary);
       setStockInPage(nextPage + 1);
       setStockInHasMore(rows.length === REPORT_PAGE_SIZE);
     } catch (err) {
@@ -90,7 +94,9 @@ export default function StockReports() {
         offset: nextPage * REPORT_PAGE_SIZE,
       });
       const rows = response.data.data || [];
+      const summary = response.data.summary || { total_stock: 0, total_price: 0 };
       setStockOutRows((current) => (reset ? rows : [...current, ...rows]));
+      setStockOutSummary(summary);
       setStockOutPage(nextPage + 1);
       setStockOutHasMore(rows.length === REPORT_PAGE_SIZE);
     } catch (err) {
@@ -124,6 +130,7 @@ export default function StockReports() {
 
   const rows = activeTab === "in" ? stockInRows : stockOutRows;
   const hasMore = activeTab === "in" ? stockInHasMore : stockOutHasMore;
+  const summary = activeTab === "in" ? stockInSummary : stockOutSummary;
 
   const handleReportScroll = (event) => {
     const { scrollTop, clientHeight, scrollHeight } = event.currentTarget;
@@ -192,6 +199,21 @@ export default function StockReports() {
             row.total_price ?? row.totalprice ?? 0,
           ]
     );
+
+    const totalStock = reportRows.reduce(
+      (sum, row) => sum + Number(row.stock || 0),
+      0
+    );
+    const totalPrice = reportRows.reduce(
+      (sum, row) => sum + Number(row.total_price ?? row.totalprice ?? 0),
+      0
+    );
+
+    if (isStockIn) {
+      tableRows.push(["", "", "", "Totals", "", totalStock, totalPrice]);
+    } else {
+      tableRows.push(["", "", "Totals", "", totalStock, totalPrice]);
+    }
 
     exportTableToPdf({
       title: isStockIn ? "Stock In Report" : "Stock Out Report",
@@ -367,6 +389,15 @@ export default function StockReports() {
                       </td>
                     </tr>
                   ))
+                )}
+                {!loading && rows.length > 0 && (
+                  <tr className="border-t border-gray-200 bg-gray-50 font-semibold">
+                    <td className="px-4 py-3" colSpan={4}>
+                      Totals
+                    </td>
+                    <td className="px-4 py-3">{summary.total_stock || 0}</td>
+                    <td className="px-4 py-3">{summary.total_price || 0}</td>
+                  </tr>
                 )}
               </tbody>
             </table>

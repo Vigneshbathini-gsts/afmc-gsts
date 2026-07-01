@@ -53,14 +53,13 @@ export default function ProfitManagement() {
         e.preventDefault();
 
         try {
-            await profitAPI.updateMemberPricing({
+            const payload = {
                 category: memberForm.category,
-                profit: Number(memberForm.profit),
-                foodPrCharges:
-                    memberForm.category === "Snacks"
-                        ? Number(memberForm.foodPrCharges || 0)
-                        : 0,
-            });
+                profit: memberForm.category === "Liquor" ? Number(memberForm.profit) : 0,
+                foodPrCharges: memberForm.category === "Snacks" ? Number(memberForm.foodPrCharges || 0) : 0,
+            };
+
+            await profitAPI.updateMemberPricing(payload);
 
             toast.success("Member pricing updated successfully");
             setMemberForm({
@@ -79,14 +78,13 @@ export default function ProfitManagement() {
         e.preventDefault();
 
         try {
-            await profitAPI.updateNonMemberPricing({
+            const payload = {
                 category: nonMemberForm.category,
-                profit: Number(nonMemberForm.profit),
-                prCharges:
-                    nonMemberForm.category === "Snacks"
-                        ? Number(nonMemberForm.prCharges || 0)
-                        : 0,
-            });
+                profit: nonMemberForm.category === "Liquor" ? Number(nonMemberForm.profit) : 0,
+                prCharges: nonMemberForm.category === "Snacks" ? Number(nonMemberForm.prCharges || 0) : 0,
+            };
+
+            await profitAPI.updateNonMemberPricing(payload);
 
             toast.success("Non-member pricing updated successfully");
             setNonMemberForm({
@@ -154,30 +152,32 @@ export default function ProfitManagement() {
                                 </select>
                             </div>
 
-                            <div className="mb-3">
-                                <label className="block mb-1 text-sm font-medium text-slate-700">
-                                    Member Profit
-                                </label>
-                                <input
-                                    type="text"
-                                    inputMode="decimal"
-                                    name="profit"
-                                    value={memberForm.profit}
-                                    onChange={(e) => {
-                                        const value = e.target.value;
+                            {/* Profit field - Only for Liquor */}
+                            {memberForm.category === "Liquor" && (
+                                <div className="mb-3">
+                                    <label className="block mb-1 text-sm font-medium text-slate-700">
+                                        Member Profit
+                                    </label>
+                                    <input
+                                        type="text"
+                                        inputMode="decimal"
+                                        name="profit"
+                                        value={memberForm.profit}
+                                        onChange={(e) => {
+                                            const value = e.target.value;
+                                            if (value.length <= 5 && /^\d*\.?\d*$/.test(value)) {
+                                                handleMemberChange(e);
+                                            }
+                                        }}
+                                        className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
+                                        required
+                                        min="0"
+                                        placeholder="Enter profit percentage (e.g 10)"
+                                    />
+                                </div>
+                            )}
 
-                                        // Max 5 chars, allow decimal
-                                        if (value.length <= 5 && /^\d*\.?\d*$/.test(value)) {
-                                            handleMemberChange(e);
-                                        }
-                                    }}
-                                    className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
-                                    required
-                                    min="0"
-                                    placeholder="Enter profit percentage (e.g 10)"
-                                />
-                            </div>
-
+                            {/* Food PR Charges - Only for Snacks */}
                             {memberForm.category === "Snacks" && (
                                 <div className="mb-3">
                                     <label className="block mb-1 text-sm font-medium text-slate-700">
@@ -190,15 +190,13 @@ export default function ProfitManagement() {
                                         value={memberForm.foodPrCharges}
                                         onChange={(e) => {
                                             const value = e.target.value;
-
                                             if (value.length <= 5 && /^\d*\.?\d{0,2}$/.test(value)) {
                                                 handleMemberChange(e);
                                             }
                                         }}
                                         className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
-
                                         placeholder="Enter Food PR Charges"
-
+                                        required
                                     />
                                 </div>
                             )}
@@ -238,29 +236,31 @@ export default function ProfitManagement() {
                                 </select>
                             </div>
 
-                            <div className="mb-3">
-                                <label className="block mb-1 text-sm font-medium text-slate-700">
-                                    Non-Member Profit
-                                </label>
-                                <input
-                                    type="text"
-                                    inputMode="decimal"
-                                    name="profit"
-                                    value={nonMemberForm.profit}
-                                    onChange={(e) => {
-                                        const value = e.target.value;
+                            {/* Profit field - Only for Liquor */}
+                            {nonMemberForm.category === "Liquor" && (
+                                <div className="mb-3">
+                                    <label className="block mb-1 text-sm font-medium text-slate-700">
+                                        Non-Member Profit
+                                    </label>
+                                    <input
+                                        type="text"
+                                        inputMode="decimal"
+                                        name="profit"
+                                        value={nonMemberForm.profit}
+                                        onChange={(e) => {
+                                            const value = e.target.value;
+                                            if (value.length <= 5 && /^\d*\.?\d{0,2}$/.test(value)) {
+                                                handleNonMemberChange(e);
+                                            }
+                                        }}
+                                        className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
+                                        required
+                                        placeholder="Enter profit percentage (e.g 10)"
+                                    />
+                                </div>
+                            )}
 
-                                        // Allow decimal, max 5 characters total
-                                        if (value.length <= 5 && /^\d*\.?\d{0,2}$/.test(value)) {
-                                            handleNonMemberChange(e);
-                                        }
-                                    }}
-                                    className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
-                                    required
-                                    placeholder="Enter profit percentage (e.g 10)"
-                                />
-                            </div>
-
+                            {/* PR Charges - Only for Snacks */}
                             {nonMemberForm.category === "Snacks" && (
                                 <div className="mb-3">
                                     <label className="block mb-1 text-sm font-medium text-slate-700">
@@ -273,13 +273,13 @@ export default function ProfitManagement() {
                                         value={nonMemberForm.prCharges}
                                         onChange={(e) => {
                                             const value = e.target.value;
-
                                             if (value.length <= 5 && /^\d*\.?\d{0,2}$/.test(value)) {
                                                 handleNonMemberChange(e);
                                             }
                                         }}
                                         className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
-                                         placeholder="Enter PR Charges"
+                                        placeholder="Enter PR Charges"
+                                        required
                                     />
                                 </div>
                             )}
