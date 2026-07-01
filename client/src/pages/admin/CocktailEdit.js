@@ -45,9 +45,9 @@ export default function CocktailEdit() {
     itemName: "",
     subCategory: "",
     description: "",
-    memberProfit: "",
+    // memberProfit: "",
     memberPrCharges: "",
-    nonMemberProfit: "",
+    // nonMemberProfit: "",
     nonMemberPrCharges: "",
     image: null,
     imageFileName: "",
@@ -251,13 +251,13 @@ export default function CocktailEdit() {
           itemName: item.ITEM_NAME || "",
           subCategory: item.SUB_CATEGORY != null ? String(item.SUB_CATEGORY) : "",
           description: item.DESCRIPTION || "",
-          memberProfit: item.PROFIT != null ? String(item.PROFIT) : "",
+          // memberProfit: item.PROFIT != null ? String(item.PROFIT) : "",
           memberPrCharges:
             item.FOOD_PR_CHARGES != null ? String(item.FOOD_PR_CHARGES) : "",
-          nonMemberProfit:
-            item.NON_MEMBER_PROFIT != null
-              ? String(item.NON_MEMBER_PROFIT)
-              : "",
+          // nonMemberProfit:
+          //   item.NON_MEMBER_PROFIT != null
+          //     ? String(item.NON_MEMBER_PROFIT)
+          //     : "",
           nonMemberPrCharges:
             item.PR_CHARGES != null ? String(item.PR_CHARGES) : "",
           image: null,
@@ -395,9 +395,9 @@ export default function CocktailEdit() {
       payload.append("itemName", form.itemName.trim());
       payload.append("subCategory", form.subCategory);
       payload.append("description", form.description);
-      payload.append("memberProfit", form.memberProfit);
+      // payload.append("memberProfit", form.memberProfit);
       payload.append("memberPrCharges", form.memberPrCharges);
-      payload.append("nonMemberProfit", form.nonMemberProfit);
+      // payload.append("nonMemberProfit", form.nonMemberProfit);
       payload.append("nonMemberPrCharges", form.nonMemberPrCharges);
       payload.append("rows", JSON.stringify(normalizedRows));
 
@@ -504,7 +504,7 @@ export default function CocktailEdit() {
           </div>
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <input
+            {/* <input
               type="number"
               value={form.memberProfit}
               
@@ -513,7 +513,7 @@ export default function CocktailEdit() {
               }
               placeholder="Member Profit"
               className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 outline-none focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
-            />
+            /> */}
             <input
               type="number"
               value={form.memberPrCharges}
@@ -523,7 +523,7 @@ export default function CocktailEdit() {
               placeholder="Member Pr Charges"
               className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 outline-none focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
             />
-            <input
+            {/* <input
                type="number"
               value={form.nonMemberProfit}
               onChange={(event) =>
@@ -531,7 +531,7 @@ export default function CocktailEdit() {
               }
               placeholder="Non Member Profit"
               className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 outline-none focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
-            />
+            /> */}
             <input
                type="number"
               value={form.nonMemberPrCharges}
