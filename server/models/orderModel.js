@@ -56,10 +56,57 @@ async function getAdminOrderHistory({
           '%c/%e/%Y'
         ) AS order_date,
         1 AS ord,
-        ROUND(COALESCE(xxoh.order_total, (
-          SELECT SUM(xxod2.subtotal)
+        ROUND(COALESCE((
+          SELECT SUM(
+            CASE
+              WHEN TRIM(UPPER(IFNULL(xxod2.order_status, ''))) = 'CANCELLED' THEN 0
+              WHEN scanned_totals.scanned_total > 0 AND (xxod2.price IS NULL OR xxod2.price <> 0) THEN scanned_totals.scanned_total
+              WHEN custom_totals.unit_custom_total > 0 THEN custom_totals.unit_custom_total * xxod2.quantity
+              ELSE COALESCE(xxod2.subtotal, 0)
+            END
+          )
           FROM xxafmc_order_details xxod2
+          LEFT JOIN (
+            SELECT
+              order_number,
+              inventory_item_code,
+              ROUND(SUM(IFNULL(scan_quantity, 0) * IFNULL(item_price, 0)), 2) AS scanned_total
+            FROM order_scan_collection
+            WHERE collection_name = 'S_COLLECTION'
+            GROUP BY order_number, inventory_item_code
+          ) scanned_totals
+            ON scanned_totals.order_number = xxod2.order_id
+            AND scanned_totals.inventory_item_code = xxod2.item_id
+          LEFT JOIN (
+            SELECT
+              cm.order_number,
+              cm.inventory_item_code,
+              ROUND(SUM(
+                IFNULL(cm.pegs, 0) *
+                (
+                  IFNULL(stock_prices.base_peg_price, 0) * (1 + IFNULL(od_price.profit, 0) / 100) +
+                  IFNULL(od_price.food_pr_charges, 0)
+                )
+              ), 2) AS unit_custom_total
+            FROM xxafmc_custom_cocktails_mocktails_details cm
+            JOIN xxafmc_order_details od_price
+              ON od_price.order_id = cm.order_number
+              AND od_price.item_id = cm.inventory_item_code
+            LEFT JOIN (
+              SELECT
+                item_code,
+                MAX(IFNULL(unit_price, 0) / IFNULL(NULLIF(pegs, 0), 1)) AS base_peg_price
+              FROM xxafmc_stock_out
+              WHERE IFNULL(stock_quantity, 0) > 0
+              GROUP BY item_code
+            ) stock_prices
+              ON stock_prices.item_code = cm.item_code
+            GROUP BY cm.order_number, cm.inventory_item_code
+          ) custom_totals
+            ON custom_totals.order_number = xxod2.order_id
+            AND custom_totals.inventory_item_code = xxod2.item_id
           WHERE xxod2.order_id = xxoh.order_num
+            AND TRIM(UPPER(IFNULL(xxod2.order_status, ''))) != 'CANCELLED'
         ), 0), 2) AS subtotal
       FROM xxafmc_order_header xxoh
       JOIN xxafmc_order_details xxod
@@ -113,10 +160,57 @@ async function getAdminOrderHistory({
         2 AS ord,
         ROUND(IFNULL(SUM(subtotal), 0), 2) AS subtotal
       FROM (
-        SELECT xxoh.order_num, COALESCE(xxoh.order_total, (
-          SELECT SUM(xxod2.subtotal)
+        SELECT xxoh.order_num, COALESCE((
+          SELECT SUM(
+            CASE
+              WHEN TRIM(UPPER(IFNULL(xxod2.order_status, ''))) = 'CANCELLED' THEN 0
+              WHEN scanned_totals.scanned_total > 0 AND (xxod2.price IS NULL OR xxod2.price <> 0) THEN scanned_totals.scanned_total
+              WHEN custom_totals.unit_custom_total > 0 THEN custom_totals.unit_custom_total * xxod2.quantity
+              ELSE COALESCE(xxod2.subtotal, 0)
+            END
+          )
           FROM xxafmc_order_details xxod2
+          LEFT JOIN (
+            SELECT
+              order_number,
+              inventory_item_code,
+              ROUND(SUM(IFNULL(scan_quantity, 0) * IFNULL(item_price, 0)), 2) AS scanned_total
+            FROM order_scan_collection
+            WHERE collection_name = 'S_COLLECTION'
+            GROUP BY order_number, inventory_item_code
+          ) scanned_totals
+            ON scanned_totals.order_number = xxod2.order_id
+            AND scanned_totals.inventory_item_code = xxod2.item_id
+          LEFT JOIN (
+            SELECT
+              cm.order_number,
+              cm.inventory_item_code,
+              ROUND(SUM(
+                IFNULL(cm.pegs, 0) *
+                (
+                  IFNULL(stock_prices.base_peg_price, 0) * (1 + IFNULL(od_price.profit, 0) / 100) +
+                  IFNULL(od_price.food_pr_charges, 0)
+                )
+              ), 2) AS unit_custom_total
+            FROM xxafmc_custom_cocktails_mocktails_details cm
+            JOIN xxafmc_order_details od_price
+              ON od_price.order_id = cm.order_number
+              AND od_price.item_id = cm.inventory_item_code
+            LEFT JOIN (
+              SELECT
+                item_code,
+                MAX(IFNULL(unit_price, 0) / IFNULL(NULLIF(pegs, 0), 1)) AS base_peg_price
+              FROM xxafmc_stock_out
+              WHERE IFNULL(stock_quantity, 0) > 0
+              GROUP BY item_code
+            ) stock_prices
+              ON stock_prices.item_code = cm.item_code
+            GROUP BY cm.order_number, cm.inventory_item_code
+          ) custom_totals
+            ON custom_totals.order_number = xxod2.order_id
+            AND custom_totals.inventory_item_code = xxod2.item_id
           WHERE xxod2.order_id = xxoh.order_num
+            AND TRIM(UPPER(IFNULL(xxod2.order_status, ''))) != 'CANCELLED'
         ), 0) AS subtotal
         FROM xxafmc_order_header xxoh
         JOIN xxafmc_order_details xxod
