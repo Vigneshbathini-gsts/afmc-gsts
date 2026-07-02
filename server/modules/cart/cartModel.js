@@ -125,7 +125,7 @@ const getCartIngredientConsumption = async (conn, userId, ingredientCode) => {
   return Number(rows[0]?.total_qty || 0);
 };
 
-const getCartIngredientConsumptionMap = async (conn, userId, ingredientCodes) => {
+const getCartIngredientConsumptionMap = async (conn, userId, ingredientCodes, excludeCartId = null) => {
   const normalizedCodes = [...new Set((Array.isArray(ingredientCodes) ? ingredientCodes : [])
     .map((code) => Number(code))
     .filter((code) => Number.isFinite(code) && code > 0))];
@@ -133,6 +133,12 @@ const getCartIngredientConsumptionMap = async (conn, userId, ingredientCodes) =>
   if (normalizedCodes.length === 0) return {};
 
   const placeholders = normalizedCodes.map(() => "?").join(",");
+  const params = [userId, ...normalizedCodes];
+  let excludeSql = "";
+  if (excludeCartId != null && !Number.isNaN(Number(excludeCartId))) {
+    excludeSql = " AND c.cart_id <> ?";
+    params.push(Number(excludeCartId));
+  }
 
   const [rows] = await conn.execute(
     `SELECT cc.ingredient_item_code AS item_code, IFNULL(SUM(cc.quantity * c.quantity), 0) AS total_qty
@@ -141,15 +147,66 @@ const getCartIngredientConsumptionMap = async (conn, userId, ingredientCodes) =>
        ON cc.cart_id = c.cart_id
      WHERE c.user_id = ?
        AND cc.ingredient_item_code IN (${placeholders})
-       AND c.price != 0
+       AND c.price != 0${excludeSql}
      GROUP BY cc.ingredient_item_code`,
-    [userId, ...normalizedCodes]
+    params
   );
 
   return rows.reduce((map, row) => {
     map[String(row.item_code)] = Number(row.total_qty || 0);
     return map;
   }, {});
+};
+
+const getCartConsumptionMap = async (conn, userId, itemCodes, excludeCartId = null) => {
+  const normalizedCodes = [...new Set((Array.isArray(itemCodes) ? itemCodes : [])
+    .map((code) => Number(code))
+    .filter((code) => Number.isFinite(code) && code > 0))];
+
+  if (normalizedCodes.length === 0) return {};
+
+  const placeholders = normalizedCodes.map(() => "?").join(",");
+  const params = [userId, ...normalizedCodes];
+  let excludeSql = "";
+  let excludeSqlForIngredient = "";
+  if (excludeCartId != null && !Number.isNaN(Number(excludeCartId))) {
+    excludeSql = " AND cart_id <> ?";
+    excludeSqlForIngredient = " AND c.cart_id <> ?";
+    params.push(Number(excludeCartId));
+  }
+
+  const [directRows] = await conn.execute(
+    `SELECT item_id AS item_code, IFNULL(SUM(quantity), 0) AS total_qty
+     FROM xxafmc_cart_items
+     WHERE user_id = ?
+       AND item_id IN (${placeholders})
+       AND price != 0${excludeSql}
+     GROUP BY item_id`,
+    params
+  );
+
+  const [ingredientRows] = await conn.execute(
+    `SELECT cc.ingredient_item_code AS item_code, IFNULL(SUM(cc.quantity * c.quantity), 0) AS total_qty
+     FROM ${CUSTOMIZATION_TABLE} cc
+     INNER JOIN xxafmc_cart_items c
+       ON cc.cart_id = c.cart_id
+     WHERE c.user_id = ?
+       AND cc.ingredient_item_code IN (${placeholders})
+       AND c.price != 0${excludeSqlForIngredient}
+     GROUP BY cc.ingredient_item_code`,
+    params
+  );
+
+  const map = {};
+  for (const row of directRows) {
+    map[String(row.item_code)] = Number(row.total_qty || 0);
+  }
+  for (const row of ingredientRows) {
+    const key = String(row.item_code);
+    map[key] = Number(map[key] || 0) + Number(row.total_qty || 0);
+  }
+
+  return map;
 };
 
 const isCocktailOrMocktailInfo = (itemInfo) =>
@@ -244,12 +301,15 @@ const getDefaultCocktailIngredientRows = async (
   return await enrichIngredientsWithStock(conn, baseIngredients, cartQuantity);
 };
 
-const validateCustomizationStock = async (conn, ingredients, cartQuantity = 1) => {
+const validateCustomizationStock = async (conn, ingredients, cartQuantity = 1, userId = null, excludeCartId = null) => {
   const ingredientCodes = [...new Set((Array.isArray(ingredients) ? ingredients : [])
     .map((ingredient) => Number(ingredient?.itemCode))
     .filter((code) => Number.isFinite(code) && code > 0))];
   const stockMap = await getIngredientStockQuantities(conn, ingredientCodes);
   const reservedMap = await getIngredientReservedQuantities(conn, ingredientCodes);
+  const consumptionMap = userId
+    ? await getCartConsumptionMap(conn, userId, ingredientCodes, excludeCartId)
+    : {};
 
   for (const ingredient of ingredients) {
     const itemCode = Number(ingredient.itemCode);
@@ -258,9 +318,10 @@ const validateCustomizationStock = async (conn, ingredients, cartQuantity = 1) =
 
     const stockQty = Number(stockMap[String(itemCode)] || 0);
     const reservedQty = Number(reservedMap[String(itemCode)] || 0);
+    const consumedQty = Number(consumptionMap[String(itemCode)] || 0);
+    const availableQty = Math.max(0, stockQty - reservedQty - consumedQty);
 
-    if (requiredQty + reservedQty > stockQty) {
-      const availableQty = Math.max(0, stockQty - reservedQty);
+    if (requiredQty > availableQty) {
       const ingredientName = ingredient.itemName || itemCode || "ingredient";
       const parentSuffix = ingredient.parentItemName ? ` for ${ingredient.parentItemName}` : "";
       throw createValidationError(
@@ -533,7 +594,7 @@ const updateCartCustomization = async (cartId, userId, updates) => {
       throw createValidationError("At least one valid ingredient is required");
     }
 
-    await validateCustomizationStock(conn, ingredients, cartQuantity);
+    await validateCustomizationStock(conn, ingredients, cartQuantity, userId, cartId);
     // console.log("validateCustomizationStock", validateCustomizationStock)
     // console.log("ingredients", ingredients);
 
@@ -1086,7 +1147,7 @@ const updateCartItemQuantity = async (cartId, userId, quantity) => {
   }));
 
   if (ingredientsWithParentName.length > 0) {
-    await validateCustomizationStock(conn, ingredientsWithParentName, quantity);
+    await validateCustomizationStock(conn, ingredientsWithParentName, quantity, userId, cartId);
   }
 }
 
@@ -1423,7 +1484,7 @@ const getReservedQuantitiesForOrder = async (connection, itemCodes, excludeOrder
   }, {});
 };
 
-const getIngredientStockMap = async (itemCodes, excludeOrderNumber = null) => {
+const getIngredientStockMap = async (itemCodes, excludeOrderNumber = null, userId = null, excludeCartId = null) => {
   let connection;
 
   const normalizedCodes = [...new Set((Array.isArray(itemCodes) ? itemCodes : [])
@@ -1477,8 +1538,21 @@ const getIngredientStockMap = async (itemCodes, excludeOrderNumber = null) => {
 
     const [rows] = await connection.query(query, [...excludedReservedParams, ...normalizedCodes]);
 
-    return rows.reduce((acc, row) => {
+    const baseStock = rows.reduce((acc, row) => {
       acc[String(row.itemCode)] = Number(row.stockQuantity || 0);
+      return acc;
+    }, {});
+
+    if (!userId) {
+      return baseStock;
+    }
+
+    const cartConsumptionMap = await getCartConsumptionMap(connection, userId, normalizedCodes, excludeCartId);
+
+    return normalizedCodes.reduce((acc, code) => {
+      const key = String(code);
+      const consumed = Number(cartConsumptionMap[key] || 0);
+      acc[key] = Math.max(0, Number(baseStock[key] || 0) - consumed);
       return acc;
     }, {});
   } catch (error) {

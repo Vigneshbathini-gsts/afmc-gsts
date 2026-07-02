@@ -245,13 +245,14 @@ export const cartAPI = {
   // When editing an existing buy-flow order, pass the current order number so the backend
   // can exclude that order from reserved stock calculations.
   // Backwards compatible with legacy `excludeOrderNumber` param.
-  getIngredientStocks: (codes, orderNumber, buyOrderNumber) =>
+  getIngredientStocks: (codes, orderNumber, buyOrderNumber, excludeCartId) =>
     api.get("/cart/ingredient-stocks", {
       params: {
         codes: Array.isArray(codes) ? codes.join(",") : codes,
         orderNumber: orderNumber || undefined,
         buyOrderNumber: buyOrderNumber || undefined,
         excludeOrderNumber: orderNumber || buyOrderNumber || undefined,
+        excludeCartId: excludeCartId || undefined,
       },
     }),
   updateQuantity: (cartId, quantity) => api.patch(`/cart/${cartId}`, { quantity }),

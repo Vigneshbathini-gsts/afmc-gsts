@@ -1084,7 +1084,17 @@ exports.getIngredientStocks = async (req, res) => {
       ? Number(rawExcludeOrderNumber)
       : null;
 
-    const data = await cartModel.getIngredientStockMap(codes, excludeOrderNumber);
+    const rawExcludeCartId = String(req.query?.excludeCartId || "").trim();
+    const excludeCartId = Number.isFinite(Number(rawExcludeCartId)) && Number(rawExcludeCartId) > 0
+      ? Number(rawExcludeCartId)
+      : null;
+
+    const data = await cartModel.getIngredientStockMap(
+      codes,
+      excludeOrderNumber,
+      req.user?.userId,
+      excludeCartId
+    );
     return res.status(200).json({ success: true, data });
   } catch (error) {
     console.error("Error fetching ingredient stocks:", error);

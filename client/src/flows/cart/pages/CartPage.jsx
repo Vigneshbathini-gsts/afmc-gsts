@@ -190,9 +190,8 @@ export default function CartPage({ isAttendant = false }) {
                 if (ingredients.length > 0) {
                     try {
                         const codes = [...new Set(ingredients.map((ing) => ing.itemCode))];
-                        const stockRes = await cartAPI.getIngredientStocks(codes);
+                        const stockRes = await cartAPI.getIngredientStocks(codes, undefined, undefined, cartId);
                         const stockMap = stockRes?.data?.data || {};
-
                         for (const ing of ingredients) {
                             const rawAvailable = stockMap?.[String(ing.itemCode)];
                             if (rawAvailable === undefined || rawAvailable === null || rawAvailable === "") continue;
