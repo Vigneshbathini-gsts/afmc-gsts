@@ -89,6 +89,69 @@ const getCartQuantity = async (conn, userId, itemCode, priceZero = false, parent
   return Number(rows[0]?.qty || 0);
 };
 
+const getCartQuantityExcludingCartId = async (conn, userId, itemCode, priceZero = false, excludeCartId = null) => {
+  const priceCondition = priceZero ? "= 0" : "!= 0";
+  let query = `SELECT IFNULL(SUM(quantity), 0) AS qty
+     FROM xxafmc_cart_items
+     WHERE user_id = ?
+       AND item_id = ?
+       AND price ${priceCondition}`;
+  const params = [userId, itemCode];
+
+  if (excludeCartId != null && !Number.isNaN(Number(excludeCartId))) {
+    query += " AND cart_id <> ?";
+    params.push(Number(excludeCartId));
+  }
+
+  const [rows] = await conn.execute(query, params);
+  return Number(rows[0]?.qty || 0);
+};
+
+const getCartIngredientConsumption = async (conn, userId, ingredientCode) => {
+  const normalizedCode = Number(ingredientCode);
+  if (!Number.isFinite(normalizedCode) || normalizedCode <= 0) return 0;
+
+  const [rows] = await conn.execute(
+    `SELECT IFNULL(SUM(cc.quantity * c.quantity), 0) AS total_qty
+     FROM ${CUSTOMIZATION_TABLE} cc
+     INNER JOIN xxafmc_cart_items c
+       ON cc.cart_id = c.cart_id
+     WHERE c.user_id = ?
+       AND cc.ingredient_item_code = ?
+       AND c.price != 0`,
+    [userId, normalizedCode]
+  );
+
+  return Number(rows[0]?.total_qty || 0);
+};
+
+const getCartIngredientConsumptionMap = async (conn, userId, ingredientCodes) => {
+  const normalizedCodes = [...new Set((Array.isArray(ingredientCodes) ? ingredientCodes : [])
+    .map((code) => Number(code))
+    .filter((code) => Number.isFinite(code) && code > 0))];
+
+  if (normalizedCodes.length === 0) return {};
+
+  const placeholders = normalizedCodes.map(() => "?").join(",");
+
+  const [rows] = await conn.execute(
+    `SELECT cc.ingredient_item_code AS item_code, IFNULL(SUM(cc.quantity * c.quantity), 0) AS total_qty
+     FROM ${CUSTOMIZATION_TABLE} cc
+     INNER JOIN xxafmc_cart_items c
+       ON cc.cart_id = c.cart_id
+     WHERE c.user_id = ?
+       AND cc.ingredient_item_code IN (${placeholders})
+       AND c.price != 0
+     GROUP BY cc.ingredient_item_code`,
+    [userId, ...normalizedCodes]
+  );
+
+  return rows.reduce((map, row) => {
+    map[String(row.item_code)] = Number(row.total_qty || 0);
+    return map;
+  }, {});
+};
+
 const isCocktailOrMocktailInfo = (itemInfo) =>
   (Number(itemInfo?.category_id) === 10 && [14, 15].includes(Number(itemInfo?.sub_category))) ||
   Number(itemInfo?.has_recipe || 0) > 0;
@@ -575,6 +638,7 @@ const addCartItem = async (userId, itemData) => {
     // -------------------------------
     const reservedQty = await getOrderReservedQuantity(conn, resolvedItemCode);
     const existingCartQty = isCocktailOrMocktail ? 0 : await getCartQuantity(conn, userId, resolvedItemCode, false);
+    const ingredientConsumptionQty = isCocktailOrMocktail ? 0 : await getCartIngredientConsumption(conn, userId, resolvedItemCode);
 
     let stockQty;
     if (!isCocktailOrMocktail) {
@@ -592,8 +656,8 @@ const addCartItem = async (userId, itemData) => {
 
     // For cocktails/mocktails, allow adding to cart even if ingredients are out of stock.
     // Users can adjust ingredients later via the cart edit flow, and stock will be validated at purchase time.
-    if (!isCocktailOrMocktail && existingCartQty + quantity + reservedQty > stockQty) {
-      const availableQty = Math.max(0, stockQty - reservedQty - existingCartQty);
+    if (!isCocktailOrMocktail && existingCartQty + quantity + reservedQty + ingredientConsumptionQty > stockQty) {
+      const availableQty = Math.max(0, stockQty - reservedQty - existingCartQty - ingredientConsumptionQty);
       throw createValidationError(`Out of stock. Available quantity: ${availableQty}`);
     }
 
@@ -831,6 +895,7 @@ const getCartItemsByUser = async (userId) => {
   )];
 
   const reservedMap = await getReservedTotalsQuantities(db, itemCodes);
+  const ingredientConsumptionMap = await getCartIngredientConsumptionMap(db, userId, itemCodes);
 
   const cocktailCartIds = rows
     .filter((row) => isCocktailOrMocktailInfo({
@@ -910,7 +975,10 @@ const getCartItemsByUser = async (userId) => {
       ? stockOutStock
       : Math.max(inventoryStock, stockOutStock);
     const reservedQty = Number(reservedMap.get(String(row.item_code)) || 0);
-    const availableQuantity = isCocktailItem ? null : Math.max(0, effectiveStockQty - reservedQty);
+    const ingredientConsumptionQty = Number(ingredientConsumptionMap[String(row.item_id)] || 0);
+    const availableQuantity = isCocktailItem
+      ? null
+      : Math.max(0, effectiveStockQty - reservedQty - ingredientConsumptionQty);
 
     const stockStatus = isCocktailItem
       ? (cocktailStatusMap.get(Number(row.cart_id)) || "Unknown")
@@ -993,9 +1061,11 @@ const updateCartItemQuantity = async (cartId, userId, quantity) => {
     if (!isCocktailOrMocktail) {
       const stockQty = await getStockQuantity(conn, itemId, current[0].category_id);
       const reservedQty = await getOrderReservedQuantity(conn, itemId);
+      const otherDirectQty = await getCartQuantityExcludingCartId(conn, userId, itemId, false, cartId);
+      const ingredientConsumptionQty = await getCartIngredientConsumption(conn, userId, itemId);
 
-      if (quantity + reservedQty > stockQty) {
-        const availableQty = Math.max(0, stockQty - reservedQty);
+      if (quantity + otherDirectQty + reservedQty + ingredientConsumptionQty > stockQty) {
+        const availableQty = Math.max(0, stockQty - reservedQty - otherDirectQty - ingredientConsumptionQty);
         throw createValidationError(`Out of stock. Available quantity: ${availableQty}`);
       }
     }

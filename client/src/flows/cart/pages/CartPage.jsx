@@ -69,6 +69,8 @@ export default function CartPage({ isAttendant = false }) {
     const [proceedConfirmOpen, setProceedConfirmOpen] = useState(false);
     const [stockLimitImageMessages, setStockLimitImageMessages] = useState({});
 
+
+
     const userId = user?.userId;
 
     const showToast = useCallback((message, type = 'success') => {
@@ -117,6 +119,7 @@ export default function CartPage({ isAttendant = false }) {
         try {
             const response = await cartAPI.getByUserId(userId);
             const items = response.data.data || [];
+            console.log("Fetched cart items:", items);
             setCartItems(items);
             setCartCount(items.length);
             // Pre-fetch cocktail details for cocktail/mocktail items
@@ -285,10 +288,67 @@ export default function CartPage({ isAttendant = false }) {
     }, [cartItems.length]);
 
     const handleProceedConfirm = useCallback(() => {
+
         const proceed = async () => {
             try {
                 setLoading(true);
                 setError(null);
+
+                // Normal items
+                const stockConsumption = new Map();
+                cartItems.forEach(item => {
+                    if (!isCocktailOrMocktail(item)) {
+                        const itemCode = item.itemId;
+                        stockConsumption.set(
+                            itemCode,
+                            (stockConsumption.get(itemCode) || 0) + item.quantity
+                        );
+                    }
+                });
+
+                // Mocktail ingredients
+                for (const item of cartItems) {
+                    if (isCocktailOrMocktail(item)) {
+                        const details = cocktailDetailsByCartId[item.cartId] || [];
+
+                        details.forEach((ing) => {
+                            const itemCode = Number(ing.ITEM_CODE ?? ing.itemCode);
+                            const pegs = Number(ing.PEGS ?? ing.pegs ?? 0);
+
+                            if (!itemCode || !pegs) return;
+
+                            const required = pegs * item.quantity;
+
+                            stockConsumption.set(
+                                itemCode,
+                                (stockConsumption.get(itemCode) || 0) + required
+                            );
+                        });
+                    }
+                }
+
+                const codes = [...stockConsumption.keys()].filter(
+                    (code) => Number.isFinite(Number(code)) && Number(code) > 0
+                );
+
+                if (codes.length === 0) {
+                    console.log(stockConsumption);
+                    throw new Error("No valid ingredient codes found.");
+                }
+
+                console.log("stockConsumption", [...stockConsumption.entries()]);
+
+                const stocks = await cartAPI.getIngredientStocks(codes);
+
+                for (const [itemCode, required] of stockConsumption) {
+                    const available = Number(stocks.data.data[itemCode] || 0);
+
+                    if (required > available) {
+                        toast.error(`Insufficient stock for item ${itemCode}`);
+                        return;
+                    }
+                }
+
                 const selectedPubmed = sessionStorage.getItem("afmc:selectedPubmed") || "";
                 const response = await cartAPI.confirmOrder({
                     ...(selectedPubmed ? { pubmed: selectedPubmed } : {}),
@@ -303,15 +363,15 @@ export default function CartPage({ isAttendant = false }) {
                     clearSelectedAttendantCustomer();
                 }
 
-                 setProceedConfirmOpen(false);
-                 const basePath = isAttendant ? "/attendant" : "/user";
+                setProceedConfirmOpen(false);
+                const basePath = isAttendant ? "/attendant" : "/user";
                 navigate(`${basePath}/cart/buy?orderNumber=${encodeURIComponent(orderNumber)}`, {
                     state: { orderNumber },
                 });
-             } catch (err) {
-                 setProceedConfirmOpen(false);
-                 const msg = err?.response?.data?.message || err?.message || "Unable to create order.";
-                 setError(msg);
+            } catch (err) {
+                setProceedConfirmOpen(false);
+                const msg = err?.response?.data?.message || err?.message || "Unable to create order.";
+                setError(msg);
                 showToast(msg, "error");
             } finally {
                 setLoading(false);
@@ -372,8 +432,8 @@ export default function CartPage({ isAttendant = false }) {
                         onClick={handleProceedToBuy}
                         disabled={cartItems.length === 0}
                         className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold text-white transition ${cartItems.length === 0
-                                ? "bg-gray-400 cursor-not-allowed"
-                                : "bg-red-700 hover:bg-red-800"
+                            ? "bg-gray-400 cursor-not-allowed"
+                            : "bg-red-700 hover:bg-red-800"
                             }`}
                     >
                         {toInitCap("Proceed to buy")}
@@ -489,50 +549,50 @@ export default function CartPage({ isAttendant = false }) {
                                 </div>
                             </div>
 
-                        {/* Details */}
-                        <div className="flex-1">
-                            <h2 className="text-sm font-semibold text-gray-900 overflow-hidden text-ellipsis whitespace-nowrap">
-                                {toInitCap(item.itemName) || toInitCap("Unnamed Item")}
-                            </h2>
+                            {/* Details */}
+                            <div className="flex-1">
+                                <h2 className="text-sm font-semibold text-gray-900 overflow-hidden text-ellipsis whitespace-nowrap">
+                                    {toInitCap(item.itemName) || toInitCap("Unnamed Item")}
+                                </h2>
 
-                            <p
-                                className={`text-xs mt-1 ${String(stockStatusText || "").toLowerCase() === "out of stock"
-                                    ? "text-red-600"
-                                    : "text-green-600"
-                                    }`}
-                            >
-                                {toInitCap(stockStatusText) || toInitCap("Checking Stock")}
-                            </p>
-                        </div>
+                                <p
+                                    className={`text-xs mt-1 ${String(stockStatusText || "").toLowerCase() === "out of stock"
+                                        ? "text-red-600"
+                                        : "text-green-600"
+                                        }`}
+                                >
+                                    {toInitCap(stockStatusText) || toInitCap("Checking Stock")}
+                                </p>
+                            </div>
 
-                        {/* Quantity Controls */}
-                        <div className="mt-2 flex items-center justify-between gap-2 border-t border-gray-100 pt-2">
-                            {!item.isFreeItem ? (
-                                <div className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 px-2 py-1">
-                                    <button
-                                        onClick={() => handleQuantityUpdate(item.cartId, Math.max(1, (item.quantity || 1) - 1))}
-                                        className="rounded-full bg-white px-2 text-xs font-semibold text-gray-700 shadow-sm hover:bg-gray-100 disabled:opacity-50"
-                                        disabled={updatingItemId === item.cartId || item.quantity <= 1}
-                                    >
-                                        <Minus size={12} />
-                                    </button>
-                                    <span className="min-w-[28px] text-center text-xs font-semibold">
-                                        {item.quantity || 1}
-                                    </span>
-                                    <button
-                                        onClick={() => handleQuantityUpdate(item.cartId, (item.quantity || 1) + 1)}
-                                        className="rounded-full bg-white px-2 text-xs font-semibold text-gray-700 shadow-sm hover:bg-gray-100 disabled:opacity-50"
-                                        disabled={updatingItemId === item.cartId}
-                                    >
-                                        <Plus size={12} />
-                                    </button>
-                                </div>
-                            ) : (
-                                <div className="text-xs text-gray-600">
-                                    {toInitCap("Qty")}: {item.quantity || 1} ({toInitCap("Free")})
-                                </div>
-                            )}
-                        </div>
+                            {/* Quantity Controls */}
+                            <div className="mt-2 flex items-center justify-between gap-2 border-t border-gray-100 pt-2">
+                                {!item.isFreeItem ? (
+                                    <div className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 px-2 py-1">
+                                        <button
+                                            onClick={() => handleQuantityUpdate(item.cartId, Math.max(1, (item.quantity || 1) - 1))}
+                                            className="rounded-full bg-white px-2 text-xs font-semibold text-gray-700 shadow-sm hover:bg-gray-100 disabled:opacity-50"
+                                            disabled={updatingItemId === item.cartId || item.quantity <= 1}
+                                        >
+                                            <Minus size={12} />
+                                        </button>
+                                        <span className="min-w-[28px] text-center text-xs font-semibold">
+                                            {item.quantity || 1}
+                                        </span>
+                                        <button
+                                            onClick={() => handleQuantityUpdate(item.cartId, (item.quantity || 1) + 1)}
+                                            className="rounded-full bg-white px-2 text-xs font-semibold text-gray-700 shadow-sm hover:bg-gray-100 disabled:opacity-50"
+                                            disabled={updatingItemId === item.cartId}
+                                        >
+                                            <Plus size={12} />
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="text-xs text-gray-600">
+                                        {toInitCap("Qty")}: {item.quantity || 1} ({toInitCap("Free")})
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     );
                 })}
