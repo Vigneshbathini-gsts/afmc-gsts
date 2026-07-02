@@ -1,18 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FaArrowLeft, FaChevronDown, FaSearch, FaPen, FaTrash, FaCamera } from "react-icons/fa";
+import { FaArrowLeft, FaChevronDown, FaSearch, FaPen } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
-import BarcodeScanner from "../../components/common/BarcodeScanner";
 import { inventoryAPI } from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
 import { toast } from "react-toastify";
+import AddStockModal from "./AddStockModal";
 
 
-const requiresVolume = (acUnit) => String(acUnit || "").trim().toUpperCase() !== "NOS";
 const INVENTORY_PAGE_SIZE = 20;
-const STOCK_TYPE_OPTIONS = ["Purchased", "Free"];
 const INVENTORY_IMAGE_BASE_URL = "https://afmc.globalsparkteksolutions.com/AFMCIMAGES/";
 
-const isValidBarcode = (value) => /^\d{4,15}$/.test(String(value || "").trim());
 const JPG_IMAGE_ERROR = "Only JPG image files are allowed.";
 const isJpgImageFile = (file) => {
   if (!file) return true;
@@ -31,7 +28,7 @@ const getServingVolume = (subCategoryId, acUnit) => {
   const unit = String(acUnit || "").trim().toLowerCase();
 
   if (sub === 6 && unit === "glass") return "200";
-  if (sub === 9 && unit === "glass") return "250";
+  // if (sub === 9 && unit === "glass") return "250";
   return "";
 };
 
@@ -43,24 +40,24 @@ const getAllowedAcUnits = (categoryId, subCategoryId) => {
   const allowed = new Set();
 
   if (cat === 10) {
-    if ([2, 4, 5, 8, 11, 12, 16, 17].includes(sub)) allowed.add("Pegs");
-    if ([1, 3, 1310].includes(sub)) allowed.add("Nos");
-    if ([1].includes(sub)) {
+    if ([2, 4, 5, 8, 11, 12, 16, 17].includes(sub)) {
+      allowed.add("Pegs");
+    }
+
+    if ([1, 3, 1310, 6, 9].includes(sub)) {
+      allowed.add("Nos");
+    }
+
+    if (sub === 1) {
       allowed.add("Can");
-      allowed.add("Mug");
-    }
-    if ([6].includes(sub)) {
       allowed.add("Glass");
-      allowed.add("Nos");
-    }
-    if ([9].includes(sub)) {
-      allowed.add("glass");
-      allowed.add("Nos");
     }
   }
 
   if (cat === 14) {
-    if ([7, 10].includes(sub)) allowed.add("Nos");
+    if ([7, 10].includes(sub)) {
+      allowed.add("Nos");
+    }
   }
 
   return Array.from(allowed);
@@ -90,6 +87,7 @@ export default function Inventory() {
   const [subCategories, setSubCategories] = useState([]);
   const [items, setItems] = useState([]);
   const [inventory, setInventory] = useState([]);
+  console.log("inventory",inventory);
   const [categoryId, setCategoryId] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
@@ -104,13 +102,15 @@ export default function Inventory() {
   const [error, setError] = useState("");
   const [addItemError, setAddItemError] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
-  const [showLowerSection, setShowLowerSection] = useState(false);
   const [showStockModal, setShowStockModal] = useState(false);
+  const [selectedStockItem, setSelectedStockItem] = useState(null);
   const [showImageModal, setShowImageModal] = useState(false);
   const [isAddCategoryDropdownOpen, setIsAddCategoryDropdownOpen] = useState(false);
   const [subCategoryFilter, setSubCategoryFilter] = useState("");
   const [isSubCategoryDropdownOpen, setIsSubCategoryDropdownOpen] = useState(false);
+  console.log("setIsSubCategoryDropdownOpen",isSubCategoryDropdownOpen)
   const [isAcUnitDropdownOpen, setIsAcUnitDropdownOpen] = useState(false);
+  console.log("setIsAcUnitDropdownOpen", isAcUnitDropdownOpen);
   const [formValues, setFormValues] = useState({
     itemName: "",
     description: "",
@@ -120,36 +120,18 @@ export default function Inventory() {
     prepCharges: "",
     image: null,
   });
+  console.log("setFormValues",formValues)
   const [saving, setSaving] = useState(false);
-  const [stockSaving, setStockSaving] = useState(false);
-  const [stockError, setStockError] = useState("");
-  const [stockInfo, setStockInfo] = useState("");
   const [imageSaving, setImageSaving] = useState(false);
   const [imageError, setImageError] = useState("");
   const [imagePreviewUrl, setImagePreviewUrl] = useState("");
   const [imageCacheBusters, setImageCacheBusters] = useState({});
-  const [scannerOpen, setScannerOpen] = useState(false);
   const [imageForm, setImageForm] = useState({
     itemCode: "",
     itemName: "",
     image: null,
     currentImage: "",
   });
-  const [stockForm, setStockForm] = useState({
-    itemCode: "",
-    itemName: "",
-    transactionDate: "",
-    acUnit: "",
-    rate: "",
-    quantity: 1,
-    volume: "",
-    barcode: "",
-    batchId: "",
-    stockType: "Purchased",
-    prepCharges: "",
-  });
-  const [stockRows, setStockRows] = useState([]);
-  const [stockRowSearch, setStockRowSearch] = useState("");
   const [inventorySearchInput, setInventorySearchInput] = useState("");
   const categoryDropdownRef = useRef(null);
   const itemDropdownRef = useRef(null);
@@ -428,12 +410,9 @@ export default function Inventory() {
     [formValues.subCategory, subCategories]
   );
 
-  const allAcUnitOptions = useMemo(() => ["Nos", "Pegs", "Glass", "Mug", "Can"], []);
-
   const acUnitOptions = useMemo(() => {
-    const allowed = getAllowedAcUnits(formValues.categoryId, formValues.subCategory);
-    return allowed.length === 0 ? allAcUnitOptions : allowed;
-  }, [allAcUnitOptions, formValues.categoryId, formValues.subCategory]);
+    return getAllowedAcUnits(formValues.categoryId, formValues.subCategory);
+  }, [formValues.categoryId, formValues.subCategory]);
 
   useEffect(() => {
     const allowed = getAllowedAcUnits(formValues.categoryId, formValues.subCategory);
@@ -446,21 +425,6 @@ export default function Inventory() {
       setFormValues((prev) => ({ ...prev, acUnit: allowed[0] }));
     }
   }, [formValues.categoryId, formValues.subCategory, formValues.acUnit]);
-
-  const formatDate = (date) => {
-    const d = date instanceof Date ? date : new Date(date);
-    const mm = String(d.getMonth() + 1).padStart(2, "0");
-    const dd = String(d.getDate()).padStart(2, "0");
-    const yyyy = d.getFullYear();
-    return `${yyyy}-${mm}-${dd}`;
-  };
-
-  const formatDisplayDate = (value) => {
-    if (!value) return "";
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) return String(value);
-    return `${parsed.getMonth() + 1}/${parsed.getDate()}/${parsed.getFullYear()}`;
-  };
 
   const openAddModal = () => {
     setAddItemError("");
@@ -547,33 +511,13 @@ export default function Inventory() {
   };
 
   const openStockModal = (row) => {
-    setStockError("");
-    setStockInfo("");
-    setStockRows([]);
-    setShowLowerSection(false);
-    setStockRowSearch("");
-    setStockForm({
-      itemCode: row.item_code,
-      itemName: row.item_name,
-      transactionDate: formatDate(new Date()),
-      acUnit: row.ac_unit || "Nos",
-      rate: "",
-      quantity: 1,
-      volume: "",
-      barcode: "",
-      batchId: "",
-      stockType: "Purchased",
-      prepCharges: "",
-    });
+    setSelectedStockItem(row);
     setShowStockModal(true);
   };
 
   const closeStockModal = () => {
     setShowStockModal(false);
-    setStockError("");
-    setStockInfo("");
-    setStockRows([]);
-    setStockRowSearch("");
+    setSelectedStockItem(null);
   };
 
   const openImageModal = (row) => {
@@ -595,192 +539,6 @@ export default function Inventory() {
     });
     setShowImageModal(true);
   };
-
-  const stageStockRow = useCallback(async (barcodeValue = stockForm.barcode) => {
-    const normalizedBarcode = String(barcodeValue || "").trim();
-
-    if (!stockForm.itemCode || !stockForm.rate || !normalizedBarcode || !stockForm.transactionDate) {
-      setStockError("Item code, barcode, rate, and transaction date are required.");
-      return;
-    }
-
-    if (!Number.isFinite(Number(stockForm.rate)) || Number(stockForm.rate) <= 0) {
-      setStockError("Unit selling rate must be greater than 0.");
-      return;
-    }
-
-    if (!Number.isInteger(Number(stockForm.quantity)) || Number(stockForm.quantity) <= 0) {
-      setStockError("Quantity must be a whole number greater than 0.");
-      return;
-    }
-
-    if (!stockForm.stockType) {
-      setStockError("Type is required.");
-      return;
-    }
-
-    if (!isValidBarcode(normalizedBarcode)) {
-      setStockError("Barcode must be 4 to 15 digits.");
-      return;
-    }
-
-    if (requiresVolume(stockForm.acUnit) && !String(stockForm.volume || "").trim()) {
-      setStockError("Volume is required for the selected type.");
-      return;
-    }
-
-    if (stockRows.some((row) => row.barcode === normalizedBarcode)) {
-      setStockError("This barcode is already staged.");
-      return;
-    }
-
-    setStockError("");
-    setStockInfo("");
-
-    try {
-      const response = await inventoryAPI.checkBarcodeExists(normalizedBarcode);
-      if (response.data?.exists) {
-        setStockError("This barcode already exists.");
-        return;
-      }
-    } catch (err) {
-      console.error("Failed to verify barcode:", err);
-      setStockError("Unable to verify barcode uniqueness.");
-      return;
-    }
-
-    setStockRows((current) => [
-      ...current,
-      {
-        itemCode: stockForm.itemCode,
-        itemName: stockForm.itemName,
-        quantity: 1,
-        barcode: normalizedBarcode,
-        batchName: `${stockForm.itemName}-1-${stockForm.volume || ""}-${formatDisplayDate(
-          stockForm.transactionDate
-        )}`,
-        rate: stockForm.rate,
-        transactionDate: stockForm.transactionDate,
-        displayTransactionDate: formatDisplayDate(stockForm.transactionDate),
-        volume: stockForm.volume,
-        acUnit: stockForm.acUnit,
-        stockType: stockForm.stockType,
-        prepCharges: stockForm.prepCharges,
-      },
-    ]);
-
-    setShowLowerSection(true);
-    setStockInfo("Stock row staged.");
-
-    setStockForm((prev) => ({
-      ...prev,
-      barcode: "",
-    }));
-  }, [stockForm, stockRows, setShowLowerSection]);
-
-  const handleStageStock = async () => {
-    await stageStockRow(stockForm.barcode);
-  };
-
-  const handleScannerClose = useCallback(() => {
-    setScannerOpen(false);
-  }, []);
-
-  const handleScan = useCallback(
-    async (scannedValue) => {
-      const normalizedBarcode = String(scannedValue || "").trim();
-      setScannerOpen(false);
-      setStockForm((prev) => ({ ...prev, barcode: normalizedBarcode }));
-      if (stockForm.itemCode && stockForm.rate && stockForm.transactionDate) {
-        await stageStockRow(normalizedBarcode);
-      } else {
-        setStockInfo("Scanned. Enter rate/date and click Add Stock to stage.");
-      }
-    },
-    [stageStockRow, stockForm.itemCode, stockForm.rate, stockForm.transactionDate]
-  );
-
-  const handleDeleteStockRow = (barcode) => {
-    setStockRows((current) => current.filter((row) => row.barcode !== barcode));
-  };
-
-  const handleCancelStockRows = () => {
-    setStockRows([]);
-    setShowLowerSection(false);
-    setStockRowSearch("");
-    setStockError("");
-  };
-
-  const handleStockPrepChargesChange = (value) => {
-    setStockForm((prev) => ({ ...prev, prepCharges: value }));
-    setStockRows((current) =>
-      current.map((row) => ({
-        ...row,
-        prepCharges: row.prepCharges || value,
-      }))
-    );
-  };
-
-  const handleAddStock = async () => {
-    if (stockRows.length === 0) {
-      const validationMessage = "Add at least one stock row before saving.";
-      setStockError(validationMessage);
-      toast.error(validationMessage);
-      return;
-    }
-
-    if (!stockForm.prepCharges && stockRows.some((row) => !row.prepCharges)) {
-      toast.error("Preparation charges selection is required.");
-      return;
-    }
-
-    setStockSaving(true);
-    setStockError("");
-    try {
-      await inventoryAPI.addStock({
-        items: stockRows.map((row) => ({
-          itemCode: row.itemCode,
-          quantity: 1,
-          transactionDate: row.transactionDate,
-          volume: row.volume,
-          barcode: row.barcode,
-          rate: row.rate,
-          prepCharges: row.prepCharges || stockForm.prepCharges,
-          acUnit: row.acUnit,
-          stockType: row.stockType,
-          createdBy: currentLoggedInUser,
-        })),
-      });
-      toast.success("Stock added successfully");
-      closeStockModal();
-      fetchInventory();
-    } catch (err) {
-      const addStockError = err.response?.data?.message || "Failed to add stock.";
-      console.error("Failed to add stock:", err);
-      setStockError(addStockError);
-      toast.error(addStockError);
-    } finally {
-      setStockSaving(false);
-    }
-  };
-
-  const filteredStockRows = useMemo(() => {
-    const query = stockRowSearch.trim().toLowerCase();
-    if (!query) return stockRows;
-    return stockRows.filter((row) =>
-      [
-        row.itemName,
-        row.barcode,
-        row.batchName,
-        row.volume,
-        row.rate,
-        row.stockType,
-        row.displayTransactionDate,
-      ]
-        .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(query))
-    );
-  }, [stockRowSearch, stockRows]);
 
   const handleUpdateImage = async () => {
     if (!imageForm.itemCode || !imageForm.image) {
@@ -1145,7 +903,8 @@ export default function Inventory() {
                         <td className="px-4 py-3 font-medium text-gray-800">
                           {toInitCap(row.item_name)}
                         </td>
-                        <td className="px-4 py-3 text-gray-700">Nos</td>
+                        <td className="px-4 py-3 text-gray-700">{row.
+ac_unit}</td>
                         <td className="px-4 py-3 text-gray-700">{row.stock_quantity}</td>
                       </tr>
                     ))
@@ -1168,292 +927,13 @@ export default function Inventory() {
         </div>
       </div>
 
-      {showStockModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/40 px-4 py-6">
-          <div className="mx-auto w-full max-w-5xl rounded-3xl bg-white shadow-2xl border border-white/70 relative max-h-[calc(100vh-3rem)] overflow-y-auto pt-0 px-8 pb-8">
-            <div className="sticky top-0 z-20 -mx-8 mb-6 flex items-center justify-end border-b border-gray-100 bg-white px-8 py-4 rounded-t-3xl shadow-sm">
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={handleStageStock}
-                  className="px-6 py-2.5 rounded-full bg-afmc-maroon text-white font-semibold shadow-afmc hover:bg-afmc-maroon2 focus:outline-none focus:ring-2 focus:ring-afmc-gold/50 disabled:opacity-70"
-                >
-                  Add
-                </button>
-                <button
-                  type="button"
-                  onClick={closeStockModal}
-                  className="px-6 py-2.5 rounded-full bg-gray-100 text-gray-700 font-semibold hover:bg-gray-200 transition-colors"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-
-            {stockError && (
-              <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
-                {stockError}
-              </div>
-            )}
-
-            {stockInfo && !stockError && (
-              <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
-                {stockInfo}
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Item Name
-                </label>
-                <input
-                  type="text"
-                  value={stockForm.itemName}
-                  readOnly
-                  className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-700"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Transaction Date
-                </label>
-                <input
-                  type="date"
-                  value={stockForm.transactionDate}
-                  onChange={(e) =>
-                    setStockForm((prev) => ({
-                      ...prev,
-                      transactionDate: e.target.value,
-                    }))
-                  }
-                  className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-700"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Type
-                </label>
-                <select
-                  value={stockForm.stockType}
-                  onChange={(e) =>
-                    setStockForm((prev) => ({ ...prev, stockType: e.target.value }))
-                  }
-                  className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-700"
-                >
-                  <option value="">Select type</option>
-                  {STOCK_TYPE_OPTIONS.map((type) => (
-                    <option key={type} value={type}>
-                      {type}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Unit Selling Rate
-                </label>
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  min="0"
-                  step="any"
-                  value={stockForm.rate}
-                  maxLength={12}
-                  onChange={(e) => {
-                    let v = String(e.target.value || "");
-                    v = v.replace(/e/gi, "");
-                    v = v.replace(/[^0-9.]/g, "");
-                    const parts = v.split('.');
-                    if (parts.length > 2) v = parts[0] + '.' + parts.slice(1).join('');
-                    v = v.slice(0, 12);
-                    setStockForm((prev) => ({ ...prev, rate: v }));
-                  }}
-                  className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-700"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Volume
-                </label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  min="0"
-                  value={stockForm.volume}
-                  maxLength={10}
-                  onChange={(e) => {
-                    let v = String(e.target.value || "");
-                    v = v.replace(/[^0-9]/g, "");
-                    v = v.slice(0, 10);
-                    setStockForm((prev) => ({ ...prev, volume: v }));
-                  }}
-                  placeholder="e.g., 750"
-                  className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-700"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Barcode
-                </label>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="text"
-                    value={stockForm.barcode}
-                    inputMode="text"
-                    pattern="[0-9]*"
-                    maxLength={15}
-                    onChange={(e) => {
-                      const v = String(e.target.value || "").slice(0, 15); //slice for maxlength
-                      setStockForm((prev) => ({ ...prev, barcode: v }));
-                    }}
-                    placeholder="Scan or type barcode"
-                    className="min-w-0 flex-1 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-700"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setScannerOpen(true)}
-                    className="inline-flex h-12 w-12 items-center justify-center gap-2 rounded-2xl bg-[#d70652] font-semibold text-white shadow hover:shadow-md md:w-auto md:px-5"
-                    title="Open scanner"
-                    aria-label="Open scanner"
-                  >
-                    <FaCamera />
-                    <span className="hidden md:inline">Scan</span>
-                  </button>
-                </div>
-                <p className="mt-2 text-xs text-gray-500">
-                  Tip: After scanning, the row auto-stages when rate/date are filled.
-                </p>
-              </div>
-
-              <div className="lg:col-span-2 flex items-center gap-6">
-                <span className="text-sm font-medium text-gray-700">
-                  Preparation Charges
-                </span>
-                <label className="flex items-center gap-2 text-sm text-gray-700">
-                  <input
-                    type="radio"
-                    name="stockPrep"
-                    value="N"
-                    checked={stockForm.prepCharges === "N"}
-                    onChange={(e) => handleStockPrepChargesChange(e.target.value)}
-                  />
-                  No
-                </label>
-                <label className="flex items-center gap-2 text-sm text-gray-700">
-                  <input
-                    type="radio"
-                    name="stockPrep"
-                    value="Y"
-                    checked={stockForm.prepCharges === "Y"}
-                    onChange={(e) => handleStockPrepChargesChange(e.target.value)}
-                  />
-                  Yes
-                </label>
-              </div>
-            </div>
-
-            {showLowerSection && (
-              <div className="mt-8 rounded-3xl border border-gray-200 bg-white shadow-sm">
-              <div className="flex flex-wrap items-center justify-between gap-4 p-4">
-                <button
-                  type="button"
-                  onClick={handleCancelStockRows}
-                  className="rounded-full bg-gray-600 px-5 py-2.5 text-white font-semibold"
-                >
-                  Cancel
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleAddStock}
-                  disabled={stockSaving || stockRows.length === 0}
-                  className="inline-flex items-center gap-2 rounded-full bg-afmc-maroon px-5 py-2.5 text-white font-semibold shadow-afmc hover:bg-afmc-maroon2 focus:outline-none focus:ring-2 focus:ring-afmc-gold/50 disabled:opacity-70"
-                >
-                  {stockSaving ? "Saving..." : "Add Stock"}
-                </button>
-              </div>
-
-                <div className="flex items-center gap-3 border-t border-gray-100 px-4 py-3">
-                <FaSearch className="text-gray-400" />
-                <input
-                  type="text"
-                  value={stockRowSearch}
-                  onChange={(e) => setStockRowSearch(e.target.value)}
-                  placeholder="Search staged rows"
-                  maxLength={100}
-                  className="w-40 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 outline-none"
-                />
-                <button
-                  type="button"
-                  className="rounded-xl px-3 py-2 text-sm font-medium text-gray-700"
-                >
-                  Go
-                </button>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50 text-gray-600">
-                    <tr>
-                      <th className="px-4 py-3 text-left font-medium">Item Name</th>
-                      <th className="px-4 py-3 text-left font-medium">Quantity</th>
-                      <th className="px-4 py-3 text-left font-medium">Barcode</th>
-                      <th className="px-4 py-3 text-left font-medium">Batchname</th>
-                      <th className="px-4 py-3 text-left font-medium">Rate</th>
-                      <th className="px-4 py-3 text-left font-medium">Type</th>
-                      <th className="px-4 py-3 text-left font-medium">Transaction Date</th>
-                      <th className="px-4 py-3 text-left font-medium">Volume</th>
-                      <th className="px-4 py-3 text-left font-medium">Delete</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredStockRows.length === 0 ? (
-                      <tr>
-                        <td colSpan="9" className="px-4 py-8 text-center text-gray-500">
-                          No staged stock rows yet.
-                        </td>
-                      </tr>
-                    ) : (
-                      filteredStockRows.map((row) => (
-                        <tr key={row.barcode} className="border-t border-gray-100">
-                          <td className="px-4 py-3">{row.itemName}</td>
-                          <td className="px-4 py-3">{row.quantity}</td>
-                          <td className="px-4 py-3">{row.barcode}</td>
-                          <td className="px-4 py-3">{row.batchName}</td>
-                          <td className="px-4 py-3">{row.rate}</td>
-                          <td className="px-4 py-3">{row.stockType}</td>
-                          <td className="px-4 py-3">{row.displayTransactionDate}</td>
-                          <td className="px-4 py-3">{row.volume}</td>
-                          <td className="px-4 py-3">
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteStockRow(row.barcode)}
-                              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-red-600 hover:bg-red-50"
-                            >
-                              <FaTrash />
-                            </button>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="px-4 py-3 text-right text-sm text-gray-500">
-                {filteredStockRows.length}-{stockRows.length}
-              </div>
-            </div>
-            )}
-          </div>
-        </div>
+      {showStockModal && selectedStockItem && (
+        <AddStockModal
+          item={selectedStockItem}
+          currentLoggedInUser={currentLoggedInUser}
+          onClose={closeStockModal}
+          onStockAdded={fetchInventory}
+        />
       )}
 
       {showAddModal && (
@@ -1541,6 +1021,7 @@ export default function Inventory() {
                                   ...prev,
                                   categoryId: category.category_id,
                                   subCategory: "",
+                                  acUnit: "",
                                 }));
                                 setSubCategoryFilter("");
                                 setIsAddCategoryDropdownOpen(false);
@@ -1601,7 +1082,11 @@ export default function Inventory() {
                           <button
                             type="button"
                             onClick={() => {
-                              setFormValues((prev) => ({ ...prev, subCategory: "" }));
+                              setFormValues((prev) => ({
+                                ...prev,
+                                subCategory: "",
+                                acUnit: "",
+                              }));
                               setSubCategoryFilter("");
                             }}
                             className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
@@ -1625,6 +1110,7 @@ export default function Inventory() {
                                 setFormValues((prev) => ({
                                   ...prev,
                                   subCategory: sub.sub_category_id,
+                                  acUnit: "",
                                 }));
                                 setSubCategoryFilter(toInitCap(sub.sub_category_name) || "");
                                 setIsSubCategoryDropdownOpen(false);
@@ -1680,7 +1166,11 @@ export default function Inventory() {
                     disabled={!formValues.subCategory}
                     className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-left text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20 flex items-center justify-between disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    <span className="truncate">{formValues.acUnit || "Select Unit"}</span>
+                    <span className="truncate">
+                      {formValues.subCategory
+                        ? formValues.acUnit || "Select Unit"
+                        : "Select Sub Category First"}
+                    </span>
                     <FaChevronDown
                       className={`text-gray-400 transition-transform ${isAcUnitDropdownOpen ? "rotate-180" : ""
                         }`}
@@ -1882,7 +1372,6 @@ export default function Inventory() {
           </div>
         </div>
       )}
-       <BarcodeScanner isOpen={scannerOpen} onClose={handleScannerClose} onScan={handleScan} />
     </div>
   );
 }

@@ -34,23 +34,23 @@ const saveSession = (req) =>
   });
 
 async function releaseReservationRows(connection, reservationRows) {
-  console.log("Releasing reservation rows:", reservationRows);
-  
+  // console.log("Releasing reservation rows:", reservationRows);
+
   for (const row of reservationRows) {
     const itemCode = String(row.item_code || "").trim();
     const quantity = Number(row.release_qty || 0);
     if (!itemCode || !Number.isFinite(quantity) || quantity <= 0) {
-      console.log("Skipping invalid row:", { itemCode, quantity });
+      // console.log("Skipping invalid row:", { itemCode, quantity });
       continue;
     }
 
-    console.log(`Releasing ${quantity} units for item code ${itemCode}`);
+    // console.log(`Releasing ${quantity} units for item code ${itemCode}`);
 
     await connection.query(
       `INSERT IGNORE INTO xxafmc_stock_reservation_totals (item_code, reserved_qty) VALUES (?, 0)`,
       [itemCode]
     );
-    
+
     const [result] = await connection.query(
       `
         UPDATE xxafmc_stock_reservation_totals
@@ -60,8 +60,8 @@ async function releaseReservationRows(connection, reservationRows) {
       `,
       [quantity, itemCode]
     );
-    
-    console.log(`Released ${quantity} for item ${itemCode}. Update result:`, result.affectedRows);
+
+    // console.log(`Released ${quantity} for item ${itemCode}. Update result:`, result.affectedRows);
   }
 }
 
@@ -545,26 +545,26 @@ exports.updateBarOrderStatus = async (req, res) => {
               [qty, item.barcode]
             );
 
-             
 
-              // Decrement reserved totals for this item (does not touch stock_out buckets)
-              if (physicalItemCode) {
-                await connection.query(
-                  `INSERT IGNORE INTO xxafmc_stock_reservation_totals (item_code, reserved_qty) VALUES (?, 0)`,
-                  [physicalItemCode]
-                );
-                await connection.query(
-                  `
+
+            // Decrement reserved totals for this item (does not touch stock_out buckets)
+            if (physicalItemCode) {
+              await connection.query(
+                `INSERT IGNORE INTO xxafmc_stock_reservation_totals (item_code, reserved_qty) VALUES (?, 0)`,
+                [physicalItemCode]
+              );
+              await connection.query(
+                `
                     UPDATE xxafmc_stock_reservation_totals
                     SET reserved_qty = GREATEST(0, IFNULL(reserved_qty, 0) - ?)
                     WHERE item_code = ?
                     LIMIT 1
                   `,
-                  [qty, physicalItemCode]
-                );
-              }
+                [qty, physicalItemCode]
+              );
             }
           }
+        }
 
         // Update prices specifically by order_line_id for standard items
         const linePrices = new Map();
@@ -610,19 +610,20 @@ exports.updateBarOrderStatus = async (req, res) => {
     } else {
       [result] = await pool.query(
         `
-        UPDATE xxafmc_kitchen_notification a
-        SET
-          a.status = 'Preparing',
-          a.${handledByField} = ?
-        WHERE a.ordernumber = ?
-          AND a.status = 'Received'
-          AND EXISTS (
-            SELECT 1
-            FROM (${inventorySummarySql}) inv
-            WHERE inv.item_code = a.item_id
-              AND inv.category_id = ?
-          )
-        `,
+  UPDATE xxafmc_kitchen_notification a
+  SET
+    a.status = 'Preparing',
+    a.MSG_READ = 'Y',
+    a.${handledByField} = ?
+  WHERE a.ordernumber = ?
+    AND a.status = 'Received'
+    AND EXISTS (
+      SELECT 1
+      FROM (${inventorySummarySql}) inv
+      WHERE inv.item_code = a.item_id
+        AND inv.category_id = ?
+    )
+  `,
         [handledBy, ORDERNUMBER, categoryId]
       );
     }
@@ -1001,28 +1002,56 @@ exports.processBarcodeScan = async (req, res) => {
 
     const l_barcode_scanned_qty = scannedCollection.filter(s => s.barcode === BARCODE).length;
 
-    // === Exact ac_unit validation from Oracle package ===
-    if (['Nos', 'Can', 'glass'].includes(acUnit)) {
+    // === Oracle package scan validation ===
+    // Batch/package-style items can scan the same barcode multiple times until
+    // either barcode stock or ordered quantity is exhausted. Other bottle/can
+    // items remain unique-barcode scans.
+    const normalizedAcUnit = String(acUnit || "").trim().toUpperCase();
+    const scanSubCategory = Number(item.SUB_CATEGORY) || 0;
+    const duplicateAllowedSubCategories = new Set([
+      2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 16, 17, 18, 1310,
+    ]);
+    const isTrackedAcUnit = ['NOS', 'CAN', 'GLASS', 'PEGS'].includes(normalizedAcUnit);
+    const isDuplicateAllowedScan =
+      duplicateAllowedSubCategories.has(scanSubCategory) ||
+      (scanSubCategory === 1 && normalizedAcUnit === 'GLASS');
+
+    if (isTrackedAcUnit && isDuplicateAllowedScan) {
+      if (l_total_scanned_qty + requestedQty > stockQuantity) {
+        await connection.rollback();
+        return res.status(400).json({
+          success: false,
+          message: `Error: Scanned Qty is more than stock for barcode ${BARCODE}`,
+        });
+      }
+      if (orderedQty < l_scan_item_qty + requestedQty) {
+        await connection.rollback();
+        return res.status(400).json({
+          success: false,
+          message: 'Error: Scanned Qty is more than Order quantity',
+        });
+      }
+    } else if (isTrackedAcUnit) {
       if (l_barcode_scanned_qty >= 1) {
         await connection.rollback();
-        return res.status(400).json({ success: false, message: `Alert: Duplicate bottle scan for ${BARCODE}` });
+        return res.status(400).json({
+          success: false,
+          message: `Error: Duplicate bottle scan for ${BARCODE}`,
+        });
       }
       if (requestedQty > stockQuantity) {
         await connection.rollback();
-        return res.status(400).json({ success: false, message: `Alert: Entered quantity is more than the stock ${BARCODE}` });
+        return res.status(400).json({
+          success: false,
+          message: 'Error: Entered quantity is more than stock',
+        });
       }
       if (orderedQty < l_scan_item_qty + requestedQty) {
         await connection.rollback();
-        return res.status(400).json({ success: false, message: 'Alert: Scanned quantity exceeds the ordered quantity' });
-      }
-    } else {
-      if (l_total_scanned_qty + requestedQty > stockQuantity) {
-        await connection.rollback();
-        return res.status(400).json({ success: false, message: `Alert: Scanned Quantity is more than stock for barcode ${BARCODE}` });
-      }
-      if (orderedQty < l_scan_item_qty + requestedQty) {
-        await connection.rollback();
-        return res.status(400).json({ success: false, message: 'Alert: Scanned quantity exceeds the ordered quantity' });
+        return res.status(400).json({
+          success: false,
+          message: 'Error: Scanned Qty is more than Order quantity',
+        });
       }
     }
 
@@ -1345,16 +1374,16 @@ exports.getActiveBarOrders = async (req, res) => {
     const isBar = kitchen === "Bar";
     const categoryName = isBar ? "Liquor" : "Snacks";
 
-   const [rows] = await pool.query(
-  `SELECT kn.*
+    const [rows] = await pool.query(
+      `SELECT kn.*
    FROM xxafmc_kitchen_notification kn
    JOIN xxafmc_inventory inv ON kn.item_id = inv.item_code
    JOIN xxafmc_categories ct ON inv.category_id = ct.category_id
    WHERE kn.MSG_READ = 'N'
      AND ct.category_name = ?
    ORDER BY kn.ORDERNUMBER DESC`,
-  [categoryName]
-);
+      [categoryName]
+    );
     // console.log("Active bar orders:", rows);
     res.status(200).json({
       success: true,
@@ -1668,7 +1697,7 @@ exports.cancelBarOrderItem = async (req, res) => {
   try {
     const { ORDER_LINE_ID, ORDERNUMBER, KITCHEN = "Bar" } = req.body;
     const { categoryId } = getKitchenConfig(KITCHEN);
-console.log("Cancel request received with:", { ORDER_LINE_ID, ORDERNUMBER, KITCHEN, categoryId });
+    // console.log("Cancel request received with:", { ORDER_LINE_ID, ORDERNUMBER, KITCHEN, categoryId });
 
     if (!ORDERNUMBER && !ORDER_LINE_ID) {
       return res.status(400).json({
@@ -1681,14 +1710,14 @@ console.log("Cancel request received with:", { ORDER_LINE_ID, ORDERNUMBER, KITCH
     await connection.beginTransaction();
 
     if (ORDERNUMBER) {
-      console.log("Complete order cancel - Order number:", { ORDERNUMBER, categoryId });
+      // console.log("Complete order cancel - Order number:", { ORDERNUMBER, categoryId });
 
       const reservationRows = await getReservationReleaseRowsForCancel(connection, {
         orderNumber: ORDERNUMBER,
         categoryId,
       });
 
-      console.log("Reservation rows to release for complete order:", reservationRows);
+      // console.log("Reservation rows to release for complete order:", reservationRows);
 
       const [updateResult] = await connection.query(
         `
@@ -1706,12 +1735,14 @@ console.log("Cancel request received with:", { ORDER_LINE_ID, ORDERNUMBER, KITCH
 
       await connection.query(
         `
-        UPDATE xxafmc_kitchen_notification kn
-        JOIN (${inventorySummarySql}) inv ON inv.item_code = kn.item_id
-        SET kn.status = 'Cancelled'
-        WHERE kn.ordernumber = ?
-          AND inv.category_id = ?
-          AND kn.status IN ('Received', 'Preparing')
+       UPDATE xxafmc_kitchen_notification kn
+JOIN (${inventorySummarySql}) inv ON inv.item_code = kn.item_id
+SET
+  kn.status = 'Cancelled',
+  kn.MSG_READ = 'Y'
+WHERE kn.ordernumber = ?
+  AND inv.category_id = ?
+  AND kn.status IN ('Received', 'Preparing')
         `,
         [ORDERNUMBER, categoryId]
       );
@@ -1749,11 +1780,11 @@ console.log("Cancel request received with:", { ORDER_LINE_ID, ORDERNUMBER, KITCH
     const lineItem = lineItems[0];
     const lineCategoryId = Number(lineItem.category_id) || categoryId;
 
-    console.log("Single item cancel - Line item details:", { 
-      ORDER_LINE_ID, 
+    console.log("Single item cancel - Line item details:", {
+      ORDER_LINE_ID,
       orderId: lineItem.order_id,
       itemId: lineItem.item_id,
-      lineCategoryId 
+      lineCategoryId
     });
 
     const reservationRows = await getReservationReleaseRowsForCancel(connection, {
@@ -2244,7 +2275,7 @@ exports.getOrderDetailsByOrderNumber = async (req, res) => {
     const { orderNumber } = req.params;
     const { kitchen = "Bar" } = req.query;
     const { categoryId } = getKitchenConfig(kitchen);
-console.log("Fetching order details for order number:", orderNumber, "and kitchen:", kitchen);
+    console.log("Fetching order details for order number:", orderNumber, "and kitchen:", kitchen);
     if (!orderNumber) {
       return res.status(400).json({
         success: false,

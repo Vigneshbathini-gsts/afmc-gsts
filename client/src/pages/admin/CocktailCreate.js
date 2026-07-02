@@ -31,9 +31,9 @@ export default function CocktailCreate() {
     itemName: "",
     subCategory: "",
     description: "",
-    memberProfit: "",
+    // memberProfit: "",
     memberPrCharges: "",
-    nonMemberProfit: "",
+    // nonMemberProfit: "",
     nonMemberPrCharges: "",
     image: null,
   });
@@ -58,17 +58,17 @@ export default function CocktailCreate() {
       return "Sub category is required.";
     }
 
-    if (form.memberProfit === "") {
-      return "Member Profit is required.";
-    }
+    // if (form.memberProfit === "") {
+    //   return "Member Profit is required.";
+    // }
 
     if (form.memberPrCharges === "") {
       return "Member Pr Charges is required.";
     }
 
-    if (form.nonMemberProfit === "") {
-      return "Non Member Profit is required.";
-    }
+    // if (form.nonMemberProfit === "") {
+    //   return "Non Member Profit is required.";
+    // }
 
     if (form.nonMemberPrCharges === "") {
       return "Non Member Pr Charges is required.";
@@ -349,9 +349,9 @@ export default function CocktailCreate() {
       payload.append("itemName", form.itemName.trim());
       payload.append("subCategory", form.subCategory);
       payload.append("description", form.description);
-      payload.append("memberProfit", form.memberProfit);
+      // payload.append("memberProfit", form.memberProfit);
       payload.append("memberPrCharges", form.memberPrCharges);
-      payload.append("nonMemberProfit", form.nonMemberProfit);
+      // payload.append("nonMemberProfit", form.nonMemberProfit);
       payload.append("nonMemberPrCharges", form.nonMemberPrCharges);
       payload.append("rows", JSON.stringify(normalizedRows));
 
@@ -455,7 +455,7 @@ export default function CocktailCreate() {
           </div>
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <input
+            {/* <input
               inputMode="numeric"
               pattern="[0-9]*"
               value={form.memberProfit}
@@ -467,7 +467,7 @@ export default function CocktailCreate() {
               }}
               placeholder="Member Profit"
               className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 outline-none focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
-            />
+            /> */}
             <input
               inputMode="numeric"
               pattern="[0-9]*"
@@ -481,7 +481,7 @@ export default function CocktailCreate() {
               placeholder="Member Pr Charges"
               className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 outline-none focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
             />
-            <input
+            {/* <input
               inputMode="numeric"
               pattern="[0-9]*"
               value={form.nonMemberProfit}
@@ -493,7 +493,7 @@ export default function CocktailCreate() {
               }}
               placeholder="Non Member Profit"
               className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 outline-none focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
-            />
+            /> */}
             <input
               inputMode="numeric"
               pattern="[0-9]*"

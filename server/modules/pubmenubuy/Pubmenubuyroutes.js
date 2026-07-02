@@ -1,21 +1,24 @@
 const express = require("express");
 const router = express.Router();
 const authMiddleware = require("../../middleware/authMiddleware");
+const barStatusMiddleware = require("../../middleware/barStatusMiddleware");
 const PubmenubuyController = require("./PubmenubuyController");
 
-router.post("/Pubmenubuy/create", authMiddleware, PubmenubuyController.createPubMenuOrder);
-router.get("/Pubmenubuy/:ORDER_NUMBER", authMiddleware, PubmenubuyController.getPubMenuOrderSummary);
-router.patch("/Pubmenubuy/:ORDER_NUMBER/item/:ITEM_CODE", authMiddleware, PubmenubuyController.updatePubMenuOrderItemQuantity);
+const checkBarOpen = [authMiddleware, barStatusMiddleware];
+
+router.post("/Pubmenubuy/create", checkBarOpen, PubmenubuyController.createPubMenuOrder);
+router.get("/Pubmenubuy/:ORDER_NUMBER", checkBarOpen, PubmenubuyController.getPubMenuOrderSummary);
+router.patch("/Pubmenubuy/:ORDER_NUMBER/item/:ITEM_CODE", checkBarOpen, PubmenubuyController.updatePubMenuOrderItemQuantity);
 router.put(
   "/Pubmenubuy/:ORDER_NUMBER/item/:ITEM_CODE/customization",
-  authMiddleware,
+  checkBarOpen,
   PubmenubuyController.updatePubMenuOrderItemCustomization
 );
-router.delete("/Pubmenubuy/:ORDER_NUMBER/item/:ITEM_CODE", authMiddleware, PubmenubuyController.deletePubMenuOrderItem);
-router.delete("/Pubmenubuy/:ORDER_NUMBER", authMiddleware, PubmenubuyController.cancelPubMenuOrder);
+router.delete("/Pubmenubuy/:ORDER_NUMBER/item/:ITEM_CODE", checkBarOpen, PubmenubuyController.deletePubMenuOrderItem);
+router.delete("/Pubmenubuy/:ORDER_NUMBER", checkBarOpen, PubmenubuyController.cancelPubMenuOrder);
 router.put(
   "/Pubmenubuy/:ORDER_NUMBER/line/:ORDER_LINE_ID/quantity",
-  authMiddleware,
+  checkBarOpen,
   PubmenubuyController.updatePubMenuOrderLineQuantity
 );
 

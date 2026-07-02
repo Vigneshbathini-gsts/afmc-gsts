@@ -49,76 +49,53 @@ export default function UserNavbar({ onMenuClick }) {
 
   return (
     <header className="bg-white shadow-md sticky top-0 z-30 border-b border-afmc-maroon/10">
-      <div className="px-3 md:px-6 py-3 relative">
-        {/* Mobile Layout */}
-        <div className="flex justify-between items-start sm:hidden">
-          <div className="flex items-center gap-3 flex-1 min-w-0">
+      <div className="px-3 py-3 md:px-6 md:py-4">
+        <div className="flex items-start justify-between gap-3 sm:hidden">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
             <button
               onClick={onMenuClick}
-              className="p-2 rounded-lg hover:bg-afmc-maroon/10 text-2xl text-gray-700 hover:text-afmc-maroon transition flex-shrink-0"
+              className="flex-shrink-0 rounded-lg p-2 text-2xl text-gray-700 transition hover:bg-afmc-maroon/10 hover:text-afmc-maroon"
               aria-label="Open navigation menu"
             >
               <FaBars />
             </button>
 
-            <img
-              src={afmclogo}
-              alt="AFMC Logo"
-              className="w-8 h-10 flex-shrink-0"
-            />
+            <img src={afmclogo} alt="AFMC Logo" className="h-10 w-8 flex-shrink-0" />
 
             <div className="min-w-0">
-              <h1 className="text-sm font-bold text-gray-800 whitespace-nowrap">
-                AFMC Service
-              </h1>
-
-              <p className="text-xs text-gray-500 whitespace-nowrap">
-                User Dashboard
-              </p>
+              <h1 className="whitespace-nowrap text-sm font-bold text-gray-800">AFMC Service</h1>
+              <p className="whitespace-nowrap text-xs text-gray-500">User Dashboard</p>
             </div>
           </div>
 
-          {/* Right Side */}
-          <div className="absolute right-3 top-3 flex items-center gap-2 z-10">
+          <div className="z-10 flex items-center gap-2">
             {!hideCartIcon && <CartButton />}
-
             <UserMenuDropdown compact={!isDashboard} iconOnly />
           </div>
         </div>
 
-        {/* Desktop Layout */}
-        <div className="hidden sm:flex items-center justify-between">
+        <div className="hidden items-center justify-between sm:flex">
           <div className="flex items-center gap-4">
             <button
               onClick={onMenuClick}
-              className="p-2 rounded-lg hover:bg-afmc-maroon/10 text-2xl text-gray-700 hover:text-afmc-maroon transition"
+              className="rounded-lg p-2 text-2xl text-gray-700 transition hover:bg-afmc-maroon/10 hover:text-afmc-maroon"
               aria-label="Open navigation menu"
             >
               <FaBars />
             </button>
 
-            <div className="flex items-center gap-3 min-w-0">
-              <img
-                src={afmclogo}
-                alt="AFMC Logo"
-                className="w-8 h-10"
-              />
+            <div className="flex min-w-0 items-center gap-3">
+              <img src={afmclogo} alt="AFMC Logo" className="h-10 w-8" />
 
               <div>
-                <h1 className="text-lg md:text-xl font-bold text-gray-800">
-                  AFMC Service
-                </h1>
-
-                <p className="text-sm text-gray-500">
-                  User Dashboard
-                </p>
+                <h1 className="text-lg font-bold text-gray-800 md:text-xl">AFMC Service</h1>
+                <p className="text-sm text-gray-500">User Dashboard</p>
               </div>
             </div>
           </div>
 
           <div className="flex items-center gap-3 md:gap-4">
             {!hideCartIcon && <CartButton />}
-
             <UserMenuDropdown compact={!isDashboard} />
           </div>
         </div>

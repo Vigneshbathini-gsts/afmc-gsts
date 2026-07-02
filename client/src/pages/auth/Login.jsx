@@ -75,29 +75,6 @@ export default function Login() {
     }
   }, []);
 
-  useEffect(() => {
-    if (!isLoading && user) {
-      navigate(getRedirectPath(user), { replace: true });
-    }
-  }, [user, isLoading, navigate]);
-
-  const getRedirectPath = (user) => {
-    const normalizedLoginType = String(user?.loginType || "").trim().toUpperCase();
-    const isNonMember = normalizedLoginType === "NON MEMBER";
-
-    switch (Number(user?.roleId)) {
-      case 10: return "/admin/dashboard";
-      case 20: return "/user/dashboard";
-      case 30: return isNonMember ? "/user/dashboard" : "/attendant/register-member";
-      case 40:
-        if (user.outletType === "KITCHEN") return "/kitchen/dashboard";
-        if (user.outletType === "BAR") return "/bar/dashboard";
-        return "/kitchen/dashboard";
-      case 80: return "/admin/dashboard";
-      default: return "/unauthorized";
-    }
-  };
-
   const fetchUserRole = useCallback(async () => {
     if (!email.trim() || !validateUsername(email.trim())) {
       setShowOutletDropdown(false);
@@ -157,7 +134,7 @@ export default function Login() {
         password,
         outletType,
       });
-      // console.log("Login response:", response.data);
+      console.log("Login response:", response.data.redirectPath);
       if (response.data?.success) {
         // Handle remember me - store email and token
         if (rememberMe) {
@@ -168,13 +145,11 @@ export default function Login() {
 
         // Store token and user data in localStorage
         storeAuthData(response.data.token, response.data.user, rememberMe);
-        
+
         // Update auth context with user data
         setUser(response.data.user);
-        
-        setTimeout(() => {
-          navigate(response.data.redirectPath);
-        }, 100);
+
+        navigate(response.data.redirectPath, { replace: true });
         return;
       }
       setError(response.data?.message || "Login failed");
@@ -289,7 +264,7 @@ export default function Login() {
         {/* Bottom motto */}
         <div style={styles.motto}>
           <span style={styles.mottoText}>सर्वे सन्तु निरामयाः</span>
-          
+
         </div>
       </div>
 
@@ -578,9 +553,9 @@ function OutletCard({ icon, label, value, selected, onClick }) {
 }
 
 /* Styles */
-const MAROON   = "#6B1A4F";
-const MAROON2  = "#7B2252";
-const GOLD     = "#DAA520";
+const MAROON = "#6B1A4F";
+const MAROON2 = "#7B2252";
+const GOLD = "#DAA520";
 const GOLD_DIM = "rgba(218,165,32,0.65)";
 
 const styles = {
@@ -672,15 +647,15 @@ const styles = {
     background: `radial-gradient(circle, rgba(218,165,32,0.18) 0%, transparent 70%)`,
     animation: "crestPulse 4s ease-in-out infinite",
   },
- crestImg: {
-  position: "absolute",   // ✅ force perfect centering
-  top: "50%",
-  left: "50%",
-  transform: "translate(-50%, -50%)", // ✅ true center
-  width: "70%",           // adjust visually (try 65–75%)
-  height: "70%",
-  objectFit: "contain",
-},
+  crestImg: {
+    position: "absolute",   // ✅ force perfect centering
+    top: "50%",
+    left: "50%",
+    transform: "translate(-50%, -50%)", // ✅ true center
+    width: "70%",           // adjust visually (try 65–75%)
+    height: "70%",
+    objectFit: "contain",
+  },
   crestFallback: { alignItems: "center", justifyContent: "center" },
   orgName: {
     fontFamily: "'Cinzel', serif",
@@ -998,5 +973,5 @@ const styles = {
     marginTop: 16,
     letterSpacing: "0.05em",
   },
-  
+
 };

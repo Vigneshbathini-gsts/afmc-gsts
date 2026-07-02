@@ -33,11 +33,6 @@ export default function AddItem() {
   const [scannerOpen, setScannerOpen] = useState(false);
   const pendingBarcodesRef = useRef(new Set());
 
-  const getDisplayQuantity = (item) => {
-    const pegs = Number(item?.pegs || 0);
-    return pegs > 0 ? pegs : 1;
-  };
-
   const createdBy = useMemo(() => {
     try {
       const rawUser = localStorage.getItem("user");
@@ -99,11 +94,11 @@ export default function AddItem() {
 
           return [
             ...current,
-            {
+              {
               itemCode: item.item_code,
               itemName: item.item_name,
               quantity: 1,
-              displayQuantity: getDisplayQuantity(item),
+              displayQuantity: 1,
               unitPrice: Number(item.unit_price || 0),
               transactionDate,
               barcode: normalizedBarcode,
@@ -304,7 +299,7 @@ export default function AddItem() {
             </div>
           )}
 
-          <div className="mt-8 overflow-hidden rounded-2xl border border-gray-200 bg-white">
+          <div className="mt-8 overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm">
             <div className="overflow-x-auto">
               <table className="min-w-[1200px] w-full text-left text-sm">
                 <thead className="bg-gray-50 text-gray-600">
@@ -313,6 +308,7 @@ export default function AddItem() {
                     <th className="px-4 py-3 text-left font-medium">Item Code</th>
                     <th className="px-4 py-3 text-left font-medium">Item Name</th>
                     <th className="px-4 py-3 text-left font-medium">Quantity</th>
+                    <th className="px-4 py-3 text-left font-medium">Pegs</th>
                     <th className="px-4 py-3 text-left font-medium">Unit Price</th>
                     <th className="px-4 py-3 text-left font-medium">Transaction Date</th>
                     <th className="px-4 py-3 text-left font-medium">Barcode</th>
@@ -324,7 +320,7 @@ export default function AddItem() {
                 <tbody>
                   {rows.length === 0 ? (
                     <tr>
-                      <td colSpan="10" className="px-4 py-8 text-center text-gray-500">
+                      <td colSpan="11" className="px-4 py-8 text-center text-gray-500">
                         No staged stock-out items yet.
                       </td>
                     </tr>
@@ -343,6 +339,7 @@ export default function AddItem() {
                             className="w-24 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2"
                           />
                         </td>
+                        <td className="px-4 py-3">{row.pegs || 0}</td>
                         <td className="px-4 py-3">{row.unitPrice}</td>
                         <td className="px-4 py-3">{row.transactionDate}</td>
                         <td className="px-4 py-3">{row.barcode}</td>

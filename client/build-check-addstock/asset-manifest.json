@@ -1,0 +1,21 @@
+{
+  "files": {
+    "main.css": "/static/css/main.ceeb9268.css",
+    "main.js": "/static/js/main.12cb2a4e.js",
+    "static/js/239.049a6ad3.chunk.js": "/static/js/239.049a6ad3.chunk.js",
+    "static/js/213.89662439.chunk.js": "/static/js/213.89662439.chunk.js",
+    "static/js/732.0b333a9c.chunk.js": "/static/js/732.0b333a9c.chunk.js",
+    "static/media/AFMC_Logo.png": "/static/media/AFMC_Logo.802e8742359d62ef38c8.png",
+    "static/media/afmcqrcode.png": "/static/media/afmcqrcode.8193970f8a0d3fccf945.png",
+    "index.html": "/index.html",
+    "main.ceeb9268.css.map": "/static/css/main.ceeb9268.css.map",
+    "main.12cb2a4e.js.map": "/static/js/main.12cb2a4e.js.map",
+    "239.049a6ad3.chunk.js.map": "/static/js/239.049a6ad3.chunk.js.map",
+    "213.89662439.chunk.js.map": "/static/js/213.89662439.chunk.js.map",
+    "732.0b333a9c.chunk.js.map": "/static/js/732.0b333a9c.chunk.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.ceeb9268.css",
+    "static/js/main.12cb2a4e.js"
+  ]
+}

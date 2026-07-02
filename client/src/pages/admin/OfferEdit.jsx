@@ -73,16 +73,6 @@ export default function OfferEdit() {
     fetchOfferDetails();
   }, [id]);
 
-  // Handle End Date Change
-  const handleEndDateChange = (e) => {
-    setFormData((prev) => ({
-      ...prev,
-      endDate: e.target.value,
-    }));
-    setError("");
-    setSuccessMessage("");
-  };
-
   const handleUpdate = async () => {
     try {
       setSaving(true);
@@ -312,25 +302,19 @@ export default function OfferEdit() {
             </h3>
 
             <div className="grid grid-cols-1 gap-6">
-              {/* End Date - Editable */}
+              {/* End Date - Read Only */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   End Date <span className="text-red-500">*</span>
                 </label>
-                <div className="flex items-center rounded-2xl border border-gray-200 bg-white px-4 py-3 shadow-sm focus-within:ring-2 focus-within:ring-afmc-maroon">
-                  <FaCalendarCheck className="text-gray-400 mr-3" />
-                  <input
-                    type="date"
-                    name="endDate"
-                    value={formData.endDate}
-                    onChange={handleEndDateChange}
-                    min={new Date().toISOString().split("T")[0]}
-                    className="w-full outline-none text-gray-700 bg-transparent"
-
-                  />
+                <div className="rounded-2xl border border-gray-200 bg-gray-100 px-4 py-3 shadow-sm">
+                  <div className="flex items-center gap-3">
+                    <FaCalendarCheck className="text-gray-400" />
+                    <span className="text-gray-700">{formData.endDate || "-"}</span>
+                  </div>
                 </div>
                 <p className="text-xs text-gray-400 mt-1">
-                  Set the end date for this offer. Status will be set to Inactive after this date.
+                  End Date is read-only and cannot be changed here.
                 </p>
               </div>
             </div>

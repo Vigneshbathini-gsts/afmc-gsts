@@ -70,12 +70,16 @@ export default function OutletOrderDetails() {
   };
 
   const department = useMemo(() => {
+    const queryKitchenType = kitchenTypeFromQuery.trim().toLowerCase();
+    if (queryKitchenType === "kitchen") return "Kitchen";
+    if (queryKitchenType === "bar") return "Bar";
+
     if (!user) return "Bar";
     const roleName = user.outletType?.toLowerCase() || "";
     if (roleName.includes("kitchen")) return "Kitchen";
     if (roleName.includes("bar")) return "Bar";
     return "Bar";
-  }, [user]);
+  }, [kitchenTypeFromQuery, user]);
 
   const [items, setItems] = useState([]);
   const [scannedItems, setScannedItems] = useState([]);

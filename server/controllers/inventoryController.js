@@ -178,26 +178,6 @@ exports.getStockOutItemByBarcode = async (req, res) => {
   }
 };
 
-exports.addStock = async (req, res) => {
-  try {
-    const payload = req.body?.items ? req.body.items : req.body;
-    const result = await inventoryModel.addStockTransactions(payload);
-    res.status(201).json({ success: true, data: result });
-  } catch (error) {
-    console.error("Error adding stock:", error);
-    if (error.code === "DUPLICATE_BARCODE") {
-      return res.status(409).json({ success: false, message: "Duplicate Barcode" });
-    }
-    if (error.code === "ITEM_NOT_FOUND") {
-      return res.status(404).json({ success: false, message: "Item not found" });
-    }
-    if (error.code === "INVALID_DATA") {
-      return res.status(400).json({ success: false, message: "Invalid data" });
-    }
-    res.status(500).json({ success: false, message: "Failed to add stock" });
-  }
-};
-
 exports.updateItemImage = async (req, res) => {
   try {
     const { itemCode } = req.params;
@@ -243,7 +223,8 @@ exports.getStockInReport = async (req, res) => {
   try {
     const { fromDate, toDate, limit, offset } = req.query;
     const rows = await inventoryModel.getStockInReport({ fromDate, toDate, limit, offset });
-    res.status(200).json({ success: true, data: rows });
+    const summary = await inventoryModel.getStockInReportSummary({ fromDate, toDate });
+    res.status(200).json({ success: true, data: rows, summary });
   } catch (error) {
     console.error("Error fetching stock-in report:", error);
     res.status(500).json({ success: false, message: "Failed to load stock-in report" });
@@ -254,7 +235,8 @@ exports.getStockOutReport = async (req, res) => {
   try {
     const { fromDate, toDate, limit, offset } = req.query;
     const rows = await inventoryModel.getStockOutReport({ fromDate, toDate, limit, offset });
-    res.status(200).json({ success: true, data: rows });
+    const summary = await inventoryModel.getStockOutReportSummary({ fromDate, toDate });
+    res.status(200).json({ success: true, data: rows, summary });
   } catch (error) {
     console.error("Error fetching stock-out report:", error);
     res.status(500).json({ success: false, message: "Failed to load stock-out report" });
