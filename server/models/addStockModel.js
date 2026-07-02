@@ -2,7 +2,7 @@ const db = require("../config/db");
 const { formatToSql, parseDate } = require("../utils/dateUtils");
 
 const TRANSACTION_LOCK = "xxafmc_items_transactions_id_lock";
-const BATCH_WISE_SUB_CATEGORIES = new Set([6, 7, 9, 10, 18]);
+const SINGLE_QUANTITY_SUB_CATEGORIES = new Set([1, 3, 1310]);
 
 const acquireNamedLock = async (connection, lockName) => {
   const [rows] = await connection.execute("SELECT GET_LOCK(?, 10) AS acquired", [lockName]);
@@ -48,7 +48,8 @@ const validateStockInItem = (item) => {
   return true;
 };
 
-const isBatchWiseItem = (subCategory) => BATCH_WISE_SUB_CATEGORIES.has(Number(subCategory));
+const requiresSingleQuantity = (subCategory) =>
+  SINGLE_QUANTITY_SUB_CATEGORIES.has(Number(subCategory));
 
 const normalizeTransactionDate = (value) => {
   const parsed = parseDate(value);
@@ -80,40 +81,6 @@ const getInventoryItemByCode = async (itemCode, executor = db) => {
   `;
   const [rows] = await executor.execute(sql, [Number(itemCode)]);
   return rows && rows.length ? rows[0] : null;
-};
-
-const parseVolumeToNumber = (volume) => {
-  if (!volume) return null;
-  const match = String(volume).match(/(\d+(\.\d+)?)/);
-  return match ? Number(match[1]) : null;
-};
-
-const calculatePegs = ({ subCategory, typeId, volume, acQuantity }) => {
-  const volumeNumber = parseVolumeToNumber(volume);
-  if (!volumeNumber || !acQuantity) return 0;
-
-  const subCat = Number(subCategory);
-  const type = Number(typeId);
-  const eligibleSubCats = [2, 4, 5, 8, 11, 12, 16, 17];
-  const eligibleTypes = [3, 4, 5, 6];
-
-  if (eligibleSubCats.includes(subCat) || eligibleTypes.includes(type)) {
-    return volumeNumber / acQuantity;
-  }
-
-  if (subCat === 6 && type === 5) {
-    return volumeNumber / acQuantity;
-  }
-
-  return 0;
-};
-
-const getBarLookupUnit = (subCategory, acUnit) => {
-  const sub = Number(subCategory);
-  const unit = String(acUnit || "").trim();
-
-  if (sub === 9 && unit.toLowerCase() === "glass") return "glass";
-  return unit;
 };
 
 const addStockTransactions = async (payload) => {
@@ -194,22 +161,11 @@ const addStockTransactions = async (payload) => {
         throw error;
       }
 
-      const barLookupUnit = getBarLookupUnit(inventoryItem.sub_category, effectiveAcUnit);
-      const [barRows] = await connection.execute(
-        "SELECT AC_QUANTITY AS ac_quantity, TYPE_ID AS type_id FROM xxafmc_bar WHERE TYPE = ? LIMIT 1",
-        [barLookupUnit]
-      );
-      const barRow = barRows && barRows.length ? barRows[0] : null;
-
-      const pegs = calculatePegs({
-        subCategory: inventoryItem.sub_category,
-        typeId: barRow?.type_id,
-        volume,
-        acQuantity: barRow?.ac_quantity,
-      });
-      const transactionPegs = isBatchWiseItem(inventoryItem.sub_category)
-        ? numericQuantity
-        : Math.round(Number(pegs || 0));
+      if (requiresSingleQuantity(inventoryItem.sub_category) && numericQuantity !== 1) {
+        const error = new Error("INVALID_SINGLE_QUANTITY");
+        error.code = "INVALID_SINGLE_QUANTITY";
+        throw error;
+      }
 
       const batchName = `${inventoryItem.item_name}-${numericQuantity}-${volume || ""}-${transactionDate}`;
 
@@ -233,7 +189,7 @@ const addStockTransactions = async (payload) => {
           "IN",
           batchId || "",
           normalizedBarcode,
-          transactionPegs,
+          numericQuantity,
           createdBy || "SYSTEM",
           formatToSql(new Date()),
         ]

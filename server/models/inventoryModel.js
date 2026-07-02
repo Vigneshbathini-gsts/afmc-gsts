@@ -189,12 +189,11 @@ const getDefaultServingVolume = (subCategory, acUnit) => {
 };
 
 const validateStockOutItem = (item) => {
-  const numericBarcode = Number(item.barcode);
   const numericQuantity = Number(item.quantity);
+  const normalizedBarcode = sanitizeBarcode(item.barcode);
 
   return (
-    Number.isFinite(numericBarcode) &&
-    numericBarcode > 0 &&
+    /^\d{4,32}$/.test(normalizedBarcode) &&
     Number.isFinite(numericQuantity) &&
     numericQuantity > 0
   );
@@ -366,6 +365,7 @@ const getItemById = async (itemId) => {
 };
 
 const getStockOutItemByBarcode = async (barcode, executor = db) => {
+  const normalizedBarcode = sanitizeBarcode(barcode);
   const sql = `
     SELECT
       xit.ITEM_CODE AS item_code,
@@ -393,7 +393,7 @@ const getStockOutItemByBarcode = async (barcode, executor = db) => {
     ORDER BY xit.TRANSACTION_ID DESC
     LIMIT 1
   `;
-  const [rows] = await executor.execute(sql, [Number(barcode)]);
+  const [rows] = await executor.execute(sql, [normalizedBarcode]);
   return rows && rows.length ? rows[0] : null;
 };
 
@@ -444,23 +444,25 @@ const barcodeExistsInDb = async (barcode) => {
 };
 
 const stockOutBarcodeExists = async (executor, barcode) => {
+  const normalizedBarcode = sanitizeBarcode(barcode);
   const sql = `
     SELECT COUNT(1) AS cnt
     FROM xxafmc_items_transactions
     WHERE BARCODE = ?
       AND FLAG = 'OUT'
   `;
-  const [rows] = await executor.execute(sql, [Number(barcode)]);
+  const [rows] = await executor.execute(sql, [normalizedBarcode]);
   return Number(rows[0]?.cnt || 0) > 0;
 };
 
 const stockOutRecordExists = async (executor, barcode) => {
+  const normalizedBarcode = sanitizeBarcode(barcode);
   const sql = `
     SELECT COUNT(1) AS cnt
     FROM xxafmc_stock_out
     WHERE BARCODE = ?
   `;
-  const [rows] = await executor.execute(sql, [Number(barcode)]);
+  const [rows] = await executor.execute(sql, [normalizedBarcode]);
   return Number(rows[0]?.cnt || 0) > 0;
 };
 
@@ -522,7 +524,7 @@ const addStockOutTransactions = async (payload) => {
         createdBy,
       } = item;
 
-      const numericBarcode = Number(barcode);
+      const normalizedBarcode = sanitizeBarcode(barcode);
       const numericQuantity = Number(quantity);
       const normalizedTransactionDate = normalizeTransactionDate(transactionDate);
 
@@ -532,7 +534,7 @@ const addStockOutTransactions = async (payload) => {
         throw error;
       }
 
-      const stockItem = await getStockOutItemByBarcode(numericBarcode, connection);
+      const stockItem = await getStockOutItemByBarcode(normalizedBarcode, connection);
       if (!stockItem) {
         const error = new Error("ITEM_NOT_FOUND");
         error.code = "ITEM_NOT_FOUND";
@@ -540,8 +542,8 @@ const addStockOutTransactions = async (payload) => {
       }
 
       const [alreadyConsumedByTxn, alreadyConsumedByStockOut] = await Promise.all([
-        stockOutBarcodeExists(connection, numericBarcode),
-        stockOutRecordExists(connection, numericBarcode),
+        stockOutBarcodeExists(connection, normalizedBarcode),
+        stockOutRecordExists(connection, normalizedBarcode),
       ]);
       const alreadyConsumed = alreadyConsumedByTxn || alreadyConsumedByStockOut;
       if (alreadyConsumed) {
@@ -579,7 +581,7 @@ const addStockOutTransactions = async (payload) => {
           Number(stockItem.unit_price || 0),
           stockOutQuantity,
           totalValue,
-          numericBarcode,
+          normalizedBarcode,
           creationTimestamp,
           Number(stockItem.pegs || 0),
           stockItem.ac_unit || "Nos",
@@ -612,7 +614,7 @@ const addStockOutTransactions = async (payload) => {
           stockItem.batch_name || "",
           normalizedTransactionDate,
           "OUT",
-          numericBarcode,
+          normalizedBarcode,
           createdBy || "SYSTEM",
           creationTimestamp,
         ]
@@ -630,6 +632,10 @@ const addStockOutTransactions = async (payload) => {
       nextStockOutId += 1;
       nextTransactionId += 1;
     }
+
+    await connection.execute(
+      "DELETE FROM xxafmc_items_transactions WHERE ITEM_CODE IS NULL AND FLAG = 'OUT'"
+    );
 
     await connection.commit();
     return { count: items.length };

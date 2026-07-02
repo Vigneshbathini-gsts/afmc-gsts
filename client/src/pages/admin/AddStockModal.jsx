@@ -6,10 +6,13 @@ import { inventoryAPI } from "../../services/api";
 
 const STOCK_TYPE_OPTIONS = ["Purchased", "Free"];
 const BATCH_WISE_SUB_CATEGORIES = new Set([6, 7, 9, 10, 18]);
+const SINGLE_QUANTITY_SUB_CATEGORIES = new Set([1, 3, 1310]);
 
 const requiresVolume = (acUnit) => String(acUnit || "").trim().toUpperCase() !== "NOS";
 const isValidBarcode = (value) => /^\d{4,15}$/.test(String(value || "").trim());
 const isBatchWiseItem = (subCategoryId) => BATCH_WISE_SUB_CATEGORIES.has(Number(subCategoryId));
+const requiresSingleQuantity = (subCategoryId) =>
+  SINGLE_QUANTITY_SUB_CATEGORIES.has(Number(subCategoryId));
 
 const formatDate = (date) => {
   const d = date instanceof Date ? date : new Date(date);
@@ -53,10 +56,12 @@ export default function AddStockModal({
 }) {
   const [showLowerSection, setShowLowerSection] = useState(false);
   const [stockSaving, setStockSaving] = useState(false);
+  console.log("stockSaving", stockSaving);
   const [stockError, setStockError] = useState("");
   const [stockInfo, setStockInfo] = useState("");
   const [scannerOpen, setScannerOpen] = useState(false);
   const [stockForm, setStockForm] = useState(() => buildInitialStockForm(item));
+  console.log("stockForm", stockForm);
   const [stockRows, setStockRows] = useState([]);
   const [stockRowSearch, setStockRowSearch] = useState("");
 
@@ -83,6 +88,11 @@ export default function AddStockModal({
 
     if (!Number.isInteger(Number(stockForm.quantity)) || Number(stockForm.quantity) <= 0) {
       setStockError("Quantity must be a whole number greater than 0.");
+      return;
+    }
+
+    if (requiresSingleQuantity(stockForm.subCategoryId) && Number(stockForm.quantity) !== 1) {
+      setStockError("Quantity must be 1 for this item group.");
       return;
     }
 
@@ -259,6 +269,7 @@ export default function AddStockModal({
     );
   }, [stockRowSearch, stockRows]);
 
+  console.log("filteredStockRows",filteredStockRows);
   return (
     <>
       <div className="fixed inset-0 z-50 overflow-y-auto bg-black/40 px-4 py-6">
@@ -516,7 +527,9 @@ export default function AddStockModal({
                     </tr>
                   </thead>
                   <tbody>
+                    
                     {filteredStockRows.length === 0 ? (
+                    
                       <tr>
                         <td colSpan="9" className="px-4 py-8 text-center text-gray-500">
                           No staged stock rows yet.

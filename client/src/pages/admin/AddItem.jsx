@@ -78,7 +78,7 @@ export default function AddItem() {
       try {
         const response = await inventoryAPI.getStockOutItemByBarcode(normalizedBarcode);
         const item = response.data.data;
-
+        console.log("item", item);
         const availableStock = Number(item.available_stock || 0);
         if (availableStock <= 0) {
           const validationMessage = `Scanned barcode ${normalizedBarcode} has no stock.`;
@@ -97,8 +97,8 @@ export default function AddItem() {
               {
               itemCode: item.item_code,
               itemName: item.item_name,
-              quantity: 1,
-              displayQuantity: 1,
+              pages: 1,
+              displayPages: 1,
               unitPrice: Number(item.unit_price || 0),
               transactionDate,
               barcode: normalizedBarcode,
@@ -162,17 +162,17 @@ export default function AddItem() {
   };
 
   const handleFinish = async () => {
-    const invalidRow = rows.find((row) => !row.quantity || Number(row.quantity) <= 0);
+    const invalidRow = rows.find((row) => !row.pages || Number(row.pages) <= 0);
     if (invalidRow) {
-      const validationMessage = "Every row must have a quantity greater than 0.";
+      const validationMessage = "Every row must have pages greater than 0.";
       setError(validationMessage);
       toast.error(validationMessage);
       return;
     }
 
-    const overdrawnRow = rows.find((row) => Number(row.quantity) > Number(row.availableStock || 0));
+    const overdrawnRow = rows.find((row) => Number(row.pages) > Number(row.availableStock || 0));
     if (overdrawnRow) {
-      const validationMessage = `Quantity exceeds available stock for barcode ${overdrawnRow.barcode}.`;
+      const validationMessage = `Pages exceed available stock for barcode ${overdrawnRow.barcode}.`;
       setError(validationMessage);
       toast.error(validationMessage);
       return;
@@ -182,10 +182,11 @@ export default function AddItem() {
     setError("");
     setSuccessMessage("");
     try {
+      console.log("inventoryAPI",inventoryAPI)
       await inventoryAPI.createStockOut({
         items: rows.map((row) => ({
           barcode: row.barcode,
-          quantity: Number(row.quantity),
+          pages: Number(row.pages ?? row.displayPages ?? row.pegs ?? 1),
           transactionDate,
           createdBy,
         })),
@@ -308,7 +309,7 @@ export default function AddItem() {
                     <th className="px-4 py-3 text-left font-medium">Item Code</th>
                     <th className="px-4 py-3 text-left font-medium">Item Name</th>
                     <th className="px-4 py-3 text-left font-medium">Quantity</th>
-                    <th className="px-4 py-3 text-left font-medium">Pegs</th>
+                    {/* <th className="px-4 py-3 text-left font-medium">Pegs</th> */}
                     <th className="px-4 py-3 text-left font-medium">Unit Price</th>
                     <th className="px-4 py-3 text-left font-medium">Transaction Date</th>
                     <th className="px-4 py-3 text-left font-medium">Barcode</th>
@@ -330,16 +331,7 @@ export default function AddItem() {
                         <td className="px-4 py-3">{index + 1}</td>
                         <td className="px-4 py-3">{row.itemCode}</td>
                         <td className="px-4 py-3 font-medium text-gray-800">{row.itemName}</td>
-                        <td className="px-4 py-3">
-                          <input
-                            type="number"
-                            value={row.displayQuantity ?? row.quantity}
-                            readOnly
-                            title={`${row.displayQuantity ?? row.quantity} ${row.acUnit || "Nos"}`}
-                            className="w-24 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2"
-                          />
-                        </td>
-                        <td className="px-4 py-3">{row.pegs || 0}</td>
+                        <td className="px-4 py-3">{row.pages ?? row.displayPages ?? row.pegs ?? 0}</td>
                         <td className="px-4 py-3">{row.unitPrice}</td>
                         <td className="px-4 py-3">{row.transactionDate}</td>
                         <td className="px-4 py-3">{row.barcode}</td>
