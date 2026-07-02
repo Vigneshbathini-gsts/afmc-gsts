@@ -121,12 +121,16 @@ export default function OrderDetailsModal({ isOpen, onClose, orderNumber }) {
                   {items.map((item, index) => {
                     const priceValue = parseNumber(item.price || item.PRICE);
                     const subtotalValue = parseNumber(item.subtotal || item.SUBTOTAL || item.total);
-                    const isFreeItem = priceValue === 0 && subtotalValue === 0;
-                   const typeValue =
-  item.type || item.TYPE || item.ac_unit || item.acUnit || (isFreeItem ? "Free Item" : "NA");
+                    const statusValue =
+                      item.status || item.STATUS || item.order_status || item.ORDER_STATUS || "";
+                    const normalizedStatus = String(statusValue).trim().toUpperCase();
+                    const isCancelled = normalizedStatus === "CANCELLED";
+                    const isFreeItem = !isCancelled && priceValue === 0 && subtotalValue === 0;
+                    const typeValue =
+                      item.type || item.TYPE || item.ac_unit || item.acUnit || (isFreeItem ? "Free Item" : "NA");
 
-const displayType =
-  typeValue === "NA" ? "NA" : toInitCap(typeValue);
+                    const displayType =
+                      typeValue === "NA" ? "NA" : toInitCap(typeValue);
 
                     return (
                       <tr key={index} className="border-t hover:bg-gray-50">
@@ -162,12 +166,16 @@ const displayType =
               {items.map((item, index) => {
                 const priceValue = parseNumber(item.price || item.PRICE);
                 const subtotalValue = parseNumber(item.subtotal || item.SUBTOTAL || item.total);
-                const isFreeItem = priceValue === 0 && subtotalValue === 0;
+                const statusValue =
+                  item.status || item.STATUS || item.order_status || item.ORDER_STATUS || "";
+                const normalizedStatus = String(statusValue).trim().toUpperCase();
+                const isCancelled = normalizedStatus === "CANCELLED";
+                const isFreeItem = !isCancelled && priceValue === 0 && subtotalValue === 0;
                 const typeValue =
-  item.type || item.TYPE || item.ac_unit || item.acUnit || (isFreeItem ? "Free Item" : "NA");
+                  item.type || item.TYPE || item.ac_unit || item.acUnit || (isFreeItem ? "Free Item" : "NA");
 
-const displayType =
-  typeValue === "NA" ? "NA" : toInitCap(typeValue);
+                const displayType =
+                  typeValue === "NA" ? "NA" : toInitCap(typeValue);
 
                 return (
                   <div key={index} className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm">

@@ -20,8 +20,10 @@ async function getInvoiceReportByOrderNumber(orderNumber) {
         od.item_id,
         COALESCE(xi.item_name, od.item_id) AS item_name,
         od.quantity,
+        od.order_status AS order_status,
         ROUND(
           CASE
+            WHEN TRIM(UPPER(IFNULL(od.order_status, ''))) = 'CANCELLED' THEN 0
             WHEN scanned_totals.scanned_total > 0 AND (od.price IS NULL OR od.price <> 0) THEN scanned_totals.scanned_total
             WHEN custom_totals.unit_custom_total > 0 THEN custom_totals.unit_custom_total * od.quantity
             ELSE IFNULL(od.subtotal, 0)
@@ -30,6 +32,7 @@ async function getInvoiceReportByOrderNumber(orderNumber) {
         ) AS subtotal,
         ROUND(
           CASE
+            WHEN TRIM(UPPER(IFNULL(od.order_status, ''))) = 'CANCELLED' THEN 0
             WHEN scanned_totals.scanned_total > 0 AND (od.price IS NULL OR od.price <> 0) THEN scanned_totals.scanned_total / NULLIF(od.quantity, 0)
             WHEN custom_totals.unit_custom_total > 0 THEN custom_totals.unit_custom_total
             ELSE COALESCE(od.price, od.subtotal / NULLIF(od.quantity, 0), 0)
@@ -119,10 +122,11 @@ async function getInvoiceReportByOrderNumber(orderNumber) {
     (sum, row) => sum + Number(row.subtotal || 0),
     0
   );
-  const totalQuantity = detailRows.reduce(
-    (sum, row) => sum + Number(row.quantity || 0),
-    0
-  );
+  const totalQuantity = detailRows.reduce((sum, row) => {
+    const status = String(row.order_status || "").trim().toUpperCase();
+    return sum + (status === "CANCELLED" ? 0 : Number(row.quantity || 0));
+  }, 0);
+  const computedTotal = Number(totalAmount.toFixed(2));
 
   return {
     header: {
@@ -132,8 +136,8 @@ async function getInvoiceReportByOrderNumber(orderNumber) {
       invoice_date: header.invoice_date || header.order_date || null,
       payment_method: header.payment_method || null,
       payment_status: header.payment_status || null,
-      order_total: Number(header.order_total || totalAmount || 0),
-      invoice_amount: Number(header.invoice_amount || totalAmount || 0),
+      order_total: computedTotal,
+      invoice_amount: computedTotal,
     },
     items: detailRows.map((row) => ({
       ...row,
