@@ -54,6 +54,16 @@ export default function KitchenOrderBell({ kitchen = "Bar" }) {
       document.removeEventListener("mousedown", handleOutsideClick);
   }, []);
 
+  useEffect(() => {
+    const handleRefresh = () => {
+      fetchOrders();
+    };
+
+    window.addEventListener("refreshKitchenBell", handleRefresh);
+    return () => {
+      window.removeEventListener("refreshKitchenBell", handleRefresh);
+    };
+  }, [fetchOrders]);
 
   const handleCloseModel = () => {
     setOpen(false);
@@ -69,12 +79,12 @@ export default function KitchenOrderBell({ kitchen = "Bar" }) {
 
   //   Mark as read
   const handleMarkAsRead = async (notificationId) => {
-    console.log("Marking notification as read:", notificationId);
+    // console.log("Marking notification as read:", notificationId);
     try {
       const resp = await barOrdersAPI.markNotificationAsRead({
         notification_id: notificationId,
       });
-      console.log("Mark as read response:", resp);
+      // console.log("Mark as read response:", resp);
       setNotifications((prev) =>
         prev.filter((n) => n.NOTIFICATION_ID !== notificationId)
       );

@@ -237,6 +237,8 @@ export default function OutletOrders({ kitchenType = "Bar" }) {
         updated.STATUS = "Preparing";
       }
 
+      window.dispatchEvent(new Event("refreshKitchenBell"));
+
       const params = new URLSearchParams();
       if (updated.ORDERNUMBER) params.set("orderNumber", String(updated.ORDERNUMBER));
       params.set("kitchenType", String(kitchenType || "Bar"));

@@ -977,7 +977,7 @@ export default function OutletOrderDetails() {
                   ×
                 </button>
               </div>
-              <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
+              <div className="mt-6 flex flex-wrap gap-3 justify-end">
                 <button
                   type="button"
                   onClick={() => closeConfirmModal(false)}

@@ -834,6 +834,9 @@ exports.processBarcodeScan = async (req, res) => {
     const forcedParentItem = String(PARENT_ITEM || "").trim();
 
     if (!forcedParentItem) {
+      // NOTE: Only checks recipe/cocktail membership here. The standalone
+      // order-line case is deliberately excluded from the ambiguity check
+      // and is also guarded against cancelled lines.
       const [possibleParentRows] = await connection.query(
         `
         SELECT DISTINCT inventory_item_code FROM (
@@ -849,7 +852,8 @@ exports.processBarcodeScan = async (req, res) => {
           FROM xxafmc_cocktails_mocktails_details
           WHERE item_code = ?
             AND inventory_item_code IN (
-              SELECT item_id FROM xxafmc_order_details WHERE order_id = ?
+              SELECT item_id FROM xxafmc_order_details
+              WHERE order_id = ? AND (order_status IS NULL OR order_status = '')
             )
         ) p
         `,
@@ -868,33 +872,54 @@ exports.processBarcodeScan = async (req, res) => {
         });
       }
     }
-    const [parentRows] = await connection.query(`
-      SELECT inventory_item_code FROM (
-        SELECT inventory_item_code FROM xxafmc_custom_cocktails_mocktails_details WHERE order_number = ? AND item_code = ?
-        UNION ALL
-        SELECT inventory_item_code FROM xxafmc_custom_cocktails_mocktails_details_dummy WHERE order_number = ? AND item_code = ?
-        UNION ALL
-        SELECT inventory_item_code
-        FROM xxafmc_cocktails_mocktails_details
-        WHERE item_code = ?
-          AND inventory_item_code IN (
-            SELECT item_id FROM xxafmc_order_details WHERE order_id = ?
-          )
-        UNION ALL
-        SELECT CAST(item_id AS CHAR) FROM xxafmc_order_details WHERE order_id = ? AND item_id = ?
-      ) x LIMIT 1`,
-      [
-        ORDERNUMBER,
-        scanItemCode,
-        ORDERNUMBER,
-        scanItemCode,
-        scanItemCode,
-        ORDERNUMBER,
-        ORDERNUMBER,
-        scanItemCode,
-      ]);
 
-    const parentItem = forcedParentItem || (parentRows.length > 0 ? parentRows[0].inventory_item_code : String(scanItemCode));
+    // --- Parent resolution (FIXED) ---
+    // Recipe/cocktail membership is checked FIRST and independently. Only if
+    // there is no recipe match do we fall back to treating the barcode as a
+    // standalone order line — and that fallback now excludes cancelled lines,
+    // so a cancelled standalone line can never "steal" a scan that should be
+    // attributed to an active cocktail/mocktail.
+    let parentItem = forcedParentItem || null;
+
+    if (!parentItem) {
+      const [recipeParentRows] = await connection.query(
+        `
+        SELECT inventory_item_code FROM (
+          SELECT inventory_item_code FROM xxafmc_custom_cocktails_mocktails_details
+          WHERE order_number = ? AND item_code = ?
+          UNION ALL
+          SELECT inventory_item_code FROM xxafmc_custom_cocktails_mocktails_details_dummy
+          WHERE order_number = ? AND item_code = ?
+          UNION ALL
+          SELECT inventory_item_code
+          FROM xxafmc_cocktails_mocktails_details
+          WHERE item_code = ?
+            AND inventory_item_code IN (
+              SELECT item_id FROM xxafmc_order_details
+              WHERE order_id = ? AND (order_status IS NULL OR order_status = '')
+            )
+        ) x LIMIT 1
+        `,
+        [ORDERNUMBER, scanItemCode, ORDERNUMBER, scanItemCode, scanItemCode, ORDERNUMBER]
+      );
+
+      if (recipeParentRows.length > 0) {
+        parentItem = recipeParentRows[0].inventory_item_code;
+      }
+    }
+
+    if (!parentItem) {
+      const [standaloneRows] = await connection.query(
+        `
+        SELECT CAST(item_id AS CHAR) AS item_id
+        FROM xxafmc_order_details
+        WHERE order_id = ? AND item_id = ? AND (order_status IS NULL OR order_status = '')
+        LIMIT 1
+        `,
+        [ORDERNUMBER, scanItemCode]
+      );
+      parentItem = standaloneRows.length > 0 ? standaloneRows[0].item_id : String(scanItemCode);
+    }
 
     // Fetch the order_line_id for the parent item (cocktail/mocktail) from xxafmc_order_details
     let parentOrderLineId = null;
@@ -915,7 +940,6 @@ exports.processBarcodeScan = async (req, res) => {
     const roleId = userRows.length > 0 ? Number(userRows[0].ROLE_ID) : null;
 
     // Get ordered quantity (l_ord_qty_item)
-    // If PARENT_ITEM is provided, cap is calculated only for that cocktail/mocktail item.
     const [orderQtyRows] = await connection.query(`
       SELECT SUM(quantity) AS total_quantity FROM (
         SELECT (COALESCE(x.pegs, 1) * COALESCE(x.quantity, 0)) AS quantity FROM xxafmc_custom_cocktails_mocktails_details x 
@@ -961,23 +985,11 @@ exports.processBarcodeScan = async (req, res) => {
         WHERE xo.order_id = ? AND xo.item_id = ? AND (xo.order_status IS NULL OR xo.order_status = '')
       ) a`,
       [
-        ORDERNUMBER,
-        scanItemCode,
-        forcedParentItem,
-        forcedParentItem,
-        ORDERNUMBER,
-        scanItemCode,
-        forcedParentItem,
-        forcedParentItem,
-        ORDERNUMBER,
-        forcedParentItem,
-        forcedParentItem,
-        forcedParentItem,
-        scanItemCode,
-        ORDERNUMBER,
-        ORDERNUMBER,
-        ORDERNUMBER,
-        scanItemCode,
+        ORDERNUMBER, scanItemCode, forcedParentItem, forcedParentItem,
+        ORDERNUMBER, scanItemCode, forcedParentItem, forcedParentItem,
+        ORDERNUMBER, forcedParentItem, forcedParentItem, forcedParentItem, scanItemCode,
+        ORDERNUMBER, ORDERNUMBER,
+        ORDERNUMBER, scanItemCode,
       ]);
 
     const orderedQty = Number(orderQtyRows[0]?.total_quantity || 0);
@@ -1003,9 +1015,6 @@ exports.processBarcodeScan = async (req, res) => {
     const l_barcode_scanned_qty = scannedCollection.filter(s => s.barcode === BARCODE).length;
 
     // === Oracle package scan validation ===
-    // Batch/package-style items can scan the same barcode multiple times until
-    // either barcode stock or ordered quantity is exhausted. Other bottle/can
-    // items remain unique-barcode scans.
     const normalizedAcUnit = String(acUnit || "").trim().toUpperCase();
     const scanSubCategory = Number(item.SUB_CATEGORY) || 0;
     const duplicateAllowedSubCategories = new Set([
@@ -1055,12 +1064,8 @@ exports.processBarcodeScan = async (req, res) => {
       }
     }
 
-
     // ================= PRICE CALCULATION (FINAL - ORACLE MATCH) =================
 
-    // STEP A: Get the pricing already chosen for this order line.
-    // The kitchen user is staff, so req.user.loginType is not the customer's
-    // member type at completion time.
     const targetOrderItemCode = String(parentItem || scanItemCode).trim();
     const [orderPricingRows] = await connection.query(
       `
@@ -1089,7 +1094,6 @@ exports.processBarcodeScan = async (req, res) => {
       ? Number(orderPricing.subcategory)
       : null;
 
-
     // STEP B: Check FREE ITEM
     const [freeItemRows] = await connection.query(
       `
@@ -1105,7 +1109,6 @@ exports.processBarcodeScan = async (req, res) => {
     );
 
     const isFreeItem = freeItemRows.length > 0 && Number(freeItemRows[0].price) === 0;
-
 
     // STEP C: Base values
     const unitPrice = Number(item.UNIT_PRICE) || 0;
@@ -1188,32 +1191,19 @@ exports.processBarcodeScan = async (req, res) => {
         SELECT COALESCE(xi.item_code, xo.ITEM_ID) AS item_code, COALESCE(xi.item_name, 'Unknown') AS item_name, (CASE WHEN UPPER(TRIM(COALESCE(xo.type, ''))) = 'LARGE' THEN 2 ELSE 1 END * xo.quantity) AS quantity,
                CAST(xo.ITEM_ID AS CHAR) AS inventory_item_code, 'I' AS Mix, xo.price, xo.order_line_id, xo.free_item_quantity
         FROM xxafmc_order_details xo LEFT JOIN (${inventorySummarySql}) xi ON xi.item_code = xo.ITEM_ID
-        WHERE xo.order_id = ? AND xo.item_id = ?
+        WHERE xo.order_id = ? AND xo.item_id = ? AND (xo.order_status IS NULL OR xo.order_status = '')
       ) A`,
       [
-        ORDERNUMBER,
-        scanItemCode,
-        forcedParentItem,
-        forcedParentItem,
-        ORDERNUMBER,
-        scanItemCode,
-        forcedParentItem,
-        forcedParentItem,
-        ORDERNUMBER,
-        forcedParentItem,
-        forcedParentItem,
-        forcedParentItem,
-        scanItemCode,
-        ORDERNUMBER,
-        ORDERNUMBER,
-        ORDERNUMBER,
-        scanItemCode,
+        ORDERNUMBER, scanItemCode, forcedParentItem, forcedParentItem,
+        ORDERNUMBER, scanItemCode, forcedParentItem, forcedParentItem,
+        ORDERNUMBER, forcedParentItem, forcedParentItem, forcedParentItem, scanItemCode,
+        ORDERNUMBER, ORDERNUMBER,
+        ORDERNUMBER, scanItemCode,
       ]);
     const currentScanned = req.session[sessionKey] || [];
 
     let componentsWithRemaining = componentRows
       .map(comp => {
-        // Fix: Subtract scans allocated ONLY to this specific line
         const already = currentScanned.filter(s => {
           if (comp.Mix === 'I' && comp.order_line_id) {
             return s.orderLineId === comp.order_line_id;
@@ -1225,12 +1215,10 @@ exports.processBarcodeScan = async (req, res) => {
       })
       .filter(comp => comp.coll_qty > 0)
       .sort((a, b) => {
-        // Priority: Cocktail ingredients -> Paid Standard items -> Free Standard items
         if (a.Mix !== b.Mix) return a.Mix.localeCompare(b.Mix);
         return Number(b.price || 0) - Number(a.price || 0);
       });
 
-    // CRITICAL: If nothing left to add → show exact Oracle error
     if (componentsWithRemaining.length === 0) {
       await connection.rollback();
       return res.status(400).json({
@@ -1239,7 +1227,6 @@ exports.processBarcodeScan = async (req, res) => {
       });
     }
 
-    // Add to session (Oracle loop logic)
     let reqQtyLeft = requestedQty;
     const addedThisScan = [];
 
@@ -1250,7 +1237,6 @@ exports.processBarcodeScan = async (req, res) => {
       let finalPrice = calculatedPaidPrice;
       let isFree = false;
 
-      // Determine if this specific component is a free line
       if (comp.Mix === 'I' && Number(comp.price || 1) === 0) {
         finalPrice = 0;
         isFree = true;
@@ -1270,7 +1256,7 @@ exports.processBarcodeScan = async (req, res) => {
         itemPrice: finalPrice,
         lineTotalPrice: Number((Number(finalPrice || 0) * qtyToAdd).toFixed(2)),
         barcode: BARCODE,
-        orderLineId: comp.Mix === 'MO' ? parentOrderLineId : comp.order_line_id, // Use parent's order_line_id for ingredients
+        orderLineId: comp.Mix === 'MO' ? parentOrderLineId : comp.order_line_id,
         scannedAt: new Date().toISOString(),
         parentItem: comp.inventory_item_code,
         categoryId,
@@ -1293,7 +1279,6 @@ exports.processBarcodeScan = async (req, res) => {
     transactionCommitted = true;
     await saveSession(req);
 
-    // Final Response - Only success if we actually added something
     return res.status(201).json({
       success: true,
       message: "Barcode scanned successfully",
