@@ -106,13 +106,41 @@ export default function InvoicePage() {
     setPaymentStatus(isCreditPayment ? "Un Paid" : "Paid");
   }, [isCreditPayment]);
 
-  const items = Array.isArray(invoiceData?.items) ? invoiceData.items : [];
+  const rawItems = Array.isArray(invoiceData?.items) ? invoiceData.items : [];
+  const items = rawItems.filter(
+    (item) =>
+      Number(item?.quantity || item?.QUANTITY || 0) > 0 &&
+      String(item?.order_status || "").trim().toUpperCase() !== "CANCELLED"
+  );
+  const getItemName = (item) =>
+    item?.item_name || item?.ITEM_NAME || item?.itemName || "";
+  const itemAmount = rawItems.reduce(
+    (sum, item) =>
+      sum +
+      ((String(item?.order_status || "").trim().toUpperCase() === "CANCELLED")
+        ? 0
+        : Number(item?.SUBTOTAL ?? item?.subtotal ?? 0)),
+    0
+  );
   const computedAmount = Number(
-    invoiceData?.invoice?.amount || invoiceData?.header?.order_total || amountFromQuery || 0
+    invoiceData?.totalAmount ??
+      (Array.isArray(invoiceData?.items) ? itemAmount : undefined) ??
+      invoiceData?.invoice?.amount ??
+      invoiceData?.header?.order_total ??
+      amountFromQuery ??
+      0
   );
   const totalQuantity = useMemo(
-    () => items.reduce((sum, item) => sum + Number(item.quantity || 0), 0),
-    [items]
+    () =>
+      rawItems.reduce(
+        (sum, item) =>
+          sum +
+          ((String(item?.order_status || "").trim().toUpperCase() === "CANCELLED")
+            ? 0
+            : Number(item.quantity || item.QUANTITY || 0)),
+        0
+      ),
+    [rawItems]
   );
 
   const handleComplete = () => {
@@ -338,7 +366,7 @@ export default function InvoicePage() {
                           className="transition hover:bg-afmc-gold/5"
                         >
                           <td className="px-5 py-4 text-sm font-medium text-stone-800">
-                            {item.item_name}
+                            {getItemName(item)}
                           </td>
                           <td className="px-5 py-4 text-sm text-stone-700">
                             {item.quantity}

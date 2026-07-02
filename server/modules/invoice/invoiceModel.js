@@ -18,14 +18,35 @@ async function getInvoiceDetails(orderNumber) {
         oh.order_num,
         oh.user_id,
         oh.order_date,
-        ROUND(IFNULL(oh.order_total, 0), 2) AS order_total,
+        ROUND(IFNULL((
+          SELECT SUM(
+            CASE
+              WHEN TRIM(UPPER(IFNULL(od2.order_status, ''))) = 'CANCELLED' THEN 0
+              ELSE IFNULL(od2.subtotal, 0)
+            END
+          )
+          FROM xxafmc_order_details od2
+          WHERE od2.order_id = oh.order_num
+        ), 0), 2) AS order_total,
         od.item_id,
         inv.invoice_id,
         inv.payment_method,
         inv.payment_reference,
         inv.payment_status,
         inv.invoice_date,
-        ROUND(IFNULL(inv.amount, 0), 2) AS amount
+        ROUND( IFNULL(
+          inv.amount,
+          (
+            SELECT SUM(
+              CASE
+                WHEN TRIM(UPPER(IFNULL(od2.order_status, ''))) = 'CANCELLED' THEN 0
+                ELSE IFNULL(od2.subtotal, 0)
+              END
+            )
+            FROM xxafmc_order_details od2
+            WHERE od2.order_id = oh.order_num
+          )
+        ), 2) AS amount
       FROM xxafmc_order_header oh
       LEFT JOIN xxafmc_order_details od
         ON od.order_id = oh.order_num
@@ -50,13 +71,26 @@ async function getInvoiceDetails(orderNumber) {
         od.item_id,
         COALESCE(xi.item_name, od.item_id) AS item_name,
         od.quantity,
-        ROUND(IFNULL(od.price, 0), 2) AS price,
-        ROUND(IFNULL(od.subtotal, 0), 2) AS total
+        od.order_status,
+        ROUND(
+          CASE
+            WHEN TRIM(UPPER(IFNULL(od.order_status, ''))) = 'CANCELLED' THEN 0
+            ELSE IFNULL(od.price, 0)
+          END,
+          2
+        ) AS price,
+        ROUND(
+          CASE
+            WHEN TRIM(UPPER(IFNULL(od.order_status, ''))) = 'CANCELLED' THEN 0
+            ELSE IFNULL(od.subtotal, 0)
+          END,
+          2
+        ) AS total
       FROM xxafmc_order_details od
       LEFT JOIN xxafmc_inventory xi
         ON xi.item_code = od.item_id
       WHERE od.order_id = ?
-        AND od.order_status IS NULL
+        AND TRIM(UPPER(IFNULL(od.order_status, ''))) <> 'CANCELLED'
       ORDER BY od.order_line_id ASC
     `,
     [normalizedOrderNumber]
@@ -266,12 +300,40 @@ const findInvoiceWithItemsByOrder = async (orderNumber) => {
         inv.payment_method AS paymentMethod,
         inv.payment_status AS paymentStatus,
         DATE_FORMAT(inv.invoice_date, '%c/%e/%Y') AS invoiceDate,
-        inv.amount AS totalAmount,
+        ROUND(
+          COALESCE(
+            (
+              SELECT SUM(
+                CASE
+                  WHEN TRIM(UPPER(IFNULL(xxod.order_status, ''))) = 'CANCELLED' THEN 0
+                  ELSE IFNULL(xxod.subtotal, 0)
+                END
+              )
+              FROM xxafmc_order_details xxod
+              WHERE xxod.order_id = inv.order_num
+            ),
+            0
+          ),
+          2
+        ) AS totalAmount,
         inv.payment_reference AS paymentReference,
         od.item_id,
         od.quantity,
-        od.price,
-        od.subtotal,
+        od.order_status AS order_status,
+        ROUND(
+          CASE
+            WHEN TRIM(UPPER(IFNULL(od.order_status, ''))) = 'CANCELLED' THEN 0
+            ELSE IFNULL(od.price, 0)
+          END,
+          2
+        ) AS price,
+        ROUND(
+          CASE
+            WHEN TRIM(UPPER(IFNULL(od.order_status, ''))) = 'CANCELLED' THEN 0
+            ELSE IFNULL(od.subtotal, 0)
+          END,
+          2
+        ) AS subtotal,
         COALESCE(i.item_name, od.item_id) AS item_name
       FROM xxafmc_invoices inv
       LEFT JOIN xxafmc_order_details od
@@ -301,12 +363,40 @@ const findOrderWithItemsByOrder = async (orderNumber) => {
           ),
           '%c/%e/%Y'
         ) AS invoiceDate,
-        oh.order_total AS totalAmount,
+        ROUND(
+          COALESCE(
+            (
+              SELECT SUM(
+                CASE
+                  WHEN TRIM(UPPER(IFNULL(od2.order_status, ''))) = 'CANCELLED' THEN 0
+                  ELSE IFNULL(od2.subtotal, 0)
+                END
+              )
+              FROM xxafmc_order_details od2
+              WHERE od2.order_id = oh.order_num
+            ),
+            0
+          ),
+          2
+        ) AS totalAmount,
         '' AS paymentReference,
         od.item_id,
         od.quantity,
-        od.price,
-        od.subtotal,
+        od.order_status AS order_status,
+        ROUND(
+          CASE
+            WHEN TRIM(UPPER(IFNULL(od.order_status, ''))) = 'CANCELLED' THEN 0
+            ELSE IFNULL(od.price, 0)
+          END,
+          2
+        ) AS price,
+        ROUND(
+          CASE
+            WHEN TRIM(UPPER(IFNULL(od.order_status, ''))) = 'CANCELLED' THEN 0
+            ELSE IFNULL(od.subtotal, 0)
+          END,
+          2
+        ) AS subtotal,
         COALESCE(i.item_name, od.item_id) AS item_name
       FROM xxafmc_order_header oh
       LEFT JOIN xxafmc_order_details od

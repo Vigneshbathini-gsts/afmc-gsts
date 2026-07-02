@@ -36,9 +36,14 @@ const fetchInvoiceByOrder = async (orderNumber) => {
     paymentReference: invoiceRow.paymentReference || "",
     items: rows.map((row) => ({
       ITEM_NAME: row.item_name || row.item_id || "",
+      item_name: row.item_name || row.item_id || "",
       QUANTITY: row.quantity,
+      quantity: row.quantity,
       PRICE: row.price,
+      price: row.price,
       SUBTOTAL: row.subtotal,
+      subtotal: row.subtotal,
+      order_status: row.order_status || null,
     })),
   };
 };

@@ -31,20 +31,33 @@ export default function InvoiceReport() {
   const amountFromQuery = Number(searchParams.get("amount") || location.state?.amount || 0);
 
   const items = useMemo(
-    () => (Array.isArray(reportData?.items) ? reportData.items : []),
+    () =>
+      (Array.isArray(reportData?.items) ? reportData.items : []).filter(
+        (item) =>
+          Number(item?.quantity || item?.QUANTITY || 0) > 0 &&
+          String(item?.order_status || "").trim().toUpperCase() !== "CANCELLED"
+      ),
     [reportData?.items]
   );
 
   const totalQuantity = useMemo(
-    () => items.reduce((sum, item) => sum + Number(item.quantity || 0), 0),
+    () =>
+      items.reduce(
+        (sum, item) =>
+          sum +
+          ((String(item?.order_status || "").trim().toUpperCase() === "CANCELLED")
+            ? 0
+            : Number(item.quantity || item.QUANTITY || 0)),
+        0
+      ),
     [items]
   );
 
   const resolvedAmount = Number(
-    reportData?.summary?.total_amount ||
-      reportData?.header?.invoice_amount ||
-      reportData?.header?.order_total ||
-      amountFromQuery ||
+    reportData?.summary?.total_amount ??
+      reportData?.header?.invoice_amount ??
+      reportData?.header?.order_total ??
+      amountFromQuery ??
       0
   );
 
