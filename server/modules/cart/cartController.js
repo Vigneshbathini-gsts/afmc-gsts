@@ -214,8 +214,8 @@ const getCartItemByCode = async (req, itemCode) => {
 const isCocktailCartItem = (cartItem) => {
   return Boolean(
     cartItem &&
-      ((cartItem.category_id === 10 && [14, 15].includes(Number(cartItem.sub_category))) ||
-        Number(cartItem.has_recipe || 0) > 0)
+    ((cartItem.category_id === 10 && [14, 15].includes(Number(cartItem.sub_category))) ||
+      Number(cartItem.has_recipe || 0) > 0)
   );
 };
 
@@ -605,6 +605,64 @@ exports.confirmOrder = async (req, res) => {
       }
     };
 
+    const validateCombinedStock = async (cartRows) => {
+      const stockConsumption = new Map();
+
+      for (const cartItem of cartRows) {
+        const quantity = Number(cartItem.quantity || 0);
+
+        // Normal Item
+        if (![14, 15].includes(Number(cartItem.sub_category || 0))) {
+          const itemCode = Number(cartItem.item_id);
+
+          stockConsumption.set(
+            itemCode,
+            (stockConsumption.get(itemCode) || 0) + quantity
+          );
+          continue;
+        }
+
+        // Cocktail / Mocktail
+        const cartId = Number(cartItem.cart_id);
+
+        const [ingredients] = await connection.execute(
+          `
+      SELECT ingredient_item_code, ingredient_name, quantity
+      FROM xxafmc_cart_customization
+      WHERE cart_id = ?
+      `,
+          [cartId]
+        );
+
+        for (const ingredient of ingredients) {
+          const ingredientCode = Number(ingredient.ingredient_item_code);
+          const requiredQty =
+            Number(ingredient.quantity || 0) * quantity;
+
+          stockConsumption.set(
+            ingredientCode,
+            (stockConsumption.get(ingredientCode) || 0) + requiredQty
+          );
+        }
+      }
+
+      // Validate total consumption
+      for (const [itemCode, requiredQty] of stockConsumption.entries()) {
+        await lockInventoryItem(itemCode);
+
+        const stockQty = await getStockQuantity(itemCode);
+        const reservedQty = await getReservedInventoryQty(itemCode);
+
+        const availableQty = Math.max(0, stockQty - reservedQty);
+
+        if (requiredQty > availableQty) {
+          throw new Error(
+            `Insufficient stock for item ${itemCode}. Available quantity: ${availableQty}`
+          );
+        }
+      }
+    };
+
     // 1. Fetch Cart Items and join with inventory to get names and categories
     const [cartRows] = await connection.execute(
       `SELECT
@@ -626,6 +684,8 @@ exports.confirmOrder = async (req, res) => {
     if (cartRows.length === 0) {
       throw new Error("Cart is empty");
     }
+
+    await validateCombinedStock(cartRows);
 
     const cocktailCartIds = cartRows
       .filter((row) => [14, 15].includes(Number(row?.sub_category ?? row?.SUB_CATEGORY ?? 0)))
@@ -745,12 +805,12 @@ exports.confirmOrder = async (req, res) => {
       const stockCheckQty = Number(cartQtyRaw || 0);
 
       const isCocktailOrMocktail = [14, 15].includes(Number(cartSubcategoryRaw || 0));
-      if (isCocktailOrMocktail) {
-        const cartId = cartItem?.cart_id ?? cartItem?.CART_ID ?? null;
-        await validateCocktailIngredientsStock(cartId, stockCheckQty);
-      } else {
-        await validateInventoryQty(itemId, stockCheckQty, cartCategoryIdRaw, cartItemName || itemId);
-      }
+      // if (isCocktailOrMocktail) {
+      //   const cartId = cartItem?.cart_id ?? cartItem?.CART_ID ?? null;
+      //   await validateCocktailIngredientsStock(cartId, stockCheckQty);
+      // } else {
+      //   await validateInventoryQty(itemId, stockCheckQty, cartCategoryIdRaw, cartItemName || itemId);
+      // }
 
       // 3. Insert into Order Details (aligned to existing schema; no `description` column)
       const orderLineId = await getNextOrderLineId();
@@ -863,7 +923,7 @@ exports.confirmOrder = async (req, res) => {
     // 5. Clear Cart
     await connection.execute(
       `DELETE FROM xxafmc_cart_customization 
-       WHERE cart_id IN (SELECT cart_id FROM xxafmc_cart_items WHERE user_id = ?)`, 
+       WHERE cart_id IN (SELECT cart_id FROM xxafmc_cart_items WHERE user_id = ?)`,
       [userId]
     );
     await connection.execute("DELETE FROM xxafmc_cart_items WHERE user_id = ?", [userId]);
@@ -1024,7 +1084,17 @@ exports.getIngredientStocks = async (req, res) => {
       ? Number(rawExcludeOrderNumber)
       : null;
 
-    const data = await cartModel.getIngredientStockMap(codes, excludeOrderNumber);
+    const rawExcludeCartId = String(req.query?.excludeCartId || "").trim();
+    const excludeCartId = Number.isFinite(Number(rawExcludeCartId)) && Number(rawExcludeCartId) > 0
+      ? Number(rawExcludeCartId)
+      : null;
+
+    const data = await cartModel.getIngredientStockMap(
+      codes,
+      excludeOrderNumber,
+      req.user?.userId,
+      excludeCartId
+    );
     return res.status(200).json({ success: true, data });
   } catch (error) {
     console.error("Error fetching ingredient stocks:", error);

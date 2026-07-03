@@ -69,6 +69,8 @@ export default function CartPage({ isAttendant = false }) {
     const [proceedConfirmOpen, setProceedConfirmOpen] = useState(false);
     const [stockLimitImageMessages, setStockLimitImageMessages] = useState({});
 
+
+
     const userId = user?.userId;
 
     const showToast = useCallback((message, type = 'success') => {
@@ -117,6 +119,7 @@ export default function CartPage({ isAttendant = false }) {
         try {
             const response = await cartAPI.getByUserId(userId);
             const items = response.data.data || [];
+            console.log("Fetched cart items:", items);
             setCartItems(items);
             setCartCount(items.length);
             // Pre-fetch cocktail details for cocktail/mocktail items
@@ -187,9 +190,8 @@ export default function CartPage({ isAttendant = false }) {
                 if (ingredients.length > 0) {
                     try {
                         const codes = [...new Set(ingredients.map((ing) => ing.itemCode))];
-                        const stockRes = await cartAPI.getIngredientStocks(codes);
+                        const stockRes = await cartAPI.getIngredientStocks(codes, undefined, undefined, cartId);
                         const stockMap = stockRes?.data?.data || {};
-
                         for (const ing of ingredients) {
                             const rawAvailable = stockMap?.[String(ing.itemCode)];
                             if (rawAvailable === undefined || rawAvailable === null || rawAvailable === "") continue;
@@ -285,10 +287,80 @@ export default function CartPage({ isAttendant = false }) {
     }, [cartItems.length]);
 
     const handleProceedConfirm = useCallback(() => {
+
         const proceed = async () => {
             try {
                 setLoading(true);
                 setError(null);
+
+                // Build combined consumption map (normal items + cocktail ingredients)
+                const stockConsumption = new Map();
+
+                // Add normal items consumption
+                for (const item of cartItems) {
+                    if (!isCocktailOrMocktail(item)) {
+                        const code = Number(item.itemId || item.item_code || item.ITEM_CODE);
+                        if (!Number.isFinite(code) || code <= 0) continue;
+                        stockConsumption.set(code, (stockConsumption.get(code) || 0) + Number(item.quantity || 0));
+                    }
+                }
+
+                // Add cocktail/mocktail ingredient consumption (ensure details are loaded)
+                for (const item of cartItems) {
+                    if (!isCocktailOrMocktail(item)) continue;
+                    let details = cocktailDetailsByCartId[String(item.cartId)];
+                    if (!Array.isArray(details)) {
+                        try {
+                            const res = await cartAPI.getCocktailDetails(item.cartId);
+                            details = res?.data?.data?.details || [];
+                            setCocktailDetailsByCartId((m) => ({ ...m, [String(item.cartId)]: details }));
+                        } catch (e) {
+                            details = [];
+                        }
+                    }
+
+                    for (const d of (details || [])) {
+                        const code = Number(d?.ITEM_CODE ?? d?.itemCode ?? d?.item_id ?? d?.item_id);
+                        const pegs = Number(d?.PEGS ?? d?.pegs ?? d?.QUANTITY ?? d?.quantity ?? 0) || 0;
+                        if (!Number.isFinite(code) || code <= 0 || pegs <= 0) continue;
+                        const required = pegs * Number(item.quantity || 0);
+                        stockConsumption.set(code, (stockConsumption.get(code) || 0) + required);
+                    }
+                }
+
+                const codes = [...new Set([...stockConsumption.keys()])].filter((c) => Number.isFinite(Number(c)) && Number(c) > 0);
+
+                if (codes.length === 0) {
+                    showToast("No valid items or ingredient codes found to validate.", 'error');
+                    setLoading(false);
+                    setProceedConfirmOpen(false);
+                    return;
+                }
+
+                // Fetch ingredient stocks (API may return available after subtracting carts)
+                const stocksRes = await cartAPI.getIngredientStocks(codes);
+                const stocksMap = stocksRes?.data?.data || {};
+
+                // Validate required against returned availability. The API may return availability
+                // that already subtracts current cart consumption; to avoid false negatives we add
+                // back the current cart consumption for each code when comparing.
+                for (const code of codes) {
+                    const required = Number(stockConsumption.get(code) || 0);
+                    const availableApi = Number(stocksMap[String(code)] ?? 0);
+                    const availableForOrder = availableApi + required; // add back current cart consumption
+
+                    if (required > availableForOrder) {
+                        showToast(`Insufficient stock for item ${code}. Required: ${required}, Available: ${availableApi}`, 'error');
+                        // find an item using this code to show image overlay
+                        const offendingItem = cartItems.find((it) => Number(it.itemId) === Number(code) || String(it.cartId) in cocktailDetailsByCartId && (cocktailDetailsByCartId[String(it.cartId)] || []).some(d => Number(d?.ITEM_CODE ?? d?.itemCode) === Number(code)));
+                        if (offendingItem) showStockLimitOnImage(offendingItem, 'Out of Stock');
+                        setProceedConfirmOpen(false);
+                        setLoading(false);
+                        return;
+                    }
+                }
+
+                // All good — create the order
                 const selectedPubmed = sessionStorage.getItem("afmc:selectedPubmed") || "";
                 const response = await cartAPI.confirmOrder({
                     ...(selectedPubmed ? { pubmed: selectedPubmed } : {}),
@@ -303,15 +375,15 @@ export default function CartPage({ isAttendant = false }) {
                     clearSelectedAttendantCustomer();
                 }
 
-                 setProceedConfirmOpen(false);
-                 const basePath = isAttendant ? "/attendant" : "/user";
+                setProceedConfirmOpen(false);
+                const basePath = isAttendant ? "/attendant" : "/user";
                 navigate(`${basePath}/cart/buy?orderNumber=${encodeURIComponent(orderNumber)}`, {
                     state: { orderNumber },
                 });
-             } catch (err) {
-                 setProceedConfirmOpen(false);
-                 const msg = err?.response?.data?.message || err?.message || "Unable to create order.";
-                 setError(msg);
+            } catch (err) {
+                setProceedConfirmOpen(false);
+                const msg = err?.response?.data?.message || err?.message || "Unable to create order.";
+                setError(msg);
                 showToast(msg, "error");
             } finally {
                 setLoading(false);
@@ -319,7 +391,7 @@ export default function CartPage({ isAttendant = false }) {
         };
 
         proceed();
-    }, [navigate, isAttendant, showToast]);
+    }, [navigate, isAttendant, showToast, cartItems, cocktailDetailsByCartId, setCocktailDetailsByCartId, showStockLimitOnImage]);
 
     const handleGoToMenu = useCallback(() => {
         const basePath = isAttendant ? "/attendant" : "/user";
@@ -372,8 +444,8 @@ export default function CartPage({ isAttendant = false }) {
                         onClick={handleProceedToBuy}
                         disabled={cartItems.length === 0}
                         className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold text-white transition ${cartItems.length === 0
-                                ? "bg-gray-400 cursor-not-allowed"
-                                : "bg-red-700 hover:bg-red-800"
+                            ? "bg-gray-400 cursor-not-allowed"
+                            : "bg-red-700 hover:bg-red-800"
                             }`}
                     >
                         {toInitCap("Proceed to buy")}
@@ -489,50 +561,50 @@ export default function CartPage({ isAttendant = false }) {
                                 </div>
                             </div>
 
-                        {/* Details */}
-                        <div className="flex-1">
-                            <h2 className="text-sm font-semibold text-gray-900 overflow-hidden text-ellipsis whitespace-nowrap">
-                                {toInitCap(item.itemName) || toInitCap("Unnamed Item")}
-                            </h2>
+                            {/* Details */}
+                            <div className="flex-1">
+                                <h2 className="text-sm font-semibold text-gray-900 overflow-hidden text-ellipsis whitespace-nowrap">
+                                    {toInitCap(item.itemName) || toInitCap("Unnamed Item")}
+                                </h2>
 
-                            <p
-                                className={`text-xs mt-1 ${String(stockStatusText || "").toLowerCase() === "out of stock"
-                                    ? "text-red-600"
-                                    : "text-green-600"
-                                    }`}
-                            >
-                                {toInitCap(stockStatusText) || toInitCap("Checking Stock")}
-                            </p>
-                        </div>
+                                <p
+                                    className={`text-xs mt-1 ${String(stockStatusText || "").toLowerCase() === "out of stock"
+                                        ? "text-red-600"
+                                        : "text-green-600"
+                                        }`}
+                                >
+                                    {toInitCap(stockStatusText) || toInitCap("Checking Stock")}
+                                </p>
+                            </div>
 
-                        {/* Quantity Controls */}
-                        <div className="mt-2 flex items-center justify-between gap-2 border-t border-gray-100 pt-2">
-                            {!item.isFreeItem ? (
-                                <div className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 px-2 py-1">
-                                    <button
-                                        onClick={() => handleQuantityUpdate(item.cartId, Math.max(1, (item.quantity || 1) - 1))}
-                                        className="rounded-full bg-white px-2 text-xs font-semibold text-gray-700 shadow-sm hover:bg-gray-100 disabled:opacity-50"
-                                        disabled={updatingItemId === item.cartId || item.quantity <= 1}
-                                    >
-                                        <Minus size={12} />
-                                    </button>
-                                    <span className="min-w-[28px] text-center text-xs font-semibold">
-                                        {item.quantity || 1}
-                                    </span>
-                                    <button
-                                        onClick={() => handleQuantityUpdate(item.cartId, (item.quantity || 1) + 1)}
-                                        className="rounded-full bg-white px-2 text-xs font-semibold text-gray-700 shadow-sm hover:bg-gray-100 disabled:opacity-50"
-                                        disabled={updatingItemId === item.cartId}
-                                    >
-                                        <Plus size={12} />
-                                    </button>
-                                </div>
-                            ) : (
-                                <div className="text-xs text-gray-600">
-                                    {toInitCap("Qty")}: {item.quantity || 1} ({toInitCap("Free")})
-                                </div>
-                            )}
-                        </div>
+                            {/* Quantity Controls */}
+                            <div className="mt-2 flex items-center justify-between gap-2 border-t border-gray-100 pt-2">
+                                {!item.isFreeItem ? (
+                                    <div className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 px-2 py-1">
+                                        <button
+                                            onClick={() => handleQuantityUpdate(item.cartId, Math.max(1, (item.quantity || 1) - 1))}
+                                            className="rounded-full bg-white px-2 text-xs font-semibold text-gray-700 shadow-sm hover:bg-gray-100 disabled:opacity-50"
+                                            disabled={updatingItemId === item.cartId || item.quantity <= 1}
+                                        >
+                                            <Minus size={12} />
+                                        </button>
+                                        <span className="min-w-[28px] text-center text-xs font-semibold">
+                                            {item.quantity || 1}
+                                        </span>
+                                        <button
+                                            onClick={() => handleQuantityUpdate(item.cartId, (item.quantity || 1) + 1)}
+                                            className="rounded-full bg-white px-2 text-xs font-semibold text-gray-700 shadow-sm hover:bg-gray-100 disabled:opacity-50"
+                                            disabled={updatingItemId === item.cartId}
+                                        >
+                                            <Plus size={12} />
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="text-xs text-gray-600">
+                                        {toInitCap("Qty")}: {item.quantity || 1} ({toInitCap("Free")})
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     );
                 })}
