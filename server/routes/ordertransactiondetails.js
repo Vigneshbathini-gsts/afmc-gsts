@@ -167,18 +167,26 @@ const getOrderTransactionDetails = async (req, res) => {
         AND CT.inventory_item_code = OD.ITEM_ID
     `;
 
+    const multiplierExpression = `
+      CASE WHEN UPPER(TRIM(IFNULL(OD.TYPE, ''))) = 'LARGE' THEN 2 ELSE 1 END
+    `;
+
     const effectiveSubtotalExpression = `
       CASE
         WHEN XI.SUB_CATEGORY IN (14, 15) AND IFNULL(ST.scanned_subtotal, 0) > 0
           THEN ST.scanned_subtotal
         WHEN XI.SUB_CATEGORY IN (14, 15) AND IFNULL(CT.unit_custom_subtotal, 0) > 0
-          THEN CT.unit_custom_subtotal * IFNULL(OD.QUANTITY, 0)
-        ELSE IFNULL(OD.SUBTOTAL, 0)
+          THEN CT.unit_custom_subtotal * (${multiplierExpression} * IFNULL(OD.QUANTITY, 0))
+        ELSE IFNULL(OD.SUBTOTAL, 0) * (${multiplierExpression})
       END
     `;
 
     const netSubtotalExpression = `
-      (${effectiveSubtotalExpression} - IFNULL(OD.FOOD_PR_CHARGES * OD.QUANTITY, 0))
+      (${effectiveSubtotalExpression} - IFNULL(OD.FOOD_PR_CHARGES * (${multiplierExpression} * IFNULL(OD.QUANTITY, 0)), 0))
+    `;
+
+    const quantityExpression = `
+      (${multiplierExpression} * IFNULL(OD.QUANTITY, 0))
     `;
 
     const detailQuery = `
@@ -186,27 +194,27 @@ const getOrderTransactionDetails = async (req, res) => {
         OD.ORDER_LINE_ID,
         OD.ORDER_ID,
         OD.ITEM_ID,
-        OD.QUANTITY,
+        ${quantityExpression} AS QUANTITY,
         ROUND(${netSubtotalExpression}, 2) AS SUBTOTAL,
         ROUND(
           CASE 
             WHEN ${effectiveSubtotalExpression} <> 0 THEN
-              (${effectiveSubtotalExpression} - IFNULL(OD.FOOD_PR_CHARGES * OD.QUANTITY, 0))
-              / (1 + (IFNULL(OD.PROFIT, 0) / 100)) / OD.QUANTITY
+              (${effectiveSubtotalExpression} - IFNULL(OD.FOOD_PR_CHARGES * (${multiplierExpression} * IFNULL(OD.QUANTITY, 0)), 0))
+              / (1 + (IFNULL(OD.PROFIT, 0) / 100)) / NULLIF(${multiplierExpression} * IFNULL(OD.QUANTITY, 0), 0)
             ELSE 0
           END, 2
         ) AS PRICE,
-        ROUND(IFNULL(OD.FOOD_PR_CHARGES * OD.QUANTITY, 0), 2) AS FOOD_PR_CHARGES,
-        IFNULL(OD.PROFIT * OD.QUANTITY, 0) AS TOTALPROFIT,
+        ROUND(IFNULL(OD.FOOD_PR_CHARGES * (${multiplierExpression} * IFNULL(OD.QUANTITY, 0)), 0), 2) AS FOOD_PR_CHARGES,
+        IFNULL(OD.PROFIT * (${multiplierExpression} * IFNULL(OD.QUANTITY, 0)), 0) AS TOTALPROFIT,
         ROUND(
           (IFNULL(OD.PROFIT, 0) / 100) *
-          ((${effectiveSubtotalExpression} - IFNULL(OD.FOOD_PR_CHARGES * OD.QUANTITY, 0)) /
+          ((${effectiveSubtotalExpression} - IFNULL(OD.FOOD_PR_CHARGES * (${multiplierExpression} * IFNULL(OD.QUANTITY, 0)), 0)) /
           (1 + (IFNULL(OD.PROFIT, 0) / 100))), 2
         ) AS TOTAL_PROFIT,
         ROUND(
           ((IFNULL(OD.PROFIT, 0) / 100) *
-          ((${effectiveSubtotalExpression} - IFNULL(OD.FOOD_PR_CHARGES * OD.QUANTITY, 0)) /
-          (1 + (IFNULL(OD.PROFIT, 0) / 100)))) / OD.QUANTITY, 2
+          ((${effectiveSubtotalExpression} - IFNULL(OD.FOOD_PR_CHARGES * (${multiplierExpression} * IFNULL(OD.QUANTITY, 0)), 0)) /
+          (1 + (IFNULL(OD.PROFIT, 0) / 100)))) / NULLIF(${multiplierExpression} * IFNULL(OD.QUANTITY, 0), 0), 2
         ) AS UNIT_PROFIT,
         IFNULL(OD.PROFIT, 0) AS TOTALPERCENT,
         OH.ORDER_NUM,
@@ -238,11 +246,11 @@ const getOrderTransactionDetails = async (req, res) => {
         'Total' AS QUANTITY,
         ROUND(SUM(${netSubtotalExpression}),2) AS SUBTOTAL,
         NULL AS PRICE,
-        ROUND(SUM(IFNULL(OD.FOOD_PR_CHARGES * OD.QUANTITY,0)),2) AS FOOD_PR_CHARGES,
-        SUM(IFNULL(OD.PROFIT * OD.QUANTITY,0)) AS TOTALPROFIT,
+        ROUND(SUM(IFNULL(OD.FOOD_PR_CHARGES * (${multiplierExpression} * IFNULL(OD.QUANTITY, 0)),0)),2) AS FOOD_PR_CHARGES,
+        SUM(IFNULL(OD.PROFIT * (${multiplierExpression} * IFNULL(OD.QUANTITY, 0)),0)) AS TOTALPROFIT,
         ROUND(SUM(
           (IFNULL(OD.PROFIT, 0) / 100) *
-          ((${effectiveSubtotalExpression} - IFNULL(OD.FOOD_PR_CHARGES * OD.QUANTITY, 0)) /
+          ((${effectiveSubtotalExpression} - IFNULL(OD.FOOD_PR_CHARGES * (${multiplierExpression} * IFNULL(OD.QUANTITY, 0)), 0)) /
           (1 + (IFNULL(OD.PROFIT, 0) / 100)))
         ),2) AS TOTAL_PROFIT,
         NULL AS UNIT_PROFIT,
@@ -317,7 +325,7 @@ const getOrderTransactionDetails = async (req, res) => {
 
     const [results] = await db.execute(finalQuery, allParams);
 
-    console.log(`Found ${results.length} records`);
+// console.log("Fetched order transaction results count:", results.length,results);
 
     return res.json({
       success: true,
