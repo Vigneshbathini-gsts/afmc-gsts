@@ -177,13 +177,17 @@ const getOrderTransactionDetails = async (req, res) => {
       END
     `;
 
+    const netSubtotalExpression = `
+      (${effectiveSubtotalExpression} - IFNULL(OD.FOOD_PR_CHARGES * OD.QUANTITY, 0))
+    `;
+
     const detailQuery = `
       SELECT DISTINCT
         OD.ORDER_LINE_ID,
         OD.ORDER_ID,
         OD.ITEM_ID,
         OD.QUANTITY,
-        ROUND(${effectiveSubtotalExpression}, 2) AS SUBTOTAL,
+        ROUND(${netSubtotalExpression}, 2) AS SUBTOTAL,
         ROUND(
           CASE 
             WHEN ${effectiveSubtotalExpression} <> 0 THEN
@@ -232,7 +236,7 @@ const getOrderTransactionDetails = async (req, res) => {
         NULL AS ORDER_ID,
         NULL AS ITEM_ID,
         'Total' AS QUANTITY,
-        ROUND(SUM(${effectiveSubtotalExpression}),2) AS SUBTOTAL,
+        ROUND(SUM(${netSubtotalExpression}),2) AS SUBTOTAL,
         NULL AS PRICE,
         ROUND(SUM(IFNULL(OD.FOOD_PR_CHARGES * OD.QUANTITY,0)),2) AS FOOD_PR_CHARGES,
         SUM(IFNULL(OD.PROFIT * OD.QUANTITY,0)) AS TOTALPROFIT,
