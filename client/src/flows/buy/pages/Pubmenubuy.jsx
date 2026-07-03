@@ -581,9 +581,12 @@ export default function Pubmenubuy({
     const projectedConsumption = buildStockConsumptionMap(projectedItems, {
       getCocktailDetails: getCocktailDetailsForStockCheck,
     });
+    const targetUnitConsumption = buildStockConsumptionMap([{ ...targetItem, quantity: 1 }], {
+      getCocktailDetails: getCocktailDetailsForStockCheck,
+    });
     const normalAvailableByCode = buildAvailableStockByCode(projectedItems);
 
-    const codes = [...new Set([...projectedConsumption.keys()])]
+    const codes = [...new Set([...targetUnitConsumption.keys()])]
       .filter((code) => Number.isFinite(Number(code)) && Number(code) > 0);
 
     if (codes.length === 0) {
@@ -596,6 +599,11 @@ export default function Pubmenubuy({
 
       for (const code of codes) {
         const projectedRequired = Number(projectedConsumption.get(code) || 0);
+        const targetRequiredPerUnit = Number(targetUnitConsumption.get(code) || 0);
+        if (!Number.isFinite(targetRequiredPerUnit) || targetRequiredPerUnit <= 0) {
+          continue;
+        }
+
         const normalAvailable = normalAvailableByCode.get(String(code));
         const availableRaw = normalAvailable ?? stockMap[String(code)];
         if (availableRaw === undefined || availableRaw === null || availableRaw === "") {
@@ -608,9 +616,11 @@ export default function Pubmenubuy({
         }
 
         if (projectedRequired > availableApi) {
+          const otherRequired = Math.max(0, projectedRequired - (targetRequiredPerUnit * nextQuantity));
+          const adjustedAvailable = Math.max(0, Math.floor((availableApi - otherRequired) / targetRequiredPerUnit));
           return {
             ok: false,
-            message: `Out of stock. Available quantity: ${Math.max(0, availableApi)}`,
+            message: `Out of stock. Available quantity: ${adjustedAvailable}`,
           };
         }
       }
