@@ -1,9 +1,9 @@
-﻿﻿import React, { useEffect, useMemo, useRef, useState } from "react";
+﻿﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { CheckCircle2, ChevronLeft, Minus, Pencil, Plus, Trash2, XCircle } from "lucide-react";
 import Pubmenubuyservice from "../services/Pubmenubuyservice";
 import ConfirmOrderservice from "../../../services/ConfirmOrderservice";
-import { getMaxAllowedQuantity, isCocktailOrMocktail, isOutOfStock, validateNextQuantity } from "../../../utils/stockValidation";
+import { buildStockConsumptionMap, getMaxAllowedQuantity, isCocktailOrMocktail, isOutOfStock, validateNextQuantity } from "../../../utils/stockValidation";
 import { barOrdersAPI, cartAPI } from "../../../services/api";
 import { toInitCap } from "../../../utils/textFormat";
 import { toast } from "react-toastify";
@@ -255,6 +255,36 @@ function fallbackItemFromState(source) {
   ];
 }
 
+function getStockCodeForNormalItem(item) {
+  const code = Number(
+    item?.itemId ??
+    item?.item_id ??
+    item?.ITEM_ID ??
+    item?.item_code ??
+    item?.ITEM_CODE ??
+    item?.code ??
+    item?.CODE ??
+    0
+  );
+  return Number.isFinite(code) && code > 0 ? code : null;
+}
+
+function buildAvailableStockByCode(items = []) {
+  const availableByCode = new Map();
+
+  for (const item of Array.isArray(items) ? items : []) {
+    if (!item || item.isFreeItem || isCocktailOrMocktail(item)) continue;
+
+    const code = getStockCodeForNormalItem(item);
+    const available = Number(item?.availableQuantity);
+    if (!code || !Number.isFinite(available) || available < 0) continue;
+
+    availableByCode.set(String(code), Math.max(Number(availableByCode.get(String(code)) ?? 0), available));
+  }
+
+  return availableByCode;
+}
+
 function ActionButton({ children, className = "", ...props }) {
   return (
     <button
@@ -287,7 +317,6 @@ export default function Pubmenubuy({
   const [temporaryStockMessage, setTemporaryStockMessage] = useState("");
   const [cocktailDetailsByItemCode, setCocktailDetailsByItemCode] = useState({});
   const [cocktailOverrideIssues, setCocktailOverrideIssues] = useState({});
-  const [stockLimitImageMessages, setStockLimitImageMessages] = useState({});
   const [confirmModal, setConfirmModal] = useState({
     open: false,
     title: "",
@@ -312,32 +341,23 @@ export default function Pubmenubuy({
 
   const getStockLimitImageKey = (row) => String(Number(row?.orderLineId ?? row?.id) || row?.id || row?.item_code || "");
 
-  const showStockLimitOnImage = (row, message = "Out of Stock") => {
-    const key = getStockLimitImageKey(row);
-    if (!key) return;
-    setStockLimitImageMessages((current) => ({
-      ...current,
-      [key]: message,
-    }));
-  };
-
-  const clearStockLimitOnImage = (row) => {
-    const key = getStockLimitImageKey(row);
-    if (!key) return;
-    setStockLimitImageMessages((current) => {
-      if (!current[key]) return current;
-      const next = { ...current };
-      delete next[key];
-      return next;
-    });
-  };
-
   const getCocktailOverrideForItem = (row) => {
     if (!row || !isCocktailOrMocktail(row)) return null;
     const itemCode = String(row?.item_code || "").trim();
     if (!itemCode) return null;
     return cocktailOverrideIssues?.[itemCode] || null;
   };
+
+  const getCocktailDetailsForStockCheck = useCallback((item) => {
+    const itemCode = String(item?.item_code || item?.ITEM_CODE || "").trim();
+    if (!itemCode) return [];
+
+    const overrideDetails = getBuyflowOverrideDetails(orderNumber, itemCode);
+    if (Array.isArray(overrideDetails) && overrideDetails.length > 0) return overrideDetails;
+
+    const fetchedDetails = itemCode ? cocktailDetailsByItemCode?.[itemCode] : null;
+    return Array.isArray(fetchedDetails) ? fetchedDetails : [];
+  }, [cocktailDetailsByItemCode, orderNumber]);
 
   useEffect(() => {
     let ignore = false;
@@ -391,12 +411,16 @@ export default function Pubmenubuy({
       }
 
       try {
-        const stockRes = await cartAPI.getIngredientStocks([...allCodes], orderNumber);
+        const currentConsumption = buildStockConsumptionMap(items, { getCocktailDetails: getCocktailDetailsForStockCheck });
+        const normalAvailableByCode = buildAvailableStockByCode(items);
+        const stockCodes = [...new Set([...currentConsumption.keys()])]
+          .filter((code) => Number.isFinite(Number(code)) && Number(code) > 0);
+
+        const stockRes = await cartAPI.getIngredientStocks(stockCodes, orderNumber);
         const stockMap = stockRes?.data?.data || {};
 
         const next = {};
         for (const entry of entries) {
-          const parentQty = Number(entry.item?.quantity || 1) || 1;
           const normalizedDetails = entry.details
             .map((d) => ({
               itemCode: Number(d?.ITEM_CODE ?? d?.itemCode),
@@ -408,7 +432,7 @@ export default function Pubmenubuy({
           let issueMessage = "";
           let hasUnknownStock = false;
           for (const ing of normalizedDetails) {
-            const rawAvailable = stockMap?.[String(ing.itemCode)];
+            const rawAvailable = normalAvailableByCode.get(String(ing.itemCode)) ?? stockMap?.[String(ing.itemCode)];
             if (rawAvailable === undefined || rawAvailable === null || rawAvailable === "") {
               hasUnknownStock = true;
               continue;
@@ -418,8 +442,8 @@ export default function Pubmenubuy({
               hasUnknownStock = true;
               continue;
             }
-            const required = ing.pegs * parentQty;
-            if (required > available) {
+            const totalRequired = Number(currentConsumption.get(String(ing.itemCode)) || 0);
+            if (totalRequired > available) {
               issueMessage = `Out of stock for ingredient ${ing.itemName || ing.itemCode}. Available quantity: ${available}`;
               break;
             }
@@ -446,7 +470,7 @@ export default function Pubmenubuy({
     return () => {
       ignore = true;
     };
-  }, [orderNumber, items, cocktailDetailsByItemCode]);
+  }, [getCocktailDetailsForStockCheck, orderNumber, items, cocktailDetailsByItemCode]);
 
   const stockIssue = useMemo(() => {
     return (
@@ -526,6 +550,76 @@ export default function Pubmenubuy({
     if (type === "error") toast.error(message);
     else toast.success(message);
   };
+
+  const validateCombinedStockDemand = useCallback(async (targetItem, nextQtyCandidate) => {
+    if (!orderNumber || !targetItem || targetItem.isFreeItem) {
+      return { ok: true, message: "" };
+    }
+
+    const nextQuantity = Number(nextQtyCandidate);
+    if (!Number.isFinite(nextQuantity) || nextQuantity < 1) {
+      return { ok: true, message: "" };
+    }
+
+    const currentQty = Number(targetItem.quantity || 1);
+    if (nextQuantity <= currentQty) {
+      return { ok: true, message: "" };
+    }
+
+    const targetLineId = Number(targetItem.orderLineId ?? targetItem.id);
+    if (!Number.isFinite(targetLineId) || targetLineId <= 0) {
+      return { ok: true, message: "" };
+    }
+
+    const projectedItems = items.map((row) => {
+      if (Number(row.orderLineId ?? row.id) === targetLineId) {
+        return { ...row, quantity: nextQuantity };
+      }
+      return row;
+    });
+
+    const projectedConsumption = buildStockConsumptionMap(projectedItems, {
+      getCocktailDetails: getCocktailDetailsForStockCheck,
+    });
+    const normalAvailableByCode = buildAvailableStockByCode(projectedItems);
+
+    const codes = [...new Set([...projectedConsumption.keys()])]
+      .filter((code) => Number.isFinite(Number(code)) && Number(code) > 0);
+
+    if (codes.length === 0) {
+      return { ok: true, message: "" };
+    }
+
+    try {
+      const stockRes = await cartAPI.getIngredientStocks(codes, orderNumber);
+      const stockMap = stockRes?.data?.data || {};
+
+      for (const code of codes) {
+        const projectedRequired = Number(projectedConsumption.get(code) || 0);
+        const normalAvailable = normalAvailableByCode.get(String(code));
+        const availableRaw = normalAvailable ?? stockMap[String(code)];
+        if (availableRaw === undefined || availableRaw === null || availableRaw === "") {
+          continue;
+        }
+
+        const availableApi = Number(availableRaw);
+        if (!Number.isFinite(availableApi) || availableApi < 0) {
+          continue;
+        }
+
+        if (projectedRequired > availableApi) {
+          return {
+            ok: false,
+            message: `Out of stock. Available quantity: ${Math.max(0, availableApi)}`,
+          };
+        }
+      }
+    } catch (err) {
+      console.warn("Could not validate combined stock demand:", err);
+    }
+
+    return { ok: true, message: "" };
+  }, [getCocktailDetailsForStockCheck, items, orderNumber]);
 
   const showTemporaryStockMessage = (message) => {
     const text = String(message || "").trim();
@@ -656,6 +750,124 @@ export default function Pubmenubuy({
     navigate(`${currentBasePath}/cart`);
   };
 
+  const ensureOfferFreeRows = useCallback((nextItems) => {
+    if (!Array.isArray(nextItems) || nextItems.length === 0) {
+      return [];
+    }
+
+    const cleanedItems = nextItems.filter(
+      (row) => !(row?.isFreeItem && Number(row?.quantity || 0) <= 0)
+    );
+
+    const parents = cleanedItems.filter((row) => !row?.isFreeItem);
+    const children = cleanedItems.filter((row) => row?.isFreeItem);
+    const hasChildForParent = new Set(
+      children
+        .map((row) => String(row?.parentCode || "").trim())
+        .filter(Boolean)
+    );
+
+    const insertionsByAfterId = new Map();
+
+    for (const parent of parents) {
+      const parentCode = String(parent?.item_code || "").trim();
+
+      if (!parentCode) continue;
+
+      const expectedFreeQty = calculateFreeQuantity(
+        parent?.quantity,
+        parent?.offer_quantity,
+        parent?.free_item_quantity
+      );
+
+      if (expectedFreeQty <= 0) {
+        continue;
+      }
+
+      if (hasChildForParent.has(parentCode)) {
+        continue;
+      }
+
+      const freeItemCode = Number(parent?.free_item_code || 0);
+      const freeItemName = String(parent?.free_item_name || "Free item").trim() || "Free item";
+      const freeItemImage = String(parent?.free_item_image || "").trim();
+      const rawFreeItemAvailableQuantity = parent?.free_item_available_quantity;
+      const freeItemAvailableQuantity =
+        rawFreeItemAvailableQuantity === null ||
+          rawFreeItemAvailableQuantity === undefined ||
+          rawFreeItemAvailableQuantity === ""
+          ? null
+          : Number(rawFreeItemAvailableQuantity);
+
+      if (!Number.isFinite(freeItemCode) || freeItemCode <= 0) {
+        continue;
+      }
+
+      const afterId = Number(parent?.orderLineId ?? parent?.id) || 0;
+      const placeholderId = -Date.now() - Math.floor(Math.random() * 1000);
+
+      const placeholder = {
+        id: placeholderId,
+        orderLineId: placeholderId,
+        item_code: String(freeItemCode),
+        item_name: freeItemName,
+        quantity: expectedFreeQty,
+        unitPrice: 0,
+        subtotal: 0,
+        image: freeItemImage,
+        card_text: `Name: ${freeItemName} Quantity: ${expectedFreeQty}`,
+        availableQuantity: Number.isFinite(freeItemAvailableQuantity) ? freeItemAvailableQuantity : null,
+        parentCode,
+        isFreeItem: true,
+        offer_quantity: null,
+        free_item_quantity: null,
+        free_item_code: null,
+        computed_free_item_quantity: null,
+        subcategory: null,
+        stockStatus: null,
+        stockIssueMessage: null,
+      };
+
+      if (!insertionsByAfterId.has(afterId)) {
+        insertionsByAfterId.set(afterId, []);
+      }
+
+      insertionsByAfterId.get(afterId).push(placeholder);
+    }
+
+    const merged = [];
+
+    for (const row of cleanedItems) {
+      merged.push(row);
+
+      const key = Number(row?.orderLineId ?? row?.id) || 0;
+      const toAdd = insertionsByAfterId.get(key);
+
+      if (toAdd?.length) {
+        merged.push(...toAdd);
+      }
+    }
+
+    return merged.filter(
+      (row) => !(row?.isFreeItem && Number(row?.quantity || 0) <= 0)
+    );
+  }, []);
+
+  const calculateFreeQuantity = (paidQuantity, offerQuantity, freeItemQuantity) => {
+    const paid = Number(paidQuantity || 0);
+    if (!Number.isFinite(paid) || paid <= 0) return 0;
+
+    const offerQty = Number(offerQuantity);
+    const freeQty = Number(freeItemQuantity);
+
+    if (Number.isFinite(offerQty) && offerQty > 0) {
+      const freePerOffer = Number.isFinite(freeQty) && freeQty > 0 ? freeQty : 1;
+      return Math.floor(paid / offerQty) * freePerOffer;
+    }
+
+    return Math.floor(paid / 2);
+  };
+
   useEffect(() => {
     let ignore = false;
 
@@ -695,7 +907,7 @@ export default function Pubmenubuy({
     return () => {
       ignore = true;
     };
-  }, [orderNumber]);
+  }, [ensureOfferFreeRows, orderNumber]);
 
   useEffect(() => {
     let ignore = false;
@@ -749,128 +961,6 @@ export default function Pubmenubuy({
     };
   }, [items, orderNumber, cocktailDetailsByItemCode]);
 
-  const ensureOfferFreeRows = (nextItems) => {
-    if (!Array.isArray(nextItems) || nextItems.length === 0) {
-      return [];
-    }
-
-    const cleanedItems = nextItems.filter(
-      (row) => !(row?.isFreeItem && Number(row?.quantity || 0) <= 0)
-    );
-
-    const parents = cleanedItems.filter((row) => !row?.isFreeItem);
-    const children = cleanedItems.filter((row) => row?.isFreeItem);
-    const hasChildForParent = new Set(
-      children
-        .map((row) => String(row?.parentCode || "").trim())
-        .filter(Boolean)
-    );
-
-    const insertionsByAfterId = new Map();
-
-    for (const parent of parents) {
-      const parentCode = String(parent?.item_code || "").trim();
-
-      if (!parentCode) continue;
-
-      const expectedFreeQty = calculateFreeQuantity(
-        parent?.quantity,
-        parent?.offer_quantity,
-        parent?.free_item_quantity
-      );
-
-      if (expectedFreeQty <= 0) {
-        continue;
-      }
-
-      if (hasChildForParent.has(parentCode)) {
-        continue;
-      }
-
-      const freeItemCode = Number(parent?.free_item_code || 0);
-      const freeItemName = String(parent?.free_item_name || "Free item").trim() || "Free item";
-      const freeItemImage = String(parent?.free_item_image || "").trim();
-      const rawFreeItemAvailableQuantity = parent?.free_item_available_quantity;
-      const freeItemAvailableQuantity =
-        rawFreeItemAvailableQuantity === null ||
-          rawFreeItemAvailableQuantity === undefined ||
-          rawFreeItemAvailableQuantity === ""
-          ? null
-          : Number(rawFreeItemAvailableQuantity);
-
-      if (!Number.isFinite(freeItemCode) || freeItemCode <= 0) {
-        continue;
-      }
-
-      const afterId =
-        Number(parent?.orderLineId ?? parent?.id) || 0;
-
-      const placeholderId = -Date.now() - Math.floor(Math.random() * 1000);
-
-      const placeholder = {
-        id: placeholderId,
-        orderLineId: placeholderId,
-        item_code: String(freeItemCode),
-        item_name: freeItemName,
-        quantity: expectedFreeQty,
-        unitPrice: 0,
-        subtotal: 0,
-        image: freeItemImage,
-        card_text: `Name: ${freeItemName} Quantity: ${expectedFreeQty}`,
-        availableQuantity: Number.isFinite(freeItemAvailableQuantity) ? freeItemAvailableQuantity : null,
-        parentCode,
-        isFreeItem: true,
-        offer_quantity: null,
-        free_item_quantity: null,
-        free_item_code: null,
-        computed_free_item_quantity: null,
-        subcategory: null,
-        stockStatus: null,
-        stockIssueMessage: null,
-      };
-
-      if (!insertionsByAfterId.has(afterId)) {
-        insertionsByAfterId.set(afterId, []);
-      }
-
-      insertionsByAfterId.get(afterId).push(placeholder);
-    }
-
-    const merged = [];
-
-    for (const row of cleanedItems) {
-      merged.push(row);
-
-      const key =
-        Number(row?.orderLineId ?? row?.id) || 0;
-
-      const toAdd = insertionsByAfterId.get(key);
-
-      if (toAdd?.length) {
-        merged.push(...toAdd);
-      }
-    }
-
-    return merged.filter(
-      (row) => !(row?.isFreeItem && Number(row?.quantity || 0) <= 0)
-    );
-  };
-
-  const calculateFreeQuantity = (paidQuantity, offerQuantity, freeItemQuantity) => {
-    const paid = Number(paidQuantity || 0);
-    if (!Number.isFinite(paid) || paid <= 0) return 0;
-
-    const offerQty = Number(offerQuantity);
-    const freeQty = Number(freeItemQuantity);
-
-    if (Number.isFinite(offerQty) && offerQty > 0) {
-      const freePerOffer = Number.isFinite(freeQty) && freeQty > 0 ? freeQty : 1;
-      return Math.floor(paid / offerQty) * freePerOffer;
-    }
-
-    return Math.floor(paid / 2);
-  };
-
   const refreshOrderSummary = async () => {
     if (!orderNumber) return;
 
@@ -903,7 +993,6 @@ export default function Pubmenubuy({
     setUpdatingLineId(numericOrderLineId);
     let validationMessage = "";
     let nextQuantity = null;
-    let previousQuantity = null;
     let validationKey = null;
 
     setItems((current) => {
@@ -920,7 +1009,6 @@ export default function Pubmenubuy({
       }
 
       const currentQty = Number(targetItem.quantity || 1);
-      previousQuantity = currentQty;
       const nextQtyCandidate = currentQty + delta;
 
       if (nextQtyCandidate < 1) {
@@ -1228,10 +1316,6 @@ export default function Pubmenubuy({
       return;
     }
 
-    if (delta < 0) {
-      clearStockLimitOnImage(liveItem);
-    }
-
     const nextQtyCandidate = currentQty + delta;
 
     if (delta > 0) {
@@ -1240,7 +1324,6 @@ export default function Pubmenubuy({
         if (!validation.ok) {
           const message = validation.message || "Out of stock for cocktail/mocktail ingredients.";
           showToastWithCooldown(message, "error", liveItem);
-          showStockLimitOnImage(liveItem, "Out of Stock");
           return;
         }
       }
@@ -1252,7 +1335,6 @@ export default function Pubmenubuy({
             cocktailOverride.stockIssueMessage ||
             "Out of stock for cocktail/mocktail ingredients. Please reduce quantity or update selection.";
           showToastWithCooldown(message, "error", liveItem);
-          showStockLimitOnImage(liveItem, "Out of Stock");
           return;
         }
       } else {
@@ -1260,9 +1342,15 @@ export default function Pubmenubuy({
 
         if (stockMessage) {
           showToastWithCooldown(stockMessage, "error", liveItem);
-          showStockLimitOnImage(liveItem, "Out of Stock");
           return;
         }
+      }
+
+      const combinedValidation = await validateCombinedStockDemand(liveItem, nextQtyCandidate);
+      if (!combinedValidation.ok) {
+        const message = combinedValidation.message || "Out of stock.";
+        showToastWithCooldown(message, "error", liveItem);
+        return;
       }
     }
 
@@ -1328,7 +1416,6 @@ export default function Pubmenubuy({
           "error",
           liveItem
         );
-        showStockLimitOnImage(liveItem, "Out of Stock");
         return;
       }
     }
@@ -1683,23 +1770,25 @@ export default function Pubmenubuy({
                   .map((item) => {
                     const missingCocktailIngredients = hasMissingCocktailIngredients(orderNumber, item, cocktailDetailsByItemCode);
                     const isCocktailItem = isCocktailOrMocktail(item);
+                    const cocktailOverride = isCocktailItem ? getCocktailOverrideForItem(item) : null;
                     
                     // Determine if the item is out of stock based on current availableQuantity vs requested quantity
                     const isStandardOutOfStock = !isCocktailItem && !item.isFreeItem && item.availableQuantity !== null && Number(item.quantity) > Number(item.availableQuantity);
                     const isCardOutOfStock =
                       isCocktailItem
-                        ? Boolean(getCocktailOverrideForItem(item)?.isOutOfStock || item.stockIssueMessage || isOutOfStock(item))
+                        ? cocktailOverride?.hasDetails
+                          ? Boolean(cocktailOverride.isOutOfStock)
+                          : Boolean(item.stockIssueMessage || isOutOfStock(item))
                         : Boolean(isStandardOutOfStock || Number(item.availableQuantity) === 0);
                     
                     const imageStockMessage = isCocktailItem
                       ? (isCardOutOfStock ? "Out of Stock" : "")
-                      : (isStandardOutOfStock || Number(item.availableQuantity) === 0 ? "Out of Stock" : (stockLimitImageMessages[getStockLimitImageKey(item)] || ""));
+                      : (isStandardOutOfStock || Number(item.availableQuantity) === 0 ? "Out of Stock" : "");
                       
                     const disablePlusForStock =
                       isCocktailItem
                         ? (() => {
-                          const override = getCocktailOverrideForItem(item);
-                          if (override) return Boolean(override.isOutOfStock);
+                          if (cocktailOverride?.hasDetails) return Boolean(cocktailOverride.isOutOfStock);
                           return String(item.stockIssueMessage || "").trim().length > 0 || isOutOfStock(item);
                         })()
                         : false;

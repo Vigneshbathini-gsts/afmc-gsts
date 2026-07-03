@@ -293,61 +293,74 @@ export default function CartPage({ isAttendant = false }) {
                 setLoading(true);
                 setError(null);
 
-                // Normal items
+                // Build combined consumption map (normal items + cocktail ingredients)
                 const stockConsumption = new Map();
-                cartItems.forEach(item => {
-                    if (!isCocktailOrMocktail(item)) {
-                        const itemCode = item.itemId;
-                        stockConsumption.set(
-                            itemCode,
-                            (stockConsumption.get(itemCode) || 0) + item.quantity
-                        );
-                    }
-                });
 
-                // Mocktail ingredients
+                // Add normal items consumption
                 for (const item of cartItems) {
-                    if (isCocktailOrMocktail(item)) {
-                        const details = cocktailDetailsByCartId[item.cartId] || [];
-
-                        details.forEach((ing) => {
-                            const itemCode = Number(ing.ITEM_CODE ?? ing.itemCode);
-                            const pegs = Number(ing.PEGS ?? ing.pegs ?? 0);
-
-                            if (!itemCode || !pegs) return;
-
-                            const required = pegs * item.quantity;
-
-                            stockConsumption.set(
-                                itemCode,
-                                (stockConsumption.get(itemCode) || 0) + required
-                            );
-                        });
+                    if (!isCocktailOrMocktail(item)) {
+                        const code = Number(item.itemId || item.item_code || item.ITEM_CODE);
+                        if (!Number.isFinite(code) || code <= 0) continue;
+                        stockConsumption.set(code, (stockConsumption.get(code) || 0) + Number(item.quantity || 0));
                     }
                 }
 
-                const codes = [...stockConsumption.keys()].filter(
-                    (code) => Number.isFinite(Number(code)) && Number(code) > 0
-                );
+                // Add cocktail/mocktail ingredient consumption (ensure details are loaded)
+                for (const item of cartItems) {
+                    if (!isCocktailOrMocktail(item)) continue;
+                    let details = cocktailDetailsByCartId[String(item.cartId)];
+                    if (!Array.isArray(details)) {
+                        try {
+                            const res = await cartAPI.getCocktailDetails(item.cartId);
+                            details = res?.data?.data?.details || [];
+                            setCocktailDetailsByCartId((m) => ({ ...m, [String(item.cartId)]: details }));
+                        } catch (e) {
+                            details = [];
+                        }
+                    }
+
+                    for (const d of (details || [])) {
+                        const code = Number(d?.ITEM_CODE ?? d?.itemCode ?? d?.item_id ?? d?.item_id);
+                        const pegs = Number(d?.PEGS ?? d?.pegs ?? d?.QUANTITY ?? d?.quantity ?? 0) || 0;
+                        if (!Number.isFinite(code) || code <= 0 || pegs <= 0) continue;
+                        const required = pegs * Number(item.quantity || 0);
+                        stockConsumption.set(code, (stockConsumption.get(code) || 0) + required);
+                    }
+                }
+
+                const codes = [...new Set([...stockConsumption.keys()])].filter((c) => Number.isFinite(Number(c)) && Number(c) > 0);
 
                 if (codes.length === 0) {
-                    console.log(stockConsumption);
-                    throw new Error("No valid ingredient codes found.");
+                    showToast("No valid items or ingredient codes found to validate.", 'error');
+                    setLoading(false);
+                    setProceedConfirmOpen(false);
+                    return;
                 }
 
-                console.log("stockConsumption", [...stockConsumption.entries()]);
+                // Fetch ingredient stocks (API may return available after subtracting carts)
+                const stocksRes = await cartAPI.getIngredientStocks(codes);
+                const stocksMap = stocksRes?.data?.data || {};
 
-                const stocks = await cartAPI.getIngredientStocks(codes);
+                // Validate required against returned availability. The API may return availability
+                // that already subtracts current cart consumption; to avoid false negatives we add
+                // back the current cart consumption for each code when comparing.
+                for (const code of codes) {
+                    const required = Number(stockConsumption.get(code) || 0);
+                    const availableApi = Number(stocksMap[String(code)] ?? 0);
+                    const availableForOrder = availableApi + required; // add back current cart consumption
 
-                for (const [itemCode, required] of stockConsumption) {
-                    const available = Number(stocks.data.data[itemCode] || 0);
-
-                    if (required > available) {
-                        toast.error(`Insufficient stock for item ${itemCode}`);
+                    if (required > availableForOrder) {
+                        showToast(`Insufficient stock for item ${code}. Required: ${required}, Available: ${availableApi}`, 'error');
+                        // find an item using this code to show image overlay
+                        const offendingItem = cartItems.find((it) => Number(it.itemId) === Number(code) || String(it.cartId) in cocktailDetailsByCartId && (cocktailDetailsByCartId[String(it.cartId)] || []).some(d => Number(d?.ITEM_CODE ?? d?.itemCode) === Number(code)));
+                        if (offendingItem) showStockLimitOnImage(offendingItem, 'Out of Stock');
+                        setProceedConfirmOpen(false);
+                        setLoading(false);
                         return;
                     }
                 }
 
+                // All good — create the order
                 const selectedPubmed = sessionStorage.getItem("afmc:selectedPubmed") || "";
                 const response = await cartAPI.confirmOrder({
                     ...(selectedPubmed ? { pubmed: selectedPubmed } : {}),
@@ -378,7 +391,7 @@ export default function CartPage({ isAttendant = false }) {
         };
 
         proceed();
-    }, [navigate, isAttendant, showToast]);
+    }, [navigate, isAttendant, showToast, cartItems, cocktailDetailsByCartId, setCocktailDetailsByCartId, showStockLimitOnImage]);
 
     const handleGoToMenu = useCallback(() => {
         const basePath = isAttendant ? "/attendant" : "/user";

@@ -107,9 +107,16 @@ const getCartQuantityExcludingCartId = async (conn, userId, itemCode, priceZero 
   return Number(rows[0]?.qty || 0);
 };
 
-const getCartIngredientConsumption = async (conn, userId, ingredientCode) => {
+const getCartIngredientConsumption = async (conn, userId, ingredientCode, excludeCartId = null) => {
   const normalizedCode = Number(ingredientCode);
   if (!Number.isFinite(normalizedCode) || normalizedCode <= 0) return 0;
+
+  let excludeSql = "";
+  const params = [userId, normalizedCode];
+  if (excludeCartId != null && !Number.isNaN(Number(excludeCartId))) {
+    excludeSql = " AND c.cart_id <> ?";
+    params.push(Number(excludeCartId));
+  }
 
   const [rows] = await conn.execute(
     `SELECT IFNULL(SUM(cc.quantity * c.quantity), 0) AS total_qty
@@ -118,8 +125,8 @@ const getCartIngredientConsumption = async (conn, userId, ingredientCode) => {
        ON cc.cart_id = c.cart_id
      WHERE c.user_id = ?
        AND cc.ingredient_item_code = ?
-       AND c.price != 0`,
-    [userId, normalizedCode]
+       AND c.price != 0${excludeSql}`,
+    params
   );
 
   return Number(rows[0]?.total_qty || 0);
@@ -1123,7 +1130,7 @@ const updateCartItemQuantity = async (cartId, userId, quantity) => {
       const stockQty = await getStockQuantity(conn, itemId, current[0].category_id);
       const reservedQty = await getOrderReservedQuantity(conn, itemId);
       const otherDirectQty = await getCartQuantityExcludingCartId(conn, userId, itemId, false, cartId);
-      const ingredientConsumptionQty = await getCartIngredientConsumption(conn, userId, itemId);
+      const ingredientConsumptionQty = await getCartIngredientConsumption(conn, userId, itemId, cartId);
 
       if (quantity + otherDirectQty + reservedQty + ingredientConsumptionQty > stockQty) {
         const availableQty = Math.max(0, stockQty - reservedQty - otherDirectQty - ingredientConsumptionQty);
