@@ -9,6 +9,7 @@ import Pubmenubuyservice from "../../flows/buy/services/Pubmenubuyservice";
 import FilterDropdown from "./FilterDropdown";
 import OffersMarquee from "./OffersMarquee";
 import { toInitCap } from "../../utils/textFormat";
+import { getPegTypeOrderLimitMessage } from "../../utils/stockValidation";
 import {
   clearSelectedAttendantCustomer,
   getSelectedAttendantCustomerPayload,
@@ -497,7 +498,7 @@ function MenuPopupCompact({ item, loading, onClose, onBuy }) {
             if (rawAvailable !== undefined && rawAvailable !== null && rawAvailable !== "") {
               const available = Number(rawAvailable);
               if (Number.isFinite(available) && available >= 0 && desiredQty * pegMultiplier > available) {
-                toast.error(`Out of stock. Available quantity: ${available}`);
+                toast.error(getPegTypeOrderLimitMessage(item, available, `Out of stock. Available quantity: ${available}`, pegType));
                 setIsSubmitting(false);
                 return;
               }
@@ -1580,7 +1581,7 @@ function MenuDashboard() {
           if (rawAvailable !== undefined && rawAvailable !== null && rawAvailable !== "") {
             const available = Number(rawAvailable);
             if (Number.isFinite(available) && available >= 0 && desiredQty * pegMultiplier > available) {
-              toast.error(`Out of stock. Available quantity: ${available}`);
+              toast.error(getPegTypeOrderLimitMessage(item, available, `Out of stock. Available quantity: ${available}`, typeForBackend));
               return;
             }
           }

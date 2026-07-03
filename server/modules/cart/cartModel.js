@@ -644,6 +644,8 @@ const updateCartCustomization = async (cartId, userId, updates) => {
 const addCartItem = async (userId, itemData) => {
   const { item_id, quantity = 1, unit_price = 0, remarks, type, loginType, roleId, customIngredients } = itemData;
 
+  // console.log("Adding cart item:", {type });
+
   const conn = await db.getConnection();
 
   try {
@@ -733,6 +735,7 @@ const addCartItem = async (userId, itemData) => {
     // 2. CHECK EXISTING CART ITEM
     // -------------------------------
     const selectedType = String(type || "").trim();
+    console.log("Selected type:", selectedType);
     const cartDescription = selectedType || "NA";
 
     if (selectedType) {
@@ -776,8 +779,8 @@ const addCartItem = async (userId, itemData) => {
     } else {
       const [insertResult] = await conn.execute(
         `INSERT INTO xxafmc_cart_items
-        (user_id, item_id, quantity, price, total, description, profit, food_pr_charges, created_by, creation_date)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+        (user_id, item_id, quantity, price, total, description, profit, food_pr_charges, created_by, creation_date,TYPE)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)`,
         [
           userId,
           resolvedItemCode,
@@ -788,6 +791,7 @@ const addCartItem = async (userId, itemData) => {
           selectedProfit,
           selectedCharges,
           userId,
+          selectedType
         ]
       );
       insertId = insertResult.insertId;
@@ -936,6 +940,7 @@ const getCartItemsByUser = async (userId) => {
       c.parent_code,
       xi.category_id,
       c.subcategory,
+      c.type,
       xi.sub_category AS inventory_subcategory,
       EXISTS (
         SELECT 1
@@ -1077,6 +1082,7 @@ const getCartItemsByUser = async (userId) => {
       stockStatus,
       isFreeItem,
       canEdit,
+      type: row.type,
       hasRecipe: Number(row.has_recipe || 0) > 0,
     };
   });

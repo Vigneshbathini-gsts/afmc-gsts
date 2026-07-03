@@ -3,7 +3,7 @@ import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { CheckCircle2, ChevronLeft, Minus, Pencil, Plus, Trash2, XCircle } from "lucide-react";
 import Pubmenubuyservice from "../services/Pubmenubuyservice";
 import ConfirmOrderservice from "../../../services/ConfirmOrderservice";
-import { buildStockConsumptionMap, getMaxAllowedQuantity, isCocktailOrMocktail, isOutOfStock, validateNextQuantity } from "../../../utils/stockValidation";
+import { buildStockConsumptionMap, getMaxAllowedQuantity, getPegTypeOrderLimitMessage, isCocktailOrMocktail, isOutOfStock, validateNextQuantity } from "../../../utils/stockValidation";
 import { barOrdersAPI, cartAPI } from "../../../services/api";
 import { toInitCap } from "../../../utils/textFormat";
 import { toast } from "react-toastify";
@@ -136,7 +136,10 @@ function validateNextQuantityForItem(item, nextQuantity) {
       return { ok: false, message: "Out of stock." };
     }
     if (qty > allowedQty) {
-      return { ok: false, message: `Out of stock. Available quantity: ${allowedQty}` };
+      return {
+        ok: false,
+        message: getPegTypeOrderLimitMessage(item, maxAllowed, `Out of stock. Available quantity: ${allowedQty}`),
+      };
     }
   }
 
@@ -624,7 +627,7 @@ export default function Pubmenubuy({
     const available = Number(getMaxAllowedQuantity(stockIssue) ?? stockIssue.availableQuantity ?? 0);
     return stockIssue.isFreeItem
       ? `Out of stock for free item. Available quantity: ${available}`
-      : `Out of stock. Available quantity: ${available}`;
+      : getPegTypeOrderLimitMessage(stockIssue, available, `Out of stock. Available quantity: ${available}`);
   }, [stockIssue, cocktailStockIssue, cocktailOverrideIssues, missingCocktailIngredientItem]);
 
   const showToast = (message, type = "success") => {
@@ -713,7 +716,7 @@ export default function Pubmenubuy({
             ok: false,
             message: ingredientName
               ? `Out of stock for ingredient ${ingredientName}. Available quantity: ${adjustedAvailable}`
-              : `Out of stock. Available quantity: ${adjustedAvailable}`,
+              : getPegTypeOrderLimitMessage(targetItem, adjustedAvailable, `Out of stock. Available quantity: ${adjustedAvailable}`),
           };
         }
       }
@@ -1466,7 +1469,7 @@ export default function Pubmenubuy({
       Number.isFinite(Number(availableQty))
     ) {
       if (nextQtyCandidate * liveItemMultiplier > Number(availableQty)) {
-        const message = `Out of stock. Available quantity: ${availableQty}`;
+        const message = getPegTypeOrderLimitMessage(liveItem, availableQty, `Out of stock. Available quantity: ${availableQty}`);
         showToastWithCooldown(message, "error", liveItem);
         showStockLimitOnImage(liveItem, "Out of Stock");
         return;
