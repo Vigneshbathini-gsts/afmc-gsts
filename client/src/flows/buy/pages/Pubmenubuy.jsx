@@ -584,6 +584,15 @@ export default function Pubmenubuy({
     const targetUnitConsumption = buildStockConsumptionMap([{ ...targetItem, quantity: 1 }], {
       getCocktailDetails: getCocktailDetailsForStockCheck,
     });
+    const targetIngredientNameByCode = new Map(
+      (isCocktailOrMocktail(targetItem) ? getCocktailDetailsForStockCheck(targetItem) : [])
+        .map((detail) => {
+          const code = Number(detail?.ITEM_CODE ?? detail?.itemCode ?? detail?.item_id ?? detail?.itemId ?? detail?.code ?? detail?.CODE ?? 0);
+          const name = String(detail?.ITEM_NAME ?? detail?.itemName ?? detail?.item_name ?? detail?.name ?? "").trim();
+          return Number.isFinite(code) && code > 0 && name ? [String(code), name] : null;
+        })
+        .filter(Boolean)
+    );
     const normalAvailableByCode = buildAvailableStockByCode(projectedItems);
 
     const codes = [...new Set([...targetUnitConsumption.keys()])]
@@ -618,9 +627,12 @@ export default function Pubmenubuy({
         if (projectedRequired > availableApi) {
           const otherRequired = Math.max(0, projectedRequired - (targetRequiredPerUnit * nextQuantity));
           const adjustedAvailable = Math.max(0, Math.floor((availableApi - otherRequired) / targetRequiredPerUnit));
+          const ingredientName = targetIngredientNameByCode.get(String(code));
           return {
             ok: false,
-            message: `Out of stock. Available quantity: ${adjustedAvailable}`,
+            message: ingredientName
+              ? `Out of stock for ingredient ${ingredientName}. Available quantity: ${adjustedAvailable}`
+              : `Out of stock. Available quantity: ${adjustedAvailable}`,
           };
         }
       }
