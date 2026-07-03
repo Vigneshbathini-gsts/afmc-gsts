@@ -170,7 +170,7 @@ export default function OrderTransactionUI() {
         setData((current) => (reset ? detailRows : [...current, ...detailRows]));
         setPage(nextPage + 1);
         setHasMore(detailRows.length === REPORT_PAGE_SIZE);
-        
+
         // if (detailRows.length === 0) {
         //   setError("No records found for the selected filters.");
         // }
@@ -183,7 +183,7 @@ export default function OrderTransactionUI() {
       console.error("API Error:", requestError);
       setError(
         requestError.response?.data?.message ||
-          "Unable to fetch order transactions. Please try again."
+        "Unable to fetch order transactions. Please try again."
       );
       if (reset) setData([]);
       setHasMore(false);
@@ -258,13 +258,10 @@ export default function OrderTransactionUI() {
     exportTableToPdf({
       title: "Order Transaction Details Report",
       fileName: `order-transaction-details-${new Date().toISOString().split('T')[0]}.pdf`,
-      subtitle: `From: ${appliedFilters.fromDate || "All"} To: ${
-        appliedFilters.toDate || "All"
-      }${appliedFilters.orderNumber ? ` | Order No: ${appliedFilters.orderNumber}` : ""}${
-        appliedFilters.userName ? ` | User: ${appliedFilters.userName}` : ""
-      }${appliedFilters.kitchenName ? ` | Kitchen: ${appliedFilters.kitchenName}` : ""}${
-        appliedFilters.itemNames ? ` | Item: ${toInitCap(appliedFilters.itemNames)}` : ""
-      }`,
+      subtitle: `From: ${appliedFilters.fromDate || "All"} To: ${appliedFilters.toDate || "All"
+        }${appliedFilters.orderNumber ? ` | Order No: ${appliedFilters.orderNumber}` : ""}${appliedFilters.userName ? ` | User: ${appliedFilters.userName}` : ""
+        }${appliedFilters.kitchenName ? ` | Kitchen: ${appliedFilters.kitchenName}` : ""}${appliedFilters.itemNames ? ` | Item: ${toInitCap(appliedFilters.itemNames)}` : ""
+        }`,
       headers: [
         "Order Number",
         "User",
@@ -469,7 +466,7 @@ export default function OrderTransactionUI() {
             >
               Reset
             </button> */}
-            
+
             <button
               type="button"
               className="px-6 py-3 rounded-2xl bg-afmc-maroon hover:bg-afmc-maroon2 text-white font-semibold flex items-center gap-2 shadow hover:shadow-md transition disabled:opacity-60 disabled:cursor-not-allowed"

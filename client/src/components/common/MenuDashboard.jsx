@@ -687,7 +687,7 @@ function MenuPopupCompact({ item, loading, onClose, onBuy }) {
                       />
                     </div>
 
-                    {/* {isPegsUnit ? (
+                    {isPegsUnit ? (
                       <>
                         <div className="text-[14px] font-semibold leading-5 text-stone-600">
                           {toInitCap("Type")}
@@ -703,7 +703,7 @@ function MenuPopupCompact({ item, loading, onClose, onBuy }) {
                           </select>
                         </div>
                       </>
-                    ) : null} */}
+                    ) : null}
 
                     <div className="text-[14px] font-semibold leading-5 text-stone-600">
                       {toInitCap("Remarks")}
