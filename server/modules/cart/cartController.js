@@ -376,28 +376,7 @@ exports.getCocktailDetails = async (req, res) => {
     const cartItem = await cartModel.getCartItemById(Number(cartId), userId);
     validateCocktailItemOrFail(cartItem);
 
-    let collection = await cartModel.getCartCustomization(Number(cartId), userId);
-    if (collection.ingredients.length === 0) {
-      const connection = await db.getConnection();
-      try {
-        await cartModel.ensureCustomizationTable(connection);
-        await connection.beginTransaction();
-        await cartModel.createDefaultCustomizationForCart(connection, {
-          cartId: Number(cartId),
-          parentItemCode: cartItem.item_id,
-          cartQuantity: cartItem.quantity,
-          loginType: req.user?.loginType,
-          roleId: req.user?.roleId,
-        });
-        await connection.commit();
-      } catch (error) {
-        await connection.rollback();
-        throw error;
-      } finally {
-        connection.release();
-      }
-      collection = await cartModel.getCartCustomization(Number(cartId), userId);
-    }
+    const collection = await cartModel.getCartCustomization(Number(cartId), userId);
 
     return res.status(200).json({ success: true, data: collection });
   } catch (error) {
