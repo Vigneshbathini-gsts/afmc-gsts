@@ -247,7 +247,9 @@ export default function ItemDetails() {
                             if (codes.length > 0) {
                                 const stockRes = await cartAPI.getIngredientStocks(
                                     codes,
-                                    fromBuyFlow ? buyOrderNumber : undefined
+                                    fromBuyFlow ? buyOrderNumber : undefined,
+                                    undefined,
+                                    isEditingCartItem ? Number(cartId) : undefined
                                 );
                                 const stockMap = stockRes?.data?.data || {};
                                 console.log("stockMap3",stockMap)
@@ -615,7 +617,12 @@ export default function ItemDetails() {
                     const codes = [...new Set(selectedIngredients.map((d) => Number(d.itemCode)).filter((c) => Number.isFinite(c) && c > 0))];
                     if (codes.length > 0) {
                         try {
-                            const stockRes = await cartAPI.getIngredientStocks(codes, buyOrderNumber);
+                            const stockRes = await cartAPI.getIngredientStocks(
+                                codes,
+                                buyOrderNumber,
+                                undefined,
+                                isEditingCartItem ? Number(cartId) : undefined
+                            );
                             const stockMap = stockRes?.data?.data || {};
                             console.log("stockMap1", stockMap);
                             for (const ing of selectedIngredients) {
@@ -642,7 +649,12 @@ export default function ItemDetails() {
                 if (!selectedIngredients || selectedIngredients.length === 0) {
                     if (Number.isFinite(parentCode) && parentCode > 0) {
                         try {
-                            const stockRes = await cartAPI.getIngredientStocks([parentCode], buyOrderNumber);
+                            const stockRes = await cartAPI.getIngredientStocks(
+                                [parentCode],
+                                buyOrderNumber,
+                                undefined,
+                                isEditingCartItem ? Number(cartId) : undefined
+                            );
                             const stockMap = stockRes?.data?.data || {};
                             console.log("stockMap2",stockMap);
                             const rawAvailable = stockMap?.[String(parentCode)];

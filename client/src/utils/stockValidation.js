@@ -34,6 +34,37 @@ export function isOutOfStock(item) {
   return status === "out of stock";
 }
 
+export function buildStockConsumptionMap(items = [], { getCocktailDetails = null } = {}) {
+  const consumption = new Map();
+
+  for (const item of Array.isArray(items) ? items : []) {
+    if (!item) continue;
+
+    const qty = Number(item?.quantity ?? item?.QUANTITY ?? 0);
+    if (!Number.isFinite(qty) || qty <= 0) continue;
+
+    if (item?.isFreeItem) continue;
+
+    if (isCocktailOrMocktail(item)) {
+      const details = typeof getCocktailDetails === "function" ? getCocktailDetails(item) : [];
+      for (const detail of Array.isArray(details) ? details : []) {
+        const code = Number(detail?.itemCode ?? detail?.ITEM_CODE ?? detail?.item_id ?? detail?.itemId ?? detail?.code ?? detail?.CODE ?? 0);
+        const pegs = Number(detail?.pegs ?? detail?.PEGS ?? detail?.quantity ?? detail?.QUANTITY ?? 0);
+        if (!Number.isFinite(code) || code <= 0 || !Number.isFinite(pegs) || pegs <= 0) continue;
+        const required = pegs * qty;
+        consumption.set(code, (consumption.get(code) || 0) + required);
+      }
+      continue;
+    }
+
+    const code = Number(item?.itemId ?? item?.item_id ?? item?.ITEM_ID ?? item?.item_code ?? item?.ITEM_CODE ?? item?.code ?? item?.CODE ?? 0);
+    if (!Number.isFinite(code) || code <= 0) continue;
+    consumption.set(code, (consumption.get(code) || 0) + qty);
+  }
+
+  return consumption;
+}
+
 export function validateNextQuantity(item, nextQuantity) {
   const qty = Number(nextQuantity);
   if (!Number.isFinite(qty) || qty < 1) {
