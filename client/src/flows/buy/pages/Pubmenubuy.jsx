@@ -94,6 +94,55 @@ function getCocktailDetailsForItem(orderNumber, item, detailsByItemCode = {}) {
   return Array.isArray(fetchedDetails) ? fetchedDetails : null;
 }
 
+function getItemType(item) {
+  const rawType = item?.type ?? item?.TYPE ?? item?.item_type ?? item?.ITEM_TYPE ?? item?.pegType ?? item?.peg_type ?? item?.TYPE_OF_PEG ?? null;
+  if (rawType === null || rawType === undefined || rawType === "") {
+    return null;
+  }
+  return String(rawType).trim();
+}
+
+function isLargePegType(item) {
+  return String(getItemType(item) || "").trim().toLowerCase() === "large";
+}
+
+function getItemPegMultiplier(item) {
+  return isLargePegType(item) ? 2 : 1;
+}
+
+function getMaxAllowedByPegType(item) {
+  const maxAllowed = getMaxAllowedQuantity(item);
+  if (maxAllowed === null || maxAllowed === undefined) return null;
+  const multiplier = getItemPegMultiplier(item);
+  if (multiplier <= 1) return maxAllowed;
+  return Math.floor(maxAllowed / multiplier);
+}
+
+function validateNextQuantityForItem(item, nextQuantity) {
+  const qty = Number(nextQuantity);
+  if (!Number.isFinite(qty) || qty < 1) {
+    return { ok: false, message: "Quantity cannot be less than 1." };
+  }
+
+  if (isOutOfStock(item)) {
+    return { ok: false, message: "Out of stock." };
+  }
+
+  const maxAllowed = getMaxAllowedQuantity(item);
+  if (maxAllowed !== null && maxAllowed !== undefined && maxAllowed >= 0) {
+    const multiplier = getItemPegMultiplier(item);
+    const allowedQty = multiplier > 1 ? Math.floor(maxAllowed / multiplier) : maxAllowed;
+    if (allowedQty <= 0) {
+      return { ok: false, message: "Out of stock." };
+    }
+    if (qty > allowedQty) {
+      return { ok: false, message: `Out of stock. Available quantity: ${allowedQty}` };
+    }
+  }
+
+  return { ok: true, message: "" };
+}
+
 function hasMissingCocktailIngredients(orderNumber, item, detailsByItemCode = {}) {
   if (!isCocktailOrMocktail(item)) return false;
   const details = getCocktailDetailsForItem(orderNumber, item, detailsByItemCode);
@@ -231,6 +280,7 @@ function normalizeItem(item, fallbackIndex = 0) {
         : Number(rawFreeItemAvailableQuantity),
     computed_free_item_quantity: Number.isFinite(computed_free_item_quantity) ? computed_free_item_quantity : null,
     subcategory: Number.isFinite(subcategory) ? subcategory : null,
+    type: item.type || item.TYPE || item.item_type || item.ITEM_TYPE || item.pegType || item.peg_type || null,
     stockStatus,
     stockIssueMessage,
     cartId: Number.isFinite(cartId) && cartId > 0 ? cartId : null,
@@ -407,6 +457,7 @@ export default function Pubmenubuy({
 
           let issueMessage = "";
           let hasUnknownStock = false;
+          const multiplier = getItemPegMultiplier(entry.item);
           for (const ing of normalizedDetails) {
             const rawAvailable = stockMap?.[String(ing.itemCode)];
             if (rawAvailable === undefined || rawAvailable === null || rawAvailable === "") {
@@ -418,7 +469,7 @@ export default function Pubmenubuy({
               hasUnknownStock = true;
               continue;
             }
-            const required = ing.pegs * parentQty;
+            const required = ing.pegs * parentQty * multiplier;
             if (required > available) {
               issueMessage = `Out of stock for ingredient ${ing.itemName || ing.itemCode}. Available quantity: ${available}`;
               break;
@@ -467,7 +518,7 @@ export default function Pubmenubuy({
           }
         }
 
-        const maxAllowed = getMaxAllowedQuantity(item);
+        const maxAllowed = getMaxAllowedByPegType(item);
 
         return (
           maxAllowed !== null &&
@@ -672,7 +723,7 @@ export default function Pubmenubuy({
         const response = await Pubmenubuyservice.getByOrderNumber(orderNumber);
         const data = response?.data?.data || {};
         const rows = Array.isArray(data?.items) ? data.items : [];
-        console.log("[getByOrderNumberssssss] FETCH RESPONSE", response.data);
+        // console.log("[getByOrderNumberssssss] FETCH RESPONSE", response.data);
         if (!ignore) {
           setOrderHeader(data?.header || null);
           const normalized = rows.map((item, index) => normalizeItem(item, index));
@@ -950,7 +1001,7 @@ export default function Pubmenubuy({
 
       if (delta > 0) {
         if (!(isCocktailOrMocktail(targetItem) && cocktailOverride && !cocktailOverride.isOutOfStock)) {
-          const stockValidation = validateNextQuantity(targetItem, nextQtyCandidate);
+          const stockValidation = validateNextQuantityForItem(targetItem, nextQtyCandidate);
           if (!stockValidation.ok) {
             validationMessage =
               stockValidation.message ||
@@ -1267,14 +1318,17 @@ export default function Pubmenubuy({
     }
 
     const availableQty = liveItem?.availableQuantity;
+    const liveItemMultiplier = getItemPegMultiplier(liveItem);
     if (
       !isCocktailOrMocktail(liveItem) &&
       availableQty !== null &&
       availableQty !== undefined &&
       Number.isFinite(Number(availableQty))
     ) {
-      if (nextQtyCandidate > Number(availableQty)) {
-        showToastWithCooldown(`Out of stock. Available quantity: ${availableQty}`, "error", liveItem);
+      if (nextQtyCandidate * liveItemMultiplier > Number(availableQty)) {
+        const message = `Out of stock. Available quantity: ${availableQty}`;
+        showToastWithCooldown(message, "error", liveItem);
+        showStockLimitOnImage(liveItem, "Out of Stock");
         return;
       }
     }
@@ -1510,7 +1564,29 @@ export default function Pubmenubuy({
       const cocktailCustomizations = buildCocktailCustomizationPayload(orderNumber, items);
 
       // Validate that we have valid items to confirm
-      const validItems = (Array.isArray(items) ? items : [])
+      const confirmedItems = Array.isArray(items) ? items : [];
+      for (const item of confirmedItems) {
+        if (item.isFreeItem) continue;
+        if (isCocktailOrMocktail(item)) {
+          const validation = await validateCocktailNextQuantity(item, item.quantity);
+          if (!validation.ok) {
+            setError(validation.message);
+            showToast(validation.message || "Out of stock for cocktail/mocktail ingredients.", "error");
+            setConfirming(false);
+            return;
+          }
+        } else {
+          const validation = validateNextQuantityForItem(item, item.quantity);
+          if (!validation.ok) {
+            setError(validation.message);
+            showToast(validation.message || "Out of stock.", "error");
+            setConfirming(false);
+            return;
+          }
+        }
+      }
+
+      const validItems = confirmedItems
         .map((it) => ({
           item_id: Number(it.itemId || it.item_id || it.item_code || it.id || 0) || 0,
           order_line_id: Number(it.orderLineId || it.order_line_id || 0) || 0,
@@ -1685,7 +1761,10 @@ export default function Pubmenubuy({
                     const isCocktailItem = isCocktailOrMocktail(item);
                     
                     // Determine if the item is out of stock based on current availableQuantity vs requested quantity
-                    const isStandardOutOfStock = !isCocktailItem && !item.isFreeItem && item.availableQuantity !== null && Number(item.quantity) > Number(item.availableQuantity);
+                                    const itemMultiplier = getItemPegMultiplier(item);
+                    const isStandardOutOfStock =
+                      !isCocktailItem && !item.isFreeItem && item.availableQuantity !== null &&
+                      Number(item.quantity) * itemMultiplier > Number(item.availableQuantity);
                     const isCardOutOfStock =
                       isCocktailItem
                         ? Boolean(getCocktailOverrideForItem(item)?.isOutOfStock || item.stockIssueMessage || isOutOfStock(item))
@@ -1754,6 +1833,11 @@ export default function Pubmenubuy({
                                 </span>
                               ) : null}
                             </p>
+                            {item.type ? (
+                              <p className="mt-1 text-sm text-stone-500">
+                                {toInitCap("Type")}: <span className="font-semibold text-stone-800">{toInitCap(item.type)}</span>
+                              </p>
+                            ) : null}
                             {isCocktailOrMocktail(item) && (() => {
                               const itemCode = String(item?.item_code || "").trim();
                               const override = itemCode ? cocktailOverrideIssues?.[itemCode] : null;

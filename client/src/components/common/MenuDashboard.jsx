@@ -395,6 +395,10 @@ function MenuPopupCompact({ item, loading, onClose, onBuy }) {
     }
   };
 
+  const getPegMultiplier = (type) => {
+    return String(type || "").trim().toLowerCase() === "large" ? 2 : 1;
+  };
+
   const handleAddToCart = async () => {
     if (!item) return;
 
@@ -402,6 +406,8 @@ function MenuPopupCompact({ item, loading, onClose, onBuy }) {
       toast.error("Select the type");
       return;
     }
+
+    const pegMultiplier = getPegMultiplier(pegType);
 
     try {
       setIsSubmitting(true);
@@ -470,7 +476,7 @@ function MenuPopupCompact({ item, loading, onClose, onBuy }) {
                 if (rawAvailable === undefined || rawAvailable === null || rawAvailable === "") continue;
                 const available = Number(rawAvailable);
                 if (!Number.isFinite(available) || available < 0) continue;
-                const required = ing.pegs * desiredQty;
+                const required = ing.pegs * desiredQty * pegMultiplier;
                 if (required > available) {
                   const msg = `Out of stock for ingredient ${ing.itemName || ing.itemCode}. Available quantity: ${available}`;
                   toast.error(msg);
@@ -490,7 +496,7 @@ function MenuPopupCompact({ item, loading, onClose, onBuy }) {
             const rawAvailable = stockMap?.[String(itemCode)];
             if (rawAvailable !== undefined && rawAvailable !== null && rawAvailable !== "") {
               const available = Number(rawAvailable);
-              if (Number.isFinite(available) && available >= 0 && desiredQty > available) {
+              if (Number.isFinite(available) && available >= 0 && desiredQty * pegMultiplier > available) {
                 toast.error(`Out of stock. Available quantity: ${available}`);
                 setIsSubmitting(false);
                 return;
@@ -1534,6 +1540,55 @@ function MenuDashboard() {
   const handleBuy = async (item, qty, remarks, selectedType) => {
     try {
       const typeForBackend = selectedType || null;
+      const pegMultiplier = String(typeForBackend || "").trim().toLowerCase() === "large" ? 2 : 1;
+      const desiredQty = Number(qty) || 1;
+      const itemCode = Number(item?.item_code ?? item?.item_id) || null;
+
+      try {
+        if (isCocktailOrMocktailItem(item) && Number.isFinite(itemCode) && itemCode > 0) {
+          const res = await barOrdersAPI.getCocktailDetailsById(itemCode);
+          const details = res?.data?.data?.details || [];
+          const ingredients = (details || [])
+            .map((d) => ({
+              itemCode: Number(d?.ITEM_CODE ?? d?.itemCode),
+              pegs: Number(d?.PEGS ?? d?.pegs ?? d?.QUANTITY ?? d?.quantity ?? 0) || 0,
+              itemName: String(d?.ITEM_NAME ?? d?.itemName ?? "").trim(),
+            }))
+            .filter((x) => Number.isFinite(x.itemCode) && x.itemCode > 0 && x.pegs > 0);
+
+          if (ingredients.length > 0) {
+            const codes = [...new Set(ingredients.map((ing) => ing.itemCode))];
+            const stockRes = await cartAPI.getIngredientStocks(codes);
+            const stockMap = stockRes?.data?.data || {};
+
+            for (const ing of ingredients) {
+              const rawAvailable = stockMap?.[String(ing.itemCode)];
+              if (rawAvailable === undefined || rawAvailable === null || rawAvailable === "") continue;
+              const available = Number(rawAvailable);
+              if (!Number.isFinite(available) || available < 0) continue;
+              const required = ing.pegs * desiredQty * pegMultiplier;
+              if (required > available) {
+                toast.error(`Out of stock for ingredient ${ing.itemName || ing.itemCode}. Available quantity: ${available}`);
+                return;
+              }
+            }
+          }
+        } else if (Number.isFinite(itemCode) && itemCode > 0) {
+          const stockRes = await cartAPI.getIngredientStocks([itemCode]);
+          const stockMap = stockRes?.data?.data || {};
+          const rawAvailable = stockMap?.[String(itemCode)];
+          if (rawAvailable !== undefined && rawAvailable !== null && rawAvailable !== "") {
+            const available = Number(rawAvailable);
+            if (Number.isFinite(available) && available >= 0 && desiredQty * pegMultiplier > available) {
+              toast.error(`Out of stock. Available quantity: ${available}`);
+              return;
+            }
+          }
+        }
+      } catch (err) {
+        // ignore stock check failures here; do not hard-block buy flow on API issues
+      }
+
       const menuSearchParams = new URLSearchParams(location.search);
       const selectedPubmed = String(
         location.state?.pubmed ||

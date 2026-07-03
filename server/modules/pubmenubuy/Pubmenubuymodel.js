@@ -889,6 +889,7 @@ async function getOrderSummary(orderNumber) {
         xxod.QUANTITY AS quantity,
         xxod.PRICE AS price,
         xxod.BARCODE AS barcode,
+        xxod.TYPE AS type,
         XXINV.SUB_CATEGORY AS subcategory,
         CONCAT(
           'Name: ', XXINV.ITEM_NAME,
