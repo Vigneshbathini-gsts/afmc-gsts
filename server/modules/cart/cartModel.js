@@ -597,11 +597,10 @@ const updateCartCustomization = async (cartId, userId, updates) => {
 
     const cartQuantity = Number(cartItem.quantity || 1);
     const ingredients = await normalizeCustomizationUpdates(conn, updates, cartQuantity);
-    if (ingredients.length === 0) {
-      throw createValidationError("At least one valid ingredient is required");
-    }
 
-    await validateCustomizationStock(conn, ingredients, cartQuantity, userId, cartId);
+    if (ingredients.length > 0) {
+      await validateCustomizationStock(conn, ingredients, cartQuantity, userId, cartId);
+    }
     // console.log("validateCustomizationStock", validateCustomizationStock)
     // console.log("ingredients", ingredients);
 
