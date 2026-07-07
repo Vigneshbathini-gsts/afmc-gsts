@@ -1,4 +1,5 @@
 const invoiceModel = require("../invoice/invoiceModel");
+const { emitOrderStatusUpdate } = require("../../utils/orderEvents");
 
 const fetchPaymentModes = async ({ roleId, loginType }) => {
   const normalizedLoginType = loginType?.trim().toUpperCase();
@@ -32,6 +33,8 @@ const processPayment = async ({
     paymentStatus,
     createdBy,
   });
+
+  await emitOrderStatusUpdate(orderNumber, { payment_status: paymentStatus });
 
   return {
     orderNumber,

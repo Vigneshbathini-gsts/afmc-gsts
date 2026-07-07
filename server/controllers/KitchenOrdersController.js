@@ -1,5 +1,6 @@
 const pool = require("../config/db");
 const { getStartOfDay, getEndOfDay } = require("../utils/dateUtils");
+const { emitOrderStatusUpdate } = require("../utils/orderEvents");
 
 const getRequestUsername = (req) =>
   String(req.user?.username || req.user?.user_name || req.body?.appUser || "").trim();
@@ -626,6 +627,10 @@ exports.updateBarOrderStatus = async (req, res) => {
   `,
         [handledBy, ORDERNUMBER, categoryId]
       );
+    }
+
+    if (result.affectedRows > 0) {
+      await emitOrderStatusUpdate(String(ORDERNUMBER), { status: normalizedStatus });
     }
 
     return res.status(200).json({
@@ -1296,6 +1301,7 @@ exports.processBarcodeScan = async (req, res) => {
     await connection.commit();
     transactionCommitted = true;
     await saveSession(req);
+    await emitOrderStatusUpdate(String(ORDERNUMBER));
 
     return res.status(201).json({
       success: true,
@@ -1751,6 +1757,7 @@ WHERE kn.ordernumber = ?
       );
 
       await connection.commit();
+      await emitOrderStatusUpdate(String(ORDERNUMBER), { status: "Cancelled" });
 
       return res.status(200).json({
         success: true,
@@ -1828,6 +1835,7 @@ WHERE kn.ordernumber = ?
     );
 
     await connection.commit();
+    await emitOrderStatusUpdate(String(lineItem?.order_id || ORDERNUMBER), { status: "Cancelled" });
 
     return res.status(200).json({
       success: true,
@@ -2407,6 +2415,7 @@ exports.completeOrder = async (req, res) => {
 
 
     await connection.commit();
+    await emitOrderStatusUpdate(String(ORDERNUMBER), { status: STATUS });
 
     return res.status(200).json({
       success: true,

@@ -77,6 +77,7 @@ export default function AddItem() {
       setSuccessMessage("");
       try {
         const response = await inventoryAPI.getStockOutItemByBarcode(normalizedBarcode);
+
         const item = response.data.data;
         console.log("item", item);
         const availableStock = Number(item.available_stock || 0);
@@ -92,23 +93,25 @@ export default function AddItem() {
             return current;
           }
 
-          return [
-            ...current,
-              {
-              itemCode: item.item_code,
-              itemName: item.item_name,
-              pages: 1,
-              displayPages: 1,
-              unitPrice: Number(item.unit_price || 0),
-              transactionDate,
-              barcode: normalizedBarcode,
-              volume: item.volume || "",
-              batchName: item.batch_name || "",
-              acUnit: item.ac_unit || "Nos",
-              pegs: Number(item.pegs || 0),
-              availableStock,
-            },
-          ];
+          const barcodeQty = Number(item.barcode_qty || 0);
+
+return [
+  ...current,
+  {
+    itemCode: item.item_code,
+    itemName: item.item_name,
+    pages: barcodeQty,
+    displayPages: barcodeQty,
+    unitPrice: Number(item.unit_price || 0),
+    transactionDate,
+    barcode: normalizedBarcode,
+    volume: item.volume || "",
+    batchName: item.batch_name || "",
+    acUnit: item.ac_unit || "Nos",
+    pegs: Number(item.pegs || 0),
+    availableStock,
+  },
+];
         });
         setBarcode("");
         toast.success(`Added barcode ${normalizedBarcode} successfully.`);
@@ -183,13 +186,21 @@ export default function AddItem() {
     setSuccessMessage("");
     try {
       console.log("inventoryAPI",inventoryAPI)
+      console.log(
+  rows.map((row) => ({
+    barcode: row.barcode,
+    quantity: Number(row.pages ?? row.displayPages ?? row.pegs ?? 1),
+    transactionDate,
+    createdBy,
+  }))
+);
       await inventoryAPI.createStockOut({
-        items: rows.map((row) => ({
-          barcode: row.barcode,
-          pages: Number(row.pages ?? row.displayPages ?? row.pegs ?? 1),
-          transactionDate,
-          createdBy,
-        })),
+       items: rows.map((row) => ({
+    barcode: row.barcode,
+    quantity: Number(row.pages ?? row.displayPages ?? row.pegs ?? 1),
+    transactionDate,
+    createdBy,
+})),
       });
 
       setRows([]);

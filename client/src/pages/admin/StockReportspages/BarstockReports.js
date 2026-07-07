@@ -60,7 +60,7 @@ export default function BarstockReports() {
 
         const newData = res.data.data || [];
 
-        console.log("Barstock",newData);
+        // console.log("Barstock",newData);
 
         if (reset) {
           setData(newData);
@@ -170,8 +170,6 @@ export default function BarstockReports() {
           "Stock",
           "Rate",
           "Value",
-          // "Available",
-          // "Reserved", 
           "Bottles/Nos",
           "Pegs",
         ],
@@ -182,8 +180,6 @@ export default function BarstockReports() {
           item.STOCK_QUANTITY ?? 0,
           item.unit_price ?? 0,
           item.value ?? 0,
-          // item.AVAILABLE_STOCK ?? 0,
-          // item.RESERVED_STOCK ?? 0,
           item.bottles ?? 0,
           item.pegs ?? 0,
         ]),
