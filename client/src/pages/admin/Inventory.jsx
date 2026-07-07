@@ -936,330 +936,331 @@ ac_unit}</td>
         />
       )}
 
-      {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center overflow-y-auto bg-black/40 px-4 py-6">
-          <div className="w-full max-w-full sm:max-w-4xl rounded-3xl bg-white/95 shadow-2xl border border-white/70 backdrop-blur-md p-4 sm:p-8 relative max-h-[calc(100vh-3rem)] overflow-y-auto">
-            <button
-              type="button"
-              onClick={() => setShowAddModal(false)}
-              className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"
-              aria-label="Close"
-            >
-              X
-            </button>
+{showAddModal && (
+  <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center overflow-y-auto bg-black/40 px-4 py-6">
+    <div className="w-full max-w-full sm:max-w-4xl rounded-3xl bg-white/95 shadow-2xl border border-white/70 backdrop-blur-md p-4 sm:p-8 relative max-h-[calc(100vh-3rem)] overflow-y-auto">
+      <button
+        type="button"
+        onClick={() => setShowAddModal(false)}
+        className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"
+        aria-label="Close"
+      >
+        X
+      </button>
 
-            {addItemError && (
-              <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
-                {addItemError}
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Item Name
-                </label>
-                <input
-                  type="text"
-                  value={formValues.itemName}
-                  onChange={(e) =>
-                    setFormValues((prev) => ({ ...prev, itemName: e.target.value }))
-                  }
-                  maxLength={100}
-                  className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-800"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Description
-                </label>
-                <input
-                  type="text"
-                  value={formValues.description}
-                  onChange={(e) =>
-                    setFormValues((prev) => ({ ...prev, description: e.target.value }))
-                  }
-                  maxLength={250}
-                  className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-800"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Category
-                </label>
-                <div className="relative" ref={addCategoryDropdownRef}>
-                  <button
-                    type="button"
-                    onClick={() => setIsAddCategoryDropdownOpen((prev) => !prev)}
-                    className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-left text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20 flex items-center justify-between"
-                  >
-                    <span className="truncate">
-                      {selectedAddCategory?.category_name || "Select Category"}
-                    </span>
-                    <FaChevronDown
-                      className={`text-gray-400 transition-transform ${isAddCategoryDropdownOpen ? "rotate-180" : ""
-                        }`}
-                    />
-                  </button>
-
-                  {isAddCategoryDropdownOpen && (
-                    <div className="absolute z-30 mt-2 w-full rounded-2xl border border-gray-200 bg-white shadow-2xl overflow-hidden">
-                      <div className="max-h-72 overflow-y-auto py-2">
-                        {filteredAddCategories.length === 0 ? (
-                          <div className="px-4 py-3 text-sm text-gray-500">
-                            No matching categories found.
-                          </div>
-                        ) : (
-                          filteredAddCategories.map((category) => (
-                            <button
-                              key={category.category_id}
-                              type="button"
-                              onClick={() => {
-                                setFormValues((prev) => ({
-                                  ...prev,
-                                  categoryId: category.category_id,
-                                  subCategory: "",
-                                  acUnit: "",
-                                }));
-                                setSubCategoryFilter("");
-                                setIsAddCategoryDropdownOpen(false);
-                              }}
-                              className={`w-full px-4 py-2.5 text-left text-sm hover:bg-afmc-maroon2/5 ${String(formValues.categoryId) === String(category.category_id)
-                                ? "bg-afmc-maroon2/10 font-medium text-afmc-maroon"
-                                : "text-gray-700"
-                                }`}
-                            >
-                              {category.category_name}
-                            </button>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Sub Category
-                </label>
-                <div className="relative" ref={subCategoryDropdownRef}>
-                  <button
-                    type="button"
-                    onClick={() => setIsSubCategoryDropdownOpen((prev) => !prev)}
-                    disabled={!formValues.categoryId}
-                    className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-left text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20 flex items-center justify-between disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    <span className="truncate">
-                      {toInitCap(selectedAddSubCategory?.sub_category_name) ||
-                        (formValues.categoryId
-                          ? "Select Sub Category"
-                          : "Select Category First")}
-                    </span>
-                    <FaChevronDown
-                      className={`text-gray-400 transition-transform ${isSubCategoryDropdownOpen ? "rotate-180" : ""
-                        }`}
-                    />
-                  </button>
-
-                  {isSubCategoryDropdownOpen && formValues.categoryId && (
-                    <div className="absolute z-30 mt-2 w-full rounded-2xl border border-gray-200 bg-white shadow-2xl overflow-hidden">
-                      <div className="border-b border-gray-100 p-3">
-                        <div className="flex items-center gap-2">
-                          <div className="flex flex-1 items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2">
-                            <FaSearch className="text-gray-400" />
-                            <input
-                              type="text"
-                              value={subCategoryFilter}
-                              onChange={(e) => setSubCategoryFilter(e.target.value)}
-                              placeholder="Search sub category"
-                              maxLength={100}
-                              className="w-full bg-transparent text-sm text-gray-800 outline-none placeholder:text-gray-400"
-                            />
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setFormValues((prev) => ({
-                                ...prev,
-                                subCategory: "",
-                                acUnit: "",
-                              }));
-                              setSubCategoryFilter("");
-                            }}
-                            className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                          >
-                            Reset
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="max-h-72 overflow-y-auto py-2">
-                        {filteredAddSubCategories.length === 0 ? (
-                          <div className="px-4 py-3 text-sm text-gray-500">
-                            No matching sub categories found.
-                          </div>
-                        ) : (
-                          filteredAddSubCategories.map((sub) => (
-                            <button
-                              key={sub.sub_category_id}
-                              type="button"
-                              onClick={() => {
-                                setFormValues((prev) => ({
-                                  ...prev,
-                                  subCategory: sub.sub_category_id,
-                                  acUnit: "",
-                                }));
-                                setSubCategoryFilter(toInitCap(sub.sub_category_name) || "");
-                                setIsSubCategoryDropdownOpen(false);
-                              }}
-                              className={`w-full px-4 py-2.5 text-left text-sm hover:bg-afmc-maroon2/5 ${String(formValues.subCategory) === String(sub.sub_category_id)
-                                ? "bg-afmc-maroon2/10 font-medium text-afmc-maroon"
-                                : "text-gray-700"
-                                }`}
-                            >
-                              {toInitCap(sub.sub_category_name)}
-                            </button>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="md:col-span-1">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Image
-                </label>
-                <input
-                  type="file"
-                  accept=".jpg"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0] || null;
-                    if (file && !isJpgImageFile(file)) {
-                      e.target.value = "";
-                      setFormValues((prev) => ({ ...prev, image: null }));
-                      setAddItemError(JPG_IMAGE_ERROR);
-                      return;
-                    }
-                    setAddItemError("");
-                    setFormValues((prev) => ({
-                      ...prev,
-                      image: file,
-                    }));
-                  }}
-                  className="w-full rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-4 py-3 text-gray-700"
-                />
-              </div>
-
-              <div className="md:col-span-1">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Accounting Unit
-                </label>
-                <div className="relative" ref={acUnitDropdownRef}>
-                  <button
-                    type="button"
-                    onClick={() => setIsAcUnitDropdownOpen((prev) => !prev)}
-                    disabled={!formValues.subCategory}
-                    className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-left text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20 flex items-center justify-between disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    <span className="truncate">
-                      {formValues.subCategory
-                        ? formValues.acUnit || "Select Unit"
-                        : "Select Sub Category First"}
-                    </span>
-                    <FaChevronDown
-                      className={`text-gray-400 transition-transform ${isAcUnitDropdownOpen ? "rotate-180" : ""
-                        }`}
-                    />
-                  </button>
-
-                  {isAcUnitDropdownOpen && (
-                    <div className="absolute z-30 mt-2 w-full rounded-2xl border border-gray-200 bg-white shadow-2xl overflow-hidden">
-                      <div className="max-h-72 overflow-y-auto py-2">
-                        {acUnitOptions.map((unit) => (
-                          <button
-                            key={unit}
-                            type="button"
-                            onClick={() => {
-                              setFormValues((prev) => ({ ...prev, acUnit: unit }));
-                              setIsAcUnitDropdownOpen(false);
-                            }}
-                            className={`w-full px-4 py-2.5 text-left text-sm hover:bg-afmc-maroon2/5 ${String(formValues.acUnit).toLowerCase() === String(unit).toLowerCase()
-                              ? "bg-afmc-maroon2/10 font-medium text-afmc-maroon"
-                              : "text-gray-700"
-                              }`}
-                          >
-                            {unit}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="md:col-span-2 flex items-center gap-6">
-                <span className="text-sm font-medium text-gray-700">
-                  Preparation charges
-                </span>
-                <label className="flex items-center gap-2 text-sm text-gray-700">
-                  <input
-                    type="radio"
-                    name="prepCharges"
-                    value="N"
-                    checked={formValues.prepCharges === "N"}
-                    onChange={(e) =>
-                      setFormValues((prev) => ({
-                        ...prev,
-                        prepCharges: e.target.value,
-                      }))
-                    }
-                  />
-                  No
-                </label>
-                <label className="flex items-center gap-2 text-sm text-gray-700">
-                  <input
-                    type="radio"
-                    name="prepCharges"
-                    value="Y"
-                    checked={formValues.prepCharges === "Y"}
-                    onChange={(e) =>
-                      setFormValues((prev) => ({
-                        ...prev,
-                        prepCharges: e.target.value,
-                      }))
-                    }
-                  />
-                  Yes
-                </label>
-              </div>
-            </div>
-
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <button
-                type="button"
-                onClick={() => setShowAddModal(false)}
-                className="w-full sm:w-auto px-6 py-3 rounded-full bg-gray-600 text-white"
-              >
-                Back
-              </button>
-              <button
-                type="button"
-                onClick={handleCreateItem}
-                disabled={saving}
-                className="w-full sm:w-auto px-8 py-3 rounded-full bg-afmc-maroon text-white font-semibold shadow-afmc hover:bg-afmc-maroon2 focus:outline-none focus:ring-2 focus:ring-afmc-gold/50 disabled:opacity-70"
-              >
-                {saving ? "Creating..." : "Create"}
-              </button>
-            </div>
-          </div>
+      {addItemError && (
+        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+          {addItemError}
         </div>
       )}
 
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Item Name
+          </label>
+          <input
+            type="text"
+            value={formValues.itemName}
+            onChange={(e) =>
+              setFormValues((prev) => ({ ...prev, itemName: e.target.value }))
+            }
+            maxLength={100}
+            className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-800"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Description
+          </label>
+          <input
+            type="text"
+            value={formValues.description}
+            onChange={(e) =>
+              setFormValues((prev) => ({ ...prev, description: e.target.value }))
+            }
+            maxLength={250}
+            className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-800"
+          />
+        </div>
+
+        {/* Category - Explicitly set to col-span-1 */}
+        <div className="col-span-1">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Category
+          </label>
+          <div className="relative" ref={addCategoryDropdownRef}>
+            <button
+              type="button"
+              onClick={() => setIsAddCategoryDropdownOpen((prev) => !prev)}
+              className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-left text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20 flex items-center justify-between"
+            >
+              <span className="truncate">
+                {selectedAddCategory?.category_name || "Select Category"}
+              </span>
+              <FaChevronDown
+                className={`text-gray-400 transition-transform ${isAddCategoryDropdownOpen ? "rotate-180" : ""
+                  }`}
+              />
+            </button>
+
+            {isAddCategoryDropdownOpen && (
+              <div className="absolute z-30 mt-2 w-full rounded-2xl border border-gray-200 bg-white shadow-2xl overflow-hidden">
+                <div className="max-h-72 overflow-y-auto py-2">
+                  {filteredAddCategories.length === 0 ? (
+                    <div className="px-4 py-3 text-sm text-gray-500">
+                      No matching categories found.
+                    </div>
+                  ) : (
+                    filteredAddCategories.map((category) => (
+                      <button
+                        key={category.category_id}
+                        type="button"
+                        onClick={() => {
+                          setFormValues((prev) => ({
+                            ...prev,
+                            categoryId: category.category_id,
+                            subCategory: "",
+                            acUnit: "",
+                          }));
+                          setSubCategoryFilter("");
+                          setIsAddCategoryDropdownOpen(false);
+                        }}
+                        className={`w-full px-4 py-2.5 text-left text-sm hover:bg-afmc-maroon2/5 ${String(formValues.categoryId) === String(category.category_id)
+                          ? "bg-afmc-maroon2/10 font-medium text-afmc-maroon"
+                          : "text-gray-700"
+                          }`}
+                      >
+                        {category.category_name}
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Sub Category - Explicitly set to col-span-1 */}
+        <div className="col-span-1">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Sub Category
+          </label>
+          <div className="relative" ref={subCategoryDropdownRef}>
+            <button
+              type="button"
+              onClick={() => setIsSubCategoryDropdownOpen((prev) => !prev)}
+              disabled={!formValues.categoryId}
+              className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-left text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20 flex items-center justify-between disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <span className="truncate">
+                {toInitCap(selectedAddSubCategory?.sub_category_name) ||
+                  (formValues.categoryId
+                    ? "Select Sub Category"
+                    : "Select Category First")}
+              </span>
+              <FaChevronDown
+                className={`text-gray-400 transition-transform ${isSubCategoryDropdownOpen ? "rotate-180" : ""
+                  }`}
+              />
+            </button>
+
+            {isSubCategoryDropdownOpen && formValues.categoryId && (
+              <div className="absolute z-30 mt-2 w-full rounded-2xl border border-gray-200 bg-white shadow-2xl overflow-hidden">
+                <div className="border-b border-gray-100 p-3">
+                  <div className="flex items-center gap-2">
+                    <div className="flex flex-1 items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2">
+                      <FaSearch className="text-gray-400" />
+                      <input
+                        type="text"
+                        value={subCategoryFilter}
+                        onChange={(e) => setSubCategoryFilter(e.target.value)}
+                        placeholder="Search sub category"
+                        maxLength={100}
+                        className="w-full bg-transparent text-sm text-gray-800 outline-none placeholder:text-gray-400"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormValues((prev) => ({
+                          ...prev,
+                          subCategory: "",
+                          acUnit: "",
+                        }));
+                        setSubCategoryFilter("");
+                      }}
+                      className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                    >
+                      Reset
+                    </button>
+                  </div>
+                </div>
+
+                <div className="max-h-72 overflow-y-auto py-2">
+                  {filteredAddSubCategories.length === 0 ? (
+                    <div className="px-4 py-3 text-sm text-gray-500">
+                      No matching sub categories found.
+                    </div>
+                  ) : (
+                    filteredAddSubCategories.map((sub) => (
+                      <button
+                        key={sub.sub_category_id}
+                        type="button"
+                        onClick={() => {
+                          setFormValues((prev) => ({
+                            ...prev,
+                            subCategory: sub.sub_category_id,
+                            acUnit: "",
+                          }));
+                          setSubCategoryFilter(toInitCap(sub.sub_category_name) || "");
+                          setIsSubCategoryDropdownOpen(false);
+                        }}
+                        className={`w-full px-4 py-2.5 text-left text-sm hover:bg-afmc-maroon2/5 ${String(formValues.subCategory) === String(sub.sub_category_id)
+                          ? "bg-afmc-maroon2/10 font-medium text-afmc-maroon"
+                          : "text-gray-700"
+                          }`}
+                      >
+                        {toInitCap(sub.sub_category_name)}
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="col-span-1">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Image
+          </label>
+          <input
+            type="file"
+            accept=".jpg"
+            onChange={(e) => {
+              const file = e.target.files?.[0] || null;
+              if (file && !isJpgImageFile(file)) {
+                e.target.value = "";
+                setFormValues((prev) => ({ ...prev, image: null }));
+                setAddItemError(JPG_IMAGE_ERROR);
+                return;
+              }
+              setAddItemError("");
+              setFormValues((prev) => ({
+                ...prev,
+                image: file,
+              }));
+            }}
+            className="w-full rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-4 py-3 text-gray-700"
+          />
+        </div>
+
+        <div className="col-span-1">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Accounting Unit
+          </label>
+          <div className="relative" ref={acUnitDropdownRef}>
+            <button
+              type="button"
+              onClick={() => setIsAcUnitDropdownOpen((prev) => !prev)}
+              disabled={!formValues.subCategory}
+              className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-left text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20 flex items-center justify-between disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <span className="truncate">
+                {formValues.subCategory
+                  ? formValues.acUnit || "Select Unit"
+                  : "Select Sub Category First"}
+              </span>
+              <FaChevronDown
+                className={`text-gray-400 transition-transform ${isAcUnitDropdownOpen ? "rotate-180" : ""
+                  }`}
+              />
+            </button>
+
+            {isAcUnitDropdownOpen && (
+              <div className="absolute z-30 mt-2 w-full rounded-2xl border border-gray-200 bg-white shadow-2xl overflow-hidden">
+                <div className="max-h-72 overflow-y-auto py-2">
+                  {acUnitOptions.map((unit) => (
+                    <button
+                      key={unit}
+                      type="button"
+                      onClick={() => {
+                        setFormValues((prev) => ({ ...prev, acUnit: unit }));
+                        setIsAcUnitDropdownOpen(false);
+                      }}
+                      className={`w-full px-4 py-2.5 text-left text-sm hover:bg-afmc-maroon2/5 ${String(formValues.acUnit).toLowerCase() === String(unit).toLowerCase()
+                        ? "bg-afmc-maroon2/10 font-medium text-afmc-maroon"
+                        : "text-gray-700"
+                        }`}
+                    >
+                      {unit}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="col-span-1 sm:col-span-2 flex items-center gap-6">
+          <span className="text-sm font-medium text-gray-700">
+            Preparation charges
+          </span>
+          <label className="flex items-center gap-2 text-sm text-gray-700">
+            <input
+              type="radio"
+              name="prepCharges"
+              value="N"
+              checked={formValues.prepCharges === "N"}
+              onChange={(e) =>
+                setFormValues((prev) => ({
+                  ...prev,
+                  prepCharges: e.target.value,
+                }))
+              }
+            />
+            No
+          </label>
+          <label className="flex items-center gap-2 text-sm text-gray-700">
+            <input
+              type="radio"
+              name="prepCharges"
+              value="Y"
+              checked={formValues.prepCharges === "Y"}
+              onChange={(e) =>
+                setFormValues((prev) => ({
+                  ...prev,
+                  prepCharges: e.target.value,
+                }))
+              }
+            />
+            Yes
+          </label>
+        </div>
+      </div>
+
+      <div className="mt-8 flex flex-row items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={() => setShowAddModal(false)}
+          className="flex-1 sm:flex-none px-6 py-3 rounded-full bg-gray-600 text-white"
+        >
+          Back
+        </button>
+        <button
+          type="button"
+          onClick={handleCreateItem}
+          disabled={saving}
+          className="flex-1 sm:flex-none px-8 py-3 rounded-full bg-afmc-maroon text-white font-semibold shadow-afmc hover:bg-afmc-maroon2 focus:outline-none focus:ring-2 focus:ring-afmc-gold/50 disabled:opacity-70"
+        >
+          {saving ? "Creating..." : "Create"}
+        </button>
+      </div>
+    </div>
+  </div>
+)}
       {showImageModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
           <div className="w-full max-w-2xl rounded-3xl bg-white/95 shadow-2xl border border-white/70 backdrop-blur-md p-8 relative">
