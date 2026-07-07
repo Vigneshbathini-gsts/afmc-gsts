@@ -228,36 +228,36 @@ export default function KitchenOrderBell({ kitchen = "Bar" }) {
       )}
 
       {showClearConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6">
-          <div className="w-full max-w-md rounded-3xl bg-white shadow-2xl border border-gray-200">
-            <div className="p-6">
-              <h3 className="text-lg font-semibold text-gray-900">
-                Confirm clear all
-              </h3>
-              <p className="mt-2 text-sm text-gray-600">
-                Clear all {notifications.length} pending notification(s)?
-              </p>
-              <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
-                <button
-                  type="button"
-                  onClick={handleCancelClearAll}
-                  className="w-full rounded-full border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition sm:w-auto"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleConfirmClearAll}
-                  disabled={clearingAll}
-                  className="w-full rounded-full bg-afmc-maroon px-4 py-2 text-sm font-medium text-white hover:bg-afmc-maroon2 transition disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
-                >
-                  {clearingAll ? "Clearing..." : "Yes, clear all"}
-                </button>
-              </div>
-            </div>
-          </div>
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6">
+    <div className="w-full max-w-md rounded-3xl bg-white shadow-2xl border border-gray-200">
+      <div className="p-6">
+        <h3 className="text-lg font-semibold text-gray-900">
+          Confirm clear all
+        </h3>
+        <p className="mt-2 text-sm text-gray-600">
+          Clear all {notifications.length} pending notification(s)?
+        </p>
+        <div className="mt-6 flex flex-row gap-3 justify-end">
+          <button
+            type="button"
+            onClick={handleCancelClearAll}
+            className="flex-1 rounded-full border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition sm:flex-none"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleConfirmClearAll}
+            disabled={clearingAll}
+            className="flex-1 rounded-full bg-afmc-maroon px-4 py-2 text-sm font-medium text-white hover:bg-afmc-maroon2 transition disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none"
+          >
+            {clearingAll ? "Clearing..." : "Yes, clear all"}
+          </button>
         </div>
-      )}
+      </div>
+    </div>
+  </div>
+)}
     </div>
   );
 }

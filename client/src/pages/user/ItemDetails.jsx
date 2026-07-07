@@ -21,13 +21,13 @@ const normalizeDetail = (detail) => detail && ({
 });
 
 const initCap = (str) => {
-  if (!str) return "";
+    if (!str) return "";
 
-  return str
-    .toLowerCase()
-    .split(" ")
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
+    return str
+        .toLowerCase()
+        .split(" ")
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(" ");
 };
 export default function ItemDetails() {
     const { id } = useParams();
@@ -162,7 +162,7 @@ export default function ItemDetails() {
             try {
                 setLoading(true);
                 const response = await inventoryAPI.getById(id);
-                
+
                 if (response.data.success) {
                     const fetchedItem = response.data.data;
                     let details = fetchedItem.details || [];
@@ -252,7 +252,7 @@ export default function ItemDetails() {
                                     isEditingCartItem ? Number(cartId) : undefined
                                 );
                                 const stockMap = stockRes?.data?.data || {};
-                                console.log("stockMap3",stockMap)
+                                console.log("stockMap3", stockMap)
                                 details = details.map((detail, idx) => {
                                     const itemCode = Number(getDetailItemCode(detail));
                                     const stockQuantity = stockMap?.[String(itemCode)];
@@ -340,6 +340,12 @@ export default function ItemDetails() {
     };
 
     const deleteIngredient = async (index) => {
+        const currentCount = item?.details?.length || 0;
+        if (currentCount <= 1) {
+            toast.warning("At least one ingredient is required. Add another ingredient before removing this one.");
+            return;
+        }
+
         const newDetails = (item?.details || []).filter((_, idx) => idx !== index);
         const newQuantities = {};
         Object.entries(quantities).forEach(([key, value]) => {
@@ -359,7 +365,6 @@ export default function ItemDetails() {
             toast.info("Ingredient removed from recipe");
         }
     };
-
     const fetchLovIngredients = async () => {
         if (!item?.SUB_CATEGORY) return;
 
@@ -368,10 +373,10 @@ export default function ItemDetails() {
             const response = await cartAPI.getLovIngredients(item.SUB_CATEGORY);
             if (response.data.success) {
                 setLovData(response.data.data);
-              //  console.log("ingre",response.data.data)
-                
+                //  console.log("ingre",response.data.data)
+
             }
-            
+
         } catch (err) {
             console.error("Error fetching LOV ingredients:", err);
             toast.error("Failed to load ingredients list");
@@ -397,14 +402,14 @@ export default function ItemDetails() {
         const existingCount = item?.details?.length || 0;
         const selectedCount = selectedIngredients.length;
         const totalCount = existingCount + selectedCount;
-        
+
         if (totalCount >= 5) {
             toast.warning("Maximum 5 ingredients allowed per recipe");
             return;
         }
 
         const alreadySelected = selectedIngredients.some(item => item.d === ingredient.d);
-        
+
         // Check if ingredient already exists in recipe
         const existingIngredientIndex = item?.details?.findIndex(
             (detail) => String(getDetailItemName(detail) || "").trim().toLowerCase() === String(ingredient.d || "").trim().toLowerCase()
@@ -420,14 +425,14 @@ export default function ItemDetails() {
             // Ingredient exists, increase its quantity instead of adding new
             const currentQty = quantities[existingIngredientIndex] || 1;
             const newQty = currentQty + 1;
-            
+
             // Check stock availability
             const existingDetail = item.details[existingIngredientIndex];
             const rawStockQuantity = getDetailStockQuantity(existingDetail);
             const stockQuantity = rawStockQuantity == null || rawStockQuantity === "" ? null : Number(rawStockQuantity);
             const cartItemQuantity = Number(item?.cartItemQuantity || 1);
             const effectiveCartQty = Number.isFinite(cartItemQuantity) && cartItemQuantity > 0 ? cartItemQuantity : 1;
-            
+
             if (Number.isFinite(stockQuantity) && stockQuantity >= 0) {
                 const requiredNext = newQty * effectiveCartQty;
                 if (requiredNext > stockQuantity) {
@@ -436,12 +441,12 @@ export default function ItemDetails() {
                     return;
                 }
             }
-            
+
             // Update quantity
             const newQuantities = { ...quantities, [existingIngredientIndex]: newQty };
             setQuantities(newQuantities);
             persistCustomDetails(item?.details || [], newQuantities);
-            
+
             toast.success(`${initCap(ingredient.d)} already exists increasing the  quantity ${newQty}`);
             return; // Don't add to selected ingredients list
         }
@@ -450,6 +455,7 @@ export default function ItemDetails() {
     };
 
     const handleRemoveSelectedIngredient = (index) => {
+        console.log("Removing selected ingredient at index:", index);
         setSelectedIngredients(prev => prev.filter((_, i) => i !== index));
     };
 
@@ -461,7 +467,7 @@ export default function ItemDetails() {
 
         const existingCount = item?.details?.length || 0;
         const newTotal = existingCount + selectedIngredients.length;
-        
+
         if (newTotal > 5) {
             toast.warning(`Cannot add ${selectedIngredients.length} ingredient(s). Maximum 5 ingredients allowed. You currently have ${existingCount} ingredient(s).`);
             return;
@@ -471,7 +477,7 @@ export default function ItemDetails() {
         const newDetails = [...(item.details || [])];
         const newQuantities = { ...quantities };
         const startIndex = item.details?.length || 0;
-        
+
         selectedIngredients.forEach((ingredient, idx) => {
             const rawStockQuantity = ingredient?.stockQuantity ?? ingredient?.STOCK_QUANTITY ?? ingredient?.stock_quantity ?? null;
             const stockQuantity =
@@ -479,7 +485,7 @@ export default function ItemDetails() {
                     ? null
                     : Number(rawStockQuantity);
             const stockStatusRaw = ingredient?.stockStatus ?? ingredient?.STOCK_STATUS ?? ingredient?.stock_status ?? null;
-            
+
             newDetails.push({
                 itemName: ingredient.d,
                 itemCode: ingredient.r,
@@ -493,7 +499,7 @@ export default function ItemDetails() {
                         ? (stockQuantity > 0 ? "In Stock" : "Out Of Stock")
                         : "Unknown"),
             });
-            
+
             newQuantities[startIndex + idx] = 1;
         });
 
@@ -656,7 +662,7 @@ export default function ItemDetails() {
                                 isEditingCartItem ? Number(cartId) : undefined
                             );
                             const stockMap = stockRes?.data?.data || {};
-                            console.log("stockMap2",stockMap);
+                            console.log("stockMap2", stockMap);
                             const rawAvailable = stockMap?.[String(parentCode)];
                             if (rawAvailable !== undefined && rawAvailable !== null && rawAvailable !== "") {
                                 const available = Number(rawAvailable);
@@ -677,7 +683,7 @@ export default function ItemDetails() {
             const response = isEditingCartItem
                 ? await cartAPI.customizeCocktail(cartId, { ingredients: selectedIngredients })
                 : await cartAPI.addNewItem(payload);
-           // console.log('response', response.data);
+            // console.log('response', response.data);
             if (response?.data?.success) {
                 const newCartId = response.data?.data?.cartId;
                 if (!isEditingCartItem && newCartId) {
@@ -812,11 +818,11 @@ export default function ItemDetails() {
                             <tbody>
                                 {item.details && item.details.map((detail, index) => {
                                     const pegs = getDetailPegs(detail);
-                                  //  console.log("pegs", pegs);
+                                    //  console.log("pegs", pegs);
                                     const hasQuantity = pegs !== 0 && pegs !== null;
                                     const currentQty = quantities[index] || 1;
                                     const stockQuantity = getDetailStockQuantity(detail);
-                                  //  console.log("stockQuantity", stockQuantity);
+                                    //  console.log("stockQuantity", stockQuantity);
                                     const requiredQuantity = getDetailRequiredQuantity(detail);
                                     const explicitStatus = getDetailStockStatus(detail);
                                     const effectiveRequired = (!isEditingCartItem && fromBuyFlow)
@@ -862,10 +868,11 @@ export default function ItemDetails() {
                                                 </span>
                                             </td>
                                             <td className="px-5 py-3">
-                                                {hasQuantity && (
+                                                {hasQuantity && (item.details.length > 1) && (
                                                     <button
                                                         onClick={() => deleteIngredient(index)}
-                                                        className="flex h-8 w-8 items-center justify-center rounded-md bg-red-50 text-red-600 transition hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+                                                        disabled={!(hasQuantity && item.details.length > 1)}
+                                                        className="flex h-8 w-8 items-center justify-center rounded-md bg-red-50 text-red-600 transition hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:pointer-events-none disabled:opacity-50"
                                                     >
                                                         <FaTrash className="text-sm" />
                                                     </button>

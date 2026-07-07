@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../../context/AuthContext";
 import { cartAPI } from "../../../services/api";
-import { Trash2, Minus, Plus, X, Pencil } from "lucide-react";
+import { Trash2, Minus, Plus,Pencil } from "lucide-react";
 import { toast } from "react-toastify";
 import { getMaxAllowedQuantity, getItemPegMultiplier, getPegTypeOrderLimitMessage, isOutOfStock, isCocktailOrMocktail } from "../../../utils/stockValidation";
 
@@ -131,7 +131,7 @@ export default function CartPage({ isAttendant = false }) {
                         .map(async (it) => {
                             try {
                                 const res = await cartAPI.getCocktailDetails(it.cartId);
-                                cocktailMap[String(it.cartId)] = res?.data?.data?.details || [];
+                                cocktailMap[String(it.cartId)] = res?.data?.data?.ingredients || [];
                             } catch (_) {
                                 cocktailMap[String(it.cartId)] = [];
                             }
@@ -172,7 +172,7 @@ export default function CartPage({ isAttendant = false }) {
                 if (!Array.isArray(details)) {
                     try {
                         const res = await cartAPI.getCocktailDetails(cartId);
-                        details = res?.data?.data?.details || [];
+                        details = res?.data?.data?.ingredients || [];
                         setCocktailDetailsByCartId((m) => ({ ...m, [String(cartId)]: details }));
                     } catch (e) {
                         details = [];
@@ -322,7 +322,7 @@ export default function CartPage({ isAttendant = false }) {
                     if (!Array.isArray(details)) {
                         try {
                             const res = await cartAPI.getCocktailDetails(item.cartId);
-                            details = res?.data?.data?.details || [];
+                           details = res?.data?.data?.ingredients || [];
                             setCocktailDetailsByCartId((m) => ({ ...m, [String(item.cartId)]: details }));
                         } catch (e) {
                             details = [];

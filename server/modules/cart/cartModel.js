@@ -575,7 +575,7 @@ const updateCartCustomization = async (cartId, userId, updates) => {
         LEFT JOIN xxafmc_inventory xi ON c.item_id = xi.item_code
         WHERE c.cart_id = ?
           AND c.user_id = ?
-          AND c.price != 0
+         AND c.parent_code IS NULL
         LIMIT 1
       `,
       [cartId, userId]
@@ -596,11 +596,11 @@ const updateCartCustomization = async (cartId, userId, updates) => {
     }
 
     const cartQuantity = Number(cartItem.quantity || 1);
-    const ingredients = await normalizeCustomizationUpdates(conn, updates, cartQuantity);
+    // const ingredients = await normalizeCustomizationUpdates(conn, updates, cartQuantity);
 
-    if (ingredients.length > 0) {
-      await validateCustomizationStock(conn, ingredients, cartQuantity, userId, cartId);
-    }
+    // if (ingredients.length > 0) {
+    //   await validateCustomizationStock(conn, ingredients, cartQuantity, userId, cartId);
+    // }
     // console.log("validateCustomizationStock", validateCustomizationStock)
     // console.log("ingredients", ingredients);
 
@@ -608,6 +608,34 @@ const updateCartCustomization = async (cartId, userId, updates) => {
 // console.log("User ID:", userId);
 // console.log("Ingredients received from UI:");
 // console.log(JSON.stringify(ingredients, null, 2));
+const ingredients = await normalizeCustomizationUpdates(conn, updates, cartQuantity);
+if (ingredients.length === 0) {
+  const error = new Error("A cocktail/mocktail must have at least one ingredient.");
+  error.status = 400;
+  throw error;
+}
+
+// Only re-validate ingredients whose required quantity is increasing vs. what's
+// already saved. This lets deletions and untouched out-of-stock ingredients
+// through without blocking the whole save.
+const [existingRows] = await conn.execute(
+  `SELECT ingredient_item_code, quantity FROM ${CUSTOMIZATION_TABLE} WHERE cart_id = ?`,
+  [cartId]
+);
+const existingQtyMap = existingRows.reduce((map, row) => {
+  map[String(row.ingredient_item_code)] = Number(row.quantity || 0);
+  return map;
+}, {});
+
+const ingredientsNeedingValidation = ingredients.filter((ing) => {
+  const existingQty = existingQtyMap[String(ing.itemCode)];
+  if (existingQty === undefined) return true; // brand new ingredient — validate
+  return Number(ing.quantity) > existingQty;   // only validate real increases
+});
+
+if (ingredientsNeedingValidation.length > 0) {
+  await validateCustomizationStock(conn, ingredientsNeedingValidation, cartQuantity, userId, cartId);
+}
     await replaceCartCustomization(conn, cartId, ingredients);
 
 //     console.log("Saving ingredients into xxafmc_cart_customization table:");
