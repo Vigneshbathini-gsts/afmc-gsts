@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback,useMemo  } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../../context/AuthContext";
 import { cartAPI } from "../../../services/api";
@@ -293,8 +293,50 @@ export default function CartPage({ isAttendant = false }) {
 
     const handleProceedToBuy = useCallback(() => {
         if (cartItems.length === 0) return;
+         if (hasOutOfStockItem) {
+        showToast("Some items in your cart are out of stock. Please remove or update them before proceeding.", 'error');
+        return;
+    }
         setProceedConfirmOpen(true);
     }, [cartItems.length]);
+
+
+const getItemStockInfo = useCallback((item) => {
+    const isCocktailItem = isCocktailOrMocktail(item);
+    const cocktailDetails = isCocktailItem ? cocktailDetailsByCartId[String(item.cartId)] : null;
+    const cocktailDetailsStockStatus = Array.isArray(cocktailDetails) && cocktailDetails.length > 0
+        ? (
+            cocktailDetails.every((detail) => {
+                const status = String(detail?.stockStatus ?? detail?.stock_status ?? "").trim().toLowerCase();
+                return status === "in stock";
+            })
+                ? "In Stock"
+                : "Out Of Stock"
+        )
+        : null;
+    const maxAllowed = isCocktailItem ? null : getMaxAllowedQuantity(item);
+    const hasNoAvailableStock = Number.isFinite(Number(maxAllowed)) && Number(maxAllowed) === 0;
+    const hasKnownAvailableStock = Number.isFinite(Number(maxAllowed)) && Number(maxAllowed) > 0;
+    const effectiveOutOfStock = isCocktailItem
+        ? cocktailDetailsStockStatus === "Out Of Stock"
+        : hasNoAvailableStock || (!hasKnownAvailableStock && isOutOfStock(item));
+
+    return {
+        isCocktailItem,
+        cocktailDetails,
+        cocktailDetailsStockStatus,
+        maxAllowed,
+        hasNoAvailableStock,
+        hasKnownAvailableStock,
+        effectiveOutOfStock,
+    };
+}, [cocktailDetailsByCartId]);
+
+const hasOutOfStockItem = useMemo(
+    () => cartItems.some((item) => !item.isFreeItem && getItemStockInfo(item).effectiveOutOfStock),
+    [cartItems, getItemStockInfo]
+);
+
 
     const handleProceedConfirm = useCallback(() => {
 
@@ -450,16 +492,17 @@ export default function CartPage({ isAttendant = false }) {
                     >
                         {toInitCap("Go to menu")}
                     </button>
-                    <button
-                        onClick={handleProceedToBuy}
-                        disabled={cartItems.length === 0}
-                        className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold text-white transition ${cartItems.length === 0
-                            ? "bg-gray-400 cursor-not-allowed"
-                            : "bg-red-700 hover:bg-red-800"
-                            }`}
-                    >
-                        {toInitCap("Proceed to buy")}
-                    </button>
+                   <button
+    onClick={handleProceedToBuy}
+    disabled={cartItems.length === 0 || hasOutOfStockItem}
+    className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold text-white transition ${
+        cartItems.length === 0 || hasOutOfStockItem
+            ? "bg-gray-400 cursor-not-allowed"
+            : "bg-red-700 hover:bg-red-800"
+    }`}
+>
+    {toInitCap("Proceed to buy")}
+</button>
                 </div>
             </div>
 
