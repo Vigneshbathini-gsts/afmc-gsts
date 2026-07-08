@@ -78,17 +78,17 @@ const validatePayload = (payload) => {
     throw new Error("Valid sub category is required");
   }
 
-  if (memberProfit == null) {
-    throw new Error("Member profit is required");
-  }
+  // if (memberProfit == null) {
+  //   throw new Error("Member profit is required");
+  // }
 
   if (memberPrCharges == null) {
     throw new Error("Member PR charges are required");
   }
 
-  if (nonMemberProfit == null) {
-    throw new Error("Non member profit is required");
-  }
+  // if (nonMemberProfit == null) {
+  //   throw new Error("Non member profit is required");
+  // }
 
   if (nonMemberPrCharges == null) {
     throw new Error("Non member PR charges are required");

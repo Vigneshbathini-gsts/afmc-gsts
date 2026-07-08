@@ -9,6 +9,7 @@ import Pubmenubuyservice from "../../flows/buy/services/Pubmenubuyservice";
 import FilterDropdown from "./FilterDropdown";
 import OffersMarquee from "./OffersMarquee";
 import { toInitCap } from "../../utils/textFormat";
+import { getPegTypeOrderLimitMessage } from "../../utils/stockValidation";
 import {
   clearSelectedAttendantCustomer,
   getSelectedAttendantCustomerPayload,
@@ -497,7 +498,7 @@ function MenuPopupCompact({ item, loading, onClose, onBuy }) {
             if (rawAvailable !== undefined && rawAvailable !== null && rawAvailable !== "") {
               const available = Number(rawAvailable);
               if (Number.isFinite(available) && available >= 0 && desiredQty * pegMultiplier > available) {
-                toast.error(`Out of stock. Available quantity: ${available}`);
+                toast.error(getPegTypeOrderLimitMessage(item, available, `Out of stock. Available quantity: ${available}`, pegType));
                 setIsSubmitting(false);
                 return;
               }
@@ -954,28 +955,69 @@ function MenuHeader({ onBack }) {
 }
 
 function ScrollTabs({ items, activeKey, onChange }) {
+  const few = Array.isArray(items) && items.length <= 2;
+
   return (
     <div className="w-full">
-      <div className="flex snap-x snap-mandatory items-center gap-2 overflow-x-auto rounded-full bg-white/70 p-1 shadow-inner ring-1 ring-gray-200 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {items.map((it) => {
-          const active = activeKey === it.key;
-          return (
-            <button
-              key={it.key}
-              type="button"
-              onClick={() => onChange(it.key)}
-              className={`shrink-0 snap-start rounded-full px-4 py-2 text-sm font-bold transition ${
-                active
-                  ? "bg-gradient-to-r from-afmc-maroon to-afmc-maroon/80 text-white shadow-sm"
-                  : "text-gray-700 hover:bg-white hover:text-afmc-maroon"
-              }`}
-              aria-current={active ? "page" : undefined}
-            >
-              <span className="whitespace-nowrap">{it.label}</span>
-            </button>
-          );
-        })}
-      </div>
+      {few ? (
+        items.length === 1 ? (
+          <div className="grid grid-cols-1 gap-2">
+            {items.map((it) => (
+              <button
+                key={it.key}
+                type="button"
+                onClick={() => onChange(it.key)}
+                className={`w-full rounded-full px-4 py-2 text-sm font-bold transition text-gray-700 hover:bg-white hover:text-afmc-maroon`}
+                aria-current={activeKey === it.key ? "page" : undefined}
+              >
+                <span className="whitespace-nowrap">{it.label}</span>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="inline-grid grid-cols-2 rounded-full bg-white/80 p-1.5 shadow-sm ring-1 ring-gray-200">
+            {items.map((it) => {
+              const active = activeKey === it.key;
+              return (
+                <button
+                  key={it.key}
+                  type="button"
+                  onClick={() => onChange(it.key)}
+                  className={`w-full rounded-full px-5 py-2 text-sm font-extrabold transition ${
+                    active
+                      ? "bg-gray-950 text-white shadow-sm"
+                      : "bg-transparent text-gray-700 hover:bg-gray-50 hover:text-afmc-maroon"
+                  }`}
+                  aria-pressed={active}
+                >
+                  {it.label}
+                </button>
+              );
+            })}
+          </div>
+        )
+      ) : (
+        <div className="flex snap-x snap-mandatory items-center gap-2 overflow-x-auto rounded-full bg-white/70 p-1 shadow-inner ring-1 ring-gray-200 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {items.map((it) => {
+            const active = activeKey === it.key;
+            return (
+              <button
+                key={it.key}
+                type="button"
+                onClick={() => onChange(it.key)}
+                className={`shrink-0 snap-start rounded-full px-4 py-2 text-sm font-bold transition ${
+                  active
+                    ? "bg-gradient-to-r from-afmc-maroon to-afmc-maroon/80 text-white shadow-sm"
+                    : "text-gray-700 hover:bg-white hover:text-afmc-maroon"
+                }`}
+                aria-current={active ? "page" : undefined}
+              >
+                <span className="whitespace-nowrap">{it.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -1069,10 +1111,12 @@ function EmptyState({ title = "No items found", subtitle = "Try changing filters
 }
 
 function FilterShell({ leftFilter, rightFilter, children }) {
+  const hasBoth = Boolean(leftFilter && rightFilter);
+
   return (
     <div className="space-y-6">
       {(leftFilter || rightFilter) && (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className={`grid gap-4 ${hasBoth ? "grid-cols-2" : "grid-cols-1"}`}>
           {leftFilter && <div>{leftFilter}</div>}
           {rightFilter && <div>{rightFilter}</div>}
         </div>
@@ -1161,7 +1205,7 @@ function EnduserOtherSection({ onItemClick }) {
   const categoryOptions = useMemo(() => {
     const map = new Map();
     (Array.isArray(data) ? data : []).forEach((item) => {
-      const id = item?.sub_category;
+      const id = item?.sub_category;  
       const name = item?.sub_category_name;
       if (id === null || id === undefined || id === "") return;
       if (!map.has(String(id))) {
@@ -1580,7 +1624,7 @@ function MenuDashboard() {
           if (rawAvailable !== undefined && rawAvailable !== null && rawAvailable !== "") {
             const available = Number(rawAvailable);
             if (Number.isFinite(available) && available >= 0 && desiredQty * pegMultiplier > available) {
-              toast.error(`Out of stock. Available quantity: ${available}`);
+              toast.error(getPegTypeOrderLimitMessage(item, available, `Out of stock. Available quantity: ${available}`, typeForBackend));
               return;
             }
           }

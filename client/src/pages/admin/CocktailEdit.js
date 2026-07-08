@@ -421,7 +421,7 @@ export default function CocktailEdit() {
     }
   };
 
-  return (
+return (
     <div className="min-h-screen bg-gradient-to-br from-afmc-bg via-white to-afmc-bg2 relative">
       <div className="absolute top-16 left-12 w-72 h-72 bg-afmc-maroon/10 rounded-full blur-3xl"></div>
       <div className="absolute bottom-20 right-20 w-80 h-80 bg-afmc-maroon2/10 rounded-full blur-3xl"></div>
@@ -463,28 +463,40 @@ export default function CocktailEdit() {
             </div>
           )}
 
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <input
-              value={form.itemName}
-              onChange={(event) => updateField("itemName", event.target.value)}
-              placeholder="Item Name"
-              className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 outline-none focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20 capitalize"
-            />
-            <select
-              value={form.subCategory}
-              onChange={(event) => updateField("subCategory", event.target.value)}
-              className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 outline-none focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
-            >
-              <option value="">Sub Category</option>
-              <option value="14">COCKTAIL</option>
-              <option value="15">MOCKTAIL</option>
-            </select>
-            <input
-              value={form.description}
-              onChange={(event) => updateField("description", event.target.value)}
-              placeholder="Description"
-              className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 outline-none focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
-            />
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 items-start">
+            <div>
+              <label className="mb-1 block text-sm text-[#4d4640]">Item Name</label>
+              <input
+                value={form.itemName}
+                onChange={(event) => updateField("itemName", event.target.value)}
+                placeholder="Item Name"
+                className="h-[52px] w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 outline-none focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20 capitalize"
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm text-[#4d4640]">Sub Category</label>
+              <select
+                value={form.subCategory}
+                onChange={(event) => updateField("subCategory", event.target.value)}
+                className="h-[52px] w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 outline-none focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
+              >
+                <option value="">Sub Category</option>
+                <option value="14">COCKTAIL</option>
+                <option value="15">MOCKTAIL</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm text-[#4d4640]">Description</label>
+              <input
+                value={form.description}
+                onChange={(event) => updateField("description", event.target.value)}
+                placeholder="Description"
+                className="h-[52px] w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 outline-none focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
+              />
+            </div>
+
             <div>
               <label className="mb-1 block text-sm text-[#4d4640]">Image</label>
               <input
@@ -495,7 +507,7 @@ export default function CocktailEdit() {
                   updateField("image", file);
                   updateField("imageFileName", file?.name || form.imageFileName);
                 }}
-                className="w-full rounded-2xl border border-dashed border-gray-300 bg-white px-4 py-3"
+                className="h-[52px] w-full rounded-2xl border border-dashed border-gray-300 bg-white px-4 flex items-center file:mr-3 file:h-full file:border-0 file:bg-transparent"
               />
               {form.imageFileName && (
                 <p className="mt-2 text-sm text-[#6d655e]">{form.imageFileName}</p>
@@ -503,7 +515,8 @@ export default function CocktailEdit() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {/* Pr Charges inputs - side by side on mobile too, 4 cols on xl */}
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
             {/* <input
               type="number"
               value={form.memberProfit}
@@ -521,7 +534,7 @@ export default function CocktailEdit() {
                 updateField("memberPrCharges", event.target.value)
               }
               placeholder="Member Pr Charges"
-              className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 outline-none focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
+              className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-3 sm:px-4 py-3 outline-none focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
             />
             {/* <input
                type="number"
@@ -539,29 +552,33 @@ export default function CocktailEdit() {
                 updateField("nonMemberPrCharges", event.target.value)
               }
               placeholder="Non Member Pr Charges"
-              className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 outline-none focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
+              className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-3 sm:px-4 py-3 outline-none focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
             />
           </div>
 
           <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
-            <div className="flex flex-wrap items-center gap-4 border-b border-gray-100 px-4 py-4">
+            {/* Ingredients header - label stacks above on mobile, Search + Add Row always side by side */}
+            <div className="flex flex-col gap-3 border-b border-gray-100 px-4 py-4 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4">
               <div className="flex items-center gap-2 text-gray-600">
                 <Search size={18} />
                 <span className="text-sm font-medium">Ingredients</span>
               </div>
-              <input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search: All Text Columns"
-                className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 outline-none focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
-              />
-              <button
-                type="button"
-                onClick={addRow}
-                className="ml-auto px-6 py-3 rounded-2xl bg-[#5b5b5b] text-white font-semibold shadow hover:shadow-md"
-              >
-                Add Row
-              </button>
+
+              <div className="flex items-center gap-2 sm:ml-auto sm:gap-3">
+                <input
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Search: All Text Columns"
+                  className="min-w-0 flex-1 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 outline-none focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20 sm:flex-none"
+                />
+                <button
+                  type="button"
+                  onClick={addRow}
+                  className="shrink-0 whitespace-nowrap rounded-2xl bg-[#5b5b5b] px-4 py-3 font-semibold text-white shadow hover:shadow-md sm:px-6"
+                >
+                  Add Row
+                </button>
+              </div>
             </div>
 
             <div className="overflow-x-auto">

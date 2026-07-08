@@ -11,6 +11,38 @@ function toFiniteNumber(value) {
   return Number.isFinite(n) ? n : null;
 }
 
+function getItemType(item) {
+  const rawType = item?.type ?? item?.TYPE ?? item?.item_type ?? item?.ITEM_TYPE ?? item?.pegType ?? item?.peg_type ?? item?.TYPE_OF_PEG ?? null;
+  if (rawType === null || rawType === undefined || rawType === "") {
+    return null;
+  }
+  return String(rawType).trim();
+}
+
+function isLargePegType(item) {
+  return String(getItemType(item) || "").trim().toLowerCase() === "large";
+}
+
+export function getItemPegMultiplier(item) {
+  return isLargePegType(item) ? 2 : 1;
+}
+
+export function getPegTypeOrderLimitMessage(item, availablePegs, fallbackMessage = "Out of stock.", selectedPegType = null) {
+  const normalizedType = String(selectedPegType ?? getItemType(item) ?? "").trim().toLowerCase();
+
+  if (normalizedType === "small") {
+    const maxQty = Number.isFinite(Number(availablePegs)) ? Math.max(0, Number(availablePegs)) : 0;
+    return `Only ${maxQty} Small drink(s) can be ordered with the current stock. Please reduce the quantity.`;
+  }
+
+  if (normalizedType === "large") {
+    const maxQty = Number.isFinite(Number(availablePegs)) ? Math.max(0, Math.floor(Number(availablePegs) / 2)) : 0;
+    return `Only ${maxQty} Large drink(s) can be ordered with the current stock. Please reduce the quantity.`;
+  }
+
+  return fallbackMessage;
+}
+
 export function getMaxAllowedQuantity(item) {
   const candidates = [
     item?.availableQuantity,
@@ -80,8 +112,18 @@ export function validateNextQuantity(item, nextQuantity) {
     return { ok: false, message: "Out of stock." };
   }
 
-  if (maxAllowed !== null && maxAllowed !== undefined && maxAllowed > 0 && qty > maxAllowed) {
-    return { ok: false, message: `Out of stock. Available quantity: ${maxAllowed}` };
+  if (maxAllowed !== null && maxAllowed !== undefined && maxAllowed > 0) {
+    const multiplier = getItemPegMultiplier(item);
+    const effectiveAllowed = multiplier > 1 ? Math.floor(maxAllowed / multiplier) : maxAllowed;
+    if (effectiveAllowed <= 0) {
+      return { ok: false, message: "Out of stock." };
+    }
+    if (qty > effectiveAllowed) {
+      return {
+        ok: false,
+        message: getPegTypeOrderLimitMessage(item, maxAllowed, `Out of stock. Available quantity: ${effectiveAllowed}`),
+      };
+    }
   }
 
   return { ok: true, message: "" };

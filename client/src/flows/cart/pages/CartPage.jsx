@@ -2,9 +2,9 @@ import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../../context/AuthContext";
 import { cartAPI } from "../../../services/api";
-import { Trash2, Minus, Plus, X, Pencil } from "lucide-react";
+import { Trash2, Minus, Plus,Pencil } from "lucide-react";
 import { toast } from "react-toastify";
-import { getMaxAllowedQuantity, isOutOfStock, isCocktailOrMocktail } from "../../../utils/stockValidation";
+import { getMaxAllowedQuantity, getItemPegMultiplier, getPegTypeOrderLimitMessage, isOutOfStock, isCocktailOrMocktail } from "../../../utils/stockValidation";
 
 // Cache cocktail details per cart item
 // so we can validate ingredient-level stock before quantity changes.
@@ -131,7 +131,7 @@ export default function CartPage({ isAttendant = false }) {
                         .map(async (it) => {
                             try {
                                 const res = await cartAPI.getCocktailDetails(it.cartId);
-                                cocktailMap[String(it.cartId)] = res?.data?.data?.details || [];
+                                cocktailMap[String(it.cartId)] = res?.data?.data?.ingredients || [];
                             } catch (_) {
                                 cocktailMap[String(it.cartId)] = [];
                             }
@@ -172,7 +172,7 @@ export default function CartPage({ isAttendant = false }) {
                 if (!Array.isArray(details)) {
                     try {
                         const res = await cartAPI.getCocktailDetails(cartId);
-                        details = res?.data?.data?.details || [];
+                        details = res?.data?.data?.ingredients || [];
                         setCocktailDetailsByCartId((m) => ({ ...m, [String(cartId)]: details }));
                     } catch (e) {
                         details = [];
@@ -226,11 +226,21 @@ export default function CartPage({ isAttendant = false }) {
                     setUpdatingItemId(null);
                     return;
                 }
-                if (Number.isFinite(Number(maxAllowed)) && Number(maxAllowed) >= 0 && Number(newQuantity) > Number(maxAllowed)) {
-                    const msg = `Out of stock. Available quantity: ${maxAllowed}`;
-                    showToast(msg, 'error');
-                    setUpdatingItemId(null);
-                    return;
+
+                if (Number.isFinite(Number(maxAllowed)) && Number(maxAllowed) >= 0) {
+                    const multiplier = getItemPegMultiplier(currentItemForMax);
+                    const effectiveAllowed = multiplier > 1 ? Math.floor(Number(maxAllowed) / multiplier) : Number(maxAllowed);
+                    if (effectiveAllowed <= 0) {
+                        showToast("Out of stock. Available quantity: 0", 'error');
+                        setUpdatingItemId(null);
+                        return;
+                    }
+                    if (Number(newQuantity) > effectiveAllowed) {
+                        const msg = getPegTypeOrderLimitMessage(currentItemForMax, Number(maxAllowed), `Out of stock. Available quantity: ${effectiveAllowed}`);
+                        showToast(msg, 'error');
+                        setUpdatingItemId(null);
+                        return;
+                    }
                 }
                 if (Number.isFinite(Number(maxAllowed)) && Number(maxAllowed) > 0) {
                     clearStockLimitOnImage(currentItemForMax);
@@ -312,7 +322,7 @@ export default function CartPage({ isAttendant = false }) {
                     if (!Array.isArray(details)) {
                         try {
                             const res = await cartAPI.getCocktailDetails(item.cartId);
-                            details = res?.data?.data?.details || [];
+                           details = res?.data?.data?.ingredients || [];
                             setCocktailDetailsByCartId((m) => ({ ...m, [String(item.cartId)]: details }));
                         } catch (e) {
                             details = [];
@@ -566,6 +576,11 @@ export default function CartPage({ isAttendant = false }) {
                                 <h2 className="text-sm font-semibold text-gray-900 overflow-hidden text-ellipsis whitespace-nowrap">
                                     {toInitCap(item.itemName) || toInitCap("Unnamed Item")}
                                 </h2>
+                                <h2>Type: {toInitCap(item.type)}</h2>
+                                
+                                <p className="text-sm font-semibold text-gray-900 mt-1">
+                                    {item.price ? `₹${Number(item.price).toFixed(2)}` : "Price not available"}
+                                </p>
 
                                 <p
                                     className={`text-xs mt-1 ${String(stockStatusText || "").toLowerCase() === "out of stock"
