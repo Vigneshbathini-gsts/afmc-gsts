@@ -171,6 +171,20 @@ function parseCardText(cardText = "") {
   };
 }
 
+
+function resolveCocktailOutOfStock(item, override) {
+  const serverSaysOOS = String(item?.stockStatus || "").trim().toLowerCase() === "out of stock"
+    || String(item?.stockIssueMessage || "").trim().length > 0;
+
+  if (!override?.hasDetails) {
+    // No client recomputation yet — trust the server snapshot only.
+    return serverSaysOOS;
+  }
+
+  // Once the client recomputation exists, OOS if EITHER source says so.
+  return serverSaysOOS || Boolean(override.isOutOfStock);
+}
+
 function normalizeItem(item, fallbackIndex = 0) {
   const parsed = parseCardText(item.card_text || item.CARD_TEXT);
   const quantity = Number(item.quantity || item.QUANTITY || parsed.quantity || 1);
@@ -586,21 +600,16 @@ export default function Pubmenubuy({
     );
   }, [items]);
 
-  const cocktailStockIssue = useMemo(() => {
-    return (
-      items.find(
-        (item) => {
-          if (!isCocktailOrMocktail(item)) return false;
-          const itemCode = String(item?.item_code || "").trim();
-          const override = itemCode ? cocktailOverrideIssues?.[itemCode] : null;
-          if (override?.hasDetails) {
-            return Boolean(override.isOutOfStock);
-          }
-          return isOutOfStock(item);
-        }
-      ) || null
-    );
-  }, [items, cocktailOverrideIssues]);
+ const cocktailStockIssue = useMemo(() => {
+  return (
+    items.find((item) => {
+      if (!isCocktailOrMocktail(item)) return false;
+      const itemCode = String(item?.item_code || "").trim();
+      const override = itemCode ? cocktailOverrideIssues?.[itemCode] : null;
+      return resolveCocktailOutOfStock(item, override);
+    }) || null
+  );
+}, [items, cocktailOverrideIssues]);
 
   const missingCocktailIngredientItem = useMemo(() => {
     return (
@@ -1908,12 +1917,10 @@ export default function Pubmenubuy({
                     const isStandardOutOfStock =
                       !isCocktailItem && !item.isFreeItem && item.availableQuantity !== null &&
                       Number(item.quantity) * itemMultiplier > Number(item.availableQuantity);
-                    const isCardOutOfStock =
-                      isCocktailItem
-                        ? cocktailOverride?.hasDetails
-                          ? Boolean(cocktailOverride.isOutOfStock)
-                          : Boolean(item.stockIssueMessage || isOutOfStock(item))
-                        : Boolean(isStandardOutOfStock || Number(item.availableQuantity) === 0);
+                   const isCardOutOfStock =
+  isCocktailItem
+    ? resolveCocktailOutOfStock(item, cocktailOverride)
+    : Boolean(isStandardOutOfStock || Number(item.availableQuantity) === 0);
                     
                     const imageStockMessage = isCocktailItem
                       ? (isCardOutOfStock ? "Out of Stock" : "")
@@ -1985,9 +1992,11 @@ export default function Pubmenubuy({
                             {isCocktailOrMocktail(item) && (() => {
                               const itemCode = String(item?.item_code || "").trim();
                               const override = itemCode ? cocktailOverrideIssues?.[itemCode] : null;
-                              const statusText = override?.hasDetails
-                                ? (override.isOutOfStock ? "Out Of Stock" : "In Stock")
-                                : (item.stockStatus || "");
+                             const statusText = isCocktailOrMocktail(item)
+  ? (resolveCocktailOutOfStock(item, cocktailOverrideIssues?.[String(item?.item_code || "").trim()])
+      ? "Out Of Stock"
+      : "In Stock")
+  : "";
 
                               if (!statusText || missingCocktailIngredients) return null;
 
