@@ -1,8 +1,8 @@
-import React, { useEffect, useState, useCallback,useMemo  } from "react";
+import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../../context/AuthContext";
 import { cartAPI } from "../../../services/api";
-import { Trash2, Minus, Plus,Pencil } from "lucide-react";
+import { Trash2, Minus, Plus, Pencil } from "lucide-react";
 import { toast } from "react-toastify";
 import { getMaxAllowedQuantity, getItemPegMultiplier, getPegTypeOrderLimitMessage, isOutOfStock, isCocktailOrMocktail } from "../../../utils/stockValidation";
 
@@ -68,6 +68,9 @@ export default function CartPage({ isAttendant = false }) {
     const [confirmModal, setConfirmModal] = useState({ isOpen: false, cartId: null });
     const [proceedConfirmOpen, setProceedConfirmOpen] = useState(false);
     const [stockLimitImageMessages, setStockLimitImageMessages] = useState({});
+    const quantityDebounceRef = useRef({});
+    const pendingQuantityRef = useRef({});
+    const confirmedQuantityRef = useRef({});
 
 
 
@@ -80,6 +83,9 @@ export default function CartPage({ isAttendant = false }) {
             toast.success(message);
         }
     }, []);
+
+
+
 
     const getStockLimitImageKey = useCallback((item) => String(Number(item?.cartId ?? item?.id) || item?.cartId || item?.id || item?.itemId || ""), []);
 
@@ -110,6 +116,12 @@ export default function CartPage({ isAttendant = false }) {
             return next;
         });
     }, [getStockLimitImageKey]);
+
+    useEffect(() => {
+        cartItems.forEach((it) => {
+            confirmedQuantityRef.current[it.cartId] = it.quantity;
+        });
+    }, [cartItems]);
 
     const fetchCartItems = useCallback(async () => {
         if (!userId) return;
@@ -156,18 +168,16 @@ export default function CartPage({ isAttendant = false }) {
     const handleQuantityUpdate = useCallback(async (cartId, newQuantity) => {
         if (!cartId || Number.isNaN(Number(cartId))) {
             showToast("Invalid cart item selected", 'error');
-            return;
+            return false;
         }
-        if (newQuantity < 1) return;
+        if (newQuantity < 1) return false;
 
         setUpdatingItemId(cartId);
         setError(null);
 
-        // Validate cocktail/mocktail ingredient stocks before updating
         try {
             const currentItem = cartItems.find((c) => Number(c.cartId) === Number(cartId));
             if (currentItem && isCocktailOrMocktail(currentItem)) {
-                // get cocktail ingredient details (cached or fetch)
                 let details = cocktailDetailsByCartId[String(cartId)];
                 if (!Array.isArray(details)) {
                     try {
@@ -203,7 +213,7 @@ export default function CartPage({ isAttendant = false }) {
                                 showToast(msg, 'error');
                                 showStockLimitOnImage(currentItem, "Out of Stock");
                                 setUpdatingItemId(null);
-                                return;
+                                return false;
                             }
                         }
                     } catch (err) {
@@ -212,7 +222,6 @@ export default function CartPage({ isAttendant = false }) {
                 }
             }
 
-            // Non-cocktail stock checks (respect max allowed)
             const currentItemForMax = cartItems.find((c) => Number(c.cartId) === Number(cartId));
             if (currentItemForMax && !isCocktailOrMocktail(currentItemForMax)) {
                 const maxAllowed = getMaxAllowedQuantity(currentItemForMax);
@@ -224,7 +233,7 @@ export default function CartPage({ isAttendant = false }) {
                     showToast(msg, 'error');
                     showStockLimitOnImage(currentItemForMax, "Out of Stock");
                     setUpdatingItemId(null);
-                    return;
+                    return false;
                 }
 
                 if (Number.isFinite(Number(maxAllowed)) && Number(maxAllowed) >= 0) {
@@ -233,13 +242,13 @@ export default function CartPage({ isAttendant = false }) {
                     if (effectiveAllowed <= 0) {
                         showToast("Out of stock. Available quantity: 0", 'error');
                         setUpdatingItemId(null);
-                        return;
+                        return false;
                     }
                     if (Number(newQuantity) > effectiveAllowed) {
                         const msg = getPegTypeOrderLimitMessage(currentItemForMax, Number(maxAllowed), `Out of stock. Available quantity: ${effectiveAllowed}`);
                         showToast(msg, 'error');
                         setUpdatingItemId(null);
-                        return;
+                        return false;
                     }
                 }
                 if (Number.isFinite(Number(maxAllowed)) && Number(maxAllowed) > 0) {
@@ -252,12 +261,33 @@ export default function CartPage({ isAttendant = false }) {
             setCartItems(items);
             setCartCount(items.length);
             showToast("Quantity updated successfully");
+            return true;
         } catch (err) {
             showToast(err?.response?.data?.message || "Failed to update quantity", 'error');
+            return false;
         } finally {
             setUpdatingItemId(null);
         }
     }, [cartItems, cocktailDetailsByCartId, setCocktailDetailsByCartId, setCartItems, setCartCount, showToast, showStockLimitOnImage, clearStockLimitOnImage]);
+    const commitQuantityUpdate = useCallback((cartId, quantity) => {
+        // Optimistic local update so the UI feels instant
+        setCartItems((prev) =>
+            prev.map((it) => (Number(it.cartId) === Number(cartId) ? { ...it, quantity } : it))
+        );
+
+        pendingQuantityRef.current[cartId] = quantity;
+
+        if (quantityDebounceRef.current[cartId]) {
+            clearTimeout(quantityDebounceRef.current[cartId]);
+        }
+
+        quantityDebounceRef.current[cartId] = setTimeout(async () => {
+            const finalQty = pendingQuantityRef.current[cartId];
+            delete quantityDebounceRef.current[cartId];
+            delete pendingQuantityRef.current[cartId];
+            await handleQuantityUpdate(cartId, finalQty); // your existing validated update function
+        }, 500); // wait 500ms after the last click before hitting the server
+    }, [handleQuantityUpdate]);
 
     const handleRemoveItem = useCallback(async () => {
         const { cartId } = confirmModal;
@@ -293,49 +323,49 @@ export default function CartPage({ isAttendant = false }) {
 
     const handleProceedToBuy = useCallback(() => {
         if (cartItems.length === 0) return;
-         if (hasOutOfStockItem) {
-        showToast("Some items in your cart are out of stock. Please remove or update them before proceeding.", 'error');
-        return;
-    }
+        if (hasOutOfStockItem) {
+            showToast("Some items in your cart are out of stock. Please remove or update them before proceeding.", 'error');
+            return;
+        }
         setProceedConfirmOpen(true);
     }, [cartItems.length]);
 
 
-const getItemStockInfo = useCallback((item) => {
-    const isCocktailItem = isCocktailOrMocktail(item);
-    const cocktailDetails = isCocktailItem ? cocktailDetailsByCartId[String(item.cartId)] : null;
-    const cocktailDetailsStockStatus = Array.isArray(cocktailDetails) && cocktailDetails.length > 0
-        ? (
-            cocktailDetails.every((detail) => {
-                const status = String(detail?.stockStatus ?? detail?.stock_status ?? "").trim().toLowerCase();
-                return status === "in stock";
-            })
-                ? "In Stock"
-                : "Out Of Stock"
-        )
-        : null;
-    const maxAllowed = isCocktailItem ? null : getMaxAllowedQuantity(item);
-    const hasNoAvailableStock = Number.isFinite(Number(maxAllowed)) && Number(maxAllowed) === 0;
-    const hasKnownAvailableStock = Number.isFinite(Number(maxAllowed)) && Number(maxAllowed) > 0;
-    const effectiveOutOfStock = isCocktailItem
-        ? cocktailDetailsStockStatus === "Out Of Stock"
-        : hasNoAvailableStock || (!hasKnownAvailableStock && isOutOfStock(item));
+    const getItemStockInfo = useCallback((item) => {
+        const isCocktailItem = isCocktailOrMocktail(item);
+        const cocktailDetails = isCocktailItem ? cocktailDetailsByCartId[String(item.cartId)] : null;
+        const cocktailDetailsStockStatus = Array.isArray(cocktailDetails) && cocktailDetails.length > 0
+            ? (
+                cocktailDetails.every((detail) => {
+                    const status = String(detail?.stockStatus ?? detail?.stock_status ?? "").trim().toLowerCase();
+                    return status === "in stock";
+                })
+                    ? "In Stock"
+                    : "Out Of Stock"
+            )
+            : null;
+        const maxAllowed = isCocktailItem ? null : getMaxAllowedQuantity(item);
+        const hasNoAvailableStock = Number.isFinite(Number(maxAllowed)) && Number(maxAllowed) === 0;
+        const hasKnownAvailableStock = Number.isFinite(Number(maxAllowed)) && Number(maxAllowed) > 0;
+        const effectiveOutOfStock = isCocktailItem
+            ? cocktailDetailsStockStatus === "Out Of Stock"
+            : hasNoAvailableStock || (!hasKnownAvailableStock && isOutOfStock(item));
 
-    return {
-        isCocktailItem,
-        cocktailDetails,
-        cocktailDetailsStockStatus,
-        maxAllowed,
-        hasNoAvailableStock,
-        hasKnownAvailableStock,
-        effectiveOutOfStock,
-    };
-}, [cocktailDetailsByCartId]);
+        return {
+            isCocktailItem,
+            cocktailDetails,
+            cocktailDetailsStockStatus,
+            maxAllowed,
+            hasNoAvailableStock,
+            hasKnownAvailableStock,
+            effectiveOutOfStock,
+        };
+    }, [cocktailDetailsByCartId]);
 
-const hasOutOfStockItem = useMemo(
-    () => cartItems.some((item) => !item.isFreeItem && getItemStockInfo(item).effectiveOutOfStock),
-    [cartItems, getItemStockInfo]
-);
+    const hasOutOfStockItem = useMemo(
+        () => cartItems.some((item) => !item.isFreeItem && getItemStockInfo(item).effectiveOutOfStock),
+        [cartItems, getItemStockInfo]
+    );
 
 
     const handleProceedConfirm = useCallback(() => {
@@ -364,7 +394,7 @@ const hasOutOfStockItem = useMemo(
                     if (!Array.isArray(details)) {
                         try {
                             const res = await cartAPI.getCocktailDetails(item.cartId);
-                           details = res?.data?.data?.ingredients || [];
+                            details = res?.data?.data?.ingredients || [];
                             setCocktailDetailsByCartId((m) => ({ ...m, [String(item.cartId)]: details }));
                         } catch (e) {
                             details = [];
@@ -492,17 +522,16 @@ const hasOutOfStockItem = useMemo(
                     >
                         {toInitCap("Go to menu")}
                     </button>
-                   <button
-    onClick={handleProceedToBuy}
-    disabled={cartItems.length === 0 || hasOutOfStockItem}
-    className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold text-white transition ${
-        cartItems.length === 0 || hasOutOfStockItem
-            ? "bg-gray-400 cursor-not-allowed"
-            : "bg-red-700 hover:bg-red-800"
-    }`}
->
-    {toInitCap("Proceed to buy")}
-</button>
+                    <button
+                        onClick={handleProceedToBuy}
+                        disabled={cartItems.length === 0 || hasOutOfStockItem}
+                        className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold text-white transition ${cartItems.length === 0 || hasOutOfStockItem
+                                ? "bg-gray-400 cursor-not-allowed"
+                                : "bg-red-700 hover:bg-red-800"
+                            }`}
+                    >
+                        {toInitCap("Proceed to buy")}
+                    </button>
                 </div>
             </div>
 
@@ -619,8 +648,8 @@ const hasOutOfStockItem = useMemo(
                                 <h2 className="text-sm font-semibold text-gray-900 overflow-hidden text-ellipsis whitespace-nowrap">
                                     {toInitCap(item.itemName) || toInitCap("Unnamed Item")}
                                 </h2>
-                                <h2>Type: {toInitCap(item.type)}</h2>
-                                
+                                {/* <h2>Type: {toInitCap(item.type)}</h2> */}
+
                                 <p className="text-sm font-semibold text-gray-900 mt-1">
                                     {item.price ? `₹${Number(item.price).toFixed(2)}` : "Price not available"}
                                 </p>
@@ -640,7 +669,18 @@ const hasOutOfStockItem = useMemo(
                                 {!item.isFreeItem ? (
                                     <div className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 px-2 py-1">
                                         <button
-                                            onClick={() => handleQuantityUpdate(item.cartId, Math.max(1, (item.quantity || 1) - 1))}
+                                            onClick={async () => {
+                                                const newQty = Math.max(1, (item.quantity || 1) - 1);
+                                                const ok = await handleQuantityUpdate(item.cartId, newQty);
+                                                if (!ok) {
+                                                    const lastGood = confirmedQuantityRef.current[item.cartId];
+                                                    if (lastGood !== undefined) {
+                                                        setCartItems((prev) =>
+                                                            prev.map((it) => (Number(it.cartId) === Number(item.cartId) ? { ...it, quantity: lastGood } : it))
+                                                        );
+                                                    }
+                                                }
+                                            }}
                                             className="rounded-full bg-white px-2 text-xs font-semibold text-gray-700 shadow-sm hover:bg-gray-100 disabled:opacity-50"
                                             disabled={updatingItemId === item.cartId || item.quantity <= 1}
                                         >
@@ -650,7 +690,18 @@ const hasOutOfStockItem = useMemo(
                                             {item.quantity || 1}
                                         </span>
                                         <button
-                                            onClick={() => handleQuantityUpdate(item.cartId, (item.quantity || 1) + 1)}
+                                            onClick={async () => {
+                                                const newQty = (item.quantity || 1) + 1;
+                                                const ok = await handleQuantityUpdate(item.cartId, newQty);
+                                                if (!ok) {
+                                                    const lastGood = confirmedQuantityRef.current[item.cartId];
+                                                    if (lastGood !== undefined) {
+                                                        setCartItems((prev) =>
+                                                            prev.map((it) => (Number(it.cartId) === Number(item.cartId) ? { ...it, quantity: lastGood } : it))
+                                                        );
+                                                    }
+                                                }
+                                            }}
                                             className="rounded-full bg-white px-2 text-xs font-semibold text-gray-700 shadow-sm hover:bg-gray-100 disabled:opacity-50"
                                             disabled={updatingItemId === item.cartId}
                                         >

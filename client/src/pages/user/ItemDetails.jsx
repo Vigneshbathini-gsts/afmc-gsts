@@ -306,65 +306,52 @@ export default function ItemDetails() {
         }
     }, [buyOrderNumber, cartId, draftKey, fromBuyFlow, id, isEditingCartItem, prefillDetails]);
 
-    const updateQuantity = async (index, delta) => {
-        const oldQty = quantities[index] || 1;
-        const newVal = oldQty + delta;
-        if (newVal < 1) return;
+   const updateQuantity = (index, delta) => {
+    const oldQty = quantities[index] || 1;
+    const newVal = oldQty + delta;
+    if (newVal < 1) return;
 
-        const currentDetail = item?.details?.[index];
-        if (currentDetail) {
-            const rawStockQuantity = getDetailStockQuantity(currentDetail);
-            const stockQuantity =
-                rawStockQuantity == null || rawStockQuantity === ""
-                    ? null
-                    : Number(rawStockQuantity);
-            const cartItemQuantity = Number(item?.cartItemQuantity || 1);
-            const effectiveCartQty = Number.isFinite(cartItemQuantity) && cartItemQuantity > 0 ? cartItemQuantity : 1;
-            if (Number.isFinite(stockQuantity) && stockQuantity >= 0) {
-                const requiredNext = Number(newVal) * effectiveCartQty;
-                if (requiredNext > stockQuantity) {
-                    const itemName = getDetailItemName(currentDetail);
-                    showToastWithCooldown(`${itemName} available quantity: ${stockQuantity}`, "error", index);
-                    return;
-                }
+    const currentDetail = item?.details?.[index];
+    if (currentDetail) {
+        const rawStockQuantity = getDetailStockQuantity(currentDetail);
+        const stockQuantity = rawStockQuantity == null || rawStockQuantity === "" ? null : Number(rawStockQuantity);
+        const cartItemQuantity = Number(item?.cartItemQuantity || 1);
+        const effectiveCartQty = Number.isFinite(cartItemQuantity) && cartItemQuantity > 0 ? cartItemQuantity : 1;
+        if (Number.isFinite(stockQuantity) && stockQuantity >= 0) {
+            const requiredNext = Number(newVal) * effectiveCartQty;
+            if (requiredNext > stockQuantity) {
+                const itemName = getDetailItemName(currentDetail);
+                showToastWithCooldown(`${itemName} available quantity: ${stockQuantity}`, "error", index);
+                return;
             }
         }
+    }
 
-        const newQuantities = { ...quantities, [index]: newVal };
-        setQuantities(newQuantities);
+    // Local only — nothing hits the server until "Save Customization" is clicked.
+    setQuantities((prev) => ({ ...prev, [index]: newVal }));
+};
 
-        const saved = await persistCustomDetails(item?.details || [], newQuantities);
-        if (!saved) {
-            setQuantities((prev) => ({ ...prev, [index]: oldQty }));
-        }
-    };
+   const deleteIngredient = (index) => {
+    const currentCount = item?.details?.length || 0;
+    if (currentCount <= 1) {
+        toast.warning("At least one ingredient is required. Add another ingredient before removing this one.");
+        return;
+    }
 
-    const deleteIngredient = async (index) => {
-        const currentCount = item?.details?.length || 0;
-        if (currentCount <= 1) {
-            toast.warning("At least one ingredient is required. Add another ingredient before removing this one.");
-            return;
-        }
+    const newDetails = (item?.details || []).filter((_, idx) => idx !== index);
+    const newQuantities = {};
+    Object.entries(quantities).forEach(([key, value]) => {
+        const idx = Number(key);
+        if (idx === index) return;
+        const newIndex = idx > index ? idx - 1 : idx;
+        newQuantities[newIndex] = value;
+    });
 
-        const newDetails = (item?.details || []).filter((_, idx) => idx !== index);
-        const newQuantities = {};
-        Object.entries(quantities).forEach(([key, value]) => {
-            const idx = Number(key);
-            if (idx === index) return;
-            const newIndex = idx > index ? idx - 1 : idx;
-            newQuantities[newIndex] = value;
-        });
-
-        const saved = await persistCustomDetails(newDetails, newQuantities);
-        if (saved) {
-            setItem((prev) => ({
-                ...prev,
-                details: newDetails,
-            }));
-            setQuantities(newQuantities);
-            toast.info("Ingredient removed from recipe");
-        }
-    };
+    // Local only — persisted only when Save Customization is clicked.
+    setItem((prev) => ({ ...prev, details: newDetails }));
+    setQuantities(newQuantities);
+    toast.info("Ingredient removed — click Save Customization to keep this change");
+};
     const fetchLovIngredients = async () => {
         if (!item?.SUB_CATEGORY) return;
 
@@ -442,13 +429,9 @@ export default function ItemDetails() {
                 }
             }
 
-            // Update quantity
-            const newQuantities = { ...quantities, [existingIngredientIndex]: newQty };
-            setQuantities(newQuantities);
-            persistCustomDetails(item?.details || [], newQuantities);
-
-            toast.success(`${initCap(ingredient.d)} already exists increasing the  quantity ${newQty}`);
-            return; // Don't add to selected ingredients list
+          setQuantities((prev) => ({ ...prev, [existingIngredientIndex]: newQty }));
+toast.success(`${initCap(ingredient.d)} already exists, increased quantity to ${newQty} — click Save Customization to keep this`);
+return;
         }
 
         setSelectedIngredients(prev => [...prev, ingredient]);
@@ -459,65 +442,64 @@ export default function ItemDetails() {
         setSelectedIngredients(prev => prev.filter((_, i) => i !== index));
     };
 
-    const handleAddIngredients = async () => {
-        if (selectedIngredients.length === 0) {
-            toast.warning("Please select at least one ingredient");
-            return;
-        }
+ const handleAddIngredients = () => {
+    if (selectedIngredients.length === 0) {
+        toast.warning("Please select at least one ingredient");
+        return;
+    }
 
-        const existingCount = item?.details?.length || 0;
-        const newTotal = existingCount + selectedIngredients.length;
+    const existingCount = item?.details?.length || 0;
+    const newTotal = existingCount + selectedIngredients.length;
+    if (newTotal > 5) {
+        toast.warning(`Cannot add ${selectedIngredients.length} ingredient(s). Maximum 5 ingredients allowed. You currently have ${existingCount} ingredient(s).`);
+        return;
+    }
 
-        if (newTotal > 5) {
-            toast.warning(`Cannot add ${selectedIngredients.length} ingredient(s). Maximum 5 ingredients allowed. You currently have ${existingCount} ingredient(s).`);
-            return;
-        }
+    const cartItemQuantity = Number(item?.cartItemQuantity || 1);
+    const effectiveCartQty = Number.isFinite(cartItemQuantity) && cartItemQuantity > 0 ? cartItemQuantity : 1;
 
-        // Add selected ingredients to the item details with default quantity 1
-        const newDetails = [...(item.details || [])];
-        const newQuantities = { ...quantities };
-        const startIndex = item.details?.length || 0;
+    const newDetails = [...(item.details || [])];
+    const newQuantities = { ...quantities };
+    const startIndex = item.details?.length || 0;
+    let anyOutOfStock = false;
 
-        selectedIngredients.forEach((ingredient, idx) => {
-            const rawStockQuantity = ingredient?.stockQuantity ?? ingredient?.STOCK_QUANTITY ?? ingredient?.stock_quantity ?? null;
-            const stockQuantity =
-                rawStockQuantity == null || rawStockQuantity === ""
-                    ? null
-                    : Number(rawStockQuantity);
-            const stockStatusRaw = ingredient?.stockStatus ?? ingredient?.STOCK_STATUS ?? ingredient?.stock_status ?? null;
+    selectedIngredients.forEach((ingredient, idx) => {
+        const rawStockQuantity = ingredient?.stockQuantity ?? ingredient?.STOCK_QUANTITY ?? ingredient?.stock_quantity ?? null;
+        const stockQuantity = rawStockQuantity == null || rawStockQuantity === "" ? null : Number(rawStockQuantity);
 
-            newDetails.push({
-                itemName: ingredient.d,
-                itemCode: ingredient.r,
-                pegs: 1,
-                memberPrice: null,
-                unitPrice: ingredient.unitPrice,
-                stockQuantity,
-                stockStatus:
-                    stockStatusRaw ||
-                    (Number.isFinite(stockQuantity) && stockQuantity >= 0
-                        ? (stockQuantity > 0 ? "In Stock" : "Out Of Stock")
-                        : "Unknown"),
-            });
+        // Required amount scales with how many of this cocktail are already in the cart.
+        const requiredQuantity = 1 * effectiveCartQty;
+        const isOOS = Number.isFinite(stockQuantity) && stockQuantity >= 0
+            ? stockQuantity < requiredQuantity
+            : false;
+        if (isOOS) anyOutOfStock = true;
 
-            newQuantities[startIndex + idx] = 1;
+        newDetails.push({
+            itemName: ingredient.d,
+            itemCode: ingredient.r,
+            pegs: 1,
+            memberPrice: null,
+            unitPrice: ingredient.unitPrice,
+            stockQuantity,
+            requiredQuantity,
+            stockStatus: Number.isFinite(stockQuantity) ? (isOOS ? "Out Of Stock" : "In Stock") : "Unknown",
         });
 
-        const saved = await persistCustomDetails(newDetails, newQuantities);
-        if (!saved) {
-            toast.error("Failed to add selected ingredients");
-            return;
-        }
+        newQuantities[startIndex + idx] = 1;
+    });
 
-        setItem(prev => ({
-            ...prev,
-            details: newDetails
-        }));
-        setQuantities(newQuantities);
-        setShowModal(false);
-        setSelectedIngredients([]);
-        toast.success(`${selectedIngredients.length} ingredient(s) added successfully`);
-    };
+    // Local only — nothing is sent to the server here.
+    setItem(prev => ({ ...prev, details: newDetails }));
+    setQuantities(newQuantities);
+    setShowModal(false);
+    setSelectedIngredients([]);
+
+    if (anyOutOfStock) {
+        toast.error("One or more added ingredients are out of stock. Fix them and Save, or Back will discard this change.");
+    } else {
+        toast.success(`${selectedIngredients.length} ingredient(s) added. Click "Save Customization" to keep this change.`);
+    }
+};
 
     const filteredLovData = lovData.filter(item =>
         item.d.toLowerCase().includes(searchTerm.toLowerCase())

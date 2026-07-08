@@ -1977,11 +1977,11 @@ export default function Pubmenubuy({
                                 </span>
                               ) : null}
                             </p>
-                            {item.type ? (
+                            {/* {item.type ? (
                               <p className="mt-1 text-sm text-stone-500">
                                 {toInitCap("Type")}: <span className="font-semibold text-stone-800">{toInitCap(item.type)}</span>
                               </p>
-                            ) : null}
+                            ) : null} */}
                             {isCocktailOrMocktail(item) && (() => {
                               const itemCode = String(item?.item_code || "").trim();
                               const override = itemCode ? cocktailOverrideIssues?.[itemCode] : null;
