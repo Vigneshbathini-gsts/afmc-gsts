@@ -60,6 +60,8 @@ export default function BarstockReports() {
 
         const newData = res.data.data || [];
 
+        // console.log("Barstock",newData);
+
         if (reset) {
           setData(newData);
           setPage(1);
@@ -164,20 +166,22 @@ export default function BarstockReports() {
         headers: [
           "Item Code",
           "Item Name",
-          "Unit Price",
-          "Total Price",
-          "Available Stock",
-          "Reserved Stock",
           "A/C Unit",
+          "Stock",
+          "Rate",
+          "Value",
+          "Bottles/Nos",
+          "Pegs",
         ],
         rows: allRows.map((item) => [
           item.item_code ?? "-",
-          toInitCap(item.item_name) || "-",
-          item.unit_price ?? "-",
-          item.total_price ?? "-",
-          item.AVAILABLE_STOCK ?? 0,
-          item.RESERVED_STOCK ?? 0,
+          toInitCap(item.item_name),
           getAcUnitLabel(item),
+          item.STOCK_QUANTITY ?? 0,
+          item.unit_price ?? 0,
+          item.value ?? 0,
+          item.bottles ?? 0,
+          item.pegs ?? 0,
         ]),
       });
     } catch (err) {
@@ -255,77 +259,96 @@ export default function BarstockReports() {
                 onScroll={handleScroll}
               >
                 <table className="min-w-[720px] w-full text-left text-sm">
-                <thead className="sticky top-0 bg-gray-50 text-gray-600">
-                  <tr>
-                    <th className="px-4 py-3 text-left font-medium">
-                      Item Code
-                    </th>
-                    <th className="px-4 py-3 text-left font-medium">
-                      Item Name
-                    </th>
-                    {/* <th className="px-4 py-3 text-left font-medium">
+                  <thead className="sticky top-0 bg-gray-50 text-gray-600">
+                    <tr>
+                      <th className="px-4 py-3 text-left font-medium">
+                        Item Code
+                      </th>
+                      <th className="px-4 py-3 text-left font-medium">
+                        Item Name
+                      </th>
+                      <th className="px-4 py-3 text-left font-medium">
+                        A/C Unit
+                      </th>
+                      {/* <th className="px-4 py-3 text-left font-medium">
                       Unit Price
                     </th> */}
-                    <th className="px-4 py-3 text-left font-medium">
-                      Total Price
-                    </th>
-                    <th className="px-4 py-3 text-left font-medium">
-                      Available Stock
-                    </th>
-                    <th className="px-4 py-3 text-left font-medium">
-                      Reserved Stock
-                    </th>
-                    <th className="px-4 py-3 text-left font-medium">
-                      A/C Unit
-                    </th>
-                  </tr>
-                </thead>
+                      <th className="px-4 py-3 text-left font-medium">
+                        Stock
+                      </th>
+                      <th className="px-4 py-3 text-left font-medium">
+                        Rate
+                      </th>
 
-                <tbody>
-                  {data.map((item, index) => (
-                    <tr
-                      key={`${item.item_code || "row"}-${index}`}
-                      className="border-t border-gray-100 hover:bg-gray-50"
-                    >
-                      <td className="px-4 py-3">{item.item_code}</td>
-                      <td className="px-4 py-3 capitalize">
-                        {toInitCap(item.item_name)}
-                      </td>
-                      {/* <td className="px-4 py-3">{item.unit_price ?? "-"}</td> */}
-                      <td className="px-4 py-3">{item.total_price ?? "-"}</td>
-                      <td className="px-4 py-3">{item.AVAILABLE_STOCK ?? 0}</td>
-                      <td className="px-4 py-3">{item.RESERVED_STOCK ?? 0}</td>
-                      <td className="px-4 py-3">
-                        {getAcUnitLabel(item)}
-                      </td>
+                      <th className="px-4 py-3 text-left font-medium">
+                        Value
+                      </th>
+                      {/* <th className="px-4 py-3 text-left font-medium">
+                        Available
+                      </th>
+                      <th className="px-4 py-3 text-left font-medium">
+                        Reserved
+                      </th> */}
+
+                      <th className="px-4 py-3 text-left font-medium">
+                        Bottles/Nos
+                      </th>
+                      <th className="px-4 py-3 text-left font-medium">
+                        Pegs
+                      </th>
+
+
                     </tr>
-                  ))}
+                  </thead>
 
-                  {!loading && !data.length && (
-                    <tr>
-                      <td className="px-4 py-6 text-center text-gray-500" colSpan="6">
-                        No records found.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+                  <tbody>
+                    {data.map((item, index) => (
+                      <tr
+                        key={`${item.item_code || "row"}-${index}`}
+                        className="border-t border-gray-100 hover:bg-gray-50"
+                      >
+                        <td className="px-4 py-3">{item.item_code}</td>
+                        <td className="px-4 py-3 capitalize">
+                          {toInitCap(item.item_name)}
+                        </td>
+                        <td className="px-4 py-3">{getAcUnitLabel(item)}</td>
+                        {/* <td className="px-4 py-3">{item.unit_price ?? "-"}</td> */}
+                        <td className="px-4 py-3">{item.STOCK_QUANTITY ?? 0}</td>
+                        <td className="px-4 py-3">{item.unit_price ?? 0}</td>
+                        <td className="px-4 py-3">{item.value ?? 0}</td>
+                        {/* <td className="px-4 py-3">{item.AVAILABLE_STOCK ?? 0}</td>
+                        <td className="px-4 py-3">{item.RESERVED_STOCK ?? 0}</td> */}
 
-              {loading && (
-                <p className="px-4 py-6 text-center text-gray-500">
-                  Loading...
-                </p>
-              )}
-              {!loading && data.length > 0 && !hasMore && (
-                <p className="px-4 py-6 text-center text-gray-500">
-                  No more data
-                </p>
-              )}
+                        <td className="px-4 py-3">{item.bottles ?? 0}</td>
+                        <td className="px-4 py-3">{item.pegs ?? 0}</td>
+                      </tr>
+                    ))}
+
+                    {!loading && !data.length && (
+                      <tr>
+                        <td className="px-4 py-6 text-center text-gray-500" colSpan="6">
+                          No records found.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+
+                {loading && (
+                  <p className="px-4 py-6 text-center text-gray-500">
+                    Loading...
+                  </p>
+                )}
+                {!loading && data.length > 0 && !hasMore && (
+                  <p className="px-4 py-6 text-center text-gray-500">
+                    No more data
+                  </p>
+                )}
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
     </div>
   );
 }

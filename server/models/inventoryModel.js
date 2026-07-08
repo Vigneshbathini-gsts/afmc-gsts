@@ -370,6 +370,7 @@ const getStockOutItemByBarcode = async (barcode, executor = db) => {
     SELECT
       xit.ITEM_CODE AS item_code,
       xi.ITEM_NAME AS item_name,
+      xit.STOCK AS barcode_qty,
       COALESCE(NULLIF(xit.\`A/C_UNIT\`, ''), NULLIF(xi.\`A/C_UNIT\`, ''), 'Nos') AS ac_unit,
       xit.RATE AS unit_price,
       xit.VOLUME AS volume,

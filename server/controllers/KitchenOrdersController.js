@@ -1,5 +1,6 @@
 const pool = require("../config/db");
 const { getStartOfDay, getEndOfDay } = require("../utils/dateUtils");
+const { emitOrderStatusUpdate } = require("../utils/orderEvents");
 
 const getRequestUsername = (req) =>
   String(req.user?.username || req.user?.user_name || req.body?.appUser || "").trim();
@@ -628,6 +629,10 @@ exports.updateBarOrderStatus = async (req, res) => {
       );
     }
 
+    if (result.affectedRows > 0) {
+      await emitOrderStatusUpdate(String(ORDERNUMBER), { status: normalizedStatus });
+    }
+
     return res.status(200).json({
       success: true,
       message: result.affectedRows > 0
@@ -833,10 +838,17 @@ exports.processBarcodeScan = async (req, res) => {
     // we must know which parent item it should be attributed to.
     const forcedParentItem = String(PARENT_ITEM || "").trim();
 
+    const [standaloneRows] = await connection.query(
+      `
+      SELECT CAST(item_id AS CHAR) AS item_id
+      FROM xxafmc_order_details
+      WHERE order_id = ? AND item_id = ? AND (order_status IS NULL OR order_status = '')
+      LIMIT 1
+      `,
+      [ORDERNUMBER, scanItemCode]
+    );
+
     if (!forcedParentItem) {
-      // NOTE: Only checks recipe/cocktail membership here. The standalone
-      // order-line case is deliberately excluded from the ambiguity check
-      // and is also guarded against cancelled lines.
       const [possibleParentRows] = await connection.query(
         `
         SELECT DISTINCT inventory_item_code FROM (
@@ -864,7 +876,7 @@ exports.processBarcodeScan = async (req, res) => {
         .map((r) => String(r.inventory_item_code || "").trim())
         .filter(Boolean);
 
-      if (possibleParents.length > 1) {
+      if (possibleParents.length > 1 && standaloneRows.length === 0) {
         await connection.rollback();
         return res.status(400).json({
           success: false,
@@ -874,12 +886,14 @@ exports.processBarcodeScan = async (req, res) => {
     }
 
     // --- Parent resolution (FIXED) ---
-    // Recipe/cocktail membership is checked FIRST and independently. Only if
-    // there is no recipe match do we fall back to treating the barcode as a
-    // standalone order line — and that fallback now excludes cancelled lines,
-    // so a cancelled standalone line can never "steal" a scan that should be
-    // attributed to an active cocktail/mocktail.
+    // Prefer standalone order details when the scanned item exactly matches a
+    // normal order item. Only fall back to recipe parent items when there is
+    // no active standalone row or when a recipe has been explicitly selected.
     let parentItem = forcedParentItem || null;
+
+    if (!parentItem && standaloneRows.length > 0) {
+      parentItem = standaloneRows[0].item_id;
+    }
 
     if (!parentItem) {
       const [recipeParentRows] = await connection.query(
@@ -909,16 +923,7 @@ exports.processBarcodeScan = async (req, res) => {
     }
 
     if (!parentItem) {
-      const [standaloneRows] = await connection.query(
-        `
-        SELECT CAST(item_id AS CHAR) AS item_id
-        FROM xxafmc_order_details
-        WHERE order_id = ? AND item_id = ? AND (order_status IS NULL OR order_status = '')
-        LIMIT 1
-        `,
-        [ORDERNUMBER, scanItemCode]
-      );
-      parentItem = standaloneRows.length > 0 ? standaloneRows[0].item_id : String(scanItemCode);
+      parentItem = String(scanItemCode);
     }
 
     // Fetch the order_line_id for the parent item (cocktail/mocktail) from xxafmc_order_details
@@ -1002,8 +1007,15 @@ exports.processBarcodeScan = async (req, res) => {
     // === Collection metrics (like apex_collections) ===
     const scannedCollection = req.session[sessionKey] || [];
 
+    // const l_scan_item_qty = scannedCollection
+    //   .filter(s => sameCode(s.itemCode, scanItemCode))
+    //   .reduce((sum, s) => sum + Number(s.scanQuantity || 0), 0);
+
     const l_scan_item_qty = scannedCollection
-      .filter(s => sameCode(s.itemCode, scanItemCode))
+      .filter(s =>
+        sameCode(s.itemCode, scanItemCode) &&
+        sameCode(s.parentItem, parentItem)
+      )
       .reduce((sum, s) => sum + Number(s.scanQuantity || 0), 0);
 
     const l_total_scanned_qty = scannedCollection
@@ -1202,6 +1214,7 @@ exports.processBarcodeScan = async (req, res) => {
       ]);
     const currentScanned = req.session[sessionKey] || [];
 
+    const hasForcedParent = Boolean(forcedParentItem);
     let componentsWithRemaining = componentRows
       .map(comp => {
         const already = currentScanned.filter(s => {
@@ -1215,7 +1228,17 @@ exports.processBarcodeScan = async (req, res) => {
       })
       .filter(comp => comp.coll_qty > 0)
       .sort((a, b) => {
-        if (a.Mix !== b.Mix) return a.Mix.localeCompare(b.Mix);
+        if (hasForcedParent) {
+          const aMatchesParent = sameCode(a.inventory_item_code, forcedParentItem);
+          const bMatchesParent = sameCode(b.inventory_item_code, forcedParentItem);
+          if (aMatchesParent !== bMatchesParent) {
+            return aMatchesParent ? -1 : 1;
+          }
+        }
+
+        if (a.Mix !== b.Mix) {
+          return a.Mix.localeCompare(b.Mix);
+        }
         return Number(b.price || 0) - Number(a.price || 0);
       });
 
@@ -1278,6 +1301,7 @@ exports.processBarcodeScan = async (req, res) => {
     await connection.commit();
     transactionCommitted = true;
     await saveSession(req);
+    await emitOrderStatusUpdate(String(ORDERNUMBER));
 
     return res.status(201).json({
       success: true,
@@ -1733,6 +1757,7 @@ WHERE kn.ordernumber = ?
       );
 
       await connection.commit();
+      await emitOrderStatusUpdate(String(ORDERNUMBER), { status: "Cancelled" });
 
       return res.status(200).json({
         success: true,
@@ -1810,6 +1835,7 @@ WHERE kn.ordernumber = ?
     );
 
     await connection.commit();
+    await emitOrderStatusUpdate(String(lineItem?.order_id || ORDERNUMBER), { status: "Cancelled" });
 
     return res.status(200).json({
       success: true,
@@ -2389,6 +2415,7 @@ exports.completeOrder = async (req, res) => {
 
 
     await connection.commit();
+    await emitOrderStatusUpdate(String(ORDERNUMBER), { status: STATUS });
 
     return res.status(200).json({
       success: true,
