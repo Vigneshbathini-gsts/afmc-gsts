@@ -611,6 +611,49 @@ export default function Pubmenubuy({
   );
 }, [items, cocktailOverrideIssues]);
 
+  // Check if ANY item is out of stock (comprehensive check for button disabling)
+  const hasAnyOutOfStockItem = useMemo(() => {
+    if (!Array.isArray(items)) return false;
+    
+    return items.some((item) => {
+      if (item?.isFreeItem) return false; // Free items don't block confirm
+      
+      // Check standard items
+      if (!isCocktailOrMocktail(item)) {
+        const multiplier = getItemPegMultiplier(item);
+        if (item?.availableQuantity !== null && item?.availableQuantity !== undefined) {
+          if (Number(item.quantity || 0) * multiplier > Number(item.availableQuantity)) {
+            return true; // Out of stock
+          }
+        }
+        return false;
+      }
+      
+      // Check cocktail items
+      const itemCode = String(item?.item_code || "").trim();
+      const override = itemCode ? cocktailOverrideIssues?.[itemCode] : null;
+      if (resolveCocktailOutOfStock(item, override)) {
+        return true;
+      }
+      
+      return false;
+    });
+  }, [items, cocktailOverrideIssues]);
+
+  // True while any cocktail/mocktail item's live ingredient-stock recheck hasn't
+  // resolved yet. Until it resolves, we don't actually know whether the item is
+  // in stock (the server snapshot alone isn't trustworthy), so we treat this as
+  // blocking rather than assuming it's safe to confirm.
+  const isCheckingCocktailStock = useMemo(() => {
+    return items.some((item) => {
+      if (!isCocktailOrMocktail(item)) return false;
+      const itemCode = String(item?.item_code || "").trim();
+      if (!itemCode) return false;
+      const override = cocktailOverrideIssues?.[itemCode];
+      return !override?.hasDetails;
+    });
+  }, [items, cocktailOverrideIssues]);
+
   const missingCocktailIngredientItem = useMemo(() => {
     return (
       items.find((item) => hasMissingCocktailIngredients(orderNumber, item, cocktailDetailsByItemCode)) || null
@@ -1690,11 +1733,37 @@ export default function Pubmenubuy({
       return;
     }
 
-    // Check for stock issues
+    // Check for stock issues (defensive check before allowing confirm)
     if (stockIssueMessage) {
       showTemporaryStockMessage(stockIssueMessage);
       showToast(stockIssueMessage, "error");
       return;
+    }
+
+    // Defensive check: verify no items are out of stock
+    if (hasAnyOutOfStockItem) {
+      const itemWithIssue = items.find((item) => {
+        if (item?.isFreeItem) return false;
+        if (!isCocktailOrMocktail(item)) {
+          const multiplier = getItemPegMultiplier(item);
+          if (item?.availableQuantity !== null && item?.availableQuantity !== undefined) {
+            if (Number(item.quantity || 0) * multiplier > Number(item.availableQuantity)) {
+              return true;
+            }
+          }
+          return false;
+        }
+        const itemCode = String(item?.item_code || "").trim();
+        const override = itemCode ? cocktailOverrideIssues?.[itemCode] : null;
+        return resolveCocktailOutOfStock(item, override);
+      });
+      
+      if (itemWithIssue) {
+        const errorMsg = itemWithIssue?.stockIssueMessage || "Item is out of stock. Please adjust your order.";
+        setError(errorMsg);
+        showToast(errorMsg, "error");
+        return;
+      }
     }
 
     const confirmed = await confirmAction(
@@ -1783,21 +1852,34 @@ export default function Pubmenubuy({
         });
       }
     } catch (confirmError) {
-      console.error(" :", confirmError);
+      console.error("Confirm order error:", confirmError);
       const errorMessage = confirmError?.response?.data?.message ||
         confirmError?.message ||
         "Unable to confirm this order. Please try again.";
+
       if (isOutOfStockMessage(errorMessage)) {
+        // Stock error: don't refresh, don't modify state, keep UI exactly as-is
         setError("");
         showTemporaryStockMessage(errorMessage);
+        showToast(errorMessage, "error");
+        console.debug("[Pubmenubuy] Stock validation prevented confirm - order state unchanged");
+        // Deliberately do NOT refresh the order summary here. A rejected
+        // confirm should be a pure no-op — the cart/order the person sees
+        // was already accurate before they clicked Confirm. Re-fetching
+        // immediately after a failed confirm can momentarily reflect a
+        // partially-applied state on the server, which makes items appear
+        // to vanish until a later reload corrects it. Leaving `items` as-is
+        // keeps the UI stable and matches what actually happened: nothing
+        // was confirmed, so nothing should change on screen.
       } else {
         setError(errorMessage);
+        showToast(errorMessage, "error");
+        // Non-stock failures (network errors, session issues, etc.) are more
+        // likely to mean our local view is stale for unrelated reasons, so a
+        // refresh is still useful here.
+        console.debug("[Pubmenubuy] Non-stock error during confirm, refreshing order state");
+        await refreshOrderSummary();
       }
-      
-      // Refresh data to get actual stock levels from the server
-      await refreshOrderSummary();
-      
-      showToast(errorMessage, "error");
     } finally {
       setConfirming(false);
     }
@@ -1827,17 +1909,32 @@ export default function Pubmenubuy({
 
                 <ActionButton
                   onClick={handleConfirmOrder}
-                  disabled={loading || confirming || Boolean(stockIssueMessage) || items.length === 0}
+                  disabled={
+                    loading ||
+                    confirming ||
+                    Boolean(stockIssueMessage) ||
+                    items.length === 0 ||
+                    isCheckingCocktailStock ||
+                    hasAnyOutOfStockItem
+                  }
                   className="bg-afmc-maroon px-4 py-2 text-white ring-1 ring-afmc-gold/30 hover:bg-afmc-maroon/90 disabled:cursor-not-allowed disabled:opacity-60"
                   title={
                     loading ? "Loading order details..." :
                       items.length === 0 ? "No items to confirm" :
-                        stockIssueMessage ? stockIssueMessage :
-                          "Confirm order"
+                        isCheckingCocktailStock ? "Checking ingredient stock..." :
+                          hasAnyOutOfStockItem ? (cocktailStockIssue?.stockIssueMessage || stockIssueMessage || "Some items are out of stock") :
+                            stockIssueMessage ? stockIssueMessage :
+                              "Confirm order"
                   }
                 >
                   <CheckCircle2 className="h-4 w-4" />
-                  {loading ? toInitCap("Loading...") : confirming ? toInitCap("Confirming...") : toInitCap("Confirm")}
+                  {loading
+                    ? toInitCap("Loading...")
+                    : confirming
+                      ? toInitCap("Confirming...")
+                      : isCheckingCocktailStock
+                        ? toInitCap("Checking stock...")
+                        : toInitCap("Confirm")}
                 </ActionButton>
 
                 <ActionButton

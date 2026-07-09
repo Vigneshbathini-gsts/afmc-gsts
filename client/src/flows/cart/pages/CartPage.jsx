@@ -333,7 +333,9 @@ export default function CartPage({ isAttendant = false }) {
 
     const getItemStockInfo = useCallback((item) => {
         const isCocktailItem = isCocktailOrMocktail(item);
+        console.log(`Getting stock info for item ${item.cartId} (cocktail: ${isCocktailItem})`);
         const cocktailDetails = isCocktailItem ? cocktailDetailsByCartId[String(item.cartId)] : null;
+        
         const cocktailDetailsStockStatus = Array.isArray(cocktailDetails) && cocktailDetails.length > 0
             ? (
                 cocktailDetails.every((detail) => {
