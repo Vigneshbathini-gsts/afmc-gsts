@@ -681,10 +681,9 @@ const getStockInReport = async ({ fromDate, toDate, limit, offset }) => {
     SELECT
       XIT.ITEM_CODE AS item_code,
       XI.ITEM_NAME AS item_name,
-      XIT.BATCH_ID AS batch_id,
       COALESCE(NULLIF(XI.\`A/C_UNIT\`, ''), 'Nos') AS ac_unit,
       SUM(XIT.STOCK) AS stock,
-      ROUND(SUM(IFNULL(XIT.RATE, 0) * IFNULL(XIT.STOCK, 0)), 2) AS total_price,
+      ROUND(SUM(IFNULL(XIT.RATE, 0)), 2) AS total_price,
       MIN(XIT.TRANSACTION_DATE) AS transaction_date,
       MIN(XIT.CREATION_DATE) AS creation_date
     FROM xxafmc_items_transactions XIT
@@ -692,13 +691,14 @@ const getStockInReport = async ({ fromDate, toDate, limit, offset }) => {
     WHERE XIT.TRANSACTION_DATE >= ? AND XIT.TRANSACTION_DATE <= ?
       AND XIT.FLAG = 'IN'
       AND XI.SUB_CATEGORY NOT IN (14, 15)
-    GROUP BY XIT.ITEM_CODE, XI.ITEM_NAME, XIT.BATCH_ID, XI.\`A/C_UNIT\`
+    GROUP BY XIT.ITEM_CODE, XI.ITEM_NAME, XI.\`A/C_UNIT\`
     ORDER BY creation_date DESC
     ${hasPagination ? `LIMIT ${limitNumber} OFFSET ${offsetNumber}` : ""}
   `;
   const [rows] = await db.execute(sql, [start, end]);
   return mapAcUnitRows(rows);
-};
+ }; 
+// ROUND(SUM(IFNULL(XIT.RATE, 0) * IFNULL(XIT.STOCK, 0)), 2) AS total_price,
 
 const getStockInReportSummary = async ({ fromDate, toDate }) => {
   const start = getStartOfDay(fromDate);
@@ -706,7 +706,7 @@ const getStockInReportSummary = async ({ fromDate, toDate }) => {
   const sql = `
     SELECT
       IFNULL(SUM(XIT.STOCK), 0) AS total_stock,
-      ROUND(SUM(IFNULL(XIT.RATE, 0) * IFNULL(XIT.STOCK, 0)), 2) AS total_price
+      ROUND(SUM(IFNULL(XIT.RATE, 0)), 2) AS total_price
     FROM xxafmc_items_transactions XIT
     JOIN xxafmc_inventory XI ON XIT.ITEM_CODE = XI.ITEM_CODE
     WHERE XIT.TRANSACTION_DATE >= ? AND XIT.TRANSACTION_DATE <= ?
@@ -732,7 +732,7 @@ const getStockOutReport = async ({ fromDate, toDate, limit, offset }) => {
       XSO.ITEM_CODE AS item_code,
       XSO.ITEM_NAME AS item_name,
       SUM(XSO.STOCK_QUANTITY) AS stock,
-      ROUND(SUM(IFNULL(XSO.TOTAL_VALUE, 0)), 2) AS total_price,
+      ROUND(SUM(IFNULL(XSO.UNIT_PRICE, 0)), 2) AS total_price,
       MIN(XSO.CREATION_DATE) AS creation_date,
       COALESCE(NULLIF(XI.\`A/C_UNIT\`, ''), 'Nos') AS ac_unit
     FROM xxafmc_stock_out XSO
