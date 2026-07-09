@@ -60,14 +60,14 @@ const getOrderTransactionDetails = async (req, res) => {
     const itemNameExact = normalizeExactParam(req.query.itemNames);
     const { limit, offset } = parsePagination(req.query);
 
-    console.log("Received filters:", {
-      fromDate,
-      toDate,
-      orderNumberExact,
-      userNameExact,
-      kitchenNameExact,
-      itemNameExact,
-    });
+    // console.log("Received filters:", {
+    //   fromDate,
+    //   toDate,
+    //   orderNumberExact,
+    //   userNameExact,
+    //   kitchenNameExact,
+    //   itemNameExact,
+    // });
 
     const dateFilterClause = buildDateFilterClause(
       "OH.ORDER_DATE",
@@ -320,8 +320,8 @@ const getOrderTransactionDetails = async (req, res) => {
     // Duplicate params for the summary query (since it has the same WHERE clause)
     const allParams = [...params, ...params];
 
-    console.log("Query parameters count:", allParams.length);
-    console.log("Query parameters:", allParams);
+    // console.log("Query parameters count:", allParams.length);
+    // console.log("Query parameters:", allParams);
 
     const [results] = await db.execute(finalQuery, allParams);
 
