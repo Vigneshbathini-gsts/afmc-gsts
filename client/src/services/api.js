@@ -51,6 +51,17 @@ const api = axios.create({
   withCredentials: true,
 });
 
+const dispatchNetworkEvent = (type) => {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(type));
+  }
+};
+
+const isBackendNetworkError = (err) => {
+  const code = err?.response?.data?.code;
+  return code === "NETWORK_ERROR" || code === "GATEWAY_TIMEOUT";
+};
+
 // Configure automatic retries with Exponential Backoff
 axiosRetry(api, {
   retries: 3, 
@@ -94,12 +105,20 @@ api.interceptors.response.use(
     }
 
     // 2. HANDLE TIMEOUT / SLOW NETWORK (After all retries failed)
-    // Axios sets code 'ECONNABORTED' when a timeout occurs
     if (err.code === 'ECONNABORTED' || err.message.includes('timeout')) {
       console.error(" Request timed out after retries due to a slow connection.");
-      //  Dispatch native event to tell AuthContext/App.js to trigger the Slow Warning Toast
-      window.dispatchEvent(new CustomEvent('app-network-slow'));
+      dispatchNetworkEvent('app-network-slow');
       return Promise.reject(new Error("NETWORK_TIMEOUT"));
+    }
+
+    if (isBackendNetworkError(err)) {
+      const code = err.response?.data?.code;
+      if (code === "GATEWAY_TIMEOUT") {
+        dispatchNetworkEvent('app-network-slow');
+      } else if (code === "NETWORK_ERROR") {
+        dispatchNetworkEvent('app-network-offline');
+      }
+      return Promise.reject(new Error(code));
     }
 
     // 3. HANDLE SPECIFIC SERVER STATUS CODES (Your existing logic remains completely intact)
