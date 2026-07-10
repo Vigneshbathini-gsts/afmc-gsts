@@ -10,18 +10,34 @@ function toFiniteNumber(value) {
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
 }
-
 function getItemType(item) {
-  const rawType = item?.type ?? item?.TYPE ?? item?.item_type ?? item?.ITEM_TYPE ?? item?.pegType ?? item?.peg_type ?? item?.TYPE_OF_PEG ?? null;
+  const rawType =
+    // Prefer the real cart column (stored as `description` in xxafmc_cart_items)
+    item?.description ??
+    item?.DESCRIPTION ??
+    item?.type ??
+    item?.TYPE ??
+    // Fallbacks for any legacy payloads
+    item?.item_type ??
+    item?.ITEM_TYPE ??
+    item?.pegType ??
+    item?.peg_type ??
+    item?.TYPE_OF_PEG ??
+    null;
+
   if (rawType === null || rawType === undefined || rawType === "") {
     return null;
   }
+
   return String(rawType).trim();
 }
 
 function isLargePegType(item) {
-  return String(getItemType(item) || "").trim().toLowerCase() === "large";
+  const type = String(getItemType(item) || "").trim().toUpperCase();
+  // Your cart payload might use different markers; treat "L" and "LARGE" as Large.
+  return type === "L" || type === "LARGE";
 }
+
 
 export function getItemPegMultiplier(item) {
   return isLargePegType(item) ? 2 : 1;
@@ -30,12 +46,14 @@ export function getItemPegMultiplier(item) {
 export function getPegTypeOrderLimitMessage(item, availablePegs, fallbackMessage = "Out of stock.", selectedPegType = null) {
   const normalizedType = String(selectedPegType ?? getItemType(item) ?? "").trim().toLowerCase();
 
-  if (normalizedType === "small") {
+  
+if (normalizedType === "S" || normalizedType === "SMALL") {
     const maxQty = Number.isFinite(Number(availablePegs)) ? Math.max(0, Number(availablePegs)) : 0;
     return `Only ${maxQty} Small drink(s) can be ordered with the current stock. Please reduce the quantity.`;
   }
 
-  if (normalizedType === "large") {
+
+if (normalizedType === "L" || normalizedType === "LARGE") {
     const maxQty = Number.isFinite(Number(availablePegs)) ? Math.max(0, Math.floor(Number(availablePegs) / 2)) : 0;
     return `Only ${maxQty} Large drink(s) can be ordered with the current stock. Please reduce the quantity.`;
   }
@@ -79,11 +97,12 @@ export function buildStockConsumptionMap(items = [], { getCocktailDetails = null
 
     if (isCocktailOrMocktail(item)) {
       const details = typeof getCocktailDetails === "function" ? getCocktailDetails(item) : [];
+      const multiplier = getItemPegMultiplier(item);
       for (const detail of Array.isArray(details) ? details : []) {
         const code = Number(detail?.itemCode ?? detail?.ITEM_CODE ?? detail?.item_id ?? detail?.itemId ?? detail?.code ?? detail?.CODE ?? 0);
         const pegs = Number(detail?.pegs ?? detail?.PEGS ?? detail?.quantity ?? detail?.QUANTITY ?? 0);
         if (!Number.isFinite(code) || code <= 0 || !Number.isFinite(pegs) || pegs <= 0) continue;
-        const required = pegs * qty;
+        const required = pegs * qty * multiplier;
         consumption.set(code, (consumption.get(code) || 0) + required);
       }
       continue;
@@ -91,7 +110,9 @@ export function buildStockConsumptionMap(items = [], { getCocktailDetails = null
 
     const code = Number(item?.itemId ?? item?.item_id ?? item?.ITEM_ID ?? item?.item_code ?? item?.ITEM_CODE ?? item?.code ?? item?.CODE ?? 0);
     if (!Number.isFinite(code) || code <= 0) continue;
-    consumption.set(code, (consumption.get(code) || 0) + qty);
+    const multiplier = getItemPegMultiplier(item);
+    const effectiveQty = qty * multiplier;
+    consumption.set(code, (consumption.get(code) || 0) + effectiveQty);
   }
 
   return consumption;

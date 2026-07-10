@@ -95,7 +95,7 @@ function getCocktailDetailsForItem(orderNumber, item, detailsByItemCode = {}) {
 }
 
 function getItemType(item) {
-  const rawType = item?.type ?? item?.TYPE ?? item?.item_type ?? item?.ITEM_TYPE ?? item?.pegType ?? item?.peg_type ?? item?.TYPE_OF_PEG ?? null;
+  const rawType = item?.description ?? item?.DESCRIPTION ?? item?.type ?? item?.TYPE ?? item?.item_type ?? item?.ITEM_TYPE ?? item?.pegType ?? item?.peg_type ?? item?.TYPE_OF_PEG ?? null;
   if (rawType === null || rawType === undefined || rawType === "") {
     return null;
   }
@@ -297,7 +297,7 @@ function normalizeItem(item, fallbackIndex = 0) {
         : Number(rawFreeItemAvailableQuantity),
     computed_free_item_quantity: Number.isFinite(computed_free_item_quantity) ? computed_free_item_quantity : null,
     subcategory: Number.isFinite(subcategory) ? subcategory : null,
-    type: item.type || item.TYPE || item.item_type || item.ITEM_TYPE || item.pegType || item.peg_type || null,
+    type: item.description || item.DESCRIPTION || item.type || item.TYPE || item.item_type || item.ITEM_TYPE || item.pegType || item.peg_type || null,
     stockStatus,
     stockIssueMessage,
     cartId: Number.isFinite(cartId) && cartId > 0 ? cartId : null,

@@ -8,14 +8,19 @@ const createValidationError = (message) => {
   error.status = 400;
   return error;
 };
+const getPegTypeValue = (value) => {
+  const raw = value?.description ?? value?.DESCRIPTION ?? value?.type ?? value?.TYPE ?? value ?? null;
+  return String(raw ?? "").trim();
+};
+
 const getPegMultiplierForType = (type) => {
-  return String(type || "").trim().toLowerCase() === "large" ? 2 : 1;
+  return getPegTypeValue(type).toLowerCase() === "large" ? 2 : 1;
 };
 
 // Sums quantity * pegMultiplier across all cart rows for this item (optionally excluding one cart_id).
 // This makes stock checks type-aware: a Large row consumes 2x the pegs of an equal-quantity Small row.
 const getCartPegWeightedQuantity = async (conn, userId, itemCode, excludeCartId = null) => {
-  let query = `SELECT quantity, type FROM xxafmc_cart_items
+  let query = `SELECT quantity, description, type FROM xxafmc_cart_items
      WHERE user_id = ?
        AND item_id = ?
        AND price != 0`;
@@ -141,7 +146,7 @@ const getCartIngredientConsumption = async (conn, userId, ingredientCode, exclud
   }
 
   const [rows] = await conn.execute(
-    `SELECT IFNULL(SUM(cc.quantity * c.quantity), 0) AS total_qty
+    `SELECT cc.quantity AS ingredient_qty, c.quantity AS cart_qty, c.description, c.type
      FROM ${CUSTOMIZATION_TABLE} cc
      INNER JOIN xxafmc_cart_items c
        ON cc.cart_id = c.cart_id
@@ -151,7 +156,10 @@ const getCartIngredientConsumption = async (conn, userId, ingredientCode, exclud
     params
   );
 
-  return Number(rows[0]?.total_qty || 0);
+  return rows.reduce((sum, row) => {
+    const multiplier = getPegMultiplierForType(row);
+    return sum + Number(row.ingredient_qty || 0) * Number(row.cart_qty || 0) * multiplier;
+  }, 0);
 };
 
 const getCartIngredientConsumptionMap = async (conn, userId, ingredientCodes, excludeCartId = null) => {
@@ -170,19 +178,21 @@ const getCartIngredientConsumptionMap = async (conn, userId, ingredientCodes, ex
   }
 
   const [rows] = await conn.execute(
-    `SELECT cc.ingredient_item_code AS item_code, IFNULL(SUM(cc.quantity * c.quantity), 0) AS total_qty
+    `SELECT cc.ingredient_item_code AS item_code, cc.quantity AS ingredient_qty, c.quantity AS cart_qty, c.description, c.type
      FROM ${CUSTOMIZATION_TABLE} cc
      INNER JOIN xxafmc_cart_items c
        ON cc.cart_id = c.cart_id
      WHERE c.user_id = ?
        AND cc.ingredient_item_code IN (${placeholders})
-       AND c.price != 0${excludeSql}
-     GROUP BY cc.ingredient_item_code`,
+       AND c.price != 0${excludeSql}`,
     params
   );
 
   return rows.reduce((map, row) => {
-    map[String(row.item_code)] = Number(row.total_qty || 0);
+    const key = String(row.item_code);
+    const multiplier = getPegMultiplierForType(row);
+    const weightedQty = Number(row.ingredient_qty || 0) * Number(row.cart_qty || 0) * multiplier;
+    map[key] = Number(map[key] || 0) + weightedQty;
     return map;
   }, {});
 };
@@ -205,34 +215,36 @@ const getCartConsumptionMap = async (conn, userId, itemCodes, excludeCartId = nu
   }
 
   const [directRows] = await conn.execute(
-    `SELECT item_id AS item_code, IFNULL(SUM(quantity), 0) AS total_qty
+    `SELECT item_id AS item_code, quantity, description, type
      FROM xxafmc_cart_items
      WHERE user_id = ?
        AND item_id IN (${placeholders})
-       AND price != 0${excludeSql}
-     GROUP BY item_id`,
+       AND price != 0${excludeSql}`,
     params
   );
 
   const [ingredientRows] = await conn.execute(
-    `SELECT cc.ingredient_item_code AS item_code, IFNULL(SUM(cc.quantity * c.quantity), 0) AS total_qty
+    `SELECT cc.ingredient_item_code AS item_code, cc.quantity AS ingredient_qty, c.quantity AS cart_qty, c.description, c.type
      FROM ${CUSTOMIZATION_TABLE} cc
      INNER JOIN xxafmc_cart_items c
        ON cc.cart_id = c.cart_id
      WHERE c.user_id = ?
        AND cc.ingredient_item_code IN (${placeholders})
-       AND c.price != 0${excludeSqlForIngredient}
-     GROUP BY cc.ingredient_item_code`,
+       AND c.price != 0${excludeSqlForIngredient}`,
     params
   );
 
   const map = {};
   for (const row of directRows) {
-    map[String(row.item_code)] = Number(row.total_qty || 0);
+    const key = String(row.item_code);
+    const multiplier = getPegMultiplierForType(row);
+    map[key] = Number(map[key] || 0) + Number(row.quantity || 0) * multiplier;
   }
   for (const row of ingredientRows) {
     const key = String(row.item_code);
-    map[key] = Number(map[key] || 0) + Number(row.total_qty || 0);
+    const multiplier = getPegMultiplierForType(row);
+    const weightedQty = Number(row.ingredient_qty || 0) * Number(row.cart_qty || 0) * multiplier;
+    map[key] = Number(map[key] || 0) + weightedQty;
   }
 
   return map;
@@ -1123,7 +1135,7 @@ const getCartItemsByUser = async (userId) => {
       stockStatus,
       isFreeItem,
       canEdit,
-      type: row.type,
+      type: row.description || row.type || null,
       hasRecipe: Number(row.has_recipe || 0) > 0,
     };
   });
@@ -1149,6 +1161,8 @@ const updateCartItemQuantity = async (cartId, userId, quantity) => {
       `SELECT
          c.item_id,
          c.quantity,
+         c.description,
+         c.type,
          xi.category_id,
          xi.sub_category,
          EXISTS (

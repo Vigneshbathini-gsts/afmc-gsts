@@ -589,6 +589,19 @@ exports.confirmOrder = async (req, res) => {
 
       for (const cartItem of cartRows) {
         const quantity = Number(cartItem.quantity || 0);
+        const pegType = String(cartItem.description ?? cartItem.DESCRIPTION ?? cartItem.type ?? cartItem.TYPE ?? "").trim();
+        const stockMultiplier = pegType.toLowerCase() === "large" ? 2 : 1;
+
+        const stockQuantity = quantity * stockMultiplier;
+
+        console.log({
+  cartId: cartItem.cart_id,
+  itemId: cartItem.item_id,
+  type: cartItem.type,
+  quantity,
+  stockMultiplier,
+  stockQuantity,
+});
 
         // Normal Item
         if (![14, 15].includes(Number(cartItem.sub_category || 0))) {
@@ -596,7 +609,7 @@ exports.confirmOrder = async (req, res) => {
 
           stockConsumption.set(
             itemCode,
-            (stockConsumption.get(itemCode) || 0) + quantity
+            (stockConsumption.get(itemCode) || 0) + stockQuantity
           );
           continue;
         }
@@ -616,7 +629,7 @@ exports.confirmOrder = async (req, res) => {
         for (const ingredient of ingredients) {
           const ingredientCode = Number(ingredient.ingredient_item_code);
           const requiredQty =
-            Number(ingredient.quantity || 0) * quantity;
+            Number(ingredient.quantity || 0) * stockQuantity;
 
           stockConsumption.set(
             ingredientCode,
@@ -642,6 +655,7 @@ exports.confirmOrder = async (req, res) => {
       }
     };
 
+    
     // 1. Fetch Cart Items and join with inventory to get names and categories
     const [cartRows] = await connection.execute(
       `SELECT

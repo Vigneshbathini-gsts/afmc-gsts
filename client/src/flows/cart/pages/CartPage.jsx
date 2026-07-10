@@ -78,15 +78,15 @@ export default function CartPage({ isAttendant = false }) {
     const stockToastId = "stock-alert";
 
     const showStockAlert = useCallback((message) => {
-    if (toast.isActive(stockToastId)) {
-        return;
-    }
+        if (toast.isActive(stockToastId)) {
+            return;
+        }
 
-    toast.error(message, {
-        toastId: stockToastId,
-        autoClose: 3000,
-    });
-}, []);
+        toast.error(message, {
+            toastId: stockToastId,
+            autoClose: 3000,
+        });
+    }, []);
 
 
 
@@ -96,26 +96,26 @@ export default function CartPage({ isAttendant = false }) {
     const SUCCESS_TOAST_ID = "cart-success";
     const ERROR_TOAST_ID = "cart-error";
 
-   const showToast = useCallback((message, type = "success") => {
-    const toastId =
-        type === "success"
-            ? SUCCESS_TOAST_ID
-            : ERROR_TOAST_ID;
+    const showToast = useCallback((message, type = "success") => {
+        const toastId =
+            type === "success"
+                ? SUCCESS_TOAST_ID
+                : ERROR_TOAST_ID;
 
-    if (toast.isActive(toastId)) return;
+        if (toast.isActive(toastId)) return;
 
-    if (type === "success") {
-        toast.success(message, {
-            toastId,
-            autoClose: 2000,
-        });
-    } else {
-        toast.error(message, {
-            toastId,
-            autoClose: 3000,
-        });
-    }
-}, []);
+        if (type === "success") {
+            toast.success(message, {
+                toastId,
+                autoClose: 2000,
+            });
+        } else {
+            toast.error(message, {
+                toastId,
+                autoClose: 3000,
+            });
+        }
+    }, []);
 
 
 
@@ -237,12 +237,20 @@ export default function CartPage({ isAttendant = false }) {
                         const codes = [...new Set(ingredients.map((ing) => ing.itemCode))];
                         const stockRes = await cartAPI.getIngredientStocks(codes, undefined, undefined, cartId);
                         const stockMap = stockRes?.data?.data || {};
+                        const multiplier = getItemPegMultiplier(currentItem);
+                        console.log("Current Item:", currentItem);
+console.log("Type:", currentItem.type);
+console.log("Multiplier:", getItemPegMultiplier(currentItem));
                         for (const ing of ingredients) {
                             const rawAvailable = stockMap?.[String(ing.itemCode)];
                             if (rawAvailable === undefined || rawAvailable === null || rawAvailable === "") continue;
+
                             const available = Number(rawAvailable);
                             if (!Number.isFinite(available) || available < 0) continue;
-                            const required = ing.pegs * Number(newQuantity || 1);
+
+                            const required =
+                                ing.pegs * Number(newQuantity || 1) * multiplier;
+
                             if (required > available) {
                                 const msg = `Out of stock for ingredient ${ing.itemName || ing.itemCode}. Available quantity: ${available}`;
                                 showStockAlert(msg);
@@ -305,6 +313,7 @@ export default function CartPage({ isAttendant = false }) {
             setUpdatingItemId(null);
         }
     }, [cartItems, cocktailDetailsByCartId, setCocktailDetailsByCartId, setCartItems, setCartCount, showToast, showStockLimitOnImage, clearStockLimitOnImage]);
+
     const commitQuantityUpdate = useCallback((cartId, quantity) => {
         // Optimistic local update so the UI feels instant
         setCartItems((prev) =>
@@ -421,7 +430,9 @@ export default function CartPage({ isAttendant = false }) {
                     if (!isCocktailOrMocktail(item)) {
                         const code = Number(item.itemId || item.item_code || item.ITEM_CODE);
                         if (!Number.isFinite(code) || code <= 0) continue;
-                        stockConsumption.set(code, (stockConsumption.get(code) || 0) + Number(item.quantity || 0));
+                        const multiplier = getItemPegMultiplier(item);
+                        const effectiveQty = Number(item.quantity || 0) * multiplier;
+                        stockConsumption.set(code, (stockConsumption.get(code) || 0) + effectiveQty);
                     }
                 }
 
@@ -443,7 +454,7 @@ export default function CartPage({ isAttendant = false }) {
                         const code = Number(d?.ITEM_CODE ?? d?.itemCode ?? d?.item_id ?? d?.item_id);
                         const pegs = Number(d?.PEGS ?? d?.pegs ?? d?.QUANTITY ?? d?.quantity ?? 0) || 0;
                         if (!Number.isFinite(code) || code <= 0 || pegs <= 0) continue;
-                        const required = pegs * Number(item.quantity || 0);
+                        const required = pegs * Number(item.quantity || 0) * getItemPegMultiplier(item);
                         stockConsumption.set(code, (stockConsumption.get(code) || 0) + required);
                     }
                 }
@@ -686,11 +697,8 @@ export default function CartPage({ isAttendant = false }) {
                                 <h2 className="text-sm font-semibold text-gray-900 overflow-hidden text-ellipsis whitespace-nowrap">
                                     {toInitCap(item.itemName) || toInitCap("Unnamed Item")}
                                 </h2>
-                                <h2>Type: {toInitCap(item.type)}</h2>
+                                <h2 className="text-sm text-gray-900 overflow-hidden text-ellipsis whitespace-nowrap">Type: {toInitCap(item.description || item.DESCRIPTION || item.type || 'NA')}</h2>
 
-                                <p className="text-sm font-semibold text-gray-900 mt-1">
-                                    {item.price ? `₹${Number(item.price).toFixed(2)}` : "Price not available"}
-                                </p>
 
                                 <p
                                     className={`text-xs mt-1 ${String(stockStatusText || "").toLowerCase() === "out of stock"
