@@ -3,7 +3,7 @@ import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { CheckCircle2, ChevronLeft, Minus, Pencil, Plus, Trash2, XCircle } from "lucide-react";
 import Pubmenubuyservice from "../services/Pubmenubuyservice";
 import ConfirmOrderservice from "../../../services/ConfirmOrderservice";
-import { buildStockConsumptionMap, getMaxAllowedQuantity, getPegTypeOrderLimitMessage, isCocktailOrMocktail, isOutOfStock, validateNextQuantity } from "../../../utils/stockValidation";
+import { buildStockConsumptionMap, getEffectiveAvailableQuantity, getMaxAllowedQuantity, getPegTypeOrderLimitMessage, isCocktailOrMocktail, isOutOfStock, validateNextQuantity } from "../../../utils/stockValidation";
 import { barOrdersAPI, cartAPI } from "../../../services/api";
 import { toInitCap } from "../../../utils/textFormat";
 import { toast } from "react-toastify";
@@ -113,9 +113,7 @@ function getItemPegMultiplier(item) {
 function getMaxAllowedByPegType(item) {
   const maxAllowed = getMaxAllowedQuantity(item);
   if (maxAllowed === null || maxAllowed === undefined) return null;
-  const multiplier = getItemPegMultiplier(item);
-  if (multiplier <= 1) return maxAllowed;
-  return Math.floor(maxAllowed / multiplier);
+  return getEffectiveAvailableQuantity(item, maxAllowed);
 }
 
 function validateNextQuantityForItem(item, nextQuantity) {
@@ -676,10 +674,11 @@ export default function Pubmenubuy({
         "Out of stock for cocktail/mocktail ingredients. Please reduce quantity or update selection."
       );
     }
-    const available = Number(getMaxAllowedQuantity(stockIssue) ?? stockIssue.availableQuantity ?? 0);
+    const rawAvailable = Number(getMaxAllowedQuantity(stockIssue) ?? stockIssue.availableQuantity ?? 0);
+    const effectiveAvailable = getEffectiveAvailableQuantity(stockIssue, rawAvailable);
     return stockIssue.isFreeItem
-      ? `Out of stock for free item. Available quantity: ${available}`
-      : getPegTypeOrderLimitMessage(stockIssue, available, `Out of stock. Available quantity: ${available}`);
+      ? `Out of stock for free item. Available quantity: ${effectiveAvailable}`
+      : getPegTypeOrderLimitMessage(stockIssue, rawAvailable, `Out of stock. Available quantity: ${effectiveAvailable}`);
   }, [stockIssue, cocktailStockIssue, cocktailOverrideIssues, missingCocktailIngredientItem]);
 
   const showToast = (message, type = "success") => {
@@ -764,11 +763,13 @@ export default function Pubmenubuy({
           const otherRequired = Math.max(0, projectedRequired - (targetRequiredPerUnit * nextQuantity));
           const adjustedAvailable = Math.max(0, Math.floor((availableApi - otherRequired) / targetRequiredPerUnit));
           const ingredientName = targetIngredientNameByCode.get(String(code));
+          const rawAvailableForMessage = adjustedAvailable * targetRequiredPerUnit;
+          const effectiveAvailableForMessage = getEffectiveAvailableQuantity(targetItem, rawAvailableForMessage);
           return {
             ok: false,
             message: ingredientName
               ? `Out of stock for ingredient ${ingredientName}. Available quantity: ${adjustedAvailable}`
-              : getPegTypeOrderLimitMessage(targetItem, adjustedAvailable, `Out of stock. Available quantity: ${adjustedAvailable}`),
+              : getPegTypeOrderLimitMessage(targetItem, rawAvailableForMessage, `Out of stock. Available quantity: ${effectiveAvailableForMessage}`),
           };
         }
       }
