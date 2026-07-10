@@ -43,6 +43,13 @@ export function getItemPegMultiplier(item) {
   return isLargePegType(item) ? 2 : 1;
 }
 
+export function getEffectiveAvailableQuantity(item, availablePegs) {
+  const rawAvailable = Number.isFinite(Number(availablePegs)) ? Number(availablePegs) : 0;
+  const multiplier = getItemPegMultiplier(item);
+  if (multiplier <= 1) return Math.max(0, rawAvailable);
+  return Math.max(0, Math.floor(rawAvailable / multiplier));
+}
+
 export function getPegTypeOrderLimitMessage(item, availablePegs, fallbackMessage = "Out of stock.", selectedPegType = null) {
   const normalizedType = String(selectedPegType ?? getItemType(item) ?? "").trim().toLowerCase();
 
@@ -134,8 +141,7 @@ export function validateNextQuantity(item, nextQuantity) {
   }
 
   if (maxAllowed !== null && maxAllowed !== undefined && maxAllowed > 0) {
-    const multiplier = getItemPegMultiplier(item);
-    const effectiveAllowed = multiplier > 1 ? Math.floor(maxAllowed / multiplier) : maxAllowed;
+    const effectiveAllowed = getEffectiveAvailableQuantity(item, maxAllowed);
     if (effectiveAllowed <= 0) {
       return { ok: false, message: "Out of stock." };
     }

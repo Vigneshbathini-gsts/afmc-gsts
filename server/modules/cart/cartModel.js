@@ -17,6 +17,13 @@ const getPegMultiplierForType = (type) => {
   return getPegTypeValue(type).toLowerCase() === "large" ? 2 : 1;
 };
 
+const getEffectiveAvailableQuantityForType = (rawAvailableQty, type) => {
+  const rawQty = Number(rawAvailableQty);
+  if (!Number.isFinite(rawQty) || rawQty <= 0) return 0;
+  const multiplier = getPegMultiplierForType(type);
+  return multiplier > 1 ? Math.max(0, Math.floor(rawQty / multiplier)) : rawQty;
+};
+
 // Sums quantity * pegMultiplier across all cart rows for this item (optionally excluding one cart_id).
 // This makes stock checks type-aware: a Large row consumes 2x the pegs of an equal-quantity Small row.
 const getCartPegWeightedQuantity = async (conn, userId, itemCode, excludeCartId = null) => {
@@ -780,7 +787,8 @@ const addCartItem = async (userId, itemData) => {
     const requiredQty = quantity * pegMultiplier;
     if (!isCocktailOrMocktail && existingCartQty + requiredQty + reservedQty + ingredientConsumptionQty > stockQty) {
       const availableQty = Math.max(0, stockQty - reservedQty - existingCartQty - ingredientConsumptionQty);
-      throw createValidationError(`Out of stock. Available quantity: ${availableQty}`);
+      const effectiveAvailableQty = getEffectiveAvailableQuantityForType(availableQty, type);
+      throw createValidationError(`Out of stock. Available quantity: ${effectiveAvailableQty}`);
     }
     // -------------------------------
     // 2. CHECK EXISTING CART ITEM
@@ -1204,7 +1212,8 @@ const updateCartItemQuantity = async (cartId, userId, quantity) => {
       const requiredQty = quantity * pegMultiplier;
       if (requiredQty + otherWeightedQty + reservedQty + ingredientConsumptionQty > stockQty) {
         const availableQty = Math.max(0, stockQty - reservedQty - otherWeightedQty - ingredientConsumptionQty);
-        throw createValidationError(`Out of stock. Available quantity: ${availableQty}`);
+        const effectiveAvailableQty = getEffectiveAvailableQuantityForType(availableQty, current[0]);
+        throw createValidationError(`Out of stock. Available quantity: ${effectiveAvailableQty}`);
       }
     }
     if (isCocktailOrMocktail) {
