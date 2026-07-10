@@ -72,17 +72,50 @@ export default function CartPage({ isAttendant = false }) {
     const pendingQuantityRef = useRef({});
     const confirmedQuantityRef = useRef({});
 
+    const activeStockToast = useRef(null);
+
+
+    const stockToastId = "stock-alert";
+
+    const showStockAlert = useCallback((message) => {
+    if (toast.isActive(stockToastId)) {
+        return;
+    }
+
+    toast.error(message, {
+        toastId: stockToastId,
+        autoClose: 3000,
+    });
+}, []);
+
+
 
 
     const userId = user?.userId;
 
-    const showToast = useCallback((message, type = 'success') => {
-        if (type === 'error') {
-            toast.error(message);
-        } else {
-            toast.success(message);
-        }
-    }, []);
+    const SUCCESS_TOAST_ID = "cart-success";
+    const ERROR_TOAST_ID = "cart-error";
+
+   const showToast = useCallback((message, type = "success") => {
+    const toastId =
+        type === "success"
+            ? SUCCESS_TOAST_ID
+            : ERROR_TOAST_ID;
+
+    if (toast.isActive(toastId)) return;
+
+    if (type === "success") {
+        toast.success(message, {
+            toastId,
+            autoClose: 2000,
+        });
+    } else {
+        toast.error(message, {
+            toastId,
+            autoClose: 3000,
+        });
+    }
+}, []);
 
 
 
@@ -122,6 +155,8 @@ export default function CartPage({ isAttendant = false }) {
             confirmedQuantityRef.current[it.cartId] = it.quantity;
         });
     }, [cartItems]);
+
+
 
     const fetchCartItems = useCallback(async () => {
         if (!userId) return;
@@ -210,7 +245,7 @@ export default function CartPage({ isAttendant = false }) {
                             const required = ing.pegs * Number(newQuantity || 1);
                             if (required > available) {
                                 const msg = `Out of stock for ingredient ${ing.itemName || ing.itemCode}. Available quantity: ${available}`;
-                                showToast(msg, 'error');
+                                showStockAlert(msg);
                                 showStockLimitOnImage(currentItem, "Out of Stock");
                                 setUpdatingItemId(null);
                                 return false;
@@ -230,7 +265,8 @@ export default function CartPage({ isAttendant = false }) {
                     const msg = Number(maxAllowed) === 0
                         ? "Out of stock. Available quantity: 0"
                         : "Out of stock.";
-                    showToast(msg, 'error');
+
+                    showStockAlert(msg);
                     showStockLimitOnImage(currentItemForMax, "Out of Stock");
                     setUpdatingItemId(null);
                     return false;
@@ -240,13 +276,13 @@ export default function CartPage({ isAttendant = false }) {
                     const multiplier = getItemPegMultiplier(currentItemForMax);
                     const effectiveAllowed = multiplier > 1 ? Math.floor(Number(maxAllowed) / multiplier) : Number(maxAllowed);
                     if (effectiveAllowed <= 0) {
-                        showToast("Out of stock. Available quantity: 0", 'error');
+                        showStockAlert("Out of stock. Available quantity: 0");
                         setUpdatingItemId(null);
                         return false;
                     }
                     if (Number(newQuantity) > effectiveAllowed) {
                         const msg = getPegTypeOrderLimitMessage(currentItemForMax, Number(maxAllowed), `Out of stock. Available quantity: ${effectiveAllowed}`);
-                        showToast(msg, 'error');
+                        showStockAlert(msg);
                         setUpdatingItemId(null);
                         return false;
                     }
@@ -468,7 +504,7 @@ export default function CartPage({ isAttendant = false }) {
                 setProceedConfirmOpen(false);
                 const msg = err?.response?.data?.message || err?.message || "Unable to create order.";
                 setError(msg);
-                showToast(msg, "error");
+                showStockAlert(msg);
             } finally {
                 setLoading(false);
             }
