@@ -26,7 +26,7 @@ function AppContent() {
       if (offlineToastId.current) {
         toast.dismiss(offlineToastId.current);
         offlineToastId.current = null;
-        toast.success(" Connected back to the internet!", {
+        toast.success(" Connected back to the internet please refresh the page!", {
           position: "top-center",
           autoClose: 2000,
         });

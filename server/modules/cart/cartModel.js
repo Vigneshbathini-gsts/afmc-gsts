@@ -8,7 +8,30 @@ const createValidationError = (message) => {
   error.status = 400;
   return error;
 };
+const getPegMultiplierForType = (type) => {
+  return String(type || "").trim().toLowerCase() === "large" ? 2 : 1;
+};
 
+// Sums quantity * pegMultiplier across all cart rows for this item (optionally excluding one cart_id).
+// This makes stock checks type-aware: a Large row consumes 2x the pegs of an equal-quantity Small row.
+const getCartPegWeightedQuantity = async (conn, userId, itemCode, excludeCartId = null) => {
+  let query = `SELECT quantity, type FROM xxafmc_cart_items
+     WHERE user_id = ?
+       AND item_id = ?
+       AND price != 0`;
+  const params = [userId, itemCode];
+
+  if (excludeCartId != null && !Number.isNaN(Number(excludeCartId))) {
+    query += " AND cart_id <> ?";
+    params.push(Number(excludeCartId));
+  }
+
+  const [rows] = await conn.execute(query, params);
+  return rows.reduce(
+    (sum, row) => sum + Number(row.quantity || 0) * getPegMultiplierForType(row.type),
+    0
+  );
+};
 const getStockQuantity = async (conn, itemCode, categoryId = null) => {
   const normalizedCategory = categoryId == null ? null : Number(categoryId);
   if (normalizedCategory === 10) {
@@ -386,14 +409,14 @@ const replaceCartCustomization = async (conn, cartId, ingredients) => {
         lineTotal,
       ]
     );
-//     console.log("Inserting ingredient:", {
-//   cartId,
-//   itemCode: ingredient.itemCode,
-//   itemName: ingredient.itemName,
-//   quantity: ingredient.quantity,
-//   unitPrice: ingredient.unitPrice,
-//   lineTotal: lineTotal,
-// });
+    //     console.log("Inserting ingredient:", {
+    //   cartId,
+    //   itemCode: ingredient.itemCode,
+    //   itemName: ingredient.itemName,
+    //   quantity: ingredient.quantity,
+    //   unitPrice: ingredient.unitPrice,
+    //   lineTotal: lineTotal,
+    // });
   }
 };
 
@@ -586,46 +609,46 @@ const updateCartCustomization = async (cartId, userId, updates) => {
     // console.log("validateCustomizationStock", validateCustomizationStock)
     // console.log("ingredients", ingredients);
 
-//     console.log("Cart ID:", cartId);
-// console.log("User ID:", userId);
-// console.log("Ingredients received from UI:");
-// console.log(JSON.stringify(ingredients, null, 2));
-const ingredients = await normalizeCustomizationUpdates(conn, updates, cartQuantity);
-if (ingredients.length === 0) {
-  const error = new Error("A cocktail/mocktail must have at least one ingredient.");
-  error.status = 400;
-  throw error;
-}
+    //     console.log("Cart ID:", cartId);
+    // console.log("User ID:", userId);
+    // console.log("Ingredients received from UI:");
+    // console.log(JSON.stringify(ingredients, null, 2));
+    const ingredients = await normalizeCustomizationUpdates(conn, updates, cartQuantity);
+    if (ingredients.length === 0) {
+      const error = new Error("A cocktail/mocktail must have at least one ingredient.");
+      error.status = 400;
+      throw error;
+    }
 
-// Only re-validate ingredients whose required quantity is increasing vs. what's
-// already saved. This lets deletions and untouched out-of-stock ingredients
-// through without blocking the whole save.
-const [existingRows] = await conn.execute(
-  `SELECT ingredient_item_code, quantity FROM ${CUSTOMIZATION_TABLE} WHERE cart_id = ?`,
-  [cartId]
-);
-const existingQtyMap = existingRows.reduce((map, row) => {
-  map[String(row.ingredient_item_code)] = Number(row.quantity || 0);
-  return map;
-}, {});
+    // Only re-validate ingredients whose required quantity is increasing vs. what's
+    // already saved. This lets deletions and untouched out-of-stock ingredients
+    // through without blocking the whole save.
+    const [existingRows] = await conn.execute(
+      `SELECT ingredient_item_code, quantity FROM ${CUSTOMIZATION_TABLE} WHERE cart_id = ?`,
+      [cartId]
+    );
+    const existingQtyMap = existingRows.reduce((map, row) => {
+      map[String(row.ingredient_item_code)] = Number(row.quantity || 0);
+      return map;
+    }, {});
 
-const ingredientsNeedingValidation = ingredients.filter((ing) => {
-  const existingQty = existingQtyMap[String(ing.itemCode)];
-  if (existingQty === undefined) return true; // brand new ingredient — validate
-  return Number(ing.quantity) > existingQty;   // only validate real increases
-});
+    const ingredientsNeedingValidation = ingredients.filter((ing) => {
+      const existingQty = existingQtyMap[String(ing.itemCode)];
+      if (existingQty === undefined) return true; // brand new ingredient — validate
+      return Number(ing.quantity) > existingQty;   // only validate real increases
+    });
 
-if (ingredientsNeedingValidation.length > 0) {
-  await validateCustomizationStock(conn, ingredientsNeedingValidation, cartQuantity, userId, cartId);
-}
+    if (ingredientsNeedingValidation.length > 0) {
+      await validateCustomizationStock(conn, ingredientsNeedingValidation, cartQuantity, userId, cartId);
+    }
     await replaceCartCustomization(conn, cartId, ingredients);
 
-//     console.log("Saving ingredients into xxafmc_cart_customization table:");
-// ingredients.forEach((ing) => {
-//   console.log(
-//     `ItemCode=${ing.itemCode}, Name=${ing.itemName}, Qty=${ing.quantity}, UnitPrice=${ing.unitPrice}`
-//   );
-// });
+    //     console.log("Saving ingredients into xxafmc_cart_customization table:");
+    // ingredients.forEach((ing) => {
+    //   console.log(
+    //     `ItemCode=${ing.itemCode}, Name=${ing.itemName}, Qty=${ing.quantity}, UnitPrice=${ing.unitPrice}`
+    //   );
+    // });
 
 
 
@@ -710,13 +733,14 @@ const addCartItem = async (userId, itemData) => {
     }
 
     await conn.beginTransaction();
-  
+
 
     // -------------------------------
     // 1. VALIDATE MAIN ITEM STOCK
     // -------------------------------
     const reservedQty = await getOrderReservedQuantity(conn, resolvedItemCode);
-    const existingCartQty = isCocktailOrMocktail ? 0 : await getCartQuantity(conn, userId, resolvedItemCode, false);
+    // const existingCartQty = isCocktailOrMocktail ? 0 : await getCartQuantity(conn, userId, resolvedItemCode, false);
+    const existingCartQty = isCocktailOrMocktail ? 0 : await getCartPegWeightedQuantity(conn, userId, resolvedItemCode);
     const ingredientConsumptionQty = isCocktailOrMocktail ? 0 : await getCartIngredientConsumption(conn, userId, resolvedItemCode);
 
     let stockQty;
@@ -735,32 +759,38 @@ const addCartItem = async (userId, itemData) => {
 
     // For cocktails/mocktails, allow adding to cart even if ingredients are out of stock.
     // Users can adjust ingredients later via the cart edit flow, and stock will be validated at purchase time.
-    if (!isCocktailOrMocktail && existingCartQty + quantity + reservedQty + ingredientConsumptionQty > stockQty) {
+    // if (!isCocktailOrMocktail && existingCartQty + quantity + reservedQty + ingredientConsumptionQty > stockQty) {
+    //   const availableQty = Math.max(0, stockQty - reservedQty - existingCartQty - ingredientConsumptionQty);
+    //   throw createValidationError(`Out of stock. Available quantity: ${availableQty}`);
+    // }
+
+    const pegMultiplier = getPegMultiplierForType(type);
+    const requiredQty = quantity * pegMultiplier;
+    if (!isCocktailOrMocktail && existingCartQty + requiredQty + reservedQty + ingredientConsumptionQty > stockQty) {
       const availableQty = Math.max(0, stockQty - reservedQty - existingCartQty - ingredientConsumptionQty);
       throw createValidationError(`Out of stock. Available quantity: ${availableQty}`);
     }
-
     // -------------------------------
     // 2. CHECK EXISTING CART ITEM
     // -------------------------------
     const selectedType = String(type || "").trim();
-    // console.log("Selected type:", selectedType);
+    console.log("Selected type:", selectedType);
     const cartDescription = selectedType || "NA";
 
-    if (selectedType) {
-      const [differentTypeRows] = await conn.execute(
-        `SELECT cart_id, description FROM xxafmc_cart_items
-         WHERE user_id = ?
-           AND item_id = ?
-           AND price != 0
-           AND UPPER(IFNULL(description, '')) != UPPER(?)`,
-        [userId, resolvedItemCode, selectedType]
-      );
+    // if (selectedType) {
+    //   const [differentTypeRows] = await conn.execute(
+    //     `SELECT cart_id, description FROM xxafmc_cart_items
+    //      WHERE user_id = ?
+    //        AND item_id = ?
+    //        AND price != 0
+    //        AND UPPER(IFNULL(description, '')) != UPPER(?)`,
+    //     [userId, resolvedItemCode, selectedType]
+    //   );
 
-      if (differentTypeRows.length > 0) {
-        throw createValidationError("Item already added. Visit the cart to increase the quantity.");
-      }
-    }
+    //   if (differentTypeRows.length > 0) {
+    //     throw createValidationError("Item already added. Visit the cart to increase the quantity.");
+    //   }
+    // }
 
     const existingSql = selectedType
       ? `SELECT cart_id, quantity FROM xxafmc_cart_items
@@ -811,7 +841,7 @@ const addCartItem = async (userId, itemData) => {
         const customizedUnitPrice = Number(
           normalized.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0).toFixed(2)
         ) || Number(unit_price || 0);
-        
+
         await conn.execute(
           `UPDATE xxafmc_cart_items SET price = ?, total = ? * quantity WHERE cart_id = ?`,
           [customizedUnitPrice, customizedUnitPrice, insertId]
@@ -1139,6 +1169,7 @@ const updateCartItemQuantity = async (cartId, userId, quantity) => {
 
     const itemId = current[0].item_id;
     const isCocktailOrMocktail = isCocktailOrMocktailInfo(current[0]);
+    const pegMultiplier = getPegMultiplierForType(current[0].type);
 
     // -------------------------------
     // 2. VALIDATE MAIN ITEM STOCK ON QUANTITY CHANGE
@@ -1146,34 +1177,42 @@ const updateCartItemQuantity = async (cartId, userId, quantity) => {
     if (!isCocktailOrMocktail) {
       const stockQty = await getStockQuantity(conn, itemId, current[0].category_id);
       const reservedQty = await getOrderReservedQuantity(conn, itemId);
-      const otherDirectQty = await getCartQuantityExcludingCartId(conn, userId, itemId, false, cartId);
+      // const otherDirectQty = await getCartQuantityExcludingCartId(conn, userId, itemId, false, cartId);
+      const otherWeightedQty = await getCartPegWeightedQuantity(conn, userId, itemId, cartId);
+
       const ingredientConsumptionQty = await getCartIngredientConsumption(conn, userId, itemId, cartId);
 
-      if (quantity + otherDirectQty + reservedQty + ingredientConsumptionQty > stockQty) {
-        const availableQty = Math.max(0, stockQty - reservedQty - otherDirectQty - ingredientConsumptionQty);
+      // if (quantity + otherDirectQty + reservedQty + ingredientConsumptionQty > stockQty) {
+      //   const availableQty = Math.max(0, stockQty - reservedQty - otherDirectQty - ingredientConsumptionQty);
+      //   throw createValidationError(`Out of stock. Available quantity: ${availableQty}`);
+      // }
+
+      const requiredQty = quantity * pegMultiplier;
+      if (requiredQty + otherWeightedQty + reservedQty + ingredientConsumptionQty > stockQty) {
+        const availableQty = Math.max(0, stockQty - reservedQty - otherWeightedQty - ingredientConsumptionQty);
         throw createValidationError(`Out of stock. Available quantity: ${availableQty}`);
       }
     }
     if (isCocktailOrMocktail) {
 
-  const customization = await getCartCustomization(cartId, userId);
+      const customization = await getCartCustomization(cartId, userId);
 
-  const [[parentItem]] = await conn.execute(
-    `SELECT item_name
+      const [[parentItem]] = await conn.execute(
+        `SELECT item_name
      FROM xxafmc_inventory
      WHERE item_code = ?`,
-    [itemId]
-  );
+        [itemId]
+      );
 
-  const ingredientsWithParentName = customization.ingredients.map((ingredient) => ({
-    ...ingredient,
-    parentItemName: parentItem?.item_name || itemId
-  }));
+      const ingredientsWithParentName = customization.ingredients.map((ingredient) => ({
+        ...ingredient,
+        parentItemName: parentItem?.item_name || itemId
+      }));
 
-  if (ingredientsWithParentName.length > 0) {
-    await validateCustomizationStock(conn, ingredientsWithParentName, quantity, userId, cartId);
-  }
-}
+      if (ingredientsWithParentName.length > 0) {
+        await validateCustomizationStock(conn, ingredientsWithParentName, quantity, userId, cartId);
+      }
+    }
 
     // Update the main item quantity
     await conn.execute(
@@ -1390,8 +1429,8 @@ const getLovIngredients = async (subCategory) => {
 
     const normalizedSubCategory = Number(subCategory);
 
-   
-    const allowedSubCategories = 
+
+    const allowedSubCategories =
       normalizedSubCategory === 15
         ? [9, 6, 4, 18]
         : normalizedSubCategory === 14

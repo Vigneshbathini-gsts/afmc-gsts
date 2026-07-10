@@ -335,7 +335,7 @@ export default function CartPage({ isAttendant = false }) {
         const isCocktailItem = isCocktailOrMocktail(item);
         console.log(`Getting stock info for item ${item.cartId} (cocktail: ${isCocktailItem})`);
         const cocktailDetails = isCocktailItem ? cocktailDetailsByCartId[String(item.cartId)] : null;
-        
+
         const cocktailDetailsStockStatus = Array.isArray(cocktailDetails) && cocktailDetails.length > 0
             ? (
                 cocktailDetails.every((detail) => {
@@ -528,8 +528,8 @@ export default function CartPage({ isAttendant = false }) {
                         onClick={handleProceedToBuy}
                         disabled={cartItems.length === 0 || hasOutOfStockItem}
                         className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold text-white transition ${cartItems.length === 0 || hasOutOfStockItem
-                                ? "bg-gray-400 cursor-not-allowed"
-                                : "bg-red-700 hover:bg-red-800"
+                            ? "bg-gray-400 cursor-not-allowed"
+                            : "bg-red-700 hover:bg-red-800"
                             }`}
                     >
                         {toInitCap("Proceed to buy")}
@@ -650,7 +650,7 @@ export default function CartPage({ isAttendant = false }) {
                                 <h2 className="text-sm font-semibold text-gray-900 overflow-hidden text-ellipsis whitespace-nowrap">
                                     {toInitCap(item.itemName) || toInitCap("Unnamed Item")}
                                 </h2>
-                                {/* <h2>Type: {toInitCap(item.type)}</h2> */}
+                                <h2>Type: {toInitCap(item.type)}</h2>
 
                                 <p className="text-sm font-semibold text-gray-900 mt-1">
                                     {item.price ? `₹${Number(item.price).toFixed(2)}` : "Price not available"}

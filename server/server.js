@@ -80,12 +80,12 @@ app.use(
 
 const REQUEST_TIMEOUT_SECONDS = Number(process.env.REQUEST_TIMEOUT_SECONDS || 10);
 
-// ⏳ Global Gateway Request Timeouts
+//Global Gateway Request Timeouts
 app.use(timeout(`${REQUEST_TIMEOUT_SECONDS}s`));
 app.use(express.json());
 app.use(createNetworkGuardMiddleware());
 
-// ⏳ Timeout Halt Validator Middleware
+// Timeout Halt Validator Middleware
 const haltOnTimeout = (req, res, next) => {
   if (req.timedout) {
     if (!res.headersSent) {

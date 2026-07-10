@@ -600,24 +600,24 @@ export default function Pubmenubuy({
     );
   }, [items]);
 
- const cocktailStockIssue = useMemo(() => {
-  return (
-    items.find((item) => {
-      if (!isCocktailOrMocktail(item)) return false;
-      const itemCode = String(item?.item_code || "").trim();
-      const override = itemCode ? cocktailOverrideIssues?.[itemCode] : null;
-      return resolveCocktailOutOfStock(item, override);
-    }) || null
-  );
-}, [items, cocktailOverrideIssues]);
+  const cocktailStockIssue = useMemo(() => {
+    return (
+      items.find((item) => {
+        if (!isCocktailOrMocktail(item)) return false;
+        const itemCode = String(item?.item_code || "").trim();
+        const override = itemCode ? cocktailOverrideIssues?.[itemCode] : null;
+        return resolveCocktailOutOfStock(item, override);
+      }) || null
+    );
+  }, [items, cocktailOverrideIssues]);
 
   // Check if ANY item is out of stock (comprehensive check for button disabling)
   const hasAnyOutOfStockItem = useMemo(() => {
     if (!Array.isArray(items)) return false;
-    
+
     return items.some((item) => {
       if (item?.isFreeItem) return false; // Free items don't block confirm
-      
+
       // Check standard items
       if (!isCocktailOrMocktail(item)) {
         const multiplier = getItemPegMultiplier(item);
@@ -628,14 +628,14 @@ export default function Pubmenubuy({
         }
         return false;
       }
-      
+
       // Check cocktail items
       const itemCode = String(item?.item_code || "").trim();
       const override = itemCode ? cocktailOverrideIssues?.[itemCode] : null;
       if (resolveCocktailOutOfStock(item, override)) {
         return true;
       }
-      
+
       return false;
     });
   }, [items, cocktailOverrideIssues]);
@@ -1212,7 +1212,7 @@ export default function Pubmenubuy({
       const expectedFreeQty = calculateFreeQuantity(
         nextQtyCandidate,
         targetItem.offer_quantity,
-        targetItem.free_item_quantity      );
+        targetItem.free_item_quantity);
 
       const targetCode = String(targetItem.item_code || "").trim();
       const linkedFreeItems = targetCode
@@ -1367,12 +1367,12 @@ export default function Pubmenubuy({
       const normalized = rows.map((item, index) => normalizeItem(item, index));
       setItems(ensureOfferFreeRows(normalized));
       setError("");
-      
+
       // ✅ SUCCESS TOAST FOR QUANTITY UPDATE
       const action = delta > 0 ? "increased" : "decreased";
       const itemName = items.find((item) => item.orderLineId === numericOrderLineId)?.item_name || "Item";
       showToast(`${itemName} quantity ${action} to ${nextQuantity}`, "success");
-      
+
       console.debug("[Pubmenubuy] quantity update completed", { orderNumber, orderLineId: numericOrderLineId, nextQuantity });
       await syncFreeItemQuantities();
     } catch (updateError) {
@@ -1757,7 +1757,7 @@ export default function Pubmenubuy({
         const override = itemCode ? cocktailOverrideIssues?.[itemCode] : null;
         return resolveCocktailOutOfStock(item, override);
       });
-      
+
       if (itemWithIssue) {
         const errorMsg = itemWithIssue?.stockIssueMessage || "Item is out of stock. Please adjust your order.";
         setError(errorMsg);
@@ -1862,15 +1862,7 @@ export default function Pubmenubuy({
         setError("");
         showTemporaryStockMessage(errorMessage);
         showToast(errorMessage, "error");
-        console.debug("[Pubmenubuy] Stock validation prevented confirm - order state unchanged");
-        // Deliberately do NOT refresh the order summary here. A rejected
-        // confirm should be a pure no-op — the cart/order the person sees
-        // was already accurate before they clicked Confirm. Re-fetching
-        // immediately after a failed confirm can momentarily reflect a
-        // partially-applied state on the server, which makes items appear
-        // to vanish until a later reload corrects it. Leaving `items` as-is
-        // keeps the UI stable and matches what actually happened: nothing
-        // was confirmed, so nothing should change on screen.
+
       } else {
         setError(errorMessage);
         showToast(errorMessage, "error");
@@ -1955,29 +1947,29 @@ export default function Pubmenubuy({
           </div>
 
           {/* Summary */}
-         <div className="grid gap-3 border-t border-stone-200 bg-white p-4 grid-cols-2 md:grid-cols-3">
-    <div className="rounded-xl border border-stone-200 bg-white p-3">
-        <p className="text-xs text-stone-500">{toInitCap("Order Number")}</p>
-        <h3 className="mt-1 text-xl font-semibold text-stone-900">
-            {orderHeader?.order_num || orderNumber}
-        </h3>
-    </div>
+          <div className="grid gap-3 border-t border-stone-200 bg-white p-4 grid-cols-2 md:grid-cols-3">
+            <div className="rounded-xl border border-stone-200 bg-white p-3">
+              <p className="text-xs text-stone-500">{toInitCap("Order Number")}</p>
+              <h3 className="mt-1 text-xl font-semibold text-stone-900">
+                {orderHeader?.order_num || orderNumber}
+              </h3>
+            </div>
 
-    <div className="rounded-xl border border-stone-200 bg-white p-3">
-        <p className="text-xs text-stone-500">{toInitCap("Order Date")}</p>
-        <h3 className="mt-1 text-xl font-semibold text-stone-900">
-            {formatDate(orderHeader?.order_date)}
-        </h3>
-    </div>
+            <div className="rounded-xl border border-stone-200 bg-white p-3">
+              <p className="text-xs text-stone-500">{toInitCap("Order Date")}</p>
+              <h3 className="mt-1 text-xl font-semibold text-stone-900">
+                {formatDate(orderHeader?.order_date)}
+              </h3>
+            </div>
 
-    <div className="rounded-xl border border-afmc-gold/20 bg-gradient-to-br from-white to-afmc-gold/5 p-3 col-span-2 md:col-span-1 md:col-start-3">
-        <p className="text-xs text-stone-500">{toInitCap("Items")}</p>
-        <h3 className="mt-1 text-xl font-semibold text-afmc-maroon">
-            {items.filter((row) => Number(row?.quantity || 0) > 0).length}
-        </h3>
-        <p className="mt-0.5 text-xs text-stone-500">{toInitCap("Review before confirm")}</p>
-    </div>
-</div>
+            <div className="rounded-xl border border-afmc-gold/20 bg-gradient-to-br from-white to-afmc-gold/5 p-3 col-span-2 md:col-span-1 md:col-start-3">
+              <p className="text-xs text-stone-500">{toInitCap("Items")}</p>
+              <h3 className="mt-1 text-xl font-semibold text-afmc-maroon">
+                {items.filter((row) => Number(row?.quantity || 0) > 0).length}
+              </h3>
+              <p className="mt-0.5 text-xs text-stone-500">{toInitCap("Review before confirm")}</p>
+            </div>
+          </div>
         </div>
 
         {/* Content */}
@@ -2008,21 +2000,21 @@ export default function Pubmenubuy({
                     const missingCocktailIngredients = hasMissingCocktailIngredients(orderNumber, item, cocktailDetailsByItemCode);
                     const isCocktailItem = isCocktailOrMocktail(item);
                     const cocktailOverride = isCocktailItem ? getCocktailOverrideForItem(item) : null;
-                    
+
                     // Determine if the item is out of stock based on current availableQuantity vs requested quantity
-                                    const itemMultiplier = getItemPegMultiplier(item);
+                    const itemMultiplier = getItemPegMultiplier(item);
                     const isStandardOutOfStock =
                       !isCocktailItem && !item.isFreeItem && item.availableQuantity !== null &&
                       Number(item.quantity) * itemMultiplier > Number(item.availableQuantity);
-                   const isCardOutOfStock =
-  isCocktailItem
-    ? resolveCocktailOutOfStock(item, cocktailOverride)
-    : Boolean(isStandardOutOfStock || Number(item.availableQuantity) === 0);
-                    
+                    const isCardOutOfStock =
+                      isCocktailItem
+                        ? resolveCocktailOutOfStock(item, cocktailOverride)
+                        : Boolean(isStandardOutOfStock || Number(item.availableQuantity) === 0);
+
                     const imageStockMessage = isCocktailItem
                       ? (isCardOutOfStock ? "Out of Stock" : "")
                       : (isStandardOutOfStock || Number(item.availableQuantity) === 0 ? "Out of Stock" : "");
-                      
+
                     const disablePlusForStock =
                       isCocktailItem
                         ? (() => {
@@ -2089,11 +2081,11 @@ export default function Pubmenubuy({
                             {isCocktailOrMocktail(item) && (() => {
                               const itemCode = String(item?.item_code || "").trim();
                               const override = itemCode ? cocktailOverrideIssues?.[itemCode] : null;
-                             const statusText = isCocktailOrMocktail(item)
-  ? (resolveCocktailOutOfStock(item, cocktailOverrideIssues?.[String(item?.item_code || "").trim()])
-      ? "Out Of Stock"
-      : "In Stock")
-  : "";
+                              const statusText = isCocktailOrMocktail(item)
+                                ? (resolveCocktailOutOfStock(item, cocktailOverrideIssues?.[String(item?.item_code || "").trim()])
+                                  ? "Out Of Stock"
+                                  : "In Stock")
+                                : "";
 
                               if (!statusText || missingCocktailIngredients) return null;
 
@@ -2236,41 +2228,41 @@ export default function Pubmenubuy({
       </div>
 
       {confirmModal.open && (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6">
-        <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl ring-1 ring-black/10">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6">
+          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl ring-1 ring-black/10">
             <div className="flex items-start justify-between gap-4">
-                <div>
-                    <h3 className="text-lg font-semibold text-slate-900">{confirmModal.title}</h3>
-                    <p className="mt-2 text-sm leading-6 text-slate-600">{confirmModal.text}</p>
-                </div>
-                <button
-                    type="button"
-                    onClick={() => closeConfirmModal(false)}
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:bg-slate-50"
-                    aria-label="Close"
-                >
-                    ×
-                </button>
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900">{confirmModal.title}</h3>
+                <p className="mt-2 text-sm leading-6 text-slate-600">{confirmModal.text}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => closeConfirmModal(false)}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:bg-slate-50"
+                aria-label="Close"
+              >
+                ×
+              </button>
             </div>
             <div className="mt-6 flex flex-row gap-3 justify-end">
-                <button
-                    type="button"
-                    onClick={() => closeConfirmModal(false)}
-                    className="flex-1 sm:flex-none inline-flex justify-center rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-                >
-                    {confirmModal.cancelText}
-                </button>
-                <button
-                    type="button"
-                    onClick={() => closeConfirmModal(true)}
-                    className="flex-1 sm:flex-none inline-flex justify-center rounded-full bg-afmc-maroon px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-afmc-maroon2"
-                >
-                    {confirmModal.confirmText}
-                </button>
+              <button
+                type="button"
+                onClick={() => closeConfirmModal(false)}
+                className="flex-1 sm:flex-none inline-flex justify-center rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                {confirmModal.cancelText}
+              </button>
+              <button
+                type="button"
+                onClick={() => closeConfirmModal(true)}
+                className="flex-1 sm:flex-none inline-flex justify-center rounded-full bg-afmc-maroon px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-afmc-maroon2"
+              >
+                {confirmModal.confirmText}
+              </button>
             </div>
+          </div>
         </div>
-    </div>
-)}
+      )}
     </div>
   );
 }

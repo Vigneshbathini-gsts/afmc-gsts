@@ -188,7 +188,8 @@ async function validateScansBeforeComplete(connection, req, orderNumber, kitchen
       SUM(COALESCE(xod.quantity, 0)) AS quantity,
       MAX(xod.subcategory) AS subcategory,
       xod.type,
-      MAX(inv.item_name) AS item_name
+      MAX(inv.item_name) AS item_name,
+      GROUP_CONCAT(xod.order_line_id) AS order_line_ids
     FROM xxafmc_order_details xod
     JOIN (${inventorySummarySql}) inv
       ON inv.item_code = xod.item_id
@@ -211,10 +212,20 @@ async function validateScansBeforeComplete(connection, req, orderNumber, kitchen
     if (![14, 15].includes(subcategory)) {
       const pegMultiplier = String(row.type || "").trim().toUpperCase() === "LARGE" ? 2 : 1;
       const expected = Number(row.quantity || 0) * pegMultiplier;
+
+      const orderLineIds = String(row.order_line_ids || "")
+        .split(",")
+        .map((id) => id.trim())
+        .filter(Boolean);
+
       const scanned = scannedQty(
         (item) =>
           sameCode(item.itemCode, parentItem) &&
-          sameCode(item.parentItem || item.itemCode, parentItem)
+          sameCode(item.parentItem || item.itemCode, parentItem) &&
+          // Match on the specific order line so that two lines for the same
+          // item (e.g. Large vs Small) don't count each other's scans.
+          (orderLineIds.length === 0 ||
+            orderLineIds.some((id) => sameCode(item.orderLineId, id)))
       );
 
       if (scanned !== expected) {
