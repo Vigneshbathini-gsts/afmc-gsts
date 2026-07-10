@@ -134,7 +134,9 @@ export default function Login() {
         password,
         outletType,
       });
+      
       console.log("Login response:", response.data.redirectPath);
+      
       if (response.data?.success) {
         // Handle remember me - store email and token
         if (rememberMe) {
@@ -155,15 +157,27 @@ export default function Login() {
       setError(response.data?.message || "Login failed");
     } catch (err) {
       console.error("Login error:", err);
-      setError(
-        err.response?.data?.message ||
-        err.response?.data?.error ||
-        "Login failed. Please check your credentials."
-      );
+
+      //  NETWORK ERROR FILTER CHAIN
+      if (err.message === "NETWORK_DISCONNECTED") {
+        setError(" Device is offline. Please check your internet connection.");
+      } else if (err.message === "NETWORK_TIMEOUT") {
+        setError(" Connection timed out. The server is taking too long to respond.");
+      } else if (err.code === "ERR_NETWORK" || !err.response) {
+        setError(" Network connection error. Unable to reach the authentication server.");
+      } else {
+        // Fallback to checking credential records only if the server sent an explicit response
+        setError(
+          err.response?.data?.message ||
+          err.response?.data?.error ||
+          "Login failed. Please check your credentials."
+        );
+      }
     } finally {
       setLoading(false);
     }
   };
+
 
   const getEmailError = () => {
     if (!touched.email) return "";

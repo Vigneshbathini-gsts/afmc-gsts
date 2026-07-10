@@ -11,7 +11,6 @@ const createValidationError = (message) => {
 
 const getStockQuantity = async (conn, itemCode, categoryId = null) => {
   const normalizedCategory = categoryId == null ? null : Number(categoryId);
-
   if (normalizedCategory === 10) {
     const [[stockRow]] = await conn.execute(
       `SELECT IFNULL(SUM(STOCK_QUANTITY), 0) AS stock
@@ -446,17 +445,6 @@ const getIngredientStockQuantities = async (conn, itemCodes) => {
   if (normalizedCodes.length === 0) return {};
 
   const placeholders = normalizedCodes.map(() => "?").join(",");
-  // Prefer `xxafmc_inventory.stock_quantity` when available, otherwise fall back to `xxafmc_stock_out` sum.
-  const [invRows] = await conn.execute(
-    `SELECT item_code, IFNULL(stock_quantity, 0) AS stock_quantity
-     FROM xxafmc_inventory
-     WHERE item_code IN (${placeholders})`,
-    normalizedCodes
-  );
-  const inventoryMap = invRows.reduce((map, row) => {
-    map[String(row.item_code)] = Number(row.stock_quantity || 0);
-    return map;
-  }, {});
 
   const [stockOutRows] = await conn.execute(
     `SELECT item_code, IFNULL(SUM(stock_quantity), 0) AS stock_quantity
@@ -465,18 +453,12 @@ const getIngredientStockQuantities = async (conn, itemCodes) => {
      GROUP BY item_code`,
     normalizedCodes
   );
-  const stockOutMap = stockOutRows.reduce((map, row) => {
+
+  return stockOutRows.reduce((map, row) => {
     map[String(row.item_code)] = Number(row.stock_quantity || 0);
     return map;
   }, {});
-
-  return normalizedCodes.reduce((map, code) => {
-    const key = String(code);
-    map[key] = Math.max(Number(inventoryMap[key] || 0), Number(stockOutMap[key] || 0));
-    return map;
-  }, {});
 };
-
 const getIngredientReservedQuantities = async (conn, itemCodes) => {
   const normalizedCodes = [...new Set((Array.isArray(itemCodes) ? itemCodes : [])
     .map((code) => Number(code))
@@ -762,7 +744,7 @@ const addCartItem = async (userId, itemData) => {
     // 2. CHECK EXISTING CART ITEM
     // -------------------------------
     const selectedType = String(type || "").trim();
-    console.log("Selected type:", selectedType);
+    // console.log("Selected type:", selectedType);
     const cartDescription = selectedType || "NA";
 
     if (selectedType) {
@@ -945,6 +927,7 @@ const addCartItem = async (userId, itemData) => {
 };
 
 const getCartItemsByUser = async (userId) => {
+
   await ensureCustomizationTable(db);
   const sql = `
     SELECT
@@ -989,6 +972,7 @@ const getCartItemsByUser = async (userId) => {
   `;
 
   const [rows] = await db.execute(sql, [userId]);
+
 
   const itemCodes = [...new Set(
     rows.map((r) => Number(r.item_code)).filter((code) => Number.isFinite(code) && code > 0)

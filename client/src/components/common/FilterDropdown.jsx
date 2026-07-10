@@ -19,6 +19,7 @@ export default function FilterDropdown({
   valueClassName = "",
   usePortal = false,
   onMenuScroll,
+  onSearchChange,
   hasMore = false,
   loadingMore = false,
   menuWidth = null,
@@ -162,7 +163,11 @@ export default function FilterDropdown({
           <input
             type="text"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              const nextQuery = e.target.value;
+              setQuery(nextQuery);
+              onSearchChange?.(nextQuery);
+            }}
             placeholder="Search"
             className="w-full bg-transparent text-sm text-gray-800 outline-none placeholder:text-gray-400"
             autoFocus

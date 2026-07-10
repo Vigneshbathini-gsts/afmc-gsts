@@ -22,6 +22,39 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [cartCount, setCartCount] = useState(0);
+  
+  //  NEW: Global Network States
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [isSlow, setIsSlow] = useState(false);
+
+  //  NEW: Handle Network Event Listeners
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => {
+      setIsOnline(false);
+      setIsSlow(false); // Reset slow flag if fully offline
+    };
+
+    const handleSlowNetworkEvent = () => {
+      setIsSlow(true);
+      setTimeout(() => setIsSlow(false), 5000); // Auto-hide slow banner after 5s
+    };
+
+    // Native browser connection hooks
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    // Custom hooks bound to your Axios file events
+    window.addEventListener('app-network-offline', handleOffline);
+    window.addEventListener('app-network-slow', handleSlowNetworkEvent);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('app-network-offline', handleOffline);
+      window.removeEventListener('app-network-slow', handleSlowNetworkEvent);
+    };
+  }, []);
 
   const fetchCartCount = async (userId) => {
     if (!userId) {
@@ -94,9 +127,19 @@ export function AuthProvider({ children }) {
     setIsLoading(false);
   };
 
+  //  NEW: Added isOnline and isSlow variables to the Memoized values
   const value = useMemo(
-    () => ({ user, isLoading, setUser: setAuthenticatedUser, clearUser, cartCount, setCartCount }),
-    [user, isLoading, cartCount]
+    () => ({ 
+      user, 
+      isLoading, 
+      setUser: setAuthenticatedUser, 
+      clearUser, 
+      cartCount, 
+      setCartCount,
+      isOnline, 
+      isSlow 
+    }),
+    [user, isLoading, cartCount, isOnline, isSlow]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -1,6 +1,7 @@
 // axios instance goes here
 import axios from "axios";
 import { clearAuthData, getToken } from "../utils/authStorage";
+import axiosRetry from "axios-retry";
 
 const clearOrderHistoryFilters = () => {
   try {
@@ -43,10 +44,35 @@ const API = API_BASE_URL;
 
 const api = axios.create({
   baseURL: API,
+  timeout: 8000,
   headers: {
     "Content-Type": "application/json",
   },
   withCredentials: true,
+});
+
+const dispatchNetworkEvent = (type) => {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(type));
+  }
+};
+
+const isBackendNetworkError = (err) => {
+  const code = err?.response?.data?.code;
+  return code === "NETWORK_ERROR" || code === "GATEWAY_TIMEOUT";
+};
+
+// Configure automatic retries with Exponential Backoff
+axiosRetry(api, {
+  retries: 3, 
+  retryCondition: (error) => {
+    // Retries 5xx errors or generic network dropouts/timeouts
+    return axiosRetry.isNetworkOrIdempotentRequestError(error) || error.response?.status >= 500;
+  },
+  retryDelay: (retryCount) => {
+    console.log(`⏱️ Network slow. Retry attempt #${retryCount}...`);
+    return retryCount * 2000; 
+  },
 });
 
 // ================================
@@ -64,11 +90,38 @@ api.interceptors.request.use(
 );
 
 // ================================
-// Handle unauthorized automatically
+// Handle errors, network drops, and auth automatically
 // ================================
 api.interceptors.response.use(
   (res) => res,
   (err) => {
+    // 1. HANDLE COMPLETE DISCONNECTION
+    // This triggers if the browser is entirely offline
+    if (!navigator.onLine) {
+      console.error(" Device is offline.");
+      //  Dispatch native event to tell AuthContext/App.js to trigger the Offline Toast
+      window.dispatchEvent(new CustomEvent('app-network-offline'));
+      return Promise.reject(new Error("NETWORK_DISCONNECTED"));
+    }
+
+    // 2. HANDLE TIMEOUT / SLOW NETWORK (After all retries failed)
+    if (err.code === 'ECONNABORTED' || err.message.includes('timeout')) {
+      console.error(" Request timed out after retries due to a slow connection.");
+      dispatchNetworkEvent('app-network-slow');
+      return Promise.reject(new Error("NETWORK_TIMEOUT"));
+    }
+
+    if (isBackendNetworkError(err)) {
+      const code = err.response?.data?.code;
+      if (code === "GATEWAY_TIMEOUT") {
+        dispatchNetworkEvent('app-network-slow');
+      } else if (code === "NETWORK_ERROR") {
+        dispatchNetworkEvent('app-network-offline');
+      }
+      return Promise.reject(new Error(code));
+    }
+
+    // 3. HANDLE SPECIFIC SERVER STATUS CODES (Your existing logic remains completely intact)
     if (
       err.response?.status === 403 &&
       err.response?.data?.code === "BAR_CLOSED" &&
@@ -81,14 +134,15 @@ api.interceptors.response.use(
       err.response?.status === 401 &&
       !window.location.pathname.includes("/login")
     ) {
-      // Clear all authentication data when 401 Unauthorized is received
       clearAuthData();
       clearOrderHistoryFilters();
       window.location.href = "/login";
     }
+
     return Promise.reject(err);
   }
 );
+
 
 // ================================
 // Auth-aware fetch helper (for legacy fetch usage)

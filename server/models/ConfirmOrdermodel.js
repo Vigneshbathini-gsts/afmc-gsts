@@ -21,20 +21,6 @@ async function getIngredientStockQuantities(connection, ingredientCodes) {
   if (normalizedCodes.length === 0) return {};
 
   const placeholders = normalizedCodes.map(() => "?").join(",");
-  const [invRows] = await connection.execute(
-    `
-      SELECT item_code, IFNULL(stock_quantity, 0) AS stock_quantity
-      FROM xxafmc_inventory
-      WHERE item_code IN (${placeholders})
-    `,
-    normalizedCodes
-  );
-
-  const inventoryMap = invRows.reduce((acc, row) => {
-    acc[String(row.item_code)] = Number(row.stock_quantity || 0);
-    return acc;
-  }, {});
-
   const [stockOutRows] = await connection.execute(
     `
       SELECT item_code, IFNULL(SUM(stock_quantity), 0) AS stock_quantity
@@ -45,14 +31,8 @@ async function getIngredientStockQuantities(connection, ingredientCodes) {
     normalizedCodes
   );
 
-  const stockOutMap = stockOutRows.reduce((acc, row) => {
+  return stockOutRows.reduce((acc, row) => {
     acc[String(row.item_code)] = Number(row.stock_quantity || 0);
-    return acc;
-  }, {});
-
-  return normalizedCodes.reduce((acc, code) => {
-    const key = String(code);
-    acc[key] = Math.max(Number(inventoryMap[key] || 0), Number(stockOutMap[key] || 0));
     return acc;
   }, {});
 }
@@ -994,14 +974,7 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
         const stockQuantity = Number(row.stock_quantity || 0);
         const reservedQuantity = Number(reservedMap[String(row.item_id)] || 0);
 
-        console.log({
-          item: row.item_name,
-          item_id: row.item_id,
-          orderQty: row.quantity,
-          stockQuantity,
-          reservedQuantity,
-          available: stockQuantity - reservedQuantity
-        });
+       
       });
       // console.log("FINAL detailRows BEFORE STOCK CHECK");
       // console.log("FINAL detailRows", JSON.stringify(detailRows, null, 2));

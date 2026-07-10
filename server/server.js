@@ -4,7 +4,9 @@ const dotenv = require("dotenv");
 const path = require("path");
 const session = require("express-session");
 const MySQLSession = require("express-mysql-session");
+const timeout = require("connect-timeout");
 const upload = require("./utils/uploadMiddleware");
+const { createNetworkGuardMiddleware, isNetworkError, buildRetryableErrorResponse } = require("./utils/asyncHandler");
 
 dotenv.config();
 
@@ -75,14 +77,37 @@ app.use(
     credentials: true,
   })
 );
+
+const REQUEST_TIMEOUT_SECONDS = Number(process.env.REQUEST_TIMEOUT_SECONDS || 10);
+
+// ⏳ Global Gateway Request Timeouts
+app.use(timeout(`${REQUEST_TIMEOUT_SECONDS}s`));
 app.use(express.json());
+app.use(createNetworkGuardMiddleware());
+
+// ⏳ Timeout Halt Validator Middleware
+const haltOnTimeout = (req, res, next) => {
+  if (req.timedout) {
+    if (!res.headersSent) {
+      return res.status(503).json({
+        success: false,
+        message: "The request took too long. Please retry.",
+        code: "GATEWAY_TIMEOUT",
+      });
+    }
+    return;
+  }
+
+  next();
+};
+
 app.use("/uploads", express.static(upload.uploadPath));
 app.use(`${BASE_PATH}/uploads`, express.static(upload.uploadPath));
 
-app.get("/", (req, res) => {
+app.get("/", haltOnTimeout, (req, res) => {
   res.json({ status: "Server is running", basePath: BASE_PATH, apiBasePath: API_BASE_PATH });
 });
-app.get(BASE_PATH, (req, res) => {
+app.get(BASE_PATH, haltOnTimeout, (req, res) => {
   res.json({ status: "Server is running", basePath: BASE_PATH, apiBasePath: API_BASE_PATH });
 });
 
@@ -108,37 +133,51 @@ const InvoiceReportroute = require("./modules/invoice-report/InvoiceReportroute"
 const orderHistoryRoutes = require("./routes/orderHistoryRoutes");
 const paymentRoutes = require("./modules/payment/paymentRoutes");
 const orderEvents = require("./utils/orderEvents");
-const barStatusRoutes = require("./routes/BarStatusRoutes")
+const barStatusRoutes = require("./routes/BarStatusRoutes");
 
 const apiPrefixes = ["/api", API_BASE_PATH];
 for (const prefix of apiPrefixes) {
-  app.use(`${prefix}/auth`, authRoutes);
-  app.use(`${prefix}/reports`, reportRoutes);
-  app.use(`${prefix}/cocktails`, cocktailRoutes);
-  app.use(`${prefix}/users`, userRoutes);
-  app.use(`${prefix}/orders`, orderRoutes);
-  app.use(`${prefix}/bar-orders`, KitchenOrdersRoutes);
-  app.use(`${prefix}/collection`, collectionRoutes);
-  app.use(`${prefix}/price`, priceRoutes);
-  app.use(`${prefix}/offers`, offerRoutes);
-  app.use(`${prefix}/inventory`, inventoryRoutes);
-  app.use(`${prefix}/cart`, cartRoutes);
-  app.use(`${prefix}/profit`, profitRoutes);
-  app.use(`${prefix}/notifications`, notificationRoutes);
-  app.use(`${prefix}/cancelled-orders`, cancelledOrdersRoutes);
-  // End-user + attendant menu endpoints (e.g. GET {API_BASE_URL}/menubar)
-  app.use(prefix, menuRoutesbeer);
-  app.use(prefix, Pubmenubuyroutes);
-  app.use(prefix, ConfirmOrderroutes);
-  app.use(`${prefix}/invoice`, invoiceRoutes);
-  app.use(`${prefix}/invoice-report`, InvoiceReportroute);
-  app.use(`${prefix}/order-history`, orderHistoryRoutes);
-  app.use(`${prefix}/payment`, paymentRoutes);
+  // Attached haltOnTimeout guard specifically before custom app business endpoints
+  app.use(`${prefix}/auth`, haltOnTimeout, authRoutes);
+  app.use(`${prefix}/reports`, haltOnTimeout, reportRoutes);
+  app.use(`${prefix}/cocktails`, haltOnTimeout, cocktailRoutes);
+  app.use(`${prefix}/users`, haltOnTimeout, userRoutes);
+  app.use(`${prefix}/orders`, haltOnTimeout, orderRoutes);
+  app.use(`${prefix}/bar-orders`, haltOnTimeout, KitchenOrdersRoutes);
+  app.use(`${prefix}/collection`, haltOnTimeout, collectionRoutes);
+  app.use(`${prefix}/price`, haltOnTimeout, priceRoutes);
+  app.use(`${prefix}/offers`, haltOnTimeout, offerRoutes);
+  app.use(`${prefix}/inventory`, haltOnTimeout, inventoryRoutes);
+  app.use(`${prefix}/cart`, haltOnTimeout, cartRoutes);
+  app.use(`${prefix}/profit`, haltOnTimeout, profitRoutes);
+  app.use(`${prefix}/notifications`, haltOnTimeout, notificationRoutes);
+  app.use(`${prefix}/cancelled-orders`, haltOnTimeout, cancelledOrdersRoutes);
+  
+  app.use(prefix, haltOnTimeout, menuRoutesbeer);
+  app.use(prefix, haltOnTimeout, Pubmenubuyroutes);
+  app.use(prefix, haltOnTimeout, ConfirmOrderroutes);
+  app.use(`${prefix}/invoice`, haltOnTimeout, invoiceRoutes);
+  app.use(`${prefix}/invoice-report`, haltOnTimeout, InvoiceReportroute);
+  app.use(`${prefix}/order-history`, haltOnTimeout, orderHistoryRoutes);
+  app.use(`${prefix}/payment`, haltOnTimeout, paymentRoutes);
   app.get(`${prefix}/order-events`, orderEvents.authenticateEventRequest, orderEvents.subscribe);
-  app.use(`${prefix}/bar-status`, barStatusRoutes);
+  app.use(`${prefix}/bar-status`, haltOnTimeout, barStatusRoutes);
 }
 
+// Global Custom Error Middleware (Catches timeout exceptions and file rules)
 app.use((err, req, res, next) => {
+  if (req.timedout || err?.timeout || err?.code === "ETIMEDOUT") {
+    return res.status(503).json({
+      success: false,
+      message: "The request took too long. Please retry.",
+      code: "GATEWAY_TIMEOUT",
+    });
+  }
+
+  if (isNetworkError(err)) {
+    return res.status(503).json(buildRetryableErrorResponse(err));
+  }
+
   if (!err) return next();
 
   const message = err.code === "LIMIT_FILE_SIZE"
@@ -150,5 +189,3 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
-
-

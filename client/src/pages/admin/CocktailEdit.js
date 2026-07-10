@@ -40,7 +40,8 @@ export default function CocktailEdit() {
   const [ingredientPage, setIngredientPage] = useState(0);
   const [ingredientHasMore, setIngredientHasMore] = useState(true);
   const [ingredientsLoadingMore, setIngredientsLoadingMore] = useState(false);
-  const ingredientRequestInFlight = useRef(false);
+  const [ingredientSearch, setIngredientSearch] = useState("");
+  const ingredientRequestIdRef = useRef(0);
   const [form, setForm] = useState({
     itemName: "",
     subCategory: "",
@@ -54,35 +55,58 @@ export default function CocktailEdit() {
   });
   const [rows, setRows] = useState([createEmptyRow()]);
 
-  const fetchIngredientOptions = useCallback(async ({ reset = true, nextPage = 0 } = {}) => {
-      if (ingredientRequestInFlight.current) return;
-      ingredientRequestInFlight.current = true;
+  // Fetches a single page of ingredient options, filtered by `query` on the
+  // backend (real search: matches ITEM_NAME or ITEM_CODE server-side).
+  const fetchIngredientOptions = useCallback(async ({ reset = true, nextPage = 0, query = "" } = {}) => {
+      const requestId = ++ingredientRequestIdRef.current;
+      if (!reset) setIngredientsLoadingMore(true);
       try {
-        if (!reset) setIngredientsLoadingMore(true);
-        const response = await cocktailAPI.getIngredientOptions("", {
+        const response = await cocktailAPI.getIngredientOptions(query, {
           limit: INGREDIENT_PAGE_SIZE,
           offset: nextPage * INGREDIENT_PAGE_SIZE,
         });
+
+        // Ignore this result if a newer search/page request has since started
+        // (prevents an older, slower response from overwriting fresher results).
+        if (requestId !== ingredientRequestIdRef.current) return;
+
         const rows = response.data?.data || [];
         setIngredientOptions((current) => (reset ? rows : [...current, ...rows]));
         setIngredientPage(nextPage + 1);
         setIngredientHasMore(rows.length === INGREDIENT_PAGE_SIZE);
       } catch (fetchError) {
+        if (requestId !== ingredientRequestIdRef.current) return;
         console.error(fetchError);
         setIngredientHasMore(false);
       } finally {
-        ingredientRequestInFlight.current = false;
-        setIngredientsLoadingMore(false);
+        if (requestId === ingredientRequestIdRef.current) {
+          setIngredientsLoadingMore(false);
+        }
       }
     }, []);
 
+  // Initial load: first page, no search term.
   useEffect(() => {
-    fetchIngredientOptions({ reset: true, nextPage: 0 });
-  }, [fetchIngredientOptions]);
+    fetchIngredientOptions({ reset: true, nextPage: 0, query: "" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Debounce what the user types in the dropdown's own search box, then ask
+  // the backend for matching items directly — no scrolling needed to find them.
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      fetchIngredientOptions({ reset: true, nextPage: 0, query: ingredientSearch });
+    }, 300);
+    return () => clearTimeout(handle);
+  }, [ingredientSearch, fetchIngredientOptions]);
+
+  const handleIngredientSearchChange = useCallback((nextQuery) => {
+    setIngredientSearch(nextQuery);
+  }, []);
 
   const handleIngredientMenuScroll = useCallback(() => {
-    fetchIngredientOptions({ reset: false, nextPage: ingredientPage });
-  }, [fetchIngredientOptions, ingredientPage]);
+    fetchIngredientOptions({ reset: false, nextPage: ingredientPage, query: ingredientSearch });
+  }, [fetchIngredientOptions, ingredientPage, ingredientSearch]);
 
   const updateField = (field, value) => {
     setForm((current) => ({ ...current, [field]: value }));
@@ -633,6 +657,7 @@ return (
                             usePortal
                             menuWidth={250}
                             onMenuScroll={handleIngredientMenuScroll}
+                            onSearchChange={handleIngredientSearchChange}
                             hasMore={ingredientHasMore}
                             loadingMore={ingredientsLoadingMore}
                           />
