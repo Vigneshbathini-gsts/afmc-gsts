@@ -43,6 +43,7 @@ export default function CocktailCreate() {
   const [ingredientPage, setIngredientPage] = useState(0);
   const [ingredientHasMore, setIngredientHasMore] = useState(true);
   const [ingredientsLoadingMore, setIngredientsLoadingMore] = useState(false);
+  const [ingredientsLoading, setIngredientsLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -84,6 +85,7 @@ export default function CocktailCreate() {
   const fetchIngredientOptions = useCallback(async ({ reset = true, nextPage = 0, query = "" } = {}) => {
       const requestId = ++ingredientRequestIdRef.current;
       if (!reset) setIngredientsLoadingMore(true);
+      else setIngredientsLoading(true);
       try {
         const response = await cocktailAPI.getIngredientOptions(query, {
           limit: INGREDIENT_PAGE_SIZE,
@@ -105,6 +107,7 @@ export default function CocktailCreate() {
       } finally {
         if (requestId === ingredientRequestIdRef.current) {
           setIngredientsLoadingMore(false);
+          setIngredientsLoading(false);
         }
       }
     }, []);
@@ -126,6 +129,7 @@ export default function CocktailCreate() {
 
   const handleIngredientSearchChange = useCallback((nextQuery) => {
     setIngredientSearch(nextQuery);
+    setIngredientsLoading(true);
   }, []);
 
   const handleIngredientMenuScroll = useCallback(() => {
@@ -318,6 +322,38 @@ export default function CocktailCreate() {
       label: `${String(opt.ITEM_CODE ?? "").trim()} - ${toInitCap(opt.ITEM_NAME)}`,
     }));
   }, [ingredientOptions]);
+
+  const normalizeItemCode = (value) => String(value ?? "").trim();
+
+  const getIngredientDropdownOptions = (currentRow) => {
+    const currentItemCode = normalizeItemCode(currentRow?.itemCode);
+    const selectedCodes = new Set(
+      rows
+        .filter((r) => r.id !== currentRow.id)
+        .map((r) => normalizeItemCode(r.itemCode))
+        .filter(Boolean)
+    );
+
+    const options = ingredientOptions
+      .map((opt) => ({
+        value: String(opt.ITEM_CODE ?? "").trim(),
+        label: `${String(opt.ITEM_CODE ?? "").trim()} - ${toInitCap(opt.ITEM_NAME)}`,
+      }))
+      .filter((opt) => !selectedCodes.has(String(opt.value)) || String(opt.value) === currentItemCode);
+
+    if (
+      currentItemCode &&
+      currentRow?.itemName &&
+      !options.some((option) => String(option.value) === currentItemCode)
+    ) {
+      return [
+        { value: currentItemCode, label: `${currentItemCode} - ${toInitCap(currentRow.itemName)}` },
+        ...options,
+      ];
+    }
+
+    return options;
+  };
 
   const formatIngredientLabel = (label) => {
     const str = String(label ?? "");
@@ -572,7 +608,16 @@ export default function CocktailCreate() {
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-center text-sm">
+              <table className="w-full table-fixed text-center text-sm">
+                <colgroup>
+                  <col className="w-12" />
+                  <col className="w-[22%]" />
+                  <col className="w-[24%]" />
+                  <col className="w-20" />
+                  <col className="w-[15%]" />
+                  <col className="w-[15%]" />
+                  <col className="w-24" />
+                </colgroup>
                 <thead className="bg-gray-50 text-gray-600">
                   <tr>
                     <th className="border-b border-r border-gray-100 px-4 py-4">
@@ -607,12 +652,7 @@ export default function CocktailCreate() {
                           value={row.itemCode}
                           onChange={(next) => handleItemCodeChange(row.id, next)}
                           // options={ingredientDropdownOptions}
-                          options={ingredientDropdownOptions.filter((option) => {
-                          const selectedCodes = rows
-                          .filter((r) => r.id !== row.id)
-                            .map((r) => String(r.itemCode));
-                             return !selectedCodes.includes(String(option.value));
-                            })}
+                          options={getIngredientDropdownOptions(row)}
                           placeholder="Select Item"
                           allLabel="Clear"
                           formatLabel={formatIngredientLabel}
@@ -620,11 +660,14 @@ export default function CocktailCreate() {
                           valueClassName="normal-case"
                           menuClassName="text-left"
                           usePortal
+                          searchValue={ingredientSearch}
                           menuWidth={250}
                           onMenuScroll={handleIngredientMenuScroll}
                           onSearchChange={handleIngredientSearchChange}
                           hasMore={ingredientHasMore}
                           loadingMore={ingredientsLoadingMore}
+                          loading={ingredientsLoading}
+                          loadingLabel="Searching..."
                         />
                       </td>
                       <td className="border-r border-gray-100 px-2 py-3">
