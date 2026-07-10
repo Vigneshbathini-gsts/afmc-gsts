@@ -128,8 +128,7 @@ function validateNextQuantityForItem(item, nextQuantity) {
 
   const maxAllowed = getMaxAllowedQuantity(item);
   if (maxAllowed !== null && maxAllowed !== undefined && maxAllowed >= 0) {
-    const multiplier = getItemPegMultiplier(item);
-    const allowedQty = multiplier > 1 ? Math.floor(maxAllowed / multiplier) : maxAllowed;
+    const allowedQty = getEffectiveAvailableQuantity(item, maxAllowed);
     if (allowedQty <= 0) {
       return { ok: false, message: "Out of stock." };
     }
@@ -179,8 +178,15 @@ function resolveCocktailOutOfStock(item, override) {
     return serverSaysOOS;
   }
 
-  // Once the client recomputation exists, OOS if EITHER source says so.
-  return serverSaysOOS || Boolean(override.isOutOfStock);
+  if (Boolean(override.isOutOfStock)) {
+    return true;
+  }
+
+  if (override?.hasUnknownStock) {
+    return serverSaysOOS;
+  }
+
+  return false;
 }
 
 function normalizeItem(item, fallbackIndex = 0) {
@@ -620,7 +626,8 @@ export default function Pubmenubuy({
       if (!isCocktailOrMocktail(item)) {
         const multiplier = getItemPegMultiplier(item);
         if (item?.availableQuantity !== null && item?.availableQuantity !== undefined) {
-          if (Number(item.quantity || 0) * multiplier > Number(item.availableQuantity)) {
+          const effectiveAllowed = getEffectiveAvailableQuantity(item, Number(item.availableQuantity));
+          if (Number(item.quantity || 0) > effectiveAllowed) {
             return true; // Out of stock
           }
         }
@@ -1746,9 +1753,9 @@ export default function Pubmenubuy({
       const itemWithIssue = items.find((item) => {
         if (item?.isFreeItem) return false;
         if (!isCocktailOrMocktail(item)) {
-          const multiplier = getItemPegMultiplier(item);
           if (item?.availableQuantity !== null && item?.availableQuantity !== undefined) {
-            if (Number(item.quantity || 0) * multiplier > Number(item.availableQuantity)) {
+            const effectiveAllowed = getEffectiveAvailableQuantity(item, Number(item.availableQuantity));
+            if (Number(item.quantity || 0) > effectiveAllowed) {
               return true;
             }
           }
