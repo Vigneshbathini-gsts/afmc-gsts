@@ -91,6 +91,7 @@ exports.fetchOrderDetails = async (req, res) => {
     const { id, orderId } = req.params;
     const orderIdentifier = id || orderId;
     const data = await getOrderDetails(orderIdentifier);
+    console.log("Fetched Order Details:", data);
     res.status(200).json({
       success: true,
       data,
@@ -200,7 +201,7 @@ exports.fetchUserOrderHistory = async (req, res) => {
       toDate: to,
       appUser,
     }); 
-// console.log("Fetched User Order History:", data);
+console.log("Fetched User Order History:", data);
     res.status(200).json({
       success: true,
       data,

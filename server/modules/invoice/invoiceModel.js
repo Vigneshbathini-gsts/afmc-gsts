@@ -7,6 +7,7 @@ const createValidationError = (message) => {
 };
 
 async function getInvoiceDetails(orderNumber) {
+  console.log("Fetching invoice details for order number:", orderNumber);
   const normalizedOrderNumber = Number(orderNumber);
   if (!Number.isFinite(normalizedOrderNumber) || normalizedOrderNumber <= 0) {
     throw createValidationError("Valid order number is required");

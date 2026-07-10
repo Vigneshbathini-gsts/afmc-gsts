@@ -498,7 +498,7 @@ exports.updateBarOrderStatus = async (req, res) => {
 
       // Insert scanned items + update status atomically to avoid partial/dirty state.
       if (scannedItems.length > 0) {
-        const placeholders = scannedItems.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?)").join(", ");
+        const placeholders = scannedItems.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").join(", ");
         const values = [];
         const orderPriceMap = new Map();
 
@@ -522,6 +522,7 @@ exports.updateBarOrderStatus = async (req, res) => {
             item.itemPrice,
             item.barcode,
             item.parentItem || item.itemCode,
+            item.orderLineId || null,
             JSON.stringify({
               categoryId: item.categoryId,
               subCategory: item.subCategory,
@@ -539,7 +540,7 @@ exports.updateBarOrderStatus = async (req, res) => {
         await connection.query(
           `
           INSERT INTO order_scan_collection
-            (collection_name, order_number, item_code, item_name, scan_quantity, item_price, barcode, inventory_item_code, extra_data)
+            (collection_name, order_number, item_code, item_name, scan_quantity, item_price, barcode, inventory_item_code, order_line_id, extra_data)
           VALUES ${placeholders}
           `,
           values
@@ -1225,6 +1226,35 @@ exports.processBarcodeScan = async (req, res) => {
       ]);
     const currentScanned = req.session[sessionKey] || [];
 
+    // Each cocktail/mocktail parent item on the order has its OWN order_line_id.
+    // `parentOrderLineId` above is only correct for the single item that
+    // scanItemCode was resolved against (which, when a standalone line for the
+    // same item code also exists, may not even be a cocktail at all). When one
+    // scan event's leftover quantity spills over into ingredient rows for
+    // DIFFERENT cocktails (e.g. Manhattan and Cosmopolitan both using Johny
+    // Walker Red Label), each of those rows must be tagged with that specific
+    // cocktail's own order_line_id — not the possibly-unrelated
+    // parentOrderLineId — or its scan value silently won't match any order
+    // line when totals are computed later.
+    const moParentItemCodes = [...new Set(
+      componentRows
+        .filter((c) => c.Mix === 'MO')
+        .map((c) => String(c.inventory_item_code || '').trim())
+        .filter(Boolean)
+    )];
+
+    const moOrderLineIdMap = new Map();
+    if (moParentItemCodes.length > 0) {
+      const moPlaceholders = moParentItemCodes.map(() => '?').join(', ');
+      const [moLineRows] = await connection.query(
+        `SELECT item_id, order_line_id FROM xxafmc_order_details WHERE order_id = ? AND item_id IN (${moPlaceholders}) AND (order_status IS NULL OR order_status = '')`,
+        [ORDERNUMBER, ...moParentItemCodes]
+      );
+      for (const row of moLineRows) {
+        moOrderLineIdMap.set(String(row.item_id).trim(), row.order_line_id);
+      }
+    }
+
     const hasForcedParent = Boolean(forcedParentItem);
     let componentsWithRemaining = componentRows
       .map(comp => {
@@ -1290,7 +1320,9 @@ exports.processBarcodeScan = async (req, res) => {
         itemPrice: finalPrice,
         lineTotalPrice: Number((Number(finalPrice || 0) * qtyToAdd).toFixed(2)),
         barcode: BARCODE,
-        orderLineId: comp.Mix === 'MO' ? parentOrderLineId : comp.order_line_id,
+        orderLineId: comp.Mix === 'MO'
+          ? (moOrderLineIdMap.get(String(comp.inventory_item_code || '').trim()) ?? parentOrderLineId)
+          : comp.order_line_id,
         scannedAt: new Date().toISOString(),
         parentItem: comp.inventory_item_code,
         categoryId,
@@ -1948,7 +1980,21 @@ LEFT JOIN (
     ROUND(SUM(
       CASE
         WHEN IFNULL(od.price, 0) = 0 OR UPPER(TRIM(IFNULL(od.type, ''))) = 'FREE ITEM' THEN 0
-        WHEN scanned_totals.scanned_total > 0 THEN scanned_totals.scanned_total
+        WHEN (
+          SELECT ROUND(SUM(IFNULL(osc.scan_quantity, 0) * IFNULL(osc.item_price, 0)), 2)
+          FROM order_scan_collection osc
+          WHERE osc.collection_name = 'S_COLLECTION'
+            AND osc.order_number = od.order_id
+            AND osc.inventory_item_code = od.item_id
+            AND (osc.order_line_id = od.order_line_id OR osc.order_line_id IS NULL)
+        ) > 0 THEN (
+          SELECT ROUND(SUM(IFNULL(osc.scan_quantity, 0) * IFNULL(osc.item_price, 0)), 2)
+          FROM order_scan_collection osc
+          WHERE osc.collection_name = 'S_COLLECTION'
+            AND osc.order_number = od.order_id
+            AND osc.inventory_item_code = od.item_id
+            AND (osc.order_line_id = od.order_line_id OR osc.order_line_id IS NULL)
+        )
         WHEN custom_totals.unit_custom_total > 0 THEN custom_totals.unit_custom_total * od.quantity
         ELSE IFNULL(od.subtotal, 0)
       END
@@ -1956,17 +2002,6 @@ LEFT JOIN (
   FROM xxafmc_order_details od
   JOIN (${inventorySummarySql}) total_inv
     ON total_inv.item_code = od.item_id
-  LEFT JOIN (
-    SELECT
-      order_number,
-      inventory_item_code,
-      ROUND(SUM(IFNULL(scan_quantity, 0) * IFNULL(item_price, 0)), 2) AS scanned_total
-    FROM order_scan_collection
-    WHERE collection_name = 'S_COLLECTION'
-    GROUP BY order_number, inventory_item_code
-  ) scanned_totals
-    ON scanned_totals.order_number = od.order_id
-    AND scanned_totals.inventory_item_code = od.item_id
   LEFT JOIN (
     SELECT
       cm.order_number,
@@ -2137,13 +2172,15 @@ exports.getOrderHistoryItemDetails = async (req, res) => {
         SELECT
           order_number,
           inventory_item_code,
+          order_line_id,
           ROUND(SUM(IFNULL(scan_quantity, 0) * IFNULL(item_price, 0)), 2) AS scanned_total
         FROM order_scan_collection
         WHERE collection_name = 'S_COLLECTION'
-        GROUP BY order_number, inventory_item_code
+        GROUP BY order_number, inventory_item_code, order_line_id
       ) scanned_totals
         ON scanned_totals.order_number = xo.order_id
        AND scanned_totals.inventory_item_code = xo.item_id
+       AND (scanned_totals.order_line_id = xo.order_line_id OR scanned_totals.order_line_id IS NULL)
 
       LEFT JOIN (
         SELECT
@@ -2207,7 +2244,21 @@ exports.getOrderHistoryItemDetails = async (req, res) => {
         ROUND(SUM(
           CASE
             WHEN IFNULL(xo.price, 0) = 0 OR UPPER(TRIM(IFNULL(xo.type, ''))) = 'FREE ITEM' THEN 0
-            WHEN scanned_totals.scanned_total > 0 THEN scanned_totals.scanned_total
+            WHEN (
+              SELECT ROUND(SUM(IFNULL(osc.scan_quantity, 0) * IFNULL(osc.item_price, 0)), 2)
+              FROM order_scan_collection osc
+              WHERE osc.collection_name = 'S_COLLECTION'
+                AND osc.order_number = xo.order_id
+                AND osc.inventory_item_code = xo.item_id
+                AND (osc.order_line_id = xo.order_line_id OR osc.order_line_id IS NULL)
+            ) > 0 THEN (
+              SELECT ROUND(SUM(IFNULL(osc.scan_quantity, 0) * IFNULL(osc.item_price, 0)), 2)
+              FROM order_scan_collection osc
+              WHERE osc.collection_name = 'S_COLLECTION'
+                AND osc.order_number = xo.order_id
+                AND osc.inventory_item_code = xo.item_id
+                AND (osc.order_line_id = xo.order_line_id OR osc.order_line_id IS NULL)
+            )
             WHEN custom_totals.unit_custom_total > 0 THEN custom_totals.unit_custom_total * xo.quantity
             ELSE IFNULL(xo.subtotal, 0)
           END
@@ -2215,17 +2266,6 @@ exports.getOrderHistoryItemDetails = async (req, res) => {
       FROM xxafmc_order_details xo
       JOIN (${inventorySummarySql}) xi
         ON xo.item_id = xi.item_code
-      LEFT JOIN (
-        SELECT
-          order_number,
-          inventory_item_code,
-          ROUND(SUM(IFNULL(scan_quantity, 0) * IFNULL(item_price, 0)), 2) AS scanned_total
-        FROM order_scan_collection
-        WHERE collection_name = 'S_COLLECTION'
-        GROUP BY order_number, inventory_item_code
-      ) scanned_totals
-        ON scanned_totals.order_number = xo.order_id
-        AND scanned_totals.inventory_item_code = xo.item_id
       LEFT JOIN (
         SELECT
           cm.order_number,

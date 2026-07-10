@@ -6,6 +6,8 @@ const createValidationError = (message) => {
   return error;
 };
 
+
+
 async function getInvoiceReportByOrderNumber(orderNumber) {
   const normalizedOrderNumber = Number(orderNumber);
   if (!Number.isFinite(normalizedOrderNumber) || normalizedOrderNumber <= 0) {
@@ -48,13 +50,15 @@ async function getInvoiceReportByOrderNumber(orderNumber) {
         SELECT
           order_number,
           inventory_item_code,
+          order_line_id,
           ROUND(SUM(IFNULL(scan_quantity, 0) * IFNULL(item_price, 0)), 2) AS scanned_total
         FROM order_scan_collection
         WHERE collection_name = 'S_COLLECTION'
-        GROUP BY order_number, inventory_item_code
+        GROUP BY order_number, inventory_item_code, order_line_id
       ) scanned_totals
         ON scanned_totals.order_number = od.order_id
         AND scanned_totals.inventory_item_code = od.item_id
+        AND (scanned_totals.order_line_id = od.order_line_id OR scanned_totals.order_line_id IS NULL)
       LEFT JOIN (
         SELECT
           cm.order_number,
@@ -153,6 +157,4 @@ async function getInvoiceReportByOrderNumber(orderNumber) {
   };
 }
 
-module.exports = {
-  getInvoiceReportByOrderNumber,
-};
+module.exports = { getInvoiceReportByOrderNumber };
