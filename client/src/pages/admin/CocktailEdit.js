@@ -41,6 +41,7 @@ export default function CocktailEdit() {
   const [ingredientHasMore, setIngredientHasMore] = useState(true);
   const [ingredientsLoadingMore, setIngredientsLoadingMore] = useState(false);
   const [ingredientSearch, setIngredientSearch] = useState("");
+  const [ingredientsLoading, setIngredientsLoading] = useState(false);
   const ingredientRequestIdRef = useRef(0);
   const [form, setForm] = useState({
     itemName: "",
@@ -60,6 +61,7 @@ export default function CocktailEdit() {
   const fetchIngredientOptions = useCallback(async ({ reset = true, nextPage = 0, query = "" } = {}) => {
       const requestId = ++ingredientRequestIdRef.current;
       if (!reset) setIngredientsLoadingMore(true);
+      else setIngredientsLoading(true);
       try {
         const response = await cocktailAPI.getIngredientOptions(query, {
           limit: INGREDIENT_PAGE_SIZE,
@@ -81,6 +83,7 @@ export default function CocktailEdit() {
       } finally {
         if (requestId === ingredientRequestIdRef.current) {
           setIngredientsLoadingMore(false);
+          setIngredientsLoading(false);
         }
       }
     }, []);
@@ -102,6 +105,7 @@ export default function CocktailEdit() {
 
   const handleIngredientSearchChange = useCallback((nextQuery) => {
     setIngredientSearch(nextQuery);
+    setIngredientsLoading(true);
   }, []);
 
   const handleIngredientMenuScroll = useCallback(() => {
@@ -606,7 +610,16 @@ return (
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-center text-sm">
+              <table className="w-full table-fixed text-center text-sm">
+                <colgroup>
+                  <col className="w-12" />
+                  <col className="w-[22%]" />
+                  <col className="w-[24%]" />
+                  <col className="w-20" />
+                  <col className="w-[15%]" />
+                  <col className="w-[15%]" />
+                  <col className="w-24" />
+                </colgroup>
                 <thead className="bg-gray-50 text-gray-600">
                   <tr>
                     <th className="border-b border-r border-gray-100 px-4 py-4">
@@ -656,10 +669,13 @@ return (
                             menuClassName="text-left"
                             usePortal
                             menuWidth={250}
+                            searchValue={ingredientSearch}
                             onMenuScroll={handleIngredientMenuScroll}
                             onSearchChange={handleIngredientSearchChange}
                             hasMore={ingredientHasMore}
                             loadingMore={ingredientsLoadingMore}
+                            loading={ingredientsLoading}
+                            loadingLabel="Searching..."
                           />
                         </td>
                         <td className="border-r border-gray-100 px-2 py-3">
