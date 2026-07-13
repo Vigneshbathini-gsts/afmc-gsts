@@ -48,36 +48,63 @@ const getMenuPopupDetails = async ({ itemCode, itemId, authUser }) => {
   const [userRows, stockRows, barcodeRows] = await Promise.all([
     appUser
       ? db.execute(
-        `
+          `
           SELECT user_id, role_id, login_type
           FROM xxafmc_users
           WHERE UPPER(user_name) = UPPER(?)
           LIMIT 1
         `,
-        [appUser]
-      )
+          [appUser],
+        )
       : Promise.resolve([[]]),
     db.execute(
       `
         SELECT
-          IFNULL(SUM(IFNULL(xso.STOCK_QUANTITY, 0)), 0) AS quantity,
-          IFNULL(MAX(CASE WHEN IFNULL(xso.STOCK_QUANTITY, 0) > 0 THEN xso.UNIT_PRICE END), 0) AS stock_out_unit_price,
-          IFNULL(
-            NULLIF(
-              MAX(
+    IFNULL(SUM(IFNULL(xso.STOCK_QUANTITY,0)),0) AS quantity,
+
+    IFNULL(
+        MAX(
+            CASE
+                WHEN IFNULL(xso.STOCK_QUANTITY,0) > 0
+                THEN xso.UNIT_PRICE
+            END
+        ),
+        0
+    ) AS stock_out_unit_price,
+
+    IFNULL(
+        NULLIF(
+            MAX(
                 CASE
-                  WHEN xso.PEGS IS NULL OR xso.PEGS = 0 THEN 1
-                  ELSE xso.PEGS
+                    WHEN IFNULL(xso.STOCK_QUANTITY,0) > 0 THEN
+                        CASE
+                            WHEN xso.PEGS IS NULL OR xso.PEGS = 0 THEN 1
+                            ELSE xso.PEGS
+                        END
                 END
-              ),
-              0
             ),
-            1
-          ) AS pegs
-        FROM xxafmc_stock_out xso
-        WHERE xso.ITEM_CODE = ?
+            0
+        ),
+        1
+    ) AS pegs,
+
+    IFNULL(
+        MIN(
+            CASE
+                WHEN IFNULL(xso.STOCK_QUANTITY,0) > 0 THEN
+                    CASE
+                        WHEN xso.PEGS IS NULL OR xso.PEGS = 0 THEN 1
+                        ELSE xso.PEGS
+                    END
+            END
+        ),
+        1
+    ) AS snacks_pegs
+
+FROM xxafmc_stock_out xso
+WHERE xso.ITEM_CODE = ?
       `,
-      [normalizedItemCode]
+      [normalizedItemCode],
     ),
     db.execute(
       `
@@ -88,7 +115,7 @@ const getMenuPopupDetails = async ({ itemCode, itemId, authUser }) => {
         ORDER BY xso.CREATION_DATE ASC
         LIMIT 1
       `,
-      [normalizedItemCode]
+      [normalizedItemCode],
     ),
   ]);
 
@@ -106,6 +133,7 @@ const getMenuPopupDetails = async ({ itemCode, itemId, authUser }) => {
   const inventoryBasePrice = toNumber(inventory.inventory_unit_price);
   const inventoryUnitPrice = toNumber(stock.stock_out_unit_price || inventory.inventory_unit_price);
   const pegs = Math.max(toNumber(stock.pegs, 1), 1);
+  const snacksPegs = Math.max(toNumber(stock.snacks_pegs, 1), 1);
   const memberProfit = toNumber(inventory.profit);
   const nonMemberProfit = toNumber(inventory.non_member_profit);
   const memberCharges = toNumber(inventory.food_pr_charges);
@@ -119,9 +147,13 @@ const getMenuPopupDetails = async ({ itemCode, itemId, authUser }) => {
     finalPrice = inventoryBasePrice + selectedCharges;
   } else if (categoryId === 10) {
     const pricePerPeg = inventoryUnitPrice / pegs;
-    finalPrice = pricePerPeg + (pricePerPeg * selectedProfit / 100) + selectedCharges;
+    finalPrice =
+      pricePerPeg + (pricePerPeg * selectedProfit) / 100 + selectedCharges;
   } else if (categoryId === 14) {
-    finalPrice = inventoryUnitPrice + (inventoryUnitPrice * selectedProfit / 100) + selectedCharges;
+    finalPrice =
+      (inventoryUnitPrice + (inventoryUnitPrice * selectedProfit) / 100) /
+        snacksPegs +
+      selectedCharges;
   } else {
     finalPrice = inventoryBasePrice || inventoryUnitPrice;
   }
@@ -141,10 +173,11 @@ const getMenuPopupDetails = async ({ itemCode, itemId, authUser }) => {
     base_unit_price: roundCurrency(
       categoryId === 10 && [14, 15].includes(subCategory)
         ? inventoryBasePrice
-        : inventoryUnitPrice
+        : inventoryUnitPrice,
     ),
     unit_price: roundCurrency(finalPrice),
     pegs,
+    snacks_pegs: snacksPegs,
     barcode,
   };
 };

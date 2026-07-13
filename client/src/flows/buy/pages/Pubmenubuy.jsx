@@ -3,7 +3,7 @@ import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { CheckCircle2, ChevronLeft, Minus, Pencil, Plus, Trash2, XCircle } from "lucide-react";
 import Pubmenubuyservice from "../services/Pubmenubuyservice";
 import ConfirmOrderservice from "../../../services/ConfirmOrderservice";
-import { buildStockConsumptionMap, getMaxAllowedQuantity, getPegTypeOrderLimitMessage, isCocktailOrMocktail, isOutOfStock, validateNextQuantity } from "../../../utils/stockValidation";
+import { buildStockConsumptionMap, getEffectiveAvailableQuantity, getMaxAllowedQuantity, getPegTypeOrderLimitMessage, isCocktailOrMocktail, isOutOfStock, validateNextQuantity } from "../../../utils/stockValidation";
 import { barOrdersAPI, cartAPI } from "../../../services/api";
 import { toInitCap } from "../../../utils/textFormat";
 import { toast } from "react-toastify";
@@ -95,7 +95,7 @@ function getCocktailDetailsForItem(orderNumber, item, detailsByItemCode = {}) {
 }
 
 function getItemType(item) {
-  const rawType = item?.type ?? item?.TYPE ?? item?.item_type ?? item?.ITEM_TYPE ?? item?.pegType ?? item?.peg_type ?? item?.TYPE_OF_PEG ?? null;
+  const rawType = item?.description ?? item?.DESCRIPTION ?? item?.type ?? item?.TYPE ?? item?.item_type ?? item?.ITEM_TYPE ?? item?.pegType ?? item?.peg_type ?? item?.TYPE_OF_PEG ?? null;
   if (rawType === null || rawType === undefined || rawType === "") {
     return null;
   }
@@ -113,9 +113,7 @@ function getItemPegMultiplier(item) {
 function getMaxAllowedByPegType(item) {
   const maxAllowed = getMaxAllowedQuantity(item);
   if (maxAllowed === null || maxAllowed === undefined) return null;
-  const multiplier = getItemPegMultiplier(item);
-  if (multiplier <= 1) return maxAllowed;
-  return Math.floor(maxAllowed / multiplier);
+  return getEffectiveAvailableQuantity(item, maxAllowed);
 }
 
 function validateNextQuantityForItem(item, nextQuantity) {
@@ -130,8 +128,7 @@ function validateNextQuantityForItem(item, nextQuantity) {
 
   const maxAllowed = getMaxAllowedQuantity(item);
   if (maxAllowed !== null && maxAllowed !== undefined && maxAllowed >= 0) {
-    const multiplier = getItemPegMultiplier(item);
-    const allowedQty = multiplier > 1 ? Math.floor(maxAllowed / multiplier) : maxAllowed;
+    const allowedQty = getEffectiveAvailableQuantity(item, maxAllowed);
     if (allowedQty <= 0) {
       return { ok: false, message: "Out of stock." };
     }
@@ -181,8 +178,15 @@ function resolveCocktailOutOfStock(item, override) {
     return serverSaysOOS;
   }
 
-  // Once the client recomputation exists, OOS if EITHER source says so.
-  return serverSaysOOS || Boolean(override.isOutOfStock);
+  if (Boolean(override.isOutOfStock)) {
+    return true;
+  }
+
+  if (override?.hasUnknownStock) {
+    return serverSaysOOS;
+  }
+
+  return false;
 }
 
 function normalizeItem(item, fallbackIndex = 0) {
@@ -297,7 +301,7 @@ function normalizeItem(item, fallbackIndex = 0) {
         : Number(rawFreeItemAvailableQuantity),
     computed_free_item_quantity: Number.isFinite(computed_free_item_quantity) ? computed_free_item_quantity : null,
     subcategory: Number.isFinite(subcategory) ? subcategory : null,
-    type: item.type || item.TYPE || item.item_type || item.ITEM_TYPE || item.pegType || item.peg_type || null,
+    type: item.description || item.DESCRIPTION || item.type || item.TYPE || item.item_type || item.ITEM_TYPE || item.pegType || item.peg_type || null,
     stockStatus,
     stockIssueMessage,
     cartId: Number.isFinite(cartId) && cartId > 0 ? cartId : null,
@@ -622,7 +626,8 @@ export default function Pubmenubuy({
       if (!isCocktailOrMocktail(item)) {
         const multiplier = getItemPegMultiplier(item);
         if (item?.availableQuantity !== null && item?.availableQuantity !== undefined) {
-          if (Number(item.quantity || 0) * multiplier > Number(item.availableQuantity)) {
+          const effectiveAllowed = getEffectiveAvailableQuantity(item, Number(item.availableQuantity));
+          if (Number(item.quantity || 0) > effectiveAllowed) {
             return true; // Out of stock
           }
         }
@@ -676,10 +681,11 @@ export default function Pubmenubuy({
         "Out of stock for cocktail/mocktail ingredients. Please reduce quantity or update selection."
       );
     }
-    const available = Number(getMaxAllowedQuantity(stockIssue) ?? stockIssue.availableQuantity ?? 0);
+    const rawAvailable = Number(getMaxAllowedQuantity(stockIssue) ?? stockIssue.availableQuantity ?? 0);
+    const effectiveAvailable = getEffectiveAvailableQuantity(stockIssue, rawAvailable);
     return stockIssue.isFreeItem
-      ? `Out of stock for free item. Available quantity: ${available}`
-      : getPegTypeOrderLimitMessage(stockIssue, available, `Out of stock. Available quantity: ${available}`);
+      ? `Out of stock for free item. Available quantity: ${effectiveAvailable}`
+      : getPegTypeOrderLimitMessage(stockIssue, rawAvailable, `Out of stock. Available quantity: ${effectiveAvailable}`);
   }, [stockIssue, cocktailStockIssue, cocktailOverrideIssues, missingCocktailIngredientItem]);
 
   const showToast = (message, type = "success") => {
@@ -764,11 +770,13 @@ export default function Pubmenubuy({
           const otherRequired = Math.max(0, projectedRequired - (targetRequiredPerUnit * nextQuantity));
           const adjustedAvailable = Math.max(0, Math.floor((availableApi - otherRequired) / targetRequiredPerUnit));
           const ingredientName = targetIngredientNameByCode.get(String(code));
+          const rawAvailableForMessage = adjustedAvailable * targetRequiredPerUnit;
+          const effectiveAvailableForMessage = getEffectiveAvailableQuantity(targetItem, rawAvailableForMessage);
           return {
             ok: false,
             message: ingredientName
               ? `Out of stock for ingredient ${ingredientName}. Available quantity: ${adjustedAvailable}`
-              : getPegTypeOrderLimitMessage(targetItem, adjustedAvailable, `Out of stock. Available quantity: ${adjustedAvailable}`),
+              : getPegTypeOrderLimitMessage(targetItem, rawAvailableForMessage, `Out of stock. Available quantity: ${effectiveAvailableForMessage}`),
           };
         }
       }
@@ -1706,6 +1714,8 @@ export default function Pubmenubuy({
     }
   };
 
+  
+
   const handleConfirmOrder = async () => {
     // Comprehensive validation before confirming
     if (!orderNumber) {
@@ -1745,9 +1755,9 @@ export default function Pubmenubuy({
       const itemWithIssue = items.find((item) => {
         if (item?.isFreeItem) return false;
         if (!isCocktailOrMocktail(item)) {
-          const multiplier = getItemPegMultiplier(item);
           if (item?.availableQuantity !== null && item?.availableQuantity !== undefined) {
-            if (Number(item.quantity || 0) * multiplier > Number(item.availableQuantity)) {
+            const effectiveAllowed = getEffectiveAvailableQuantity(item, Number(item.availableQuantity));
+            if (Number(item.quantity || 0) > effectiveAllowed) {
               return true;
             }
           }
@@ -2073,11 +2083,11 @@ export default function Pubmenubuy({
                                 </span>
                               ) : null}
                             </p>
-                            {/* {item.type ? (
+                            {item.type ? (
                               <p className="mt-1 text-sm text-stone-500">
                                 {toInitCap("Type")}: <span className="font-semibold text-stone-800">{toInitCap(item.type)}</span>
                               </p>
-                            ) : null} */}
+                            ) : null}
                             {isCocktailOrMocktail(item) && (() => {
                               const itemCode = String(item?.item_code || "").trim();
                               const override = itemCode ? cocktailOverrideIssues?.[itemCode] : null;
