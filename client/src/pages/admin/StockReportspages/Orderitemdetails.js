@@ -52,6 +52,22 @@ const formatQuantity = (value) => {
   return Number(value);
 };
 
+const PEG_TYPE_SUFFIX = {
+  SMALL: "(S)",
+  LARGE: "(L)",
+};
+
+const getDisplayItemName = (row) => {
+  const rawName = getRowValue(row, "item_name", "ITEM_NAME") || "-";
+  const name = toInitCap(rawName);
+  const pegType = getRowValue(row, "peg_type", "PEG_TYPE");
+  if (!pegType) return name;
+
+  const normalized = String(pegType).trim().toUpperCase();
+  const suffix = PEG_TYPE_SUFFIX[normalized];
+  return suffix ? `${name}${suffix}` : name;
+};
+
 const REPORT_PAGE_SIZE = 20;
 
 export default function Orderitemdetails() {
@@ -100,6 +116,7 @@ export default function Orderitemdetails() {
         });
 
         if (response.data.success) {
+          console.log("Filter options fetched:", response.data.data);
           setFilterOptions(
             response.data.data || {
               itemNames: [],
@@ -245,7 +262,7 @@ export default function Orderitemdetails() {
         "Total",
       ],
       rows: pdfRows.map((row) => [
-        getRowValue(row, "item_name", "ITEM_NAME") || "-",
+        row.item_id ? getDisplayItemName(row) : "Total",
         String(formatQuantity(getRowValue(row, "quantity", "QUANTITY"))),
         formatRowNumber(row, ["price", "PRICE"]),
         formatRowNumber(row, ["total_profit", "TOTAL_PROFIT", "totalProfit"]),
@@ -423,13 +440,17 @@ export default function Orderitemdetails() {
                     {displayRows.length ? (
                       displayRows.map((row, i) => (
                         <tr
-                          key={row.item_id || `${row.item_name || "row"}-${i}`}
+                          key={
+                            row.item_id
+                              ? `${row.item_id}-${getRowValue(row, "peg_type", "PEG_TYPE") || "NA"}`
+                              : `${row.item_name || "row"}-${i}`
+                          }
                           className={`border-t border-gray-100 hover:bg-gray-50 ${
                             !row.item_id ? "font-bold text-red-600" : ""
                           }`}
                         >
                           <td className="px-4 py-3 whitespace-nowrap capitalize">
-                            {toInitCap(getRowValue(row, "item_name", "ITEM_NAME") || "-")}
+                            {row.item_id ? getDisplayItemName(row) : "Total"}
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
                             {formatQuantity(getRowValue(row, "quantity", "QUANTITY"))}

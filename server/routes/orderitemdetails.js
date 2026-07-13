@@ -83,15 +83,13 @@ const getOrderItemDetails = async (req, res) => {
   const scannedTotalsJoin = `
     LEFT JOIN (
       SELECT
-        order_number,
-        inventory_item_code,
+        order_line_id,
         ROUND(SUM(IFNULL(scan_quantity, 0) * IFNULL(item_price, 0)), 2) AS scanned_subtotal
       FROM order_scan_collection
       WHERE collection_name = 'S_COLLECTION'
-      GROUP BY order_number, inventory_item_code
+      GROUP BY order_line_id
     ) st
-      ON st.order_number = od.order_id
-      AND st.inventory_item_code = od.item_id
+      ON st.order_line_id = od.ORDER_LINE_ID
   `;
 
   const customTotalsJoin = `
@@ -125,39 +123,47 @@ const getOrderItemDetails = async (req, res) => {
       AND ct.inventory_item_code = od.item_id
   `;
 
+  const multiplierExpression = `
+    CASE WHEN UPPER(TRIM(IFNULL(od.TYPE, ''))) = 'LARGE' THEN 2 ELSE 1 END
+  `;
+
   const effectiveSubtotalExpression = `
     CASE
       WHEN xi.sub_category IN (14, 15) AND IFNULL(st.scanned_subtotal, 0) > 0
         THEN st.scanned_subtotal
       WHEN xi.sub_category IN (14, 15) AND IFNULL(ct.unit_custom_subtotal, 0) > 0
-        THEN ct.unit_custom_subtotal * IFNULL(od.quantity, 0)
-      ELSE IFNULL(od.subtotal, 0)
+        THEN ct.unit_custom_subtotal * (${multiplierExpression} * IFNULL(od.quantity, 0))
+      ELSE IFNULL(od.subtotal, 0) * (${multiplierExpression})
     END
+  `;
+
+  const effectiveQuantityExpression = `
+    (${multiplierExpression} * IFNULL(od.quantity, 0))
   `;
 
   const baseQuery = `
     SELECT 
         od.item_id,
-        SUM(od.quantity) AS quantity,
+        SUM(${effectiveQuantityExpression}) AS quantity,
         IFNULL(SUM(${effectiveSubtotalExpression}), 0) AS subtotal,
         
         CASE 
             WHEN IFNULL(SUM(${effectiveSubtotalExpression}),0) > 0 THEN
                 (SUM(CASE WHEN ${effectiveSubtotalExpression} > 0 THEN ${effectiveSubtotalExpression} ELSE 0 END) -
-                 SUM(CASE WHEN ${effectiveSubtotalExpression} > 0 THEN IFNULL(od.food_pr_charges, 0) * od.quantity ELSE 0 END)) /
+                 SUM(CASE WHEN ${effectiveSubtotalExpression} > 0 THEN IFNULL(od.food_pr_charges, 0) * (${effectiveQuantityExpression}) ELSE 0 END)) /
                  (1 + (MAX(IFNULL(od.profit, 0)) / 100))
             ELSE 0
         END AS price,
 
         SUM(CASE 
                 WHEN ${effectiveSubtotalExpression} > 0
-                THEN IFNULL(od.food_pr_charges,0) * od.quantity 
+                THEN IFNULL(od.food_pr_charges,0) * (${effectiveQuantityExpression}) 
                 ELSE 0 
             END) AS food_pr_charges,
 
         SUM(CASE 
                 WHEN ${effectiveSubtotalExpression} > 0
-                THEN IFNULL(od.profit,0) * od.quantity 
+                THEN IFNULL(od.profit,0) * (${effectiveQuantityExpression}) 
                 ELSE 0 
             END) AS totalprofit,
 
@@ -165,7 +171,7 @@ const getOrderItemDetails = async (req, res) => {
             WHEN IFNULL(SUM(${effectiveSubtotalExpression}),0) > 0 THEN
                 (MAX(IFNULL(od.profit, 0)) / 100) * (
                     (SUM(CASE WHEN ${effectiveSubtotalExpression} > 0 THEN ${effectiveSubtotalExpression} ELSE 0 END) -
-                     SUM(CASE WHEN ${effectiveSubtotalExpression} > 0 THEN IFNULL(od.food_pr_charges, 0) * od.quantity ELSE 0 END)) /
+                     SUM(CASE WHEN ${effectiveSubtotalExpression} > 0 THEN IFNULL(od.food_pr_charges, 0) * (${effectiveQuantityExpression}) ELSE 0 END)) /
                      (1 + (MAX(IFNULL(od.profit, 0)) / 100))
                 )
             ELSE 0
@@ -175,14 +181,15 @@ const getOrderItemDetails = async (req, res) => {
             WHEN IFNULL(SUM(${effectiveSubtotalExpression}),0) > 0 THEN
                 ((MAX(IFNULL(od.profit, 0)) / 100) * (
                     (SUM(CASE WHEN ${effectiveSubtotalExpression} > 0 THEN ${effectiveSubtotalExpression} ELSE 0 END) -
-                     SUM(CASE WHEN ${effectiveSubtotalExpression} > 0 THEN IFNULL(od.food_pr_charges, 0) * od.quantity ELSE 0 END)) /
+                     SUM(CASE WHEN ${effectiveSubtotalExpression} > 0 THEN IFNULL(od.food_pr_charges, 0) * (${effectiveQuantityExpression}) ELSE 0 END)) /
                      (1 + (MAX(IFNULL(od.profit, 0)) / 100))
-                )) / NULLIF(SUM(CASE WHEN ${effectiveSubtotalExpression} > 0 THEN od.quantity END), 0)
+                )) / NULLIF(SUM(CASE WHEN ${effectiveSubtotalExpression} > 0 THEN (${effectiveQuantityExpression}) END), 0)
             ELSE 0
         END AS unit_profit,
 
         MAX(oh.order_date) AS order_date,
-        xi.item_name
+        xi.item_name,
+        od.TYPE AS peg_type
 
     FROM xxafmc_order_details od
     JOIN xxafmc_order_header oh ON od.order_id = oh.order_num
@@ -205,12 +212,13 @@ const getOrderItemDetails = async (req, res) => {
 
     GROUP BY 
         od.item_id,
-        xi.item_name
+        xi.item_name,
+        od.TYPE
   `;
 
   const pagedBaseQuery = `
     ${baseQuery}
-    ORDER BY order_date DESC, item_id DESC
+    ORDER BY order_date DESC, item_id DESC, peg_type ASC
     LIMIT ${limit} OFFSET ${offset}
   `;
 
@@ -248,6 +256,8 @@ const getOrderItemDetails = async (req, res) => {
     ]);
     const totalRow = totalRows?.[0] || null;
     const results = totalRow ? [...detailRows, totalRow] : detailRows;
+
+// console.log("Order Item Details Results:", results);
 
     return res.json({
       success: true,
@@ -354,5 +364,3 @@ router.get("/orderitem/filter-options", getOrderItemFilterOptions);
 router.get("/order-item/filter-options", getOrderItemFilterOptions);
 
 module.exports = router;
-
-
