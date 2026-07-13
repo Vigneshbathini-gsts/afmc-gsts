@@ -178,29 +178,28 @@ export default function FilterDropdown({
   const menuEl = (
     <div
       ref={menuRef}
-      className={`${
-        usePortal
+      className={`${usePortal
           ? "rounded-2xl border border-gray-200 bg-white shadow-2xl overflow-hidden"
           : "absolute z-30 mt-2 w-full rounded-2xl border border-gray-200 bg-white shadow-2xl overflow-hidden"
-      } ${menuClassName}`}
+        } ${menuClassName}`}
       style={
         usePortal
           ? {
-              position: "fixed",
-              left: menuPosition?.left ?? 0,
-              top: menuPosition?.top ?? 0,
-              width:
-                menuPosition?.width ??
-                (menuWidth != null
-                  ? typeof menuWidth === "number"
-                    ? `${menuWidth}px`
-                    : menuWidth
-                  : "auto"),
-              zIndex: 9999,
-              opacity: menuPosition ? 1 : 0,
-              visibility: menuPosition ? "visible" : "hidden",
-              transition: "opacity 120ms ease-out",
-            }
+            position: "fixed",
+            left: menuPosition?.left ?? 0,
+            top: menuPosition?.top ?? 0,
+            width:
+              menuPosition?.width ??
+              (menuWidth != null
+                ? typeof menuWidth === "number"
+                  ? `${menuWidth}px`
+                  : menuWidth
+                : "auto"),
+            zIndex: 9999,
+            opacity: menuPosition ? 1 : 0,
+            visibility: menuPosition ? "visible" : "hidden",
+            transition: "opacity 120ms ease-out",
+          }
           : undefined
       }
     >
@@ -247,11 +246,10 @@ export default function FilterDropdown({
             onChange?.("");
             setIsOpen(false);
           }}
-          className={`w-full px-4 py-2.5 text-left text-sm hover:bg-afmc-maroon2/5 ${
-            !selectedValue
+          className={`w-full px-4 py-2.5 text-left text-sm hover:bg-afmc-maroon2/5 ${!selectedValue
               ? "bg-afmc-maroon2/10 font-medium text-afmc-maroon"
               : "text-gray-700"
-          }`}
+            }`}
         >
           {allLabel}
         </button>
@@ -273,13 +271,12 @@ export default function FilterDropdown({
                 onChange?.(opt.value);
                 setIsOpen(false);
               }}
-              className={`w-full px-4 py-2.5 text-left text-sm hover:bg-afmc-maroon2/5 ${
-                String(selectedValue) === String(opt.value)
+              className={`w-full px-4 py-2.5 text-left text-sm hover:bg-afmc-maroon2/5 ${String(selectedValue) === String(opt.value)
                   ? "bg-afmc-maroon2/10 font-medium text-afmc-maroon"
                   : "text-gray-700"
-              }`}
+                }`}
             >
-               <span className="capitalize">{formatLabel(opt.label)}</span>
+              <span className="capitalize">{formatLabel(opt.label)}</span>
             </button>
           ))
         )}
@@ -310,13 +307,12 @@ export default function FilterDropdown({
           onClick={() => setIsOpen((prev) => !prev)}
           className={`w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-left text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20 flex items-center justify-between disabled:opacity-60 disabled:cursor-not-allowed ${buttonClassName}`}
         >
-         <span className="capitalize truncate">
+          <span className="capitalize truncate">
             {buttonLabel}
           </span>
           <FaChevronDown
-            className={`text-gray-400 transition-transform ${
-              isOpen ? "rotate-180" : ""
-            }`}
+            className={`text-gray-400 transition-transform ${isOpen ? "rotate-180" : ""
+              }`}
           />
         </button>
 
