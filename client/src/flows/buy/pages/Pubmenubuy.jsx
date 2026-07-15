@@ -173,17 +173,18 @@ function resolveCocktailOutOfStock(item, override) {
   const serverSaysOOS = String(item?.stockStatus || "").trim().toLowerCase() === "out of stock"
     || String(item?.stockIssueMessage || "").trim().length > 0;
 
-  if (!override?.hasDetails) {
-    // No client recomputation yet — trust the server snapshot only.
-    return serverSaysOOS;
-  }
+  // The server recomputes stock_status live (against current DB stock/reservations,
+  // excluding this order) every time the order summary is fetched — it is NOT a
+  // stale snapshot. It is authoritative: if it says out of stock, it stays out of
+  // stock regardless of what the client-side recheck concludes.
+  if (serverSaysOOS) return true;
 
-  if (Boolean(override.isOutOfStock)) {
+  // Server says in stock. The client recheck can still catch something that
+  // changed in this browsing session (e.g. ingredient quantity edited locally,
+  // not yet saved) — but it can only escalate to "out of stock", never
+  // downgrade a real server-reported issue.
+  if (override?.hasDetails && Boolean(override.isOutOfStock)) {
     return true;
-  }
-
-  if (override?.hasUnknownStock) {
-    return serverSaysOOS;
   }
 
   return false;
@@ -2025,13 +2026,7 @@ export default function Pubmenubuy({
                       ? (isCardOutOfStock ? "Out of Stock" : "")
                       : (isStandardOutOfStock || Number(item.availableQuantity) === 0 ? "Out of Stock" : "");
 
-                    const disablePlusForStock =
-                      isCocktailItem
-                        ? (() => {
-                          if (cocktailOverride?.hasDetails) return Boolean(cocktailOverride.isOutOfStock);
-                          return String(item.stockIssueMessage || "").trim().length > 0 || isOutOfStock(item);
-                        })()
-                        : false;
+                    const disablePlusForStock = isCocktailItem ? isCardOutOfStock : false;
                     const disableQuantityControls = disableEdit || updatingLineId === Number(item.orderLineId ?? item.id) || isCardOutOfStock;
 
                     return (
@@ -2091,11 +2086,7 @@ export default function Pubmenubuy({
                             {isCocktailOrMocktail(item) && (() => {
                               const itemCode = String(item?.item_code || "").trim();
                               const override = itemCode ? cocktailOverrideIssues?.[itemCode] : null;
-                              const statusText = isCocktailOrMocktail(item)
-                                ? (resolveCocktailOutOfStock(item, cocktailOverrideIssues?.[String(item?.item_code || "").trim()])
-                                  ? "Out Of Stock"
-                                  : "In Stock")
-                                : "";
+                              const statusText = resolveCocktailOutOfStock(item, override) ? "Out Of Stock" : "In Stock";
 
                               if (!statusText || missingCocktailIngredients) return null;
 
@@ -2110,9 +2101,12 @@ export default function Pubmenubuy({
                             {isCocktailOrMocktail(item) && (() => {
                               const itemCode = String(item?.item_code || "").trim();
                               const override = itemCode ? cocktailOverrideIssues?.[itemCode] : null;
-                              const message = override?.hasDetails
-                                ? (override.stockIssueMessage || "")
-                                : String(item.stockIssueMessage || "").trim();
+
+                              // Prefer the server's own message (it's the live, authoritative
+                              // check) and fall back to the client recheck's message only if
+                              // the server didn't flag an issue but the client one did.
+                              const serverMessage = String(item.stockIssueMessage || "").trim();
+                              const message = serverMessage || (override?.hasDetails ? (override.stockIssueMessage || "") : "");
 
                               if (!message) return null;
 
