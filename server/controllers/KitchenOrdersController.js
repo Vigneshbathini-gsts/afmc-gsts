@@ -1833,12 +1833,12 @@ WHERE kn.ordernumber = ?
     const lineItem = lineItems[0];
     const lineCategoryId = Number(lineItem.category_id) || categoryId;
 
-    console.log("Single item cancel - Line item details:", {
-      ORDER_LINE_ID,
-      orderId: lineItem.order_id,
-      itemId: lineItem.item_id,
-      lineCategoryId
-    });
+    // console.log("Single item cancel - Line item details:", {
+    //   ORDER_LINE_ID,
+    //   orderId: lineItem.order_id,
+    //   itemId: lineItem.item_id,
+    //   lineCategoryId
+    // });
 
     const reservationRows = await getReservationReleaseRowsForCancel(connection, {
       orderLineId: ORDER_LINE_ID,
