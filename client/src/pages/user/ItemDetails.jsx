@@ -442,7 +442,7 @@ return;
         setSelectedIngredients(prev => prev.filter((_, i) => i !== index));
     };
 
- const handleAddIngredients = () => {
+ const handleAddIngredients = async () => {
     if (selectedIngredients.length === 0) {
         toast.warning("Please select at least one ingredient");
         return;
@@ -458,16 +458,36 @@ return;
     const cartItemQuantity = Number(item?.cartItemQuantity || 1);
     const effectiveCartQty = Number.isFinite(cartItemQuantity) && cartItemQuantity > 0 ? cartItemQuantity : 1;
 
+    // Fetch accurate, cart-aware stock for the codes being added
+    let accurateStockMap = {};
+    try {
+        const codes = [...new Set(selectedIngredients
+            .map((ing) => Number(ing.r))
+            .filter((c) => Number.isFinite(c) && c > 0))];
+        if (codes.length > 0) {
+            const stockRes = await cartAPI.getIngredientStocks(
+                codes,
+                fromBuyFlow ? buyOrderNumber : undefined,
+                undefined,
+                isEditingCartItem ? Number(cartId) : undefined
+            );
+            accurateStockMap = stockRes?.data?.data || {};
+        }
+    } catch (err) {
+        console.warn("Could not fetch accurate stock for new ingredients:", err);
+    }
+
     const newDetails = [...(item.details || [])];
     const newQuantities = { ...quantities };
     const startIndex = item.details?.length || 0;
     let anyOutOfStock = false;
 
     selectedIngredients.forEach((ingredient, idx) => {
-        const rawStockQuantity = ingredient?.stockQuantity ?? ingredient?.STOCK_QUANTITY ?? ingredient?.stock_quantity ?? null;
+        const itemCode = Number(ingredient.r);
+        const rawStockQuantity = accurateStockMap?.[String(itemCode)] ??
+            (ingredient?.stockQuantity ?? ingredient?.STOCK_QUANTITY ?? ingredient?.stock_quantity ?? null);
         const stockQuantity = rawStockQuantity == null || rawStockQuantity === "" ? null : Number(rawStockQuantity);
 
-        // Required amount scales with how many of this cocktail are already in the cart.
         const requiredQuantity = 1 * effectiveCartQty;
         const isOOS = Number.isFinite(stockQuantity) && stockQuantity >= 0
             ? stockQuantity < requiredQuantity
@@ -488,7 +508,6 @@ return;
         newQuantities[startIndex + idx] = 1;
     });
 
-    // Local only — nothing is sent to the server here.
     setItem(prev => ({ ...prev, details: newDetails }));
     setQuantities(newQuantities);
     setShowModal(false);

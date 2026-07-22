@@ -143,7 +143,7 @@ exports.loginUser = async (req, res) => {
     }
 
     const redirectPath = getRedirectPath(user.ROLE_ID, outletType, user.LOGIN_TYPE);
-    console.log("redirectPath",redirectPath);
+    // console.log("redirectPath",redirectPath);
 
 
     const token = jwt.sign(
@@ -195,7 +195,7 @@ exports.loginUser = async (req, res) => {
 exports.forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
-    console.log("Forgot Password Request for:", email);
+    // console.log("Forgot Password Request for:", email);
 
     if (!email) {
       return res.status(400).json({ message: "Email is required" });
