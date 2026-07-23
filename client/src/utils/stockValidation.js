@@ -53,16 +53,25 @@ export function getEffectiveAvailableQuantity(item, availablePegs) {
 export function getPegTypeOrderLimitMessage(item, availablePegs, fallbackMessage = "Out of stock.", selectedPegType = null) {
   const normalizedType = String(selectedPegType ?? getItemType(item) ?? "").trim().toLowerCase();
 
-  if (normalizedType === "s" || normalizedType === "small") {
-    const maxQty = Number.isFinite(Number(availablePegs)) ? Math.max(0, Number(availablePegs)) : 0;
-    return `Only ${maxQty} Small drink(s) can be ordered with the current stock. Please reduce the quantity.`;
-  }
+if (normalizedType === "s" || normalizedType === "small") {
+  const maxQty = Number.isFinite(Number(availablePegs))
+    ? Math.max(0, Number(availablePegs))
+    : 0;
 
-  if (normalizedType === "l" || normalizedType === "large") {
-    const maxQty = Number.isFinite(Number(availablePegs)) ? Math.max(0, Math.floor(Number(availablePegs) / 2)) : 0;
-    return `Only ${maxQty} Large drink(s) can be ordered with the current stock. Please reduce the quantity.`;
-  }
+  return maxQty === 0
+    ? "Small drink is currently out of stock."
+    : `Only ${maxQty} Small drink(s) can be ordered with the current stock. Please reduce the quantity.`;
+}
 
+if (normalizedType === "l" || normalizedType === "large") {
+  const maxQty = Number.isFinite(Number(availablePegs))
+    ? Math.max(0, Math.floor(Number(availablePegs) / 2))
+    : 0;
+
+  return maxQty === 0
+    ? "Large drink is currently out of stock."
+    : `Only ${maxQty} Large drink(s) can be ordered with the current stock. Please reduce the quantity.`;
+}
   return fallbackMessage;
 }
 
