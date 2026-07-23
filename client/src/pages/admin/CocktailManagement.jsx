@@ -6,7 +6,7 @@ import {
   PlusCircle,
   Search,
 } from "lucide-react";
-import api from "../../services/api";
+import { cocktailAPI } from "../../services/api";
 import { toInitCap } from "../../utils/textFormat";
 
 const COCKTAIL_PAGE_SIZE = 20;
@@ -30,12 +30,10 @@ export default function CocktailManagement() {
       if (reset) setLoading(true);
       else setLoadingMore(true);
       setError("");
-      const response = await api.get("/cocktails", {
-        params: {
-          search: searchValue.trim(),
-          limit: COCKTAIL_PAGE_SIZE,
-          offset: nextPage * COCKTAIL_PAGE_SIZE,
-        },
+      const response = await cocktailAPI.getAll({
+        search: searchValue.trim(),
+        limit: COCKTAIL_PAGE_SIZE,
+        offset: nextPage * COCKTAIL_PAGE_SIZE,
       });
 
       if (response.data.success) {

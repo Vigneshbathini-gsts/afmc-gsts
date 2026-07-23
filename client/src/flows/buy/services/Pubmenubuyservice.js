@@ -1,16 +1,17 @@
 import api from "../../../services/api";
 
 export const Pubmenubuyservice = {
-  createOrder: (payload) => api.post("/Pubmenubuy/create", payload),
-  getByOrderNumber: (orderNumber) => api.get(`/Pubmenubuy/${orderNumber}`),
+  createOrder: (payload) => api.post("/buy-orders", payload),
+  getByOrderNumber: (orderNumber) => api.get(`/buy-orders/${orderNumber}`),
   updateItemQuantity: (orderNumber, itemCode, delta) =>
-    api.patch(`/Pubmenubuy/${orderNumber}/item/${itemCode}`, { delta }),
+    api.patch(`/buy-orders/${orderNumber}/items/${itemCode}`, { delta }),
   updateItemCustomization: (orderNumber, itemCode, ingredients) =>
-    api.put(`/Pubmenubuy/${orderNumber}/item/${itemCode}/customization`, { ingredients }),
-  deleteItem: (orderNumber, itemCode) => api.delete(`/Pubmenubuy/${orderNumber}/item/${itemCode}`),
-  cancelOrder: (orderNumber) => api.delete(`/Pubmenubuy/${orderNumber}`),
+    api.put(`/buy-orders/${orderNumber}/items/${itemCode}/customization`, { ingredients }),
+  deleteItem: (orderNumber, itemCode) =>
+    api.delete(`/buy-orders/${orderNumber}/items/${itemCode}`),
+  cancelOrder: (orderNumber) => api.delete(`/buy-orders/${orderNumber}`),
   updateLineQuantity: (orderNumber, orderLineId, quantity) =>
-    api.put(`/Pubmenubuy/${orderNumber}/line/${orderLineId}/quantity`, { quantity: Number(quantity) }),
+    api.put(`/buy-orders/${orderNumber}/lines/${orderLineId}/quantity`, { quantity: Number(quantity) }),
 };
 
 export default Pubmenubuyservice;

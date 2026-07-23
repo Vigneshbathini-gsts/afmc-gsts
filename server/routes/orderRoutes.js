@@ -18,10 +18,10 @@ router.get("/attendant", authMiddleware, fetchAttendantOrders);
 router.get("/history", authMiddleware, fetchAdminOrderHistory);
 router.get("/non-member", authMiddleware, lookupNonMember);
 router.post("/non-member", authMiddleware, createOrUpdateNonMember);
+router.get("/user/history", authMiddleware, fetchUserOrderHistory);
 router.get("/:id/summary", authMiddleware, fetchOrderSummary);
 router.get("/:id/details", authMiddleware, fetchOrderDetails);
 router.get("/:id", authMiddleware, fetchOrderDetails);
-router.get("/user/history", authMiddleware, fetchUserOrderHistory);
 
 module.exports = router;
 

@@ -1715,7 +1715,7 @@ export default function Pubmenubuy({
     }
   };
 
-  
+
 
   const handleConfirmOrder = async () => {
     // Comprehensive validation before confirming

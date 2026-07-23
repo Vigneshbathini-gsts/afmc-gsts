@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { FaArrowLeft, FaDownload, FaSearch } from "react-icons/fa";
-import api from "../../../services/api";
+import { reportAPI } from "../../../services/api";
 import Stackreporttab from "./Stackreporttab";
 import { toInitCap } from "../../../utils/textFormat";
 import { exportTableToPdf } from "../../../utils/pdfExport";
@@ -49,13 +49,11 @@ export default function BarstockReports() {
         requestInFlight.current = true;
         setLoading(true);
 
-        const res = await api.get("/reports/stock-report", {
-          params: {
-            itemName: activeFilters.itemName.trim(),
-            itemCode: activeFilters.itemCode.trim(),
-            limit: rowsPerPage,
-            offset: nextPage * rowsPerPage,
-          },
+        const res = await reportAPI.getStockReport({
+          itemName: activeFilters.itemName.trim(),
+          itemCode: activeFilters.itemCode.trim(),
+          limit: rowsPerPage,
+          offset: nextPage * rowsPerPage,
         });
 
         const newData = res.data.data || [];
@@ -137,13 +135,11 @@ export default function BarstockReports() {
       // Fetch all pages using the same endpoint and params.
       // Stop when a page comes back smaller than our page size.
       while (true) {
-        const res = await api.get("/reports/stock-report", {
-          params: {
-            itemName: activeFilters.itemName.trim(),
-            itemCode: activeFilters.itemCode.trim(),
-            limit: rowsPerPage,
-            offset: offsetPage * rowsPerPage,
-          },
+        const res = await reportAPI.getStockReport({
+          itemName: activeFilters.itemName.trim(),
+          itemCode: activeFilters.itemCode.trim(),
+          limit: rowsPerPage,
+          offset: offsetPage * rowsPerPage,
         });
 
         const chunk = res.data.data || [];

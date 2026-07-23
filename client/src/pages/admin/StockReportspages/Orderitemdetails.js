@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { FaDownload, FaSearch } from "react-icons/fa";
 import { FaArrowLeft } from "react-icons/fa";
-import api from "../../../services/api";
+import { reportAPI } from "../../../services/api";
 import Stackreporttab from "./Stackreporttab";
 import { exportTableToPdf } from "../../../utils/pdfExport";
 import FilterDropdown from "../../../components/common/FilterDropdown";
@@ -108,11 +108,9 @@ export default function Orderitemdetails() {
     const fetchFilterOptions = async () => {
       setFiltersLoading(true);
       try {
-        const response = await api.get("/reports/orderitem/filter-options", {
-          params: {
-            fromDate: filters.fromDate,
-            toDate: filters.toDate,
-          },
+        const response = await reportAPI.getOrderItemFilterOptions({
+          fromDate: filters.fromDate,
+          toDate: filters.toDate,
         });
 
         if (response.data.success) {
@@ -147,12 +145,10 @@ export default function Orderitemdetails() {
     else setLoadingMore(true);
     setError("");
     try {
-      const res = await api.get("/reports/orderitem", {
-        params: {
-          ...buildQueryParams(activeFilters),
-          limit: REPORT_PAGE_SIZE,
-          offset: nextPage * REPORT_PAGE_SIZE,
-        },
+      const res = await reportAPI.getOrderItemReport({
+        ...buildQueryParams(activeFilters),
+        limit: REPORT_PAGE_SIZE,
+        offset: nextPage * REPORT_PAGE_SIZE,
       });
       if (res.data.success) {
         const rows = res.data.data || [];
@@ -228,12 +224,10 @@ export default function Orderitemdetails() {
     let offsetPage = 0;
 
     while (true) {
-      const res = await api.get("/reports/orderitem", {
-        params: {
-          ...buildQueryParams(appliedFilters),
-          limit: REPORT_PAGE_SIZE,
-          offset: offsetPage * REPORT_PAGE_SIZE,
-        },
+      const res = await reportAPI.getOrderItemReport({
+        ...buildQueryParams(appliedFilters),
+        limit: REPORT_PAGE_SIZE,
+        offset: offsetPage * REPORT_PAGE_SIZE,
       });
       const rows = res.data.data || [];
       const detailRows = rows.filter((row) => row?.item_id);

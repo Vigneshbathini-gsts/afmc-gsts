@@ -1,205 +1,7 @@
-// axios instance goes here
-import axios from "axios";
-import { clearAuthData, getToken } from "../utils/authStorage";
-import axiosRetry from "axios-retry";
+import api, { API_BASE_URL, authFetchJson } from "./apiClient";
 
-const clearOrderHistoryFilters = () => {
-  try {
-    Object.keys(sessionStorage).forEach((key) => {
-      if (key === "orderHistoryFilters" || key.startsWith("orderHistoryFilters:")) {
-        sessionStorage.removeItem(key);
-      }
-    });
-  } catch (_) {
-    // Ignore storage access errors.
-  }
-};
+export { API_BASE_URL, authFetchJson };
 
-const trimTrailingSlash = (value) => value.replace(/\/+$/, "");
-
-const getDefaultApiBase = () => {
-  if (typeof window === "undefined") {
-    return "http://localhost:7300/AFMCMESS/api";
-  }
-
-  const { protocol, hostname, port, origin } = window.location;
-
-  if (hostname === "localhost" || hostname === "127.0.0.1") {
-    const backendOrigin = `${protocol}//${hostname}:7300`;
-    return `${backendOrigin}/AFMCMESS/api`;
-  }
-
-  if (port === "3000") {
-    return `${protocol}//${hostname}:7300/AFMCMESS/api`;
-  }
-
-  return `${origin}/AFMCMESS/api`;
-};
-
-export const API_BASE_URL = trimTrailingSlash(
-  process.env.REACT_APP_API_URL || getDefaultApiBase()
-);
-
-const API = API_BASE_URL;
-
-const api = axios.create({
-  baseURL: API,
-  timeout: 8000,
-  headers: {
-    "Content-Type": "application/json",
-  },
-  withCredentials: true,
-});
-
-const dispatchNetworkEvent = (type) => {
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(new CustomEvent(type));
-  }
-};
-
-const isBackendNetworkError = (err) => {
-  const code = err?.response?.data?.code;
-  return code === "NETWORK_ERROR" || code === "GATEWAY_TIMEOUT";
-};
-
-// Configure automatic retries with Exponential Backoff
-axiosRetry(api, {
-  retries: 3, 
-  retryCondition: (error) => {
-    // Retries 5xx errors or generic network dropouts/timeouts
-    return axiosRetry.isNetworkOrIdempotentRequestError(error) || error.response?.status >= 500;
-  },
-  retryDelay: (retryCount) => {
-    console.log(`⏱️ Network slow. Retry attempt #${retryCount}...`);
-    return retryCount * 2000; 
-  },
-});
-
-// ================================
-// Attach token automatically
-// ================================
-api.interceptors.request.use(
-  (config) => {
-    const token = getToken();
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
-
-// ================================
-// Handle errors, network drops, and auth automatically
-// ================================
-api.interceptors.response.use(
-  (res) => res,
-  (err) => {
-    // 1. HANDLE COMPLETE DISCONNECTION
-    // This triggers if the browser is entirely offline
-    if (!navigator.onLine) {
-      console.error(" Device is offline.");
-      //  Dispatch native event to tell AuthContext/App.js to trigger the Offline Toast
-      window.dispatchEvent(new CustomEvent('app-network-offline'));
-      return Promise.reject(new Error("NETWORK_DISCONNECTED"));
-    }
-
-    // 2. HANDLE TIMEOUT / SLOW NETWORK (After all retries failed)
-    if (err.code === 'ECONNABORTED' || err.message.includes('timeout')) {
-      console.error(" Request timed out after retries due to a slow connection.");
-      dispatchNetworkEvent('app-network-slow');
-      return Promise.reject(new Error("NETWORK_TIMEOUT"));
-    }
-
-    if (isBackendNetworkError(err)) {
-      const code = err.response?.data?.code;
-      if (code === "GATEWAY_TIMEOUT") {
-        dispatchNetworkEvent('app-network-slow');
-      } else if (code === "NETWORK_ERROR") {
-        dispatchNetworkEvent('app-network-offline');
-      }
-      return Promise.reject(new Error(code));
-    }
-
-    // 3. HANDLE SPECIFIC SERVER STATUS CODES (Your existing logic remains completely intact)
-    if (
-      err.response?.status === 403 &&
-      err.response?.data?.code === "BAR_CLOSED" &&
-      !window.location.pathname.includes("/bar-closed")
-    ) {
-      window.location.href = "/bar-closed";
-    }
-
-    if (
-      err.response?.status === 401 &&
-      !window.location.pathname.includes("/login")
-    ) {
-      clearAuthData();
-      clearOrderHistoryFilters();
-      window.location.href = "/login";
-    }
-
-    return Promise.reject(err);
-  }
-);
-
-
-// ================================
-// Auth-aware fetch helper (for legacy fetch usage)
-// ================================
-export async function authFetchJson(input, init = {}) {
-  const token = getToken();
-  const headers = new Headers(init.headers || {});
-
-  if (token && !headers.has("Authorization")) {
-    headers.set("Authorization", `Bearer ${token}`);
-  }
-
-  const res = await fetch(input, {
-    ...init,
-    headers,
-    credentials: init.credentials ?? "include",
-  });
-
-  if (res.status === 401 && !window.location.pathname.includes("/login")) {
-    // Clear all authentication data when 401 Unauthorized is received
-    clearAuthData();
-    clearOrderHistoryFilters();
-    window.location.href = "/login";
-    throw new Error("Unauthorized");
-  }
-
-  let data;
-  try {
-    data = await res.json();
-  } catch {
-    data = null;
-  }
-
-  if (!res.ok) {
-    if (
-      res.status === 403 &&
-      data?.code === "BAR_CLOSED" &&
-      !window.location.pathname.includes("/bar-closed")
-    ) {
-      window.location.href = "/bar-closed";
-    }
-
-    const message =
-      (data && (data.message || data.error)) || `Request failed (${res.status})`;
-    throw new Error(message);
-  }
-
-  if (data?.success === false) {
-    throw new Error(data?.message || "Request failed");
-  }
-
-  return data;
-}
-
-// ================================
-// AUTH API
-// ================================
 export const authAPI = {
   login: (credentials) => api.post("/auth/login", credentials),
   getRole: (data) => api.post("/auth/get-role", data),
@@ -211,13 +13,6 @@ export const authAPI = {
   logout: () => api.post("/auth/logout"),
 };
 
-
-
-
-
-// ================================
-// USER MANAGEMENT API (Admin)
-// ================================
 export const userAPI = {
   getAll: (search = "") =>
     api.get("/users", {
@@ -237,31 +32,22 @@ export const userAPI = {
   delete: (id) => api.delete(`/users/${id}`),
 };
 
-// ================================
-// ITEM / MENU API
-// ================================
 export const itemAPI = {
   getAll: () => api.get("/items"),
   getById: (id) => api.get(`/items/${id}`),
   create: (itemData) => api.post("/items", itemData),
   update: (id, itemData) => api.put(`/items/${id}`, itemData),
   delete: (id) => api.delete(`/items/${id}`),
-
-  // image upload item
   createWithImage: (formData) =>
     api.post("/items", formData, {
       headers: { "Content-Type": "multipart/form-data" },
     }),
-
   updateWithImage: (id, formData) =>
     api.put(`/items/${id}`, formData, {
       headers: { "Content-Type": "multipart/form-data" },
     }),
 };
 
-// ================================
-// INVENTORY API
-// ================================
 export const inventoryAPI = {
   getAll: (params) => api.get("/inventory", { params }),
   getCategories: () => api.get("/inventory/categories"),
@@ -280,7 +66,8 @@ export const inventoryAPI = {
   getStockInReport: (params) => api.get("/inventory/stock-in-report", { params }),
   getStockOutReport: (params) => api.get("/inventory/stock-out-report", { params }),
   getTodayStockOutDetails: () => api.get("/inventory/today-stock-out-details"),
-  getStockOutItemByBarcode: (barcode) => api.get(`/inventory/stock-out/barcode/${barcode}`),
+  getStockOutItemByBarcode: (barcode) =>
+    api.get(`/inventory/stock-out/barcode/${barcode}`),
   createStockOut: (data) => api.post("/inventory/stock-out", data),
   getById: (id) => api.get(`/inventory/${id}`),
   addStock: (data) => api.post("/inventory/add-stock", data),
@@ -293,12 +80,11 @@ export const cartAPI = {
   addItem: (cartData) => api.post("/cart", cartData),
   addNewItem: (cartData) => api.post("/cart/add", cartData),
   proceedToBuy: (data = {}) => api.post("/cart/proceed-to-buy", data),
-  getCocktailDetails: (cartId, params) => api.get(`/cart/cocktail/${cartId}`, { params }),
-  updateCocktailIngredients: (cartId, data) => api.patch(`/cart/cocktail/${cartId}/ingredients`, data),
+  getCocktailDetails: (cartId, params) =>
+    api.get(`/cart/cocktail/${cartId}`, { params }),
+  updateCocktailIngredients: (cartId, data) =>
+    api.patch(`/cart/cocktail/${cartId}/ingredients`, data),
   customizeCocktail: (cartId, data) => api.put(`/cart/customize/${cartId}`, data),
-  // When editing an existing buy-flow order, pass the current order number so the backend
-  // can exclude that order from reserved stock calculations.
-  // Backwards compatible with legacy `excludeOrderNumber` param.
   getIngredientStocks: (codes, orderNumber, buyOrderNumber, excludeCartId) =>
     api.get("/cart/ingredient-stocks", {
       params: {
@@ -312,50 +98,37 @@ export const cartAPI = {
   updateQuantity: (cartId, quantity) => api.patch(`/cart/${cartId}`, { quantity }),
   deleteItem: (cartId) => api.delete(`/cart/${cartId}`),
   confirmOrder: (data) => api.post("/cart/confirm-order", data),
-  getLovIngredients: (subCategory) => api.get("/cart/lov-ingredients", { params: { subCategory } }),
+  getLovIngredients: (subCategory) =>
+    api.get("/cart/lov-ingredients", { params: { subCategory } }),
   getCustomItemDetails: (itemId) => api.get(`/cart/item/${itemId}/custom-details`),
-  saveCustomItemDetails: (itemId, data) => api.post(`/cart/item/${itemId}/custom-details`, data),
-  clearCustomItemDetails: (itemId) => api.delete(`/cart/item/${itemId}/custom-details`),
+  saveCustomItemDetails: (itemId, data) =>
+    api.post(`/cart/item/${itemId}/custom-details`, data),
+  clearCustomItemDetails: (itemId) =>
+    api.delete(`/cart/item/${itemId}/custom-details`),
 };
 
-// ================================
-// ORDERS API
-// ================================
 export const orderAPI = {
-  // Common
   create: (orderData) => api.post("/orders", orderData),
   getAll: () => api.get("/orders"),
   getById: (id) => api.get(`/orders/${id}`),
   getOrderDetails: (id) => api.get(`/orders/${id}`),
   updateStatus: (id, data) => api.put(`/orders/${id}/status`, data),
   cancelOrder: (id, data) => api.put(`/orders/${id}/cancel`, data),
-
-  // User
   getMyOrders: () => api.get("/orders/my-orders"),
   getActiveOrders: (params) => api.get("/orders/active", { params }),
   getUserOrderHistory: (params) => api.get("/orders/user/history", { params }),
-
-  // Kitchen
   getKitchenOrders: () => api.get("/orders/kitchen"),
   markPrepared: (id, data) => api.put(`/orders/${id}/prepare`, data),
-
-  // Attendant
   getAttendantOrders: (params) => api.get("/orders/attendant", { params }),
   lookupNonMember: (phone) =>
     api.get("/orders/non-member", {
       params: { phone },
     }),
   saveNonMember: (data) => api.post("/orders/non-member", data),
-
-  // Admin
   getOrderHistory: (params) => api.get("/orders/history", { params }),
   getOrderSummary: (orderNumber) => api.get(`/orders/${orderNumber}/summary`),
-  getUserOrderHistory: (params) => api.get("/orders/user/history", { params }),
 };
 
-// ================================
-// DASHBOARD / REPORTS API
-// ================================
 export const dashboardAPI = {
   getAdminStats: () => api.get("/dashboard/admin"),
   getKitchenStats: () => api.get("/dashboard/kitchen"),
@@ -367,31 +140,51 @@ export const reportAPI = {
   getSalesReport: () => api.get("/reports/sales"),
   getProfitReport: () => api.get("/reports/profit"),
   getCancelledOrdersReport: () => api.get("/reports/cancelled-orders"),
+  getStockReport: (params) => api.get("/reports/stock-report", { params }),
+  getOrderItemReport: (params) => api.get("/reports/orderitem", { params }),
+  getOrderItemFilterOptions: (params) =>
+    api.get("/reports/orderitem/filter-options", { params }),
+  getOrderTransactionReport: (params) =>
+    api.get("/reports/ordertransaction", { params }),
+  getOrderTransactionItems: () => api.get("/reports/ordertransaction/items"),
+  getOrderTransactionUsers: () => api.get("/reports/ordertransaction/users"),
+  getOrderTransactionKitchens: () =>
+    api.get("/reports/ordertransaction/kitchens"),
 };
 
 export const barOrdersAPI = {
-  getOrders: (kitchen) => api.get(`/bar-orders?kitchen=${kitchen}`),
+  getOrders: (kitchen) => api.get("/bar-orders", { params: { kitchen } }),
   updateStatus: (data) => api.put("/bar-orders/status", data),
   getOrderItems: (data) => api.post("/bar-orders/items", data),
   processScan: (data) => api.post("/bar-orders/scan", data),
-  getScannedItems: (orderNumber) => api.get(`/bar-orders/scanned-items/${orderNumber}`),
-  clearScannedItems: (orderNumber) => api.delete(`/bar-orders/scanned-items/${orderNumber}`),
+  getScannedItems: (orderNumber) =>
+    api.get(`/bar-orders/scanned-items/${orderNumber}`),
+  clearScannedItems: (orderNumber) =>
+    api.delete(`/bar-orders/scanned-items/${orderNumber}`),
   cancelItem: (data) => api.put("/bar-orders/cancel", data),
   cancelOrder: (data) => api.put("/bar-orders/cancel", data),
-  getActiveOrders: (kitchen = "Bar") => api.get(`/bar-orders/active?kitchen=${kitchen}`),
-  markNotificationAsRead: (data) => api.put("/bar-orders/notifications/read", data),
-  markAllNotificationsAsRead: (data) => api.put("/bar-orders/notifications/read-all", data),
-getCocktailDetailsById: (itemId, orderNumber) => api.get(`/bar-orders/cocktail/${itemId}?orderNumber=${orderNumber}`),
-getCancelledOrders: (params) => api.get("/bar-orders/cancelled-orders", { params }),
-getOrderHistory: (params) => api.get("/bar-orders/order-history", { params }),
-getOrderDetailsByOrderNumber: (orderNumber, kitchen) => api.get(`/bar-orders/cancelled-order-details/${orderNumber}`, { params: { kitchen } }),
-getOrderHistoryItemDetails: (orderNumber, kitchen) => api.get(`/bar-orders/order-history-details/${orderNumber}`, { params: { kitchen } }),
-completeOrder: (data) => api.post("/bar-orders/completeOrder", data),
-
+  getActiveOrders: (kitchen = "Bar") =>
+    api.get("/bar-orders/active", { params: { kitchen } }),
+  markNotificationAsRead: (data) =>
+    api.put("/bar-orders/notifications/read", data),
+  markAllNotificationsAsRead: (data) =>
+    api.put("/bar-orders/notifications/read-all", data),
+  getCocktailDetailsById: (itemId, orderNumber) =>
+    api.get(`/bar-orders/cocktail/${itemId}`, { params: { orderNumber } }),
+  getCancelledOrders: (params) =>
+    api.get("/bar-orders/cancelled-orders", { params }),
+  getOrderHistory: (params) => api.get("/bar-orders/order-history", { params }),
+  getOrderDetailsByOrderNumber: (orderNumber, kitchen) =>
+    api.get(`/bar-orders/cancelled-order-details/${orderNumber}`, {
+      params: { kitchen },
+    }),
+  getOrderHistoryItemDetails: (orderNumber, kitchen) =>
+    api.get(`/bar-orders/order-history-details/${orderNumber}`, {
+      params: { kitchen },
+    }),
+  completeOrder: (data) => api.post("/bar-orders/completeOrder", data),
 };
-// ================================
-// COLLECTION API (Barcode Scan Collection)
-// ================================
+
 export const collectionAPI = {
   getByOrder: (orderNumber) => api.get(`/collection/${orderNumber}`),
   add: (data) => api.post("/collection", data),
@@ -403,38 +196,25 @@ export const collectionAPI = {
   getSummary: (orderNumber) => api.get(`/collection/${orderNumber}/summary`),
 };
 
-// ================================
-// OFFERS API
-// ================================
 export const offersAPI = {
   getAllOffers: () => api.get("/offers"),
   getOfferById: (id) => api.get(`/offers/${id}`),
-  createOffer: (data) => api.post('/offers', data),
+  createOffer: (data) => api.post("/offers", data),
   updateOffer: (id, data) => api.put(`/offers/${id}`, data),
   getAllItemsForOffer: () => api.get("/offers/items"),
 };
-
-// ================================
-// PRICE MANAGEMENT API
-// ================================
 
 export const priceAPI = {
   getItemByBarcode: (barcode) => api.get(`/price/barcode/${barcode}`),
   updateItemPrice: (data) => api.put("/price/price-update", data),
 };
 
-// ================================
-// PROFIT MANAGEMENT API
-// ================================
 export const profitAPI = {
   getProfitData: () => api.get("/profit/report"),
   updateMemberPricing: (data) => api.put("/profit/member", data),
   updateNonMemberPricing: (data) => api.put("/profit/non-member", data),
 };
 
-// ================================
-// COCKTAIL / BAR API
-// ================================
 export const cocktailAPI = {
   getAll: (params) => api.get("/cocktails", { params }),
   getById: (id) => api.get(`/cocktails/${id}`),
@@ -456,8 +236,6 @@ export const cocktailAPI = {
     }),
 };
 
-//Notification API
-
 export const notificationAPI = {
   getStockOutNotifications: () => api.get("/notifications/stock-out"),
   markStockOutRead: (itemCode) =>
@@ -466,7 +244,8 @@ export const notificationAPI = {
 
 export const invoiceAPI = {
   getByOrderNumber: (orderNumber) => api.get(`/invoice/${orderNumber}`),
-  savePayment: (orderNumber, data) => api.post(`/invoice/${orderNumber}/payment`, data),
+  savePayment: (orderNumber, data) =>
+    api.post(`/invoice/${orderNumber}/payment`, data),
 };
 
 export const invoiceReportAPI = {
@@ -481,7 +260,5 @@ export const barStatusAPI = {
   getStatus: () => api.get("/bar-status"),
   updateStatus: (status) => api.put("/bar-status", { status }),
 };
-
-
 
 export default api;

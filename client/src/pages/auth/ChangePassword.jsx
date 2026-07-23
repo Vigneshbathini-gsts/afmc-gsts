@@ -1,8 +1,7 @@
 import React, { useState } from "react";
-import axios from "axios";
 import { FaLock, FaArrowLeft, FaEye, FaEyeSlash } from "react-icons/fa";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { API_BASE_URL } from "../../services/api";
+import { authAPI } from "../../services/api";
 
 export default function ChangePassword() {
     const { token } = useParams();
@@ -35,13 +34,7 @@ export default function ChangePassword() {
         try {
             setLoading(true);
 
-            const res = await axios.post(
-                `${API_BASE_URL}/auth/reset-password`,
-                {
-                    token,
-                    password,
-                }
-            );
+            const res = await authAPI.resetPassword({ token, password });
 
             setMessage(res.data.message);
 

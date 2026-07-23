@@ -111,29 +111,32 @@ app.get(BASE_PATH, haltOnTimeout, (req, res) => {
   res.json({ status: "Server is running", basePath: BASE_PATH, apiBasePath: API_BASE_PATH });
 });
 
-const authRoutes = require("./routes/authRoutes");
-const reportRoutes = require("./routes/reportRoutes");
-const cocktailRoutes = require("./routes/cocktailRoutes");
-const userRoutes = require("./routes/userRoutes");
-const orderRoutes = require("./routes/orderRoutes");
-const KitchenOrdersRoutes = require("./routes/KitchenOrdersRoutes");
-const collectionRoutes = require("./routes/collectionRoutes");
-const priceRoutes = require("./routes/priceRoutes");
-const offerRoutes = require("./routes/offerRoutes");
-const inventoryRoutes = require("./routes/inventoryRoutes");
-const cartRoutes = require("./modules/cart/cartRoutes");
-const profitRoutes = require("./routes/profitRoutes");
-const notificationRoutes = require("./routes/notificationRoutes");
-const cancelledOrdersRoutes = require("./routes/cancelledOrdersRoutes");
+const authRoutes = require("./src/features/auth/auth.routes");
+const reportRoutes = require("./src/features/reports/report.routes");
+const cocktailRoutes = require("./src/features/cocktails/cocktail.routes");
+const userRoutes = require("./src/features/users/user.routes");
+const orderRoutes = require("./src/features/orders/order.routes");
+const outletOrderRoutes = require("./src/features/outletOrders/outletOrder.routes");
+const collectionRoutes = require("./src/features/collection/collection.routes");
+const priceRoutes = require("./src/features/pricing/price.routes");
+const offerRoutes = require("./src/features/offers/offer.routes");
+const inventoryRoutes = require("./src/features/inventory/inventory.routes");
+const cartRoutes = require("./src/features/cart/cart.routes");
+const profitRoutes = require("./src/features/pricing/profit.routes");
+const notificationRoutes = require("./src/features/notifications/notification.routes");
+const cancelledOrdersRoutes = require("./src/features/cancelledOrders/cancelledOrder.routes");
 const menuRoutesbeer = require("./routes/MenuRoutesbeer");
 const Pubmenubuyroutes = require("./modules/pubmenubuy/Pubmenubuyroutes");
 const ConfirmOrderroutes = require("./routes/ConfirmOrderroutes");
-const invoiceRoutes = require("./modules/invoice/invoiceRoutes");
-const InvoiceReportroute = require("./modules/invoice-report/InvoiceReportroute");
+const menuRoutes = require("./src/features/menu/menu.routes");
+const buyOrderRoutes = require("./src/features/buyOrders/buyOrder.routes");
+const confirmedOrderRoutes = require("./src/features/confirmedOrders/confirmedOrder.routes");
+const invoiceRoutes = require("./src/features/invoices/invoice.routes");
+const InvoiceReportroute = require("./src/features/invoices/invoiceReport.routes");
 const orderHistoryRoutes = require("./routes/orderHistoryRoutes");
-const paymentRoutes = require("./modules/payment/paymentRoutes");
+const paymentRoutes = require("./src/features/payments/payment.routes");
 const orderEvents = require("./utils/orderEvents");
-const barStatusRoutes = require("./routes/BarStatusRoutes");
+const barStatusRoutes = require("./src/features/barStatus/barStatus.routes");
 
 const apiPrefixes = ["/api", API_BASE_PATH];
 for (const prefix of apiPrefixes) {
@@ -143,7 +146,7 @@ for (const prefix of apiPrefixes) {
   app.use(`${prefix}/cocktails`, haltOnTimeout, cocktailRoutes);
   app.use(`${prefix}/users`, haltOnTimeout, userRoutes);
   app.use(`${prefix}/orders`, haltOnTimeout, orderRoutes);
-  app.use(`${prefix}/bar-orders`, haltOnTimeout, KitchenOrdersRoutes);
+  app.use(`${prefix}/bar-orders`, haltOnTimeout, outletOrderRoutes);
   app.use(`${prefix}/collection`, haltOnTimeout, collectionRoutes);
   app.use(`${prefix}/price`, haltOnTimeout, priceRoutes);
   app.use(`${prefix}/offers`, haltOnTimeout, offerRoutes);
@@ -152,6 +155,9 @@ for (const prefix of apiPrefixes) {
   app.use(`${prefix}/profit`, haltOnTimeout, profitRoutes);
   app.use(`${prefix}/notifications`, haltOnTimeout, notificationRoutes);
   app.use(`${prefix}/cancelled-orders`, haltOnTimeout, cancelledOrdersRoutes);
+  app.use(`${prefix}/menu`, haltOnTimeout, menuRoutes);
+  app.use(`${prefix}/buy-orders`, haltOnTimeout, buyOrderRoutes);
+  app.use(`${prefix}/confirmed-orders`, haltOnTimeout, confirmedOrderRoutes);
   
   app.use(prefix, haltOnTimeout, menuRoutesbeer);
   app.use(prefix, haltOnTimeout, Pubmenubuyroutes);

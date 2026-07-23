@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { FaDownload, FaSearch } from "react-icons/fa";
 import { FaArrowLeft } from "react-icons/fa";
-import api from "../../../services/api";
+import { reportAPI } from "../../../services/api";
 import Stackreporttab from "./Stackreporttab";
 import { exportTableToPdf } from "../../../utils/pdfExport";
 import FilterDropdown from "../../../components/common/FilterDropdown";
@@ -120,9 +120,9 @@ export default function OrderTransactionUI() {
       setFiltersLoading(true);
       try {
         const [itemResponse, userResponse, kitchenResponse] = await Promise.all([
-          api.get("/reports/ordertransaction/items"),
-          api.get("/reports/ordertransaction/users"),
-          api.get("/reports/ordertransaction/kitchens"),
+          reportAPI.getOrderTransactionItems(),
+          reportAPI.getOrderTransactionUsers(),
+          reportAPI.getOrderTransactionKitchens(),
         ]);
 
         setFilterOptions({
@@ -158,9 +158,7 @@ export default function OrderTransactionUI() {
         limit: REPORT_PAGE_SIZE,
         offset: nextPage * REPORT_PAGE_SIZE,
       };
-      const { data: response } = await api.get("/reports/ordertransaction", {
-        params: queryParams,
-      });
+      const { data: response } = await reportAPI.getOrderTransactionReport(queryParams);
 
       if (response.success) {
         // Server may include a pre-calculated total row (e.g. ORD === 2). We compute totals
@@ -231,12 +229,10 @@ export default function OrderTransactionUI() {
     let offsetPage = 0;
 
     while (true) {
-      const { data: response } = await api.get("/reports/ordertransaction", {
-        params: {
-          ...buildQueryParams(appliedFilters),
-          limit: REPORT_PAGE_SIZE,
-          offset: offsetPage * REPORT_PAGE_SIZE,
-        },
+      const { data: response } = await reportAPI.getOrderTransactionReport({
+        ...buildQueryParams(appliedFilters),
+        limit: REPORT_PAGE_SIZE,
+        offset: offsetPage * REPORT_PAGE_SIZE,
       });
       const chunk = (Array.isArray(response.data) ? response.data : []).filter(
         (row) => row?.ORD !== 2
