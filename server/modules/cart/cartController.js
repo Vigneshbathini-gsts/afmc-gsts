@@ -1082,11 +1082,14 @@ exports.getIngredientStocks = async (req, res) => {
       ? Number(rawExcludeCartId)
       : null;
 
+    const ignoreOwnCart = String(req.query?.ignoreOwnCart || "").trim().toLowerCase() === "true";
+
     const data = await cartModel.getIngredientStockMap(
       codes,
       excludeOrderNumber,
       req.user?.userId,
-      excludeCartId
+      excludeCartId,
+      ignoreOwnCart
     );
     return res.status(200).json({ success: true, data });
   } catch (error) {

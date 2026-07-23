@@ -847,7 +847,7 @@ function ProgressiveMenuGrid({
       }
 
       try {
-        const response = await cartAPI.getIngredientStocks(codes);
+          const response = await cartAPI.getIngredientStocks(codes, undefined, undefined, undefined, true);
         const stockMap = response?.data?.data || {};
         if (!alive) return;
         setAvailabilityByCode((current) => {

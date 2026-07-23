@@ -1570,7 +1570,7 @@ const getReservedQuantitiesForOrder = async (connection, itemCodes, excludeOrder
   }, {});
 };
 
-const getIngredientStockMap = async (itemCodes, excludeOrderNumber = null, userId = null, excludeCartId = null) => {
+const getIngredientStockMap = async (itemCodes, excludeOrderNumber = null, userId = null, excludeCartId = null, ignoreOwnCart = false) => {
   let connection;
 
   const normalizedCodes = [...new Set((Array.isArray(itemCodes) ? itemCodes : [])
@@ -1629,9 +1629,9 @@ const getIngredientStockMap = async (itemCodes, excludeOrderNumber = null, userI
       return acc;
     }, {});
 
-    if (!userId) {
-      return baseStock;
-    }
+   if (!userId || ignoreOwnCart) {
+       return baseStock;
+     }
 
     const cartConsumptionMap = await getCartConsumptionMap(connection, userId, normalizedCodes, excludeCartId);
 
