@@ -330,7 +330,7 @@ return (
             <label className="block text-sm font-medium text-gray-700 mb-2">
               {isBatchWiseItem(stockForm.subCategoryId)
                 ? "Quantity"
-                : "No of Pegs"}
+                : "No of Pegs/ Quantity"}
             </label>
             <input
               type="text"

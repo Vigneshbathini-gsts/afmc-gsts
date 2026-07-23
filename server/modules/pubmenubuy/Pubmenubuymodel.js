@@ -619,7 +619,13 @@ async function getCocktailStockStatusMap(connection, orderNumber, cocktailItemId
     .filter((code) => Number.isFinite(code) && code > 0))];
 
   const stockMap = await getIngredientStockQuantities(connection, ingredientCodes);
-  const reservedMap = await getIngredientReservedQuantitiesExcludingOrder(connection, ingredientCodes, normalizedOrderNumber);
+  // Use the same running reservation counter (xxafmc_stock_reservation_totals) that
+  // regular items use, instead of summing xxafmc_order_details across every draft
+  // order ever created. The order_details-based approach never expires, so old
+  // abandoned carts (days/weeks/months old) permanently lock up stock they never
+  // actually consumed. reservation_totals is only ever adjusted by explicit
+  // reserve/release/consume actions, so it reflects real, current holds.
+  const reservedMap = await getReservedQuantitiesExcludingOrder(connection, ingredientCodes, normalizedOrderNumber);
 
   const statusMap = new Map();
   const debugEnabled = String(process.env.DEBUG_COCKTAIL_STOCK || "") === "1";
@@ -634,7 +640,7 @@ async function getCocktailStockStatusMap(connection, orderNumber, cocktailItemId
     const overrideParentQty = Number(overrideParentQtyRaw);
     for (const ingredient of ingredients) {
       const stockQuantity = Number(stockMap[String(ingredient.itemCode)] || 0);
-      const reservedQuantity = Number(reservedMap[String(ingredient.itemCode)] || 0);
+      const reservedQuantity = Number(reservedMap.get(String(ingredient.itemCode)) || 0);
       const availableQuantity = Math.max(0, stockQuantity - reservedQuantity);
       const parentQty =
         Number.isFinite(overrideParentQty) && overrideParentQty > 0
@@ -708,7 +714,7 @@ async function getCocktailStockStatusMap(connection, orderNumber, cocktailItemId
       .filter((code) => Number.isFinite(code) && code > 0))];
 
     const legacyStockMap = await getIngredientStockQuantities(connection, legacyIngredientCodes);
-    const legacyReservedMap = await getIngredientReservedQuantitiesExcludingOrder(connection, legacyIngredientCodes, normalizedOrderNumber);
+    const legacyReservedMap = await getReservedQuantitiesExcludingOrder(connection, legacyIngredientCodes, normalizedOrderNumber);
 
     // (Optional) local debugging: set DEBUG_COCKTAIL_STOCK=1 to print stock calculations.
     if (debugEnabled) {
@@ -736,7 +742,7 @@ async function getCocktailStockStatusMap(connection, orderNumber, cocktailItemId
       let maxPossibleQty = Infinity;
       for (const ingredient of ingredients) {
         const stockQuantity = Number(legacyStockMap[String(ingredient.itemCode)] || 0);
-        const reservedQuantity = Number(legacyReservedMap[String(ingredient.itemCode)] || 0);
+        const reservedQuantity = Number(legacyReservedMap.get(String(ingredient.itemCode)) || 0);
         const availableQuantity = Math.max(0, stockQuantity - reservedQuantity);
         const requiredQuantity = Number(ingredient.pegs || 0) * parentQuantity;
 
