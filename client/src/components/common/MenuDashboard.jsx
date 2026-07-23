@@ -469,7 +469,7 @@ function MenuPopupCompact({ item, loading, onClose, onBuy }) {
 
             if (ingredients.length > 0) {
               const codes = [...new Set(ingredients.map((ing) => ing.itemCode))];
-              const stockRes = await cartAPI.getIngredientStocks(codes);
+              const stockRes = await cartAPI.getIngredientStocks(codes, undefined, undefined, undefined, true);
               const stockMap = stockRes?.data?.data || {};
 
               for (const ing of ingredients) {
@@ -492,7 +492,7 @@ function MenuPopupCompact({ item, loading, onClose, onBuy }) {
         } else if (Number.isFinite(itemCode) && itemCode > 0) {
           // For regular items, check available quantity (reservation-aware via API)
           try {
-            const stockRes = await cartAPI.getIngredientStocks([itemCode]);
+            const stockRes = await cartAPI.getIngredientStocks([itemCode], undefined, undefined, undefined, true);
             const stockMap = stockRes?.data?.data || {};
             const rawAvailable = stockMap?.[String(itemCode)];
             if (rawAvailable !== undefined && rawAvailable !== null && rawAvailable !== "") {
@@ -847,7 +847,14 @@ function ProgressiveMenuGrid({
       }
 
       try {
-          const response = await cartAPI.getIngredientStocks(codes, undefined, undefined, undefined, true);
+        // Dashboard tiles should reflect true remaining physical stock, not
+        // stock minus what this same user already put in their own cart.
+        // Otherwise, adding the last N units to the cart makes the tile show
+        // "Out of Stock" even though those units are still buyable by this
+        // same user via the buy flow. excludeCartId/orderNumber are left
+        // unset here on purpose; ignoreOwnCart=true skips the own-cart
+        // subtraction entirely on the backend.
+        const response = await cartAPI.getIngredientStocks(codes, undefined, undefined, undefined, true);
         const stockMap = response?.data?.data || {};
         if (!alive) return;
         setAvailabilityByCode((current) => {
@@ -1602,7 +1609,7 @@ function MenuDashboard() {
 
           if (ingredients.length > 0) {
             const codes = [...new Set(ingredients.map((ing) => ing.itemCode))];
-            const stockRes = await cartAPI.getIngredientStocks(codes);
+            const stockRes = await cartAPI.getIngredientStocks(codes, undefined, undefined, undefined, true);
             const stockMap = stockRes?.data?.data || {};
 
             for (const ing of ingredients) {
@@ -1618,7 +1625,7 @@ function MenuDashboard() {
             }
           }
         } else if (Number.isFinite(itemCode) && itemCode > 0) {
-          const stockRes = await cartAPI.getIngredientStocks([itemCode]);
+          const stockRes = await cartAPI.getIngredientStocks([itemCode], undefined, undefined, undefined, true);
           const stockMap = stockRes?.data?.data || {};
           const rawAvailable = stockMap?.[String(itemCode)];
           if (rawAvailable !== undefined && rawAvailable !== null && rawAvailable !== "") {
@@ -1877,4 +1884,3 @@ function MenuDashboard() {
 }
 
 export default MenuDashboard;
-

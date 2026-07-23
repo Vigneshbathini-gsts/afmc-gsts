@@ -518,7 +518,7 @@ export default function Pubmenubuy({
         const stockCodes = [...new Set([...currentConsumption.keys()])]
           .filter((code) => Number.isFinite(Number(code)) && Number(code) > 0);
 
-        const stockRes = await cartAPI.getIngredientStocks(stockCodes, orderNumber);
+        const stockRes = await cartAPI.getIngredientStocks(stockCodes, orderNumber, undefined, undefined, true);
         const stockMap = stockRes?.data?.data || {};
 
         const next = {};
@@ -746,7 +746,7 @@ export default function Pubmenubuy({
     }
 
     try {
-      const stockRes = await cartAPI.getIngredientStocks(codes, orderNumber);
+      const stockRes = await cartAPI.getIngredientStocks(codes, orderNumber, undefined, undefined, true);
       const stockMap = stockRes?.data?.data || {};
 
       for (const code of codes) {
@@ -1426,7 +1426,7 @@ export default function Pubmenubuy({
 
     try {
       const codes = [...new Set(ingredients.map((ing) => ing.itemCode))];
-      const stockRes = await cartAPI.getIngredientStocks(codes, orderNumber);
+      const stockRes = await cartAPI.getIngredientStocks(codes, orderNumber, undefined, undefined, true);
       const stockMap = stockRes?.data?.data || {};
 
       for (const ing of ingredients) {
