@@ -28,6 +28,13 @@ const getKitchenConfig = (value) => {
 
 const sameCode = (left, right) => String(left ?? "").trim() === String(right ?? "").trim();
 
+const orderPegMultiplierSql = `
+  CASE
+    WHEN UPPER(TRIM(COALESCE(xod.type, ''))) IN ('L', 'LARGE') THEN 2
+    ELSE 1
+  END
+`;
+
 const saveSession = (req) =>
   new Promise((resolve, reject) => {
     if (!req.session?.save) return resolve();
@@ -84,7 +91,7 @@ async function getReservationReleaseRowsForCancel(connection, { orderNumber, ord
       FROM (
         SELECT
           xod.item_id AS item_code,
-          SUM(COALESCE(xod.quantity, 0)) AS release_qty
+          SUM(COALESCE(xod.quantity, 0) * ${orderPegMultiplierSql}) AS release_qty
         FROM xxafmc_order_details xod
         JOIN (${inventorySummarySql}) inv ON inv.item_code = xod.item_id
         WHERE ${filterSql}
@@ -96,7 +103,7 @@ async function getReservationReleaseRowsForCancel(connection, { orderNumber, ord
 
         SELECT
           cm.item_code,
-          SUM(COALESCE(cm.pegs, 0) * COALESCE(cm.quantity, 0)) AS release_qty
+          SUM(COALESCE(cm.pegs, 0) * COALESCE(cm.quantity, 0) * ${orderPegMultiplierSql}) AS release_qty
         FROM xxafmc_order_details xod
         JOIN (${inventorySummarySql}) inv ON inv.item_code = xod.item_id
         JOIN xxafmc_custom_cocktails_mocktails_details cm
@@ -111,7 +118,7 @@ async function getReservationReleaseRowsForCancel(connection, { orderNumber, ord
 
         SELECT
           cm.item_code,
-          SUM(COALESCE(cm.pegs, 0) * COALESCE(cm.quantity, 0)) AS release_qty
+          SUM(COALESCE(cm.pegs, 0) * COALESCE(cm.quantity, 0) * ${orderPegMultiplierSql}) AS release_qty
         FROM xxafmc_order_details xod
         JOIN (${inventorySummarySql}) inv ON inv.item_code = xod.item_id
         JOIN xxafmc_custom_cocktails_mocktails_details_dummy cm
@@ -126,7 +133,7 @@ async function getReservationReleaseRowsForCancel(connection, { orderNumber, ord
 
         SELECT
           recipe.item_code,
-          SUM(COALESCE(recipe.pegs, 0) * COALESCE(xod.quantity, 0)) AS release_qty
+          SUM(COALESCE(recipe.pegs, 0) * COALESCE(xod.quantity, 0) * ${orderPegMultiplierSql}) AS release_qty
         FROM xxafmc_order_details xod
         JOIN (${inventorySummarySql}) inv ON inv.item_code = xod.item_id
         JOIN xxafmc_cocktails_mocktails_details recipe

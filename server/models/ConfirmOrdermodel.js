@@ -13,6 +13,17 @@ function deriveKitchenTypeFromCategory(categoryName) {
   return normalized === "LIQUOR" ? "Bar" : "Kitchen";
 }
 
+function getPegReservationMultiplier(description) {
+  const normalized = String(description || "").trim().toUpperCase();
+  return normalized === "L" || normalized === "LARGE" ? 2 : 1;
+}
+
+function getConfirmedReservationQuantity(quantity, description) {
+  const qty = Number(quantity || 0);
+  if (!Number.isFinite(qty) || qty <= 0) return 0;
+  return qty * getPegReservationMultiplier(description);
+}
+
 async function getIngredientStockQuantities(connection, ingredientCodes) {
   const normalizedCodes = [...new Set((Array.isArray(ingredientCodes) ? ingredientCodes : [])
     .map((code) => Number(code))
@@ -739,7 +750,7 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
           od.barcode,
           od.type_id,
           xi.item_name,
-          xi.description,
+          COALESCE(NULLIF(TRIM(od.type), ''), xi.description) AS description,
           xi.category_id,
           xi.sub_category,
           c.category_name,
@@ -803,7 +814,7 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
               od.barcode,
               od.type_id,
               xi.item_name,
-              xi.description,
+              COALESCE(NULLIF(TRIM(od.type), ''), xi.description) AS description,
               xi.category_id,
               xi.sub_category,
               c.category_name,
@@ -856,7 +867,7 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
             od.barcode,
             od.type_id,
             xi.item_name,
-            xi.description,
+            COALESCE(NULLIF(TRIM(od.type), ''), xi.description) AS description,
             xi.category_id,
             xi.sub_category,
             c.category_name,
@@ -898,7 +909,7 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
             od.barcode,
             od.type_id,
             xi.item_name,
-            xi.description,
+            COALESCE(NULLIF(TRIM(od.type), ''), xi.description) AS description,
             xi.category_id,
             xi.sub_category,
             c.category_name,
@@ -1017,10 +1028,13 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
         if (!Number.isFinite(itemId) || itemId <= 0) continue;
         if (!Number.isFinite(qty) || qty <= 0) continue;
 
+        const reservationQty = getConfirmedReservationQuantity(qty, row.description);
+        if (reservationQty <= 0) continue;
+
         const isCocktailOrMocktail = [14, 15].includes(Number(row.sub_category));
         if (!isCocktailOrMocktail) {
           // eslint-disable-next-line no-await-in-loop
-          await reserveTotalsQty(itemId, qty);
+          await reserveTotalsQty(itemId, reservationQty);
           continue;
         }
 
@@ -1028,7 +1042,7 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
         for (const ingredient of ingredientRows) {
           const ingredientCode = Number(ingredient.item_code || 0);
           const pegsPerUnit = Number(ingredient.pegs || 0);
-          const requiredQty = pegsPerUnit * qty;
+          const requiredQty = pegsPerUnit * reservationQty;
           if (!Number.isFinite(requiredQty) || requiredQty <= 0) continue;
           // eslint-disable-next-line no-await-in-loop
           await lockReservationTotal(ingredientCode);
@@ -1054,9 +1068,11 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
 
       if (shouldDeductOnConfirm) {
         const isCocktailOrMocktail = [14, 15].includes(Number(row.sub_category));
+        const reservationQty = getConfirmedReservationQuantity(qty, row.description);
+        if (reservationQty <= 0) continue;
 
         if (!isCocktailOrMocktail) {
-          await deductStockOutFifo(itemId, qty);
+          await deductStockOutFifo(itemId, reservationQty);
         } else {
           const [ingredientRows] = await connection.execute(
             `
@@ -1071,7 +1087,7 @@ async function confirmOrder(orderNumber, authUser = {}, payload = {}) {
           for (const ingredient of ingredientRows) {
             const ingredientCode = Number(ingredient.item_code || 0);
             const pegsPerUnit = Number(ingredient.pegs || 0);
-            const requiredQty = pegsPerUnit * qty;
+            const requiredQty = pegsPerUnit * reservationQty;
             await deductStockOutFifo(ingredientCode, requiredQty);
           }
         }

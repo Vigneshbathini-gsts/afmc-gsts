@@ -1470,6 +1470,8 @@ export default function Pubmenubuy({
       return;
     }
 
+    setUpdatingLineId(lineId);
+
     const liveItem = items.find((row) => Number(row?.orderLineId ?? row?.id) === lineId) || item;
 
     if (liveItem?.isFreeItem) {
