@@ -1,10 +1,9 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { FaCamera, FaSearch, FaTrash } from "react-icons/fa";
 import { toast } from "react-toastify";
 import BarcodeScanner from "../../components/common/BarcodeScanner";
 import { inventoryAPI } from "../../services/api";
 
-const STOCK_TYPE_OPTIONS = ["Purchased", "Free"];
 const BATCH_WISE_SUB_CATEGORIES = new Set([6, 7, 9, 10, 18]);
 const SINGLE_QUANTITY_SUB_CATEGORIES = new Set([1, 3, 1310]);
 
@@ -29,6 +28,25 @@ const formatDisplayDate = (value) => {
   return `${parsed.getMonth() + 1}/${parsed.getDate()}/${parsed.getFullYear()}`;
 };
 
+const normalizeBatchPart = (value) =>
+  String(value || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/-/g, " ");
+
+const buildBatchId = (itemName, transactionDate, sequence) => {
+  const normalizedName = normalizeBatchPart(itemName) || "Item";
+  const normalizedDate = transactionDate || formatDate(new Date());
+  return `${normalizedName}-${normalizedDate}-${String(sequence).padStart(3, "0")}`;
+};
+
+const incrementBatchId = (batchId, offset) => {
+  const match = String(batchId || "").match(/^(.*-)(\d+)$/);
+  if (!match) return batchId;
+  const nextSequence = Number(match[2]) + offset;
+  return `${match[1]}${String(nextSequence).padStart(match[2].length, "0")}`;
+};
+
 const buildInitialStockForm = (item) => ({
   itemCode: item?.item_code || "",
   itemName: item?.item_name || "",
@@ -43,9 +61,7 @@ const buildInitialStockForm = (item) => ({
   quantity: 1,
   volume: "",
   barcode: "",
-  batchId: "",
   stockType: "Purchased",
-  prepCharges: "",
 });
 
 export default function AddStockModal({
@@ -64,6 +80,51 @@ export default function AddStockModal({
   console.log("stockForm", stockForm);
   const [stockRows, setStockRows] = useState([]);
   const [stockRowSearch, setStockRowSearch] = useState("");
+  const [generatedBatchId, setGeneratedBatchId] = useState("");
+
+  const nextBatchSequence = useMemo(() => {
+    const currentItem = String(stockForm.itemCode || "");
+    const currentDate = String(stockForm.transactionDate || "");
+    return (
+      stockRows.filter(
+        (row) =>
+          String(row.itemCode || "") === currentItem &&
+          String(row.transactionDate || "") === currentDate
+      ).length + 1
+    );
+  }, [stockForm.itemCode, stockForm.transactionDate, stockRows]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchNextBatchId = async () => {
+      if (!stockForm.itemCode || !stockForm.transactionDate) {
+        setGeneratedBatchId("");
+        return;
+      }
+
+      try {
+        const response = await inventoryAPI.getNextBatchId({
+          itemCode: stockForm.itemCode,
+          transactionDate: stockForm.transactionDate,
+        });
+        if (!cancelled) {
+          const backendBatchId = response.data?.data?.batchId || "";
+          setGeneratedBatchId(incrementBatchId(backendBatchId, nextBatchSequence - 1));
+        }
+      } catch (err) {
+        console.error("Failed to generate batch ID:", err);
+        if (!cancelled) {
+          setGeneratedBatchId(buildBatchId(stockForm.itemName, stockForm.transactionDate, nextBatchSequence));
+        }
+      }
+    };
+
+    fetchNextBatchId();
+    return () => {
+      cancelled = true;
+    };
+  }, [nextBatchSequence, stockForm.itemCode, stockForm.itemName, stockForm.transactionDate]);
 
   const closeStockModal = () => {
     setStockError("");
@@ -135,6 +196,7 @@ export default function AddStockModal({
     const quantityLabel = isBatchWiseItem(stockForm.subCategoryId)
       ? "Quantity"
       : "No of Pegs/Quantity";
+    const batchId = generatedBatchId || buildBatchId(stockForm.itemName, stockForm.transactionDate, nextBatchSequence);
 
     setStockRows((current) => [
       ...current,
@@ -143,15 +205,13 @@ export default function AddStockModal({
         itemName: stockForm.itemName,
         quantity: numericQuantity,
         barcode: normalizedBarcode,
-        batchName: `${stockForm.itemName}-${numericQuantity}-${stockForm.volume || ""}-${formatDisplayDate(
-          stockForm.transactionDate
-        )}`,
+        batchName: batchId,
         quantityLabel,
         rate: stockForm.rate,
         transactionDate: stockForm.transactionDate,
         displayTransactionDate: formatDisplayDate(stockForm.transactionDate),
         volume: stockForm.volume,
-        batchId: stockForm.batchId,
+        batchId,
         acUnit: stockForm.acUnit,
         categoryId: stockForm.categoryId,
         subCategoryId: stockForm.subCategoryId,
@@ -159,14 +219,13 @@ export default function AddStockModal({
         currentStock: stockForm.currentStock,
         profit: stockForm.profit,
         stockType: stockForm.stockType,
-        prepCharges: stockForm.prepCharges,
       },
     ]);
 
     setShowLowerSection(true);
     setStockInfo("Stock row staged.");
     setStockForm((prev) => ({ ...prev, barcode: "" }));
-  }, [stockForm, stockRows]);
+  }, [generatedBatchId, nextBatchSequence, stockForm, stockRows]);
 
   const handleStageStock = async () => {
     await stageStockRow(stockForm.barcode);
@@ -197,26 +256,11 @@ export default function AddStockModal({
     setStockError("");
   };
 
-  const handleStockPrepChargesChange = (value) => {
-    setStockForm((prev) => ({ ...prev, prepCharges: value }));
-    setStockRows((current) =>
-      current.map((row) => ({
-        ...row,
-        prepCharges: row.prepCharges || value,
-      }))
-    );
-  };
-
   const handleAddStock = async () => {
     if (stockRows.length === 0) {
       const validationMessage = "Add at least one stock row before saving.";
       setStockError(validationMessage);
       toast.error(validationMessage);
-      return;
-    }
-
-    if (!stockForm.prepCharges && stockRows.some((row) => !row.prepCharges)) {
-      toast.error("Preparation charges selection is required.");
       return;
     }
 
@@ -231,8 +275,6 @@ export default function AddStockModal({
           volume: row.volume,
           barcode: row.barcode,
           rate: row.rate,
-          batchId: row.batchId,
-          prepCharges: row.prepCharges || stockForm.prepCharges,
           acUnit: row.acUnit,
           stockType: row.stockType,
           createdBy: currentLoggedInUser,
@@ -320,7 +362,10 @@ return (
               type="date"
               value={stockForm.transactionDate}
               onChange={(e) =>
-                setStockForm((prev) => ({ ...prev, transactionDate: e.target.value }))
+                setStockForm((prev) => ({
+                  ...prev,
+                  transactionDate: e.target.value,
+                }))
               }
               className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-700"
             />
@@ -351,7 +396,7 @@ return (
 
           <div className="col-span-1">
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Unit Selling Rate
+              Total Amount
             </label>
             <input
               type="text"
@@ -365,7 +410,8 @@ return (
                 v = v.replace(/e/gi, "");
                 v = v.replace(/[^0-9.]/g, "");
                 const parts = v.split(".");
-                if (parts.length > 2) v = `${parts[0]}.${parts.slice(1).join("")}`;
+                if (parts.length > 2)
+                  v = `${parts[0]}.${parts.slice(1).join("")}`;
                 v = v.slice(0, 12);
                 setStockForm((prev) => ({ ...prev, rate: v }));
               }}
@@ -401,12 +447,10 @@ return (
             </label>
             <input
               type="text"
-              value={stockForm.batchId}
+              value={generatedBatchId}
               maxLength={50}
-              onChange={(e) =>
-                setStockForm((prev) => ({ ...prev, batchId: e.target.value }))
-              }
-              className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-700"
+              readOnly
+              className="w-full rounded-2xl border border-gray-200 bg-gray-100 px-4 py-3 text-gray-700"
             />
           </div>
 
@@ -439,34 +483,9 @@ return (
               </button>
             </div>
             <p className="mt-2 text-xs text-gray-500">
-              Tip: After scanning, the row auto-stages when rate/date are filled.
+              Tip: After scanning, the row auto-stages when rate/date are
+              filled.
             </p>
-          </div>
-
-          <div className="col-span-2 flex flex-wrap items-center gap-4 sm:gap-6">
-            <span className="text-sm font-medium text-gray-700">
-              Preparation Charges
-            </span>
-            <label className="flex items-center gap-2 text-sm text-gray-700">
-              <input
-                type="radio"
-                name="stockPrep"
-                value="N"
-                checked={stockForm.prepCharges === "N"}
-                onChange={(e) => handleStockPrepChargesChange(e.target.value)}
-              />
-              No
-            </label>
-            <label className="flex items-center gap-2 text-sm text-gray-700">
-              <input
-                type="radio"
-                name="stockPrep"
-                value="Y"
-                checked={stockForm.prepCharges === "Y"}
-                onChange={(e) => handleStockPrepChargesChange(e.target.value)}
-              />
-              Yes
-            </label>
           </div>
         </div>
 
@@ -518,34 +537,60 @@ return (
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 text-gray-600">
                   <tr>
-                    <th className="px-2 sm:px-4 py-3 text-left font-medium">Item Name</th>
-                    <th className="px-2 sm:px-4 py-3 text-left font-medium">Qty</th>
-                    <th className="px-2 sm:px-4 py-3 text-left font-medium">Barcode</th>
-                    <th className="px-2 sm:px-4 py-3 text-left font-medium">Batch</th>
-                    <th className="px-2 sm:px-4 py-3 text-left font-medium">Rate</th>
-                    <th className="px-2 sm:px-4 py-3 text-left font-medium">Type</th>
-                    <th className="px-2 sm:px-4 py-3 text-left font-medium hidden sm:table-cell">Date</th>
-                    <th className="px-2 sm:px-4 py-3 text-left font-medium">Vol</th>
-                    <th className="px-2 sm:px-4 py-3 text-left font-medium">Delete</th>
+                    <th className="px-2 sm:px-4 py-3 text-left font-medium">
+                      Item Name
+                    </th>
+                    <th className="px-2 sm:px-4 py-3 text-left font-medium">
+                      Qty
+                    </th>
+                    <th className="px-2 sm:px-4 py-3 text-left font-medium">
+                      Barcode
+                    </th>
+                    <th className="px-2 sm:px-4 py-3 text-left font-medium">
+                      Batch
+                    </th>
+                    <th className="px-2 sm:px-4 py-3 text-left font-medium">
+                      Rate
+                    </th>
+                    <th className="px-2 sm:px-4 py-3 text-left font-medium">
+                      Type
+                    </th>
+                    <th className="px-2 sm:px-4 py-3 text-left font-medium hidden sm:table-cell">
+                      Date
+                    </th>
+                    <th className="px-2 sm:px-4 py-3 text-left font-medium">
+                      Vol
+                    </th>
+                    <th className="px-2 sm:px-4 py-3 text-left font-medium">
+                      Delete
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredStockRows.length === 0 ? (
                     <tr>
-                      <td colSpan="9" className="px-4 py-8 text-center text-gray-500">
+                      <td
+                        colSpan="9"
+                        className="px-4 py-8 text-center text-gray-500"
+                      >
                         No staged stock rows yet.
                       </td>
                     </tr>
                   ) : (
                     filteredStockRows.map((row) => (
-                      <tr key={row.barcode} className="border-t border-gray-100">
+                      <tr
+                        key={row.barcode}
+                        className="border-t border-gray-100"
+                      >
                         <td className="px-2 sm:px-4 py-3">{row.itemName}</td>
                         <td className="px-2 sm:px-4 py-3">{row.quantity}</td>
                         <td className="px-2 sm:px-4 py-3">{row.barcode}</td>
                         <td className="px-2 sm:px-4 py-3">{row.batchName}</td>
                         <td className="px-2 sm:px-4 py-3">{row.rate}</td>
                         <td className="px-2 sm:px-4 py-3">{row.stockType}</td>
-                        <td className="px-2 sm:px-4 py-3 hidden sm:table-cell">{row.displayTransactionDate}</td>
+                        <td className="px-2 sm:px-4 py-3 hidden sm:table-cell">
+                          {row.displayTransactionDate}
+                        </td>
                         <td className="px-2 sm:px-4 py-3">{row.volume}</td>
                         <td className="px-2 sm:px-4 py-3">
                           <button

@@ -51,9 +51,52 @@ const validateStockInItem = (item) => {
 const requiresSingleQuantity = (subCategory) =>
   SINGLE_QUANTITY_SUB_CATEGORIES.has(Number(subCategory));
 
+const normalizeBatchPart = (value) =>
+  String(value || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/-/g, " ");
+
 const normalizeTransactionDate = (value) => {
   const parsed = parseDate(value);
   return parsed ? parsed.toISOString().split("T")[0] : null;
+};
+
+const getNextBatchId = async ({ itemCode, transactionDate }, executor = db) => {
+  const normalizedTransactionDate = normalizeTransactionDate(transactionDate);
+  if (!itemCode || !normalizedTransactionDate) {
+    const error = new Error("INVALID_DATA");
+    error.code = "INVALID_DATA";
+    throw error;
+  }
+
+  const inventoryItem = await getInventoryItemByCode(itemCode, executor);
+  if (!inventoryItem) {
+    const error = new Error("ITEM_NOT_FOUND");
+    error.code = "ITEM_NOT_FOUND";
+    throw error;
+  }
+
+  const batchPrefix = `${normalizeBatchPart(inventoryItem.item_name) || "Item"}-${normalizedTransactionDate}-`;
+  const [rows] = await executor.execute(
+    `
+      SELECT IFNULL(MAX(CAST(SUBSTRING(BATCH_ID, ?) AS UNSIGNED)), 0) + 1 AS next_sequence
+      FROM xxafmc_items_transactions
+      WHERE ITEM_CODE = ?
+        AND TRANSACTION_DATE = ?
+        AND FLAG = 'IN'
+        AND BATCH_ID LIKE ?
+    `,
+    [
+      batchPrefix.length + 1,
+      Number(itemCode),
+      normalizedTransactionDate,
+      `${batchPrefix}%`,
+    ]
+  );
+
+  const nextSequence = Number(rows[0]?.next_sequence || 1);
+  return `${batchPrefix}${String(nextSequence).padStart(3, "0")}`;
 };
 
 const getTransactionNextId = async (connection) => {
@@ -74,7 +117,8 @@ const getInventoryItemByCode = async (itemCode, executor = db) => {
     SELECT ITEM_CODE AS item_code,
            ITEM_NAME AS item_name,
            \`A/C_UNIT\` AS ac_unit,
-           SUB_CATEGORY AS sub_category
+           SUB_CATEGORY AS sub_category,
+           FLAG AS prep_charges
     FROM xxafmc_inventory
     WHERE ITEM_CODE = ?
     LIMIT 1
@@ -125,10 +169,8 @@ const addStockTransactions = async (payload) => {
         volume,
         barcode,
         rate,
-        batchId,
         createdBy,
         acUnit,
-        prepCharges,
       } = item;
 
       const normalizedBarcode = sanitizeBarcode(barcode);
@@ -167,7 +209,11 @@ const addStockTransactions = async (payload) => {
         throw error;
       }
 
-      const batchName = `${inventoryItem.item_name}-${numericQuantity}-${volume || ""}-${transactionDate}`;
+      const batchId = await getNextBatchId(
+        { itemCode, transactionDate: normalizedTransactionDate },
+        connection
+      );
+      const batchName = batchId;
 
       await connection.execute(
         `
@@ -200,13 +246,13 @@ const addStockTransactions = async (payload) => {
           UPDATE xxafmc_inventory
           SET STOCK_QUANTITY = IFNULL(STOCK_QUANTITY, 0) + ?,
               UNIT_PRICE = ?,
-              FLAG = COALESCE(?, FLAG)
+              FLAG = COALESCE(NULLIF(?, ''), FLAG)
           WHERE ITEM_CODE = ?
         `,
         [
           numericQuantity,
           Number(rate),
-          prepCharges ? String(prepCharges).toUpperCase() : null,
+          inventoryItem.prep_charges ? String(inventoryItem.prep_charges).toUpperCase() : null,
           Number(itemCode),
         ]
       );
@@ -229,4 +275,5 @@ const addStockTransactions = async (payload) => {
 
 module.exports = {
   addStockTransactions,
+  getNextBatchId,
 };

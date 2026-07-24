@@ -1,5 +1,26 @@
 const addStockModel = require("../models/addStockModel");
 
+exports.getNextBatchId = async (req, res) => {
+  try {
+    const { itemCode, transactionDate } = req.query;
+    if (!itemCode || !transactionDate) {
+      return res.status(400).json({
+        success: false,
+        message: "Item code and transaction date are required",
+      });
+    }
+
+    const batchId = await addStockModel.getNextBatchId({ itemCode, transactionDate });
+    res.status(200).json({ success: true, data: { batchId } });
+  } catch (error) {
+    console.error("Error generating batch ID:", error);
+    if (error.code === "ITEM_NOT_FOUND") {
+      return res.status(404).json({ success: false, message: "Item not found" });
+    }
+    res.status(500).json({ success: false, message: "Failed to generate batch ID" });
+  }
+};
+
 exports.addStock = async (req, res) => {
   try {
     const payload = req.body?.items ? req.body.items : req.body;
