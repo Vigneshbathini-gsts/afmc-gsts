@@ -853,6 +853,19 @@ export default function Pubmenubuy({
     }
 
     map[key][normalized] = now;
+    const stockLimitMessage = "Out of Stock";
+    setStockLimitImageMessages((current) => ({
+      ...current,
+      [key]: stockLimitMessage,
+    }));
+    window.setTimeout(() => {
+      setStockLimitImageMessages((current) => {
+        if (current[key] !== stockLimitMessage) return current;
+        const next = { ...current };
+        delete next[key];
+        return next;
+      });
+    }, COOLDOWN_MS);
     showToast(message, type);
   };
 
@@ -1472,127 +1485,135 @@ export default function Pubmenubuy({
 
     setUpdatingLineId(lineId);
 
-    const liveItem = items.find((row) => Number(row?.orderLineId ?? row?.id) === lineId) || item;
+    try {
+      const liveItem = items.find((row) => Number(row?.orderLineId ?? row?.id) === lineId) || item;
 
-    if (liveItem?.isFreeItem) {
-      showToast("Free items cannot be updated.", "error");
-      return;
-    }
+      if (liveItem?.isFreeItem) {
+        showToast("Free items cannot be updated.", "error");
+        return;
+      }
 
-    const currentQty = Number(liveItem?.quantity || 1);
-    if (delta < 0 && currentQty <= 1) {
-      showToast("Quantity cannot be less than 1.", "error");
-      return;
-    }
+      const currentQty = Number(liveItem?.quantity || 1);
+      if (delta < 0 && currentQty <= 1) {
+        showToast("Quantity cannot be less than 1.", "error");
+        return;
+      }
 
-    const nextQtyCandidate = currentQty + delta;
+      const nextQtyCandidate = currentQty + delta;
 
-    if (delta > 0) {
-      if (isCocktailOrMocktail(liveItem)) {
-        const validation = await validateCocktailNextQuantity(liveItem, nextQtyCandidate);
-        if (!validation.ok) {
-          const message = validation.message || "Out of stock for cocktail/mocktail ingredients.";
+      if (delta > 0) {
+        if (isCocktailOrMocktail(liveItem)) {
+          const validation = await validateCocktailNextQuantity(liveItem, nextQtyCandidate);
+          if (!validation.ok) {
+            const message = validation.message || "Out of stock for cocktail/mocktail ingredients.";
+            showToastWithCooldown(message, "error", liveItem);
+            return;
+          }
+        }
+
+        const cocktailOverride = getCocktailOverrideForItem(liveItem);
+        if (cocktailOverride) {
+          if (cocktailOverride.isOutOfStock) {
+            const message =
+              cocktailOverride.stockIssueMessage ||
+              "Out of stock for cocktail/mocktail ingredients. Please reduce quantity or update selection.";
+            showToastWithCooldown(message, "error", liveItem);
+            return;
+          }
+        } else {
+          const stockMessage = String(liveItem?.stockIssueMessage || "").trim();
+
+          if (stockMessage) {
+            showToastWithCooldown(stockMessage, "error", liveItem);
+            return;
+          }
+        }
+
+        const combinedValidation = await validateCombinedStockDemand(liveItem, nextQtyCandidate);
+        if (!combinedValidation.ok) {
+          const message = combinedValidation.message || "Out of stock.";
           showToastWithCooldown(message, "error", liveItem);
           return;
         }
       }
 
-      const cocktailOverride = getCocktailOverrideForItem(liveItem);
-      if (cocktailOverride) {
-        if (cocktailOverride.isOutOfStock) {
-          const message =
-            cocktailOverride.stockIssueMessage ||
-            "Out of stock for cocktail/mocktail ingredients. Please reduce quantity or update selection.";
+      const availableQty = liveItem?.availableQuantity;
+      const liveItemMultiplier = getItemPegMultiplier(liveItem);
+      if (
+        !isCocktailOrMocktail(liveItem) &&
+        availableQty !== null &&
+        availableQty !== undefined &&
+        Number.isFinite(Number(availableQty))
+      ) {
+        if (nextQtyCandidate * liveItemMultiplier > Number(availableQty)) {
+          const message = getPegTypeOrderLimitMessage(liveItem, availableQty, `Out of stock. Available quantity: ${availableQty}`);
           showToastWithCooldown(message, "error", liveItem);
-          return;
-        }
-      } else {
-        const stockMessage = String(liveItem?.stockIssueMessage || "").trim();
-
-        if (stockMessage) {
-          showToastWithCooldown(stockMessage, "error", liveItem);
+          showStockLimitOnImage(liveItem, "Out of Stock");
           return;
         }
       }
 
-      const combinedValidation = await validateCombinedStockDemand(liveItem, nextQtyCandidate);
-      if (!combinedValidation.ok) {
-        const message = combinedValidation.message || "Out of stock.";
-        showToastWithCooldown(message, "error", liveItem);
-        return;
-      }
-    }
-
-    const availableQty = liveItem?.availableQuantity;
-    const liveItemMultiplier = getItemPegMultiplier(liveItem);
-    if (
-      !isCocktailOrMocktail(liveItem) &&
-      availableQty !== null &&
-      availableQty !== undefined &&
-      Number.isFinite(Number(availableQty))
-    ) {
-      if (nextQtyCandidate * liveItemMultiplier > Number(availableQty)) {
-        const message = getPegTypeOrderLimitMessage(liveItem, availableQty, `Out of stock. Available quantity: ${availableQty}`);
-        showToastWithCooldown(message, "error", liveItem);
-        showStockLimitOnImage(liveItem, "Out of Stock");
-        return;
-      }
-    }
-
-    const expectedFreeQty = calculateFreeQuantity(
-      nextQtyCandidate,
-      liveItem?.offer_quantity,
-      liveItem?.free_item_quantity
-    );
-
-    const parentCode = String(liveItem?.item_code || "").trim();
-    if (parentCode && expectedFreeQty > 0) {
-      const linkedFreeItems = items.filter(
-        (row) => row?.isFreeItem && String(row?.parentCode || "").trim() === parentCode
+      const expectedFreeQty = calculateFreeQuantity(
+        nextQtyCandidate,
+        liveItem?.offer_quantity,
+        liveItem?.free_item_quantity
       );
 
-      let freeAvailableQty = null;
-      for (const freeItem of linkedFreeItems) {
-        if (
-          Number(freeItem?.quantity || 0) <= 0 ||
-          Number(freeItem?.orderLineId || 0) <= 0
-        ) {
-          continue;
-        }
-
-        const candidateAvailableQty = freeItem?.availableQuantity;
-        if (
-          candidateAvailableQty !== null &&
-          candidateAvailableQty !== undefined &&
-          Number.isFinite(Number(candidateAvailableQty))
-        ) {
-          freeAvailableQty = Number(candidateAvailableQty);
-          break;
-        }
-      }
-
-      const parentFreeAvailableQty = liveItem?.free_item_available_quantity;
-      if (
-        freeAvailableQty === null &&
-        parentFreeAvailableQty !== null &&
-        parentFreeAvailableQty !== undefined &&
-        parentFreeAvailableQty !== "" &&
-        Number.isFinite(Number(parentFreeAvailableQty))
-      ) {
-        freeAvailableQty = Number(parentFreeAvailableQty);
-      }
-
-      if (freeAvailableQty !== null && expectedFreeQty > Number(freeAvailableQty)) {
-        showToastWithCooldown(
-          `Out of stock for free item. Available quantity: ${freeAvailableQty}`,
-          "error",
-          liveItem
+      const parentCode = String(liveItem?.item_code || "").trim();
+      if (parentCode && expectedFreeQty > 0) {
+        const linkedFreeItems = items.filter(
+          (row) => row?.isFreeItem && String(row?.parentCode || "").trim() === parentCode
         );
-        return;
-      }
-    }
 
-    adjustQuantity(lineId, delta);
+        let freeAvailableQty = null;
+        for (const freeItem of linkedFreeItems) {
+          if (
+            Number(freeItem?.quantity || 0) <= 0 ||
+            Number(freeItem?.orderLineId || 0) <= 0
+          ) {
+            continue;
+          }
+
+          const candidateAvailableQty = freeItem?.availableQuantity;
+          if (
+            candidateAvailableQty !== null &&
+            candidateAvailableQty !== undefined &&
+            Number.isFinite(Number(candidateAvailableQty))
+          ) {
+            freeAvailableQty = Number(candidateAvailableQty);
+            break;
+          }
+        }
+
+        const parentFreeAvailableQty = liveItem?.free_item_available_quantity;
+        if (
+          freeAvailableQty === null &&
+          parentFreeAvailableQty !== null &&
+          parentFreeAvailableQty !== undefined &&
+          parentFreeAvailableQty !== "" &&
+          Number.isFinite(Number(parentFreeAvailableQty))
+        ) {
+          freeAvailableQty = Number(parentFreeAvailableQty);
+        }
+
+        if (freeAvailableQty !== null && expectedFreeQty > Number(freeAvailableQty)) {
+          showToastWithCooldown(
+            `Out of stock for free item. Available quantity: ${freeAvailableQty}`,
+            "error",
+            liveItem
+          );
+          return;
+        }
+      }
+
+      if (delta < 0) {
+        clearStockLimitOnImage(liveItem);
+      }
+
+      await adjustQuantity(lineId, delta);
+    } finally {
+      setUpdatingLineId(null);
+    }
   };
 
   const removeItem = async (id) => {
@@ -2024,12 +2045,20 @@ export default function Pubmenubuy({
                         ? resolveCocktailOutOfStock(item, cocktailOverride)
                         : Boolean(isStandardOutOfStock || Number(item.availableQuantity) === 0);
 
+                    const stockLimitKey = getStockLimitImageKey(item);
+                    const recentStockLimitMessage = stockLimitImageMessages[stockLimitKey] || "";
                     const imageStockMessage = isCocktailItem
                       ? (isCardOutOfStock ? "Out of Stock" : "")
                       : (isStandardOutOfStock || Number(item.availableQuantity) === 0 ? "Out of Stock" : "");
 
-                    const disablePlusForStock = isCocktailItem ? isCardOutOfStock : false;
-                    const disableQuantityControls = disableEdit || updatingLineId === Number(item.orderLineId ?? item.id) || isCardOutOfStock;
+                    const isUpdatingThisLine = updatingLineId === Number(item.orderLineId ?? item.id);
+                    const disableQuantityControls = disableEdit || isUpdatingThisLine;
+                    const disableMinusButton = disableQuantityControls || Number(item.quantity || 0) <= 1;
+                    const disablePlusButton =
+                      disableQuantityControls ||
+                      Boolean(recentStockLimitMessage) ||
+                      isStandardOutOfStock ||
+                      (isCocktailItem && isCardOutOfStock);
 
                     return (
                       <div
@@ -2175,12 +2204,12 @@ export default function Pubmenubuy({
       <button
         type="button"
         onClick={() => handleQtyClick(item, -1)}
-        aria-disabled={disableQuantityControls || item.quantity <= 1}
-        disabled={disableQuantityControls || item.quantity <= 1}
+        aria-disabled={disableMinusButton}
+        disabled={disableMinusButton}
         className={`rounded-md bg-white p-1.5 text-stone-700 shadow-sm transition hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-afmc-gold/40 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-50 ${
-          disableQuantityControls || item.quantity <= 1
-            ? "opacity-50 cursor-not-allowed"
-            : ""
+          disableMinusButton
+            ? "opacity-50 cursor-default"
+            : "cursor-pointer"
         }`}
       >
         <Minus className="h-4 w-4" />
@@ -2193,31 +2222,12 @@ export default function Pubmenubuy({
       <button
         type="button"
         onClick={() => handleQtyClick(item, 1)}
-        aria-disabled={
-          disableQuantityControls ||
-          disablePlusForStock ||
-          isStandardOutOfStock ||
-          (item.availableQuantity !== null && 
-           item.availableQuantity !== undefined && 
-           Number(item.quantity) * getItemPegMultiplier(item) >= Number(item.availableQuantity))
-        }
-        disabled={
-          disableQuantityControls ||
-          disablePlusForStock ||
-          isStandardOutOfStock ||
-          (item.availableQuantity !== null && 
-           item.availableQuantity !== undefined && 
-           Number(item.quantity) * getItemPegMultiplier(item) >= Number(item.availableQuantity))
-        }
+        aria-disabled={disablePlusButton}
+        disabled={disablePlusButton}
         className={`rounded-md bg-afmc-maroon p-1.5 text-white shadow-sm transition hover:bg-afmc-maroon2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-afmc-gold/50 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-50 ${
-          updatingLineId === Number(item.orderLineId ?? item.id) ||
-          disablePlusForStock ||
-          isStandardOutOfStock ||
-          (item.availableQuantity !== null && 
-           item.availableQuantity !== undefined && 
-           Number(item.quantity) * getItemPegMultiplier(item) >= Number(item.availableQuantity))
-            ? "opacity-60 cursor-not-allowed"
-            : ""
+          disablePlusButton
+            ? "opacity-60 cursor-default"
+            : "cursor-pointer"
         }`}
       >
         <Plus className="h-4 w-4" />
