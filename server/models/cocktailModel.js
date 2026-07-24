@@ -307,22 +307,42 @@ const getCocktailIngredientPricing = async (itemCode, pegs) => {
 const getCocktailDetailRows = async (inventoryItemCode, connection = db) => {
   const query = `
     SELECT
-      MOC_ID,
-      ITEM_CODE,
-      ITEM_NAME,
-      PRICE,
-      PEGS,
-      INVENTORY_ITEM_CODE,
-      NON_MEMBER_PRICE,
-      CATEGORY_ID,
-      SUBCATEGORY_ID
-    FROM ${DETAIL_TABLE}
-    WHERE INVENTORY_ITEM_CODE = ?
-    ORDER BY COALESCE(MOC_ID, 0), ITEM_NAME
+      recipe.MOC_ID,
+      recipe.ITEM_CODE,
+      recipe.ITEM_NAME,
+      recipe.PRICE,
+      recipe.PEGS,
+      recipe.INVENTORY_ITEM_CODE,
+      recipe.NON_MEMBER_PRICE,
+      recipe.CATEGORY_ID,
+      recipe.SUBCATEGORY_ID,
+      GREATEST(
+        IFNULL(stock_summary.stock_quantity, 0)
+          - IFNULL(reserved_summary.reserved_quantity, 0),
+        0
+      ) AS AVAILABLE_STOCK_QUANTITY
+    FROM ${DETAIL_TABLE} recipe
+    LEFT JOIN (
+      SELECT item_code, IFNULL(SUM(stock_quantity), 0) AS stock_quantity
+      FROM xxafmc_stock_out
+      GROUP BY item_code
+    ) stock_summary
+      ON stock_summary.item_code = recipe.ITEM_CODE
+    LEFT JOIN (
+      SELECT item_code, IFNULL(reserved_qty, 0) AS reserved_quantity
+      FROM xxafmc_stock_reservation_totals
+    ) reserved_summary
+      ON reserved_summary.item_code = recipe.ITEM_CODE
+    WHERE recipe.INVENTORY_ITEM_CODE = ?
+    ORDER BY COALESCE(recipe.MOC_ID, 0), recipe.ITEM_NAME
   `;
 
   const [rows] = await connection.execute(query, [inventoryItemCode]);
-  return rows.map((row) => ({
+  return rows.map((row) => {
+    const pegs = row.PEGS !== null ? Number(row.PEGS) : null;
+    const stockQuantity = Number(row.AVAILABLE_STOCK_QUANTITY || 0);
+
+    return ({
     MOC_ID: row.MOC_ID,
     ITEM_CODE: row.ITEM_CODE,
     ITEM_NAME: row.ITEM_NAME,
@@ -336,13 +356,18 @@ const getCocktailDetailRows = async (inventoryItemCode, connection = db) => {
     itemCode: row.ITEM_CODE,
     itemName: row.ITEM_NAME,
     price: row.PRICE,
-    pegs: row.PEGS !== null ? Number(row.PEGS) : null,
+    pegs,
     inventoryItemCode: row.INVENTORY_ITEM_CODE,
     nonMemberPrice: row.NON_MEMBER_PRICE,
     categoryId: row.CATEGORY_ID,
     subcategoryId: row.SUBCATEGORY_ID,
     memberPrice: Number(row.PRICE || row.NON_MEMBER_PRICE || 0),
-  }));
+    STOCK_QUANTITY: stockQuantity,
+    stockQuantity,
+    STOCK_STATUS: stockQuantity >= (Number(pegs || 1)) ? "In Stock" : "Out Of Stock",
+    stockStatus: stockQuantity >= (Number(pegs || 1)) ? "In Stock" : "Out Of Stock",
+  });
+  });
 };
 
 const getCocktailItemById = async (itemId) => {

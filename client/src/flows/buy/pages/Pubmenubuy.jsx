@@ -518,7 +518,7 @@ export default function Pubmenubuy({
         const stockCodes = [...new Set([...currentConsumption.keys()])]
           .filter((code) => Number.isFinite(Number(code)) && Number(code) > 0);
 
-        const stockRes = await cartAPI.getIngredientStocks(stockCodes, orderNumber, undefined, undefined, true);
+        const stockRes = await cartAPI.getIngredientStocks(stockCodes, undefined, undefined, undefined, true);
         const stockMap = stockRes?.data?.data || {};
 
         const next = {};
@@ -746,7 +746,7 @@ export default function Pubmenubuy({
     }
 
     try {
-      const stockRes = await cartAPI.getIngredientStocks(codes, orderNumber, undefined, undefined, true);
+      const stockRes = await cartAPI.getIngredientStocks(codes, undefined, undefined, undefined, true);
       const stockMap = stockRes?.data?.data || {};
 
       for (const code of codes) {
@@ -1426,7 +1426,7 @@ export default function Pubmenubuy({
 
     try {
       const codes = [...new Set(ingredients.map((ing) => ing.itemCode))];
-      const stockRes = await cartAPI.getIngredientStocks(codes, orderNumber, undefined, undefined, true);
+      const stockRes = await cartAPI.getIngredientStocks(codes, undefined, undefined, undefined, true);
       const stockMap = stockRes?.data?.data || {};
 
       for (const ing of ingredients) {
@@ -2168,61 +2168,78 @@ export default function Pubmenubuy({
                           </div>
 
                           {/* Controls */}
-                          {!item.isFreeItem ? (
-                            <div className="flex items-center justify-between rounded-xl bg-stone-50 px-3 py-2">
-                              <div className="flex items-center gap-1">
-                                <button
-                                  type="button"
-                                  onClick={() => handleQtyClick(item, -1)}
-                                  aria-disabled={disableQuantityControls || item.quantity <= 1}
-                                  disabled={disableQuantityControls || item.quantity <= 1}
-                                  className={`rounded-md bg-white p-1.5 text-stone-700 shadow-sm transition hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-afmc-gold/40 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-50 ${disableQuantityControls || item.quantity <= 1
-                                    ? "opacity-50"
-                                    : ""
-                                    }`}
-                                >
-                                  <Minus className="h-4 w-4" />
-                                </button>
+                          {/* Controls */}
+{!item.isFreeItem ? (
+  <div className="flex items-center justify-between rounded-xl bg-stone-50 px-3 py-2">
+    <div className="flex items-center gap-1">
+      <button
+        type="button"
+        onClick={() => handleQtyClick(item, -1)}
+        aria-disabled={disableQuantityControls || item.quantity <= 1}
+        disabled={disableQuantityControls || item.quantity <= 1}
+        className={`rounded-md bg-white p-1.5 text-stone-700 shadow-sm transition hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-afmc-gold/40 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-50 ${
+          disableQuantityControls || item.quantity <= 1
+            ? "opacity-50 cursor-not-allowed"
+            : ""
+        }`}
+      >
+        <Minus className="h-4 w-4" />
+      </button>
 
-                                <span className="min-w-[28px] text-center text-sm font-semibold text-stone-900">
-                                  {item.quantity}
-                                </span>
+      <span className="min-w-[28px] text-center text-sm font-semibold text-stone-900">
+        {item.quantity}
+      </span>
 
-                                <button
-                                  type="button"
-                                  onClick={() => handleQtyClick(item, 1)}
-                                  aria-disabled={
-                                    disableQuantityControls ||
-                                    disablePlusForStock
-                                  }
-                                  disabled={
-                                    disableQuantityControls ||
-                                    disablePlusForStock || isStandardOutOfStock
-                                  }
-                                  className={`rounded-md bg-afmc-maroon p-1.5 text-white shadow-sm transition hover:bg-afmc-maroon2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-afmc-gold/50 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-50 ${updatingLineId === Number(item.orderLineId ?? item.id) ||
-                                    disablePlusForStock || isStandardOutOfStock
-                                    ? "opacity-60"
-                                    : ""
-                                    }`}
-                                >
-                                  <Plus className="h-4 w-4" />
-                                </button>
-                              </div>
+      <button
+        type="button"
+        onClick={() => handleQtyClick(item, 1)}
+        aria-disabled={
+          disableQuantityControls ||
+          disablePlusForStock ||
+          isStandardOutOfStock ||
+          (item.availableQuantity !== null && 
+           item.availableQuantity !== undefined && 
+           Number(item.quantity) * getItemPegMultiplier(item) >= Number(item.availableQuantity))
+        }
+        disabled={
+          disableQuantityControls ||
+          disablePlusForStock ||
+          isStandardOutOfStock ||
+          (item.availableQuantity !== null && 
+           item.availableQuantity !== undefined && 
+           Number(item.quantity) * getItemPegMultiplier(item) >= Number(item.availableQuantity))
+        }
+        className={`rounded-md bg-afmc-maroon p-1.5 text-white shadow-sm transition hover:bg-afmc-maroon2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-afmc-gold/50 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-50 ${
+          updatingLineId === Number(item.orderLineId ?? item.id) ||
+          disablePlusForStock ||
+          isStandardOutOfStock ||
+          (item.availableQuantity !== null && 
+           item.availableQuantity !== undefined && 
+           Number(item.quantity) * getItemPegMultiplier(item) >= Number(item.availableQuantity))
+            ? "opacity-60 cursor-not-allowed"
+            : ""
+        }`}
+      >
+        <Plus className="h-4 w-4" />
+      </button>
+    </div>
 
-                              <button
-                                type="button"
-                                onClick={() => removeItem(item.id)}
-                                disabled={disableEdit}
-                                className={`rounded-md bg-red-50 p-1.5 text-red-600 transition hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-50 ${disableEdit ? "opacity-50 cursor-not-allowed" : ""}`}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                            </div>
-                          ) : !missingCocktailIngredients ? (
-                            <div className="rounded-xl bg-stone-50 px-3 py-2 text-xs font-medium text-stone-600">
-                              Free item
-                            </div>
-                          ) : null}
+    <button
+      type="button"
+      onClick={() => removeItem(item.id)}
+      disabled={disableEdit}
+      className={`rounded-md bg-red-50 p-1.5 text-red-600 transition hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-50 ${
+        disableEdit ? "opacity-50 cursor-not-allowed" : ""
+      }`}
+    >
+      <Trash2 className="h-4 w-4" />
+    </button>
+  </div>
+) : !missingCocktailIngredients ? (
+  <div className="rounded-xl bg-stone-50 px-3 py-2 text-xs font-medium text-stone-600">
+    Free item
+  </div>
+) : null}
                         </div>
                       </div>
                     );

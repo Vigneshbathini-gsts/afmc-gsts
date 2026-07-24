@@ -19,6 +19,21 @@ const normalizeDetail = (detail) => detail && ({
     stockQuantity: getDetailStockQuantity(detail),
     stockStatus: getDetailStockStatus(detail),
 });
+const stripStoredStockFields = (detail) => {
+    if (!detail) return detail;
+    const {
+        stockQuantity,
+        STOCK_QUANTITY,
+        stock_quantity,
+        stockStatus,
+        STOCK_STATUS,
+        stock_status,
+        requiredQuantity,
+        REQUIRED_QUANTITY,
+        ...rest
+    } = detail;
+    return rest;
+};
 
 const initCap = (str) => {
     if (!str) return "";
@@ -171,7 +186,7 @@ export default function ItemDetails() {
                     let initialQuantities = {};
 
                     if (!isEditingCartItem && Array.isArray(prefillDetails) && prefillDetails.length > 0) {
-                        details = prefillDetails;
+                        details = prefillDetails.map(stripStoredStockFields);
                     }
 
                     if (!isEditingCartItem && fromBuyFlow && buyOrderNumber) {
@@ -180,7 +195,7 @@ export default function ItemDetails() {
                             const overrideRaw = localStorage.getItem(`afmc-buyflow-custom:${buyOrderNumber}:${itemCodeKey}`);
                             const overrideValue = overrideRaw ? JSON.parse(overrideRaw) : null;
                             if (Array.isArray(overrideValue?.details) && overrideValue.details.length > 0) {
-                                details = overrideValue.details;
+                                details = overrideValue.details.map(stripStoredStockFields);
                             }
                         } catch (err) {
                             console.warn("Could not load buyflow customization override:", err);
@@ -229,7 +244,7 @@ export default function ItemDetails() {
                         try {
                             const draft = JSON.parse(localStorage.getItem(draftKey) || "null");
                             if (draft?.details?.length) {
-                                details = draft.details.map(normalizeDetail);
+                                details = draft.details.map(stripStoredStockFields).map(normalizeDetail);
                                 initialQuantities = draft.quantities || initialQuantities;
                             }
                         } catch (err) {
@@ -247,7 +262,7 @@ export default function ItemDetails() {
                             if (codes.length > 0) {
                                 const stockRes = await cartAPI.getIngredientStocks(
                                     codes,
-                                    fromBuyFlow ? buyOrderNumber : undefined,
+                                    undefined,
                                     undefined,
                                     isEditingCartItem ? Number(cartId) : undefined
                                 );
@@ -467,7 +482,7 @@ return;
         if (codes.length > 0) {
             const stockRes = await cartAPI.getIngredientStocks(
                 codes,
-                fromBuyFlow ? buyOrderNumber : undefined,
+                undefined,
                 undefined,
                 isEditingCartItem ? Number(cartId) : undefined
             );
@@ -626,7 +641,7 @@ return;
                         try {
                             const stockRes = await cartAPI.getIngredientStocks(
                                 codes,
-                                buyOrderNumber,
+                                undefined,
                                 undefined,
                                 isEditingCartItem ? Number(cartId) : undefined
                             );
@@ -658,7 +673,7 @@ return;
                         try {
                             const stockRes = await cartAPI.getIngredientStocks(
                                 [parentCode],
-                                buyOrderNumber,
+                                undefined,
                                 undefined,
                                 isEditingCartItem ? Number(cartId) : undefined
                             );
@@ -829,11 +844,17 @@ return;
                                     const effectiveRequired = (!isEditingCartItem && fromBuyFlow)
                                         ? Number(currentQty)
                                         : (requiredQuantity != null ? Number(requiredQuantity) : Number(currentQty));
-                                    const stockStatus = explicitStatus
-                                        ? explicitStatus
-                                        : stockQuantity != null
-                                            ? (Number(stockQuantity) >= effectiveRequired ? "In Stock" : "Out Of Stock")
-                                            : "Unknown";
+                                    const numericStockQuantity =
+                                        stockQuantity == null || stockQuantity === ""
+                                            ? null
+                                            : Number(stockQuantity);
+                                    const numericRequired =
+                                        Number.isFinite(effectiveRequired) && effectiveRequired > 0
+                                            ? effectiveRequired
+                                            : 1;
+                                    const stockStatus = Number.isFinite(numericStockQuantity)
+                                        ? (numericStockQuantity >= numericRequired ? "In Stock" : "Out Of Stock")
+                                        : explicitStatus || "Unknown";
 
                                     return (
                                         <tr key={index} className="border-b border-stone-100 transition last:border-b-0 hover:bg-afmc-gold/5">
