@@ -40,6 +40,7 @@ const buildInventoryQuery = ({ categoryId, itemCode, search }) => {
         COALESCE(NULLIF(xi.\`A/C_UNIT\`, ''), 'Nos') AS ac_unit,
         IFNULL(xi.STOCK_QUANTITY, 0) AS stock_quantity,
         IFNULL(xi.PROFIT, 0) AS profit,
+        xi.FLAG AS prep_charges,
         xi.ITEM_CODE AS itemid,
         xi.FILE_NAME AS file_name,
         xi.MIME_TYPE AS mime_type
@@ -53,6 +54,7 @@ const buildInventoryQuery = ({ categoryId, itemCode, search }) => {
              xs.SUB_CATEGORY_NAME,
              xi.STOCK_QUANTITY,
              xi.PROFIT,
+             xi.FLAG,
              xi.\`A/C_UNIT\`,
              xi.ITEM_ID,
              xi.FILE_NAME,
@@ -253,6 +255,7 @@ const createItem = async (payload) => {
     }
 
     const normalizedAcUnit = acUnit || "Nos";
+    const normalizedPrepCharges = String(prepCharges || "").toUpperCase() === "Y" ? "Y" : "N";
     const defaultServingVolume = getDefaultServingVolume(subCategory, normalizedAcUnit);
     const pegs = defaultServingVolume || servingVolume || "";
 
@@ -260,9 +263,9 @@ const createItem = async (payload) => {
       INSERT INTO xxafmc_inventory
         (ITEM_ID, ITEM_CODE, ITEM_NAME, DESCRIPTION, CATEGORY_ID, SUB_CATEGORY,
          \`A/C_UNIT\`, PEGS, STOCK_QUANTITY, PROFIT, FOOD_PR_CHARGES, NON_MEMBER_PROFIT,
-         PR_CHARGES, CREATION_DATE, CREATED_BY, IMAGE, MIME_TYPE, FILE_NAME)
+         PR_CHARGES, FLAG, CREATION_DATE, CREATED_BY, IMAGE, MIME_TYPE, FILE_NAME)
       VALUES
-        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     const params = [
@@ -279,6 +282,7 @@ const createItem = async (payload) => {
       foodPrCharges,
       nonMemberProfit,
       prCharges,
+      normalizedPrepCharges,
       formatToSql(new Date()),
       createdBy || "SYSTEM",
       fileName || null,
@@ -375,6 +379,7 @@ const getStockOutItemByBarcode = async (barcode, executor = db) => {
       xit.RATE AS unit_price,
       xit.VOLUME AS volume,
       xit.BATCH_NAME AS batch_name,
+      xit.BATCH_ID AS batch_id,
       IFNULL(xit.PEGS, 0) AS pegs,
       IFNULL(xi.STOCK_QUANTITY, 0) AS available_stock,
       CASE
@@ -599,9 +604,9 @@ const addStockOutTransactions = async (payload) => {
           INSERT INTO xxafmc_items_transactions
             (TRANSACTION_ID, ITEM_CODE, \`A/C_UNIT\`, RATE, STOCK, TOTAL_VALUE,
              PEGS, VOLUME, BATCH_NAME, TRANSACTION_DATE, FLAG, BARCODE,
-             CREATED_BY, CREATION_DATE)
+             BATCH_ID, CREATED_BY, CREATION_DATE)
           VALUES
-            (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `,
         [
           nextTransactionId,
@@ -616,6 +621,7 @@ const addStockOutTransactions = async (payload) => {
           normalizedTransactionDate,
           "OUT",
           normalizedBarcode,
+          stockItem.batch_id || "",
           createdBy || "SYSTEM",
           creationTimestamp,
         ]

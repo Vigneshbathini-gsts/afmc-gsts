@@ -281,6 +281,7 @@ export const inventoryAPI = {
   getStockOutReport: (params) => api.get("/inventory/stock-out-report", { params }),
   getTodayStockOutDetails: () => api.get("/inventory/today-stock-out-details"),
   getStockOutItemByBarcode: (barcode) => api.get(`/inventory/stock-out/barcode/${barcode}`),
+  getNextBatchId: (params) => api.get("/inventory/batch-id/next", { params }),
   createStockOut: (data) => api.post("/inventory/stock-out", data),
   getById: (id) => api.get(`/inventory/${id}`),
   addStock: (data) => api.post("/inventory/add-stock", data),

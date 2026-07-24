@@ -10,6 +10,7 @@ router.get("/items", inventoryController.getItems);
 router.get("/subcategories", inventoryController.getSubCategories);
 router.get("/bar-types", inventoryController.getBarTypes);
 router.get("/barcode/:barcode/exists", inventoryController.checkBarcodeExists);
+router.get("/batch-id/next", addStockController.getNextBatchId);
 router.get("/stock-out/barcode/:barcode", inventoryController.getStockOutItemByBarcode);
 router.get("/stock-in-report", inventoryController.getStockInReport);
 router.get("/stock-out-report", inventoryController.getStockOutReport);
