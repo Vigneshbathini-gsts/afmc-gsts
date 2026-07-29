@@ -1219,6 +1219,7 @@ function EnduserOtherSection({ onItemClick }) {
         map.set(String(id), { value: String(id), label: name ? String(name) : String(id) });
       }
     });
+    console.log("Computed category options:", Array.from(map.values()));
     return Array.from(map.values());
   }, [data]);
 

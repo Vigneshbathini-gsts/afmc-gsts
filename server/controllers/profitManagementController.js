@@ -1,12 +1,17 @@
 const pool = require("../config/db");
-const { getPricingCondition } = require("../helpers/pricingHelper");
+const {
+  getPricingCondition,
+  NON_ALCOHOLIC_LIQUOR_SUBCATEGORY_IDS,
+} = require("../helpers/pricingHelper");
 
 /**
  * MEMBER PRICING UPDATE
  */
+
 exports.updateMemberPricing = async (req, res) => {
   try {
     const { category, profit, foodPrCharges } = req.body;
+    console.log("Received request body:", req.body);
 
     if (!category || profit === undefined || profit === null) {
       return res.status(400).json({
@@ -16,7 +21,6 @@ exports.updateMemberPricing = async (req, res) => {
     }
 
     const condition = getPricingCondition(category);
-
     if (!condition) {
       return res.status(400).json({
         success: false,
@@ -28,6 +32,8 @@ exports.updateMemberPricing = async (req, res) => {
     let values = [];
 
     if (category === "Liquor") {
+      // Only touch alcoholic items — the shared condition already excludes
+      // non-alcoholic subcategories (soft drinks, juice, mixers, syrup).
       query = `
         UPDATE xxafmc_inventory
         SET PROFIT = ?
@@ -74,7 +80,6 @@ exports.updateNonMemberPricing = async (req, res) => {
     }
 
     const condition = getPricingCondition(category);
-
     if (!condition) {
       return res.status(400).json({
         success: false,
@@ -122,6 +127,7 @@ exports.updateNonMemberPricing = async (req, res) => {
  */
 exports.getPricingReport = async (req, res) => {
   try {
+    const liquorExclusion = `SUB_CATEGORY NOT IN (${NON_ALCOHOLIC_LIQUOR_SUBCATEGORY_IDS.join(", ")})`;
     const query = `
       SELECT 
         category_name,
@@ -132,7 +138,7 @@ exports.getPricingReport = async (req, res) => {
       FROM (
         SELECT 
           CASE
-            WHEN xi.CATEGORY_ID = 10 AND xi.SUB_CATEGORY NOT IN (14, 15) THEN 'Liquor'
+            WHEN xi.CATEGORY_ID = 10 AND xi.${liquorExclusion} THEN 'Liquor'
             WHEN xi.CATEGORY_ID = 14 AND xi.SUB_CATEGORY IN (7, 10) THEN 'Snacks'
           END AS category_name,
           xi.PROFIT,
@@ -141,7 +147,7 @@ exports.getPricingReport = async (req, res) => {
           xi.PR_CHARGES
         FROM xxafmc_inventory xi
         WHERE
-          (xi.CATEGORY_ID = 10 AND xi.SUB_CATEGORY NOT IN (14, 15))
+          (xi.CATEGORY_ID = 10 AND xi.${liquorExclusion})
           OR (xi.CATEGORY_ID = 14 AND xi.SUB_CATEGORY IN (7, 10))
       ) pricing_data
       WHERE category_name IS NOT NULL
@@ -163,4 +169,3 @@ exports.getPricingReport = async (req, res) => {
     });
   }
 };
-

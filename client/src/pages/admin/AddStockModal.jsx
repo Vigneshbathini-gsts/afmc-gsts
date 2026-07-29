@@ -72,12 +72,12 @@ export default function AddStockModal({
 }) {
   const [showLowerSection, setShowLowerSection] = useState(false);
   const [stockSaving, setStockSaving] = useState(false);
-  console.log("stockSaving", stockSaving);
+  // console.log("stockSaving", stockSaving);
   const [stockError, setStockError] = useState("");
   const [stockInfo, setStockInfo] = useState("");
   const [scannerOpen, setScannerOpen] = useState(false);
   const [stockForm, setStockForm] = useState(() => buildInitialStockForm(item));
-  console.log("stockForm", stockForm);
+  // console.log("stockForm", stockForm);
   const [stockRows, setStockRows] = useState([]);
   const [stockRowSearch, setStockRowSearch] = useState("");
   const [generatedBatchId, setGeneratedBatchId] = useState("");
@@ -311,7 +311,7 @@ export default function AddStockModal({
     );
   }, [stockRowSearch, stockRows]);
 
-  console.log("filteredStockRows",filteredStockRows);
+  // console.log("filteredStockRows",filteredStockRows);
 return (
   <>
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/40 px-4 py-6">

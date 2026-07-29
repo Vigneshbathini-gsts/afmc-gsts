@@ -1,4 +1,5 @@
 const db = require("../config/db");
+const { isExcludedLiquorSubcategory } = require("../helpers/pricingHelper");
 
 const DETAIL_TABLE = "xxafmc_cocktails_mocktails_details";
 const AFMC_IMAGE_PUBLIC_BASE_URL = (
@@ -242,6 +243,8 @@ const getCocktailIngredientPricing = async (itemCode, pegs) => {
         inv.UNIT_PRICE,
         inv.PROFIT,
         inv.NON_MEMBER_PROFIT,
+        inv.CATEGORY_ID,
+        inv.SUB_CATEGORY,
         recent_price.UNIT_PRICE AS STOCK_UNIT_PRICE,
         recent_price.PEGS AS STOCK_PEGS
       FROM xxafmc_inventory inv
@@ -287,12 +290,19 @@ const getCocktailIngredientPricing = async (itemCode, pegs) => {
   const stockPegs = normalizeNumber(item.STOCK_PEGS) || 1;
   const memberProfit = normalizeNumber(item.PROFIT) || 0;
   const nonMemberProfit = normalizeNumber(item.NON_MEMBER_PROFIT) || 0;
+  const subCategory = normalizeNumber(item.SUB_CATEGORY) || 0;
+  const isExcludedLiquorItem =
+    normalizeNumber(item.CATEGORY_ID) === 10 && isExcludedLiquorSubcategory(subCategory);
   const basePegPrice = unitPrice / (stockPegs === 0 ? 1 : stockPegs);
   const memberPrice = Number(
-    (basePegPrice + (basePegPrice * memberProfit) / 100) * normalizedPegs
+    isExcludedLiquorItem
+      ? basePegPrice * normalizedPegs
+      : (basePegPrice + (basePegPrice * memberProfit) / 100) * normalizedPegs
   );
   const nonMemberPrice = Number(
-    (basePegPrice + (basePegPrice * nonMemberProfit) / 100) * normalizedPegs
+    isExcludedLiquorItem
+      ? basePegPrice * normalizedPegs
+      : (basePegPrice + (basePegPrice * nonMemberProfit) / 100) * normalizedPegs
   );
 
   return {

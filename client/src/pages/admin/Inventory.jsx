@@ -87,7 +87,7 @@ export default function Inventory() {
   const [subCategories, setSubCategories] = useState([]);
   const [items, setItems] = useState([]);
   const [inventory, setInventory] = useState([]);
-  console.log("inventory",inventory);
+  // console.log("inventory",inventory);
   const [categoryId, setCategoryId] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
@@ -108,9 +108,9 @@ export default function Inventory() {
   const [isAddCategoryDropdownOpen, setIsAddCategoryDropdownOpen] = useState(false);
   const [subCategoryFilter, setSubCategoryFilter] = useState("");
   const [isSubCategoryDropdownOpen, setIsSubCategoryDropdownOpen] = useState(false);
-  console.log("setIsSubCategoryDropdownOpen",isSubCategoryDropdownOpen)
+  // console.log("setIsSubCategoryDropdownOpen",isSubCategoryDropdownOpen)
   const [isAcUnitDropdownOpen, setIsAcUnitDropdownOpen] = useState(false);
-  console.log("setIsAcUnitDropdownOpen", isAcUnitDropdownOpen);
+  // console.log("setIsAcUnitDropdownOpen", isAcUnitDropdownOpen);
   const [formValues, setFormValues] = useState({
     itemName: "",
     description: "",
@@ -120,7 +120,7 @@ export default function Inventory() {
     prepCharges: "",
     image: null,
   });
-  console.log("setFormValues",formValues)
+  // console.log("setFormValues",formValues)
   const [saving, setSaving] = useState(false);
   const [imageSaving, setImageSaving] = useState(false);
   const [imageError, setImageError] = useState("");
