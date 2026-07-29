@@ -6,6 +6,7 @@ import { API_BASE_URL } from "../../services/api";
 import { getToken } from "../../utils/authStorage";
 import { toInitCap } from "../../utils/textFormat";
 
+
 function formatDate(value) {
   const date = value ? new Date(value) : new Date();
   if (Number.isNaN(date.getTime())) {

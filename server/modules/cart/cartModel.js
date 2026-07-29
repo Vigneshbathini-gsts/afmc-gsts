@@ -144,14 +144,12 @@ const getCartQuantityExcludingCartId = async (conn, userId, itemCode, priceZero 
 const getCartIngredientConsumption = async (conn, userId, ingredientCode, excludeCartId = null) => {
   const normalizedCode = Number(ingredientCode);
   if (!Number.isFinite(normalizedCode) || normalizedCode <= 0) return 0;
-
   let excludeSql = "";
   const params = [userId, normalizedCode];
   if (excludeCartId != null && !Number.isNaN(Number(excludeCartId))) {
     excludeSql = " AND c.cart_id <> ?";
     params.push(Number(excludeCartId));
   }
-
   const [rows] = await conn.execute(
     `SELECT cc.quantity AS ingredient_qty, c.quantity AS cart_qty, c.description, c.type
      FROM ${CUSTOMIZATION_TABLE} cc
@@ -162,7 +160,6 @@ const getCartIngredientConsumption = async (conn, userId, ingredientCode, exclud
        AND c.price != 0${excludeSql}`,
     params
   );
-
   return rows.reduce((sum, row) => {
     const multiplier = getPegMultiplierForType(row);
     return sum + Number(row.ingredient_qty || 0) * Number(row.cart_qty || 0) * multiplier;

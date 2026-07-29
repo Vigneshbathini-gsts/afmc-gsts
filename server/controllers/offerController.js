@@ -1,5 +1,19 @@
 const db = require("../config/db");
 
+const getOfferItemAvailability = async (itemCode) => {
+  const [[row]] = await db.query(
+    `
+      SELECT
+        IFNULL(SUM(STOCK_QUANTITY), 0) AS available_quantity
+      FROM xxafmc_stock_out
+      WHERE ITEM_CODE = ?
+    `,
+    [itemCode]
+  );
+
+  return row ? Number(row.available_quantity || 0) : 0;
+};
+
 // Get All Offers
 exports.getAllOffers = async (req, res) => {
   try {
@@ -138,6 +152,16 @@ exports.createOffer = async (req, res) => {
       return res.status(400).json({ message: "End date cannot be earlier than offer date" });
     }
 
+    const itemAvailableQuantity = await getOfferItemAvailability(item_code);
+    if (itemAvailableQuantity <= 0) {
+      return res.status(400).json({ message: "Selected item has no stock" });
+    }
+
+    const freeItemAvailableQuantity = await getOfferItemAvailability(free_item_code);
+    if (freeItemAvailableQuantity <= 0) {
+      return res.status(400).json({ message: "Selected free item has no stock" });
+    }
+
     // Get item names from inventory
     const [itemInfo] = await db.query(
       "SELECT item_name FROM xxafmc_inventory WHERE item_code = ?",
@@ -250,8 +274,24 @@ exports.updateOffer = async (req, res) => {
 exports.getAllItemsForOffer = async (req, res) => {
   try {
     const [items] = await db.query(`
-      SELECT DISTINCT item_code, item_name 
-      FROM xxafmc_inventory 
+      SELECT
+        xi.ITEM_CODE AS item_code,
+        TRIM(xi.ITEM_NAME) AS item_name,
+        IFNULL(stock_summary.stock_quantity, 0) AS available_quantity
+      FROM xxafmc_inventory xi
+      INNER JOIN (
+        SELECT ITEM_CODE, IFNULL(SUM(STOCK_QUANTITY), 0) AS stock_quantity
+        FROM xxafmc_stock_out
+        GROUP BY ITEM_CODE
+      ) stock_summary
+        ON stock_summary.ITEM_CODE = xi.ITEM_CODE
+      WHERE TRIM(IFNULL(xi.ITEM_NAME, '')) <> ''
+        AND xi.SUB_CATEGORY NOT IN (14, 15)
+      GROUP BY
+        xi.ITEM_CODE,
+        xi.ITEM_NAME,
+        stock_summary.stock_quantity
+      HAVING available_quantity > 0
       ORDER BY item_name
     `);
 
