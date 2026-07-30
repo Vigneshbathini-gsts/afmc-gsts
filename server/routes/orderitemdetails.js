@@ -1,5 +1,6 @@
 const express = require("express");
 const db = require("../config/db");
+const { NON_ALCOHOLIC_LIQUOR_SUBCATEGORY_IDS } = require("../helpers/pricingHelper");
 
 const router = express.Router();
 
@@ -127,6 +128,17 @@ const getOrderItemDetails = async (req, res) => {
     CASE WHEN UPPER(TRIM(IFNULL(od.TYPE, ''))) = 'LARGE' THEN 2 ELSE 1 END
   `;
 
+  // NEW: profit is forced to 0 for non-alcoholic liquor sub-categories
+  // (soft drinks / mixers etc. filed under category_id = 10) so no markup
+  // is reported for items that shouldn't carry a liquor profit margin.
+  const effectiveProfitExpression = `
+    CASE
+      WHEN xi.category_id = 10 AND xi.sub_category IN (${NON_ALCOHOLIC_LIQUOR_SUBCATEGORY_IDS.join(", ")})
+        THEN 0
+      ELSE IFNULL(od.profit, 0)
+    END
+  `;
+
   const effectiveSubtotalExpression = `
     CASE
       WHEN xi.sub_category IN (14, 15) AND IFNULL(st.scanned_subtotal, 0) > 0
@@ -151,7 +163,7 @@ const getOrderItemDetails = async (req, res) => {
             WHEN IFNULL(SUM(${effectiveSubtotalExpression}),0) > 0 THEN
                 (SUM(CASE WHEN ${effectiveSubtotalExpression} > 0 THEN ${effectiveSubtotalExpression} ELSE 0 END) -
                  SUM(CASE WHEN ${effectiveSubtotalExpression} > 0 THEN IFNULL(od.food_pr_charges, 0) * (${effectiveQuantityExpression}) ELSE 0 END)) /
-                 (1 + (MAX(IFNULL(od.profit, 0)) / 100))
+                 (1 + (MAX(${effectiveProfitExpression}) / 100))
             ELSE 0
         END AS price,
 
@@ -163,26 +175,26 @@ const getOrderItemDetails = async (req, res) => {
 
         SUM(CASE 
                 WHEN ${effectiveSubtotalExpression} > 0
-                THEN IFNULL(od.profit,0) * (${effectiveQuantityExpression}) 
+                THEN (${effectiveProfitExpression}) * (${effectiveQuantityExpression}) 
                 ELSE 0 
             END) AS totalprofit,
 
         CASE 
             WHEN IFNULL(SUM(${effectiveSubtotalExpression}),0) > 0 THEN
-                (MAX(IFNULL(od.profit, 0)) / 100) * (
+                (MAX(${effectiveProfitExpression}) / 100) * (
                     (SUM(CASE WHEN ${effectiveSubtotalExpression} > 0 THEN ${effectiveSubtotalExpression} ELSE 0 END) -
                      SUM(CASE WHEN ${effectiveSubtotalExpression} > 0 THEN IFNULL(od.food_pr_charges, 0) * (${effectiveQuantityExpression}) ELSE 0 END)) /
-                     (1 + (MAX(IFNULL(od.profit, 0)) / 100))
+                     (1 + (MAX(${effectiveProfitExpression}) / 100))
                 )
             ELSE 0
         END AS total_profit,
 
         CASE 
             WHEN IFNULL(SUM(${effectiveSubtotalExpression}),0) > 0 THEN
-                ((MAX(IFNULL(od.profit, 0)) / 100) * (
+                ((MAX(${effectiveProfitExpression}) / 100) * (
                     (SUM(CASE WHEN ${effectiveSubtotalExpression} > 0 THEN ${effectiveSubtotalExpression} ELSE 0 END) -
                      SUM(CASE WHEN ${effectiveSubtotalExpression} > 0 THEN IFNULL(od.food_pr_charges, 0) * (${effectiveQuantityExpression}) ELSE 0 END)) /
-                     (1 + (MAX(IFNULL(od.profit, 0)) / 100))
+                     (1 + (MAX(${effectiveProfitExpression}) / 100))
                 )) / NULLIF(SUM(CASE WHEN ${effectiveSubtotalExpression} > 0 THEN (${effectiveQuantityExpression}) END), 0)
             ELSE 0
         END AS unit_profit,
@@ -256,8 +268,6 @@ const getOrderItemDetails = async (req, res) => {
     ]);
     const totalRow = totalRows?.[0] || null;
     const results = totalRow ? [...detailRows, totalRow] : detailRows;
-
-// console.log("Order Item Details Results:", results);
 
     return res.json({
       success: true,
