@@ -9,7 +9,6 @@ exports.getNextBatchId = async (req, res) => {
         message: "Item code and transaction date are required",
       });
     }
-
     const batchId = await addStockModel.getNextBatchId({ itemCode, transactionDate });
     res.status(200).json({ success: true, data: { batchId } });
   } catch (error) {
