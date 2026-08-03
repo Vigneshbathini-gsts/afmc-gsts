@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, Download, ArrowLeft } from "lucide-react";
+import { Search, Download, ArrowLeft, Eye } from "lucide-react";
 import { orderAPI } from "../../services/api";
 import { exportTableToPdf } from "../../utils/pdfExport";
 import { toInitCap } from "../../utils/textFormat";
@@ -363,6 +363,7 @@ export default function OrderHistory() {
               <table className="w-full min-w-[900px] text-sm">
                 <thead className="bg-gray-50 text-gray-600">
                   <tr>
+                    <th className="px-4 py-3 text-center font-medium">View</th>
                     <th className="px-4 py-3 text-left font-medium">Order Date</th>
                     <th className="px-4 py-3 text-left font-medium">Name</th>
                     <th className="px-4 py-3 text-left font-medium">Order Status</th>
@@ -374,19 +375,19 @@ export default function OrderHistory() {
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td className="px-4 py-8 text-center text-gray-500" colSpan="6">
+                      <td className="px-4 py-8 text-center text-gray-500" colSpan="7">
                         Loading order history...
                       </td>
                     </tr>
                   ) : error ? (
                     <tr>
-                      <td className="px-4 py-8 text-center text-red-600" colSpan="6">
+                      <td className="px-4 py-8 text-center text-red-600" colSpan="7">
                         {error}
                       </td>
                     </tr>
                   ) : !hasSearched ? (
                     <tr>
-                      <td className="px-4 py-8 text-center text-gray-500" colSpan="6">
+                      <td className="px-4 py-8 text-center text-gray-500" colSpan="7">
                         Select From and To dates, then click Search to view order history.
                       </td>
                     </tr>
@@ -398,24 +399,32 @@ export default function OrderHistory() {
                       return (
                         <tr
                           key={`${row?.order_date_iso ?? "total"}-${row?.first_name ?? "x"}-${row?.payment_status1 ?? index}`}
-                          onClick={() => handleRowClick(row)}
-                          className={`border-t border-gray-100 ${
-                            totalRow
+                          className={`border-t border-gray-100 ${totalRow
                               ? "bg-afmc-maroon/5 font-semibold text-gray-800"
-                              : clickable
-                              ? "cursor-pointer text-gray-700 transition hover:bg-gray-50"
-                              : "text-gray-400"
-                          }`}
-                          style={!clickable && !totalRow ? { cursor: "not-allowed" } : undefined}
+                              : "text-gray-700"
+                            }`}
                         >
+                          <td className="px-4 py-3 text-center">
+                            {clickable ? (
+                              <button
+                                type="button"
+                                onClick={() => handleRowClick(row)}
+                                className="inline-flex items-center justify-center rounded-full p-2 text-afmc-maroon hover:bg-afmc-maroon/10 transition"
+                                title="View Details"
+                              >
+                                <Eye size={18} />
+                              </button>
+                            ) : (
+                              "-"
+                            )}
+                          </td>
                           <td className="px-4 py-3">{row?.order_date || ""}</td>
                           <td className="px-4 py-3">
                             {totalRow ? "" : toInitCap(row?.first_name) || "-"}
                           </td>
                           <td
-                            className={`px-4 py-3 ${
-                              row?.status === "Completed" ? "font-semibold text-[#0d9807]" : ""
-                            }`}
+                            className={`px-4 py-3 ${row?.status === "Completed" ? "font-semibold text-[#0d9807]" : ""
+                              }`}
                           >
                             {row?.status || ""}
                           </td>
@@ -431,7 +440,7 @@ export default function OrderHistory() {
                     })
                   ) : (
                     <tr>
-                      <td className="px-4 py-8 text-center text-gray-500" colSpan="6">
+                      <td className="px-4 py-8 text-center text-gray-500" colSpan="7">
                         No orders found for the selected filters.
                       </td>
                     </tr>
