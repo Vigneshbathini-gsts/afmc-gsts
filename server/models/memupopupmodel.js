@@ -1,6 +1,6 @@
 const db = require("../config/db");
 const { usesMemberPricing } = require("../helpers/customerPricing");
-
+const { isExcludedLiquorSubcategory } = require("../helpers/pricingHelper");
 const toNumber = (value, fallback = 0) => {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : fallback;
@@ -143,7 +143,9 @@ WHERE xso.ITEM_CODE = ?
 
   let finalPrice = inventoryUnitPrice;
 
-  if (categoryId === 10 && [14, 15].includes(subCategory)) {
+  const isExcludedLiquorItem = categoryId === 10 && (isExcludedLiquorSubcategory(subCategory) || [14, 15].includes(subCategory));
+
+  if (isExcludedLiquorItem) {
     finalPrice = inventoryBasePrice + selectedCharges;
   } else if (categoryId === 10) {
     const pricePerPeg = inventoryUnitPrice / pegs;

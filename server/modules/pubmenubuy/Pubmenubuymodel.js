@@ -1,5 +1,9 @@
 const db = require("../../config/db");
 const { usesNonMemberPricing } = require("../../helpers/customerPricing");
+const {
+  NON_ALCOHOLIC_LIQUOR_SUBCATEGORY_IDS,
+  isExcludedLiquorSubcategory,
+} = require("../../helpers/pricingHelper");
 
 const createValidationError = (message) => {
   const error = new Error(message);
@@ -187,7 +191,9 @@ function calculateOrderUnitPrice(inventoryItem, isNonMember) {
 
   let finalPrice = inventoryUnitPrice;
 
-  if (categoryId === 10 && [14, 15].includes(subCategory)) {
+  const isExcludedLiquorItem = categoryId === 10 && (isExcludedLiquorSubcategory(subCategory) || [14, 15].includes(subCategory));
+
+  if (isExcludedLiquorItem) {
     finalPrice = inventoryBasePrice + charges;
   } else if (categoryId === 10) {
     const pricePerPeg = inventoryUnitPrice / pegs;

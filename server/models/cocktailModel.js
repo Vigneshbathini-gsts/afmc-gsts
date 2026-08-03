@@ -1,4 +1,5 @@
 const db = require("../config/db");
+const { isExcludedLiquorSubcategory } = require("../helpers/pricingHelper");
 
 const DETAIL_TABLE = "xxafmc_cocktails_mocktails_details";
 const AFMC_IMAGE_PUBLIC_BASE_URL = (
@@ -242,6 +243,8 @@ const getCocktailIngredientPricing = async (itemCode, pegs) => {
         inv.UNIT_PRICE,
         inv.PROFIT,
         inv.NON_MEMBER_PROFIT,
+        inv.CATEGORY_ID,
+        inv.SUB_CATEGORY,
         recent_price.UNIT_PRICE AS STOCK_UNIT_PRICE,
         recent_price.PEGS AS STOCK_PEGS
       FROM xxafmc_inventory inv
@@ -287,12 +290,19 @@ const getCocktailIngredientPricing = async (itemCode, pegs) => {
   const stockPegs = normalizeNumber(item.STOCK_PEGS) || 1;
   const memberProfit = normalizeNumber(item.PROFIT) || 0;
   const nonMemberProfit = normalizeNumber(item.NON_MEMBER_PROFIT) || 0;
+  const subCategory = normalizeNumber(item.SUB_CATEGORY) || 0;
+  const isExcludedLiquorItem =
+    normalizeNumber(item.CATEGORY_ID) === 10 && isExcludedLiquorSubcategory(subCategory);
   const basePegPrice = unitPrice / (stockPegs === 0 ? 1 : stockPegs);
   const memberPrice = Number(
-    (basePegPrice + (basePegPrice * memberProfit) / 100) * normalizedPegs
+    isExcludedLiquorItem
+      ? basePegPrice * normalizedPegs
+      : (basePegPrice + (basePegPrice * memberProfit) / 100) * normalizedPegs
   );
   const nonMemberPrice = Number(
-    (basePegPrice + (basePegPrice * nonMemberProfit) / 100) * normalizedPegs
+    isExcludedLiquorItem
+      ? basePegPrice * normalizedPegs
+      : (basePegPrice + (basePegPrice * nonMemberProfit) / 100) * normalizedPegs
   );
 
   return {
@@ -343,30 +353,30 @@ const getCocktailDetailRows = async (inventoryItemCode, connection = db) => {
     const stockQuantity = Number(row.AVAILABLE_STOCK_QUANTITY || 0);
 
     return ({
-    MOC_ID: row.MOC_ID,
-    ITEM_CODE: row.ITEM_CODE,
-    ITEM_NAME: row.ITEM_NAME,
-    PRICE: row.PRICE,
-    PEGS: row.PEGS,
-    INVENTORY_ITEM_CODE: row.INVENTORY_ITEM_CODE,
-    NON_MEMBER_PRICE: row.NON_MEMBER_PRICE,
-    CATEGORY_ID: row.CATEGORY_ID,
-    SUBCATEGORY_ID: row.SUBCATEGORY_ID,
-    mocId: row.MOC_ID,
-    itemCode: row.ITEM_CODE,
-    itemName: row.ITEM_NAME,
-    price: row.PRICE,
-    pegs,
-    inventoryItemCode: row.INVENTORY_ITEM_CODE,
-    nonMemberPrice: row.NON_MEMBER_PRICE,
-    categoryId: row.CATEGORY_ID,
-    subcategoryId: row.SUBCATEGORY_ID,
-    memberPrice: Number(row.PRICE || row.NON_MEMBER_PRICE || 0),
-    STOCK_QUANTITY: stockQuantity,
-    stockQuantity,
-    STOCK_STATUS: stockQuantity >= (Number(pegs || 1)) ? "In Stock" : "Out Of Stock",
-    stockStatus: stockQuantity >= (Number(pegs || 1)) ? "In Stock" : "Out Of Stock",
-  });
+      MOC_ID: row.MOC_ID,
+      ITEM_CODE: row.ITEM_CODE,
+      ITEM_NAME: row.ITEM_NAME,
+      PRICE: row.PRICE,
+      PEGS: row.PEGS,
+      INVENTORY_ITEM_CODE: row.INVENTORY_ITEM_CODE,
+      NON_MEMBER_PRICE: row.NON_MEMBER_PRICE,
+      CATEGORY_ID: row.CATEGORY_ID,
+      SUBCATEGORY_ID: row.SUBCATEGORY_ID,
+      mocId: row.MOC_ID,
+      itemCode: row.ITEM_CODE,
+      itemName: row.ITEM_NAME,
+      price: row.PRICE,
+      pegs,
+      inventoryItemCode: row.INVENTORY_ITEM_CODE,
+      nonMemberPrice: row.NON_MEMBER_PRICE,
+      categoryId: row.CATEGORY_ID,
+      subcategoryId: row.SUBCATEGORY_ID,
+      memberPrice: Number(row.PRICE || row.NON_MEMBER_PRICE || 0),
+      STOCK_QUANTITY: stockQuantity,
+      stockQuantity,
+      STOCK_STATUS: stockQuantity >= (Number(pegs || 1)) ? "In Stock" : "Out Of Stock",
+      stockStatus: stockQuantity >= (Number(pegs || 1)) ? "In Stock" : "Out Of Stock",
+    });
   });
 };
 
@@ -478,25 +488,25 @@ const syncInventoryUnitPrice = async (connection, inventoryItemCode) => {
 const createCocktailItem = async (payload, options = {}) => {
   const data = validatePayload(payload);
   const userName = normalizeText(options.userName) || "SYSTEM";
-//   const imagePath = options.imageFile
-//   ? `${AFMC_IMAGE_PUBLIC_BASE_URL}/${options.imageFile.filename}`
-//   : null;
-// const fileName = options.imageFile?.filename || null;
+  //   const imagePath = options.imageFile
+  //   ? `${AFMC_IMAGE_PUBLIC_BASE_URL}/${options.imageFile.filename}`
+  //   : null;
+  // const fileName = options.imageFile?.filename || null;
   // const mimeType = options.imageFile?.mimetype || null;
-  
-//   const imagePath = data.itemName || null;
-// const fileName = data.itemName || null;
+
+  //   const imagePath = data.itemName || null;
+  // const fileName = data.itemName || null;
   // const mimeType = options.imageFile?.mimetype || null;
-  
+
   const imagePath = options.imageFile
-  ? options.imageFile.filename
-  : null;
+    ? options.imageFile.filename
+    : null;
 
-const fileName = options.imageFile
-  ? options.imageFile.filename
-  : null;
+  const fileName = options.imageFile
+    ? options.imageFile.filename
+    : null;
 
-const mimeType = options.imageFile?.mimetype || null;
+  const mimeType = options.imageFile?.mimetype || null;
 
 
   const connection = await db.getConnection();
@@ -618,32 +628,32 @@ const updateCocktailItem = async (itemId, payload, options = {}) => {
     }
 
     const inventoryItemCode = Number(existingItem.ITEM_CODE || existingItem.ITEM_ID);
-//     const imagePath = options.imageFile
-//   ? `${AFMC_IMAGE_PUBLIC_BASE_URL}/${options.imageFile.filename}`
-//   : null;
+    //     const imagePath = options.imageFile
+    //   ? `${AFMC_IMAGE_PUBLIC_BASE_URL}/${options.imageFile.filename}`
+    //   : null;
 
-// const fileName = options.imageFile?.filename || null;
+    // const fileName = options.imageFile?.filename || null;
     // const mimeType = options.imageFile?.mimetype || null;
-    
-//     const imagePath = options.imageFile
-//   ? data.itemName
-//   : existingItem.IMAGE;
 
-// const fileName = options.imageFile
-//   ? data.itemName
+    //     const imagePath = options.imageFile
+    //   ? data.itemName
+    //   : existingItem.IMAGE;
+
+    // const fileName = options.imageFile
+    //   ? data.itemName
     //   : existingItem.FILE_NAME;
-    
+
     const imagePath = options.imageFile
-  ? options.imageFile.filename
+      ? options.imageFile.filename
       : existingItem.IMAGE;
-    
-    
 
-const fileName = options.imageFile
-  ? options.imageFile.filename
-  : existingItem.FILE_NAME;
 
-const mimeType = options.imageFile?.mimetype || existingItem.MIME_TYPE;
+
+    const fileName = options.imageFile
+      ? options.imageFile.filename
+      : existingItem.FILE_NAME;
+
+    const mimeType = options.imageFile?.mimetype || existingItem.MIME_TYPE;
 
     await connection.execute(
       `

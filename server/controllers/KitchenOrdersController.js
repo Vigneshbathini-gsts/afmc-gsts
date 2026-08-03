@@ -1,6 +1,7 @@
 const pool = require("../config/db");
 const { getStartOfDay, getEndOfDay } = require("../utils/dateUtils");
 const { emitOrderStatusUpdate } = require("../utils/orderEvents");
+const { isExcludedLiquorSubcategory } = require("../helpers/pricingHelper");
 
 const getRequestUsername = (req) =>
   String(req.user?.username || req.user?.user_name || req.body?.appUser || "").trim();
@@ -1143,6 +1144,10 @@ exports.processBarcodeScan = async (req, res) => {
 
     // STEP C: Base values
     const unitPrice = Number(item.UNIT_PRICE) || 0;
+    const itemCategoryId = Number(item.CATEGORY_ID ?? item.category_id ?? 0);
+    const itemSubCategory = Number(item.SUB_CATEGORY ?? item.sub_category ?? subCategory ?? 0);
+    const isExcludedLiquorItem =
+      itemCategoryId === 10 && isExcludedLiquorSubcategory(itemSubCategory);
     const hasOrderProfit =
       orderPricing.profit !== null &&
       orderPricing.profit !== undefined &&
@@ -1161,8 +1166,10 @@ exports.processBarcodeScan = async (req, res) => {
     const profitPercent = hasOrderProfit && Number.isFinite(orderProfit) ? orderProfit : fallbackProfit || 0;
     const prCharges = hasOrderCharges && Number.isFinite(orderCharges) ? orderCharges : fallbackCharges || 0;
     const pegsFromStock = Number(item.PEGS) || 1;
+    const basePrice = pegsFromStock > 0 ? unitPrice / pegsFromStock : unitPrice;
+    const priceWithMarkup = basePrice * (1 + profitPercent / 100);
     const calculatedPaidPrice = Number(
-      (pegsFromStock > 0 ? unitPrice / pegsFromStock : unitPrice) * (1 + profitPercent / 100) + prCharges
+      isExcludedLiquorItem ? basePrice + prCharges : priceWithMarkup + prCharges
     ).toFixed(2);
 
     const [componentRows] = await connection.query(`

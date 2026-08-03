@@ -1,5 +1,9 @@
 const express = require("express");
 const db = require("../config/db");
+const {
+  isExcludedLiquorSubcategory,
+  NON_ALCOHOLIC_LIQUOR_SUBCATEGORY_IDS,
+} = require("../helpers/pricingHelper");
 
 const router = express.Router();
 
@@ -171,6 +175,17 @@ const getOrderTransactionDetails = async (req, res) => {
       CASE WHEN UPPER(TRIM(IFNULL(OD.TYPE, ''))) = 'LARGE' THEN 2 ELSE 1 END
     `;
 
+    // NEW: profit is forced to 0 for non-alcoholic liquor sub-categories
+    // (soft drinks / mixers etc. filed under CATEGORY_ID = 10) so markup
+    // is never applied to items that shouldn't carry a liquor profit margin.
+    const effectiveProfitExpression = `
+      CASE
+        WHEN XI.CATEGORY_ID = 10 AND XI.SUB_CATEGORY IN (${NON_ALCOHOLIC_LIQUOR_SUBCATEGORY_IDS.join(", ")})
+          THEN 0
+        ELSE IFNULL(OD.PROFIT, 0)
+      END
+    `;
+
     const effectiveSubtotalExpression = `
       CASE
         WHEN XI.SUB_CATEGORY IN (14, 15) AND IFNULL(ST.scanned_subtotal, 0) > 0
@@ -200,23 +215,23 @@ const getOrderTransactionDetails = async (req, res) => {
           CASE 
             WHEN ${effectiveSubtotalExpression} <> 0 THEN
               (${effectiveSubtotalExpression} - IFNULL(OD.FOOD_PR_CHARGES * (${multiplierExpression} * IFNULL(OD.QUANTITY, 0)), 0))
-              / (1 + (IFNULL(OD.PROFIT, 0) / 100)) / NULLIF(${multiplierExpression} * IFNULL(OD.QUANTITY, 0), 0)
+              / (1 + ((${effectiveProfitExpression}) / 100)) / NULLIF(${multiplierExpression} * IFNULL(OD.QUANTITY, 0), 0)
             ELSE 0
           END, 2
         ) AS PRICE,
         ROUND(IFNULL(OD.FOOD_PR_CHARGES * (${multiplierExpression} * IFNULL(OD.QUANTITY, 0)), 0), 2) AS FOOD_PR_CHARGES,
-        IFNULL(OD.PROFIT * (${multiplierExpression} * IFNULL(OD.QUANTITY, 0)), 0) AS TOTALPROFIT,
+        (${effectiveProfitExpression}) * (${multiplierExpression} * IFNULL(OD.QUANTITY, 0)) AS TOTALPROFIT,
         ROUND(
-          (IFNULL(OD.PROFIT, 0) / 100) *
+          ((${effectiveProfitExpression}) / 100) *
           ((${effectiveSubtotalExpression} - IFNULL(OD.FOOD_PR_CHARGES * (${multiplierExpression} * IFNULL(OD.QUANTITY, 0)), 0)) /
-          (1 + (IFNULL(OD.PROFIT, 0) / 100))), 2
+          (1 + ((${effectiveProfitExpression}) / 100))), 2
         ) AS TOTAL_PROFIT,
         ROUND(
-          ((IFNULL(OD.PROFIT, 0) / 100) *
+          (((${effectiveProfitExpression}) / 100) *
           ((${effectiveSubtotalExpression} - IFNULL(OD.FOOD_PR_CHARGES * (${multiplierExpression} * IFNULL(OD.QUANTITY, 0)), 0)) /
-          (1 + (IFNULL(OD.PROFIT, 0) / 100)))) / NULLIF(${multiplierExpression} * IFNULL(OD.QUANTITY, 0), 0), 2
+          (1 + ((${effectiveProfitExpression}) / 100)))) / NULLIF(${multiplierExpression} * IFNULL(OD.QUANTITY, 0), 0), 2
         ) AS UNIT_PROFIT,
-        IFNULL(OD.PROFIT, 0) AS TOTALPERCENT,
+        (${effectiveProfitExpression}) AS TOTALPERCENT,
         OH.ORDER_NUM,
         OH.USER_ID,
         OH.ORDER_DATE AS O_DATE,
@@ -247,11 +262,11 @@ const getOrderTransactionDetails = async (req, res) => {
         ROUND(SUM(${netSubtotalExpression}),2) AS SUBTOTAL,
         NULL AS PRICE,
         ROUND(SUM(IFNULL(OD.FOOD_PR_CHARGES * (${multiplierExpression} * IFNULL(OD.QUANTITY, 0)),0)),2) AS FOOD_PR_CHARGES,
-        SUM(IFNULL(OD.PROFIT * (${multiplierExpression} * IFNULL(OD.QUANTITY, 0)),0)) AS TOTALPROFIT,
+        SUM((${effectiveProfitExpression}) * (${multiplierExpression} * IFNULL(OD.QUANTITY, 0))) AS TOTALPROFIT,
         ROUND(SUM(
-          (IFNULL(OD.PROFIT, 0) / 100) *
+          ((${effectiveProfitExpression}) / 100) *
           ((${effectiveSubtotalExpression} - IFNULL(OD.FOOD_PR_CHARGES * (${multiplierExpression} * IFNULL(OD.QUANTITY, 0)), 0)) /
-          (1 + (IFNULL(OD.PROFIT, 0) / 100)))
+          (1 + ((${effectiveProfitExpression}) / 100)))
         ),2) AS TOTAL_PROFIT,
         NULL AS UNIT_PROFIT,
         NULL AS TOTALPERCENT,
@@ -320,12 +335,8 @@ const getOrderTransactionDetails = async (req, res) => {
     // Duplicate params for the summary query (since it has the same WHERE clause)
     const allParams = [...params, ...params];
 
-    // console.log("Query parameters count:", allParams.length);
-    // console.log("Query parameters:", allParams);
-
     const [results] = await db.execute(finalQuery, allParams);
 
-// console.log("Fetched order transaction results count:", results.length,results);
 
     return res.json({
       success: true,
@@ -422,4 +433,3 @@ router.get("/ordertransaction/items", getOrderTransactionItemOptions);
 router.get("/order-transaction/items", getOrderTransactionItemOptions);
 
 module.exports = router;
-

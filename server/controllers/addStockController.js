@@ -23,6 +23,7 @@ exports.getNextBatchId = async (req, res) => {
 exports.addStock = async (req, res) => {
   try {
     const payload = req.body?.items ? req.body.items : req.body;
+
     const createdBy =
       req.user?.username ||
       req.user?.user_name ||
