@@ -1,6 +1,7 @@
 const {
   getActiveOrders,
   getAdminOrderHistory,
+  getOrderHistoryUserOptions,
   getOrderWiseReport,
   getItemWiseReport,
   getNonMemberByPhone,
@@ -117,6 +118,24 @@ exports.fetchOrderWiseReport = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Unable to fetch order-wise report.",
+      error: error.message,
+    });
+  }
+};
+
+exports.fetchOrderHistoryUsers = async (req, res) => {
+  try {
+    const data = await getOrderHistoryUserOptions();
+
+    res.status(200).json({
+      success: true,
+      data,
+    });
+  } catch (error) {
+    console.error("Failed to fetch order history users:", error);
+    res.status(500).json({
+      success: false,
+      message: "Unable to fetch order history users.",
       error: error.message,
     });
   }

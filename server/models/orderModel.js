@@ -194,7 +194,7 @@ const reportItemName = `
   COALESCE(${reportText("NULLIF(xi.item_name, '')")}, ${reportText("CAST(od.item_id AS CHAR)")})
 `;
 const reportItemType = (detailTypeExpression = "od.type") => `
-  COALESCE(${reportText("NULLIF(xi.type, '')")}, ${reportText(`NULLIF(${detailTypeExpression}, '')`)}, ${reportText("'NA'")})
+  COALESCE(${reportText(`NULLIF(${detailTypeExpression}, '')`)}, ${reportText("NULLIF(xi.type, '')")}, ${reportText("'NA'")})
 `;
 
 /**
@@ -237,7 +237,7 @@ async function getAdminOrderHistory({
         AND (? IS NULL OR ${ORDER_DATE_EXPR} >= DATE(?))
         AND (? IS NULL OR ${ORDER_DATE_EXPR} <= DATE(?))
       GROUP BY xxoh.order_num, xxoh.order_date, xxoh.member_id, xxoh.user_id
-      HAVING ? IS NULL OR ? = '' OR UPPER(first_name) = UPPER(${reportText("?")})
+      HAVING ? IS NULL OR ? = '' OR LOCATE(UPPER(${reportText("?")}), UPPER(first_name)) > 0
     )
     SELECT * FROM (
       SELECT
@@ -306,6 +306,22 @@ async function getAdminOrderHistory({
   ];
 
   const [rows] = await db.execute(query, params);
+  return rows;
+}
+
+async function getOrderHistoryUserOptions() {
+  const query = `
+    SELECT DISTINCT first_name AS value, first_name AS label
+    FROM (
+      SELECT ${reportCustomerName("xxoh")} AS first_name
+      FROM xxafmc_order_header xxoh
+      WHERE ${reportCustomerName("xxoh")} IS NOT NULL
+    ) names
+    WHERE first_name IS NOT NULL AND TRIM(first_name) <> ''
+    ORDER BY first_name ASC
+  `;
+
+  const [rows] = await db.execute(query);
   return rows;
 }
 
@@ -421,7 +437,7 @@ async function getOrderWiseReport({
 }
 
 /**
- * Item-wise report (Page 82 equivalent — "item wise" view).
+ *
  * Same scope as the order-wise report, but aggregated per item.
  */
 async function getItemWiseReport({
@@ -435,7 +451,7 @@ async function getItemWiseReport({
       SELECT
         od.item_id,
         ${reportItemName} AS item_name,
-        ${reportItemType("MAX(od.type)")} AS type,
+        ${reportItemType("od.type")} AS type,
         SUM(od.quantity) AS quantity,
         ROUND(AVG(${LINE_PRICE_CASE}), 2) AS price,
         ROUND(SUM(${LINE_SUBTOTAL_CASE}), 2) AS subtotal,
@@ -467,7 +483,7 @@ async function getItemWiseReport({
             ${reportCustomerName("xoh")}
           ) = UPPER(${reportText("?")})
         )
-      GROUP BY od.item_id, xi.item_name, xi.type
+      GROUP BY od.item_id, item_name, type
 
       UNION ALL
 
@@ -504,7 +520,7 @@ async function getItemWiseReport({
           )
       ) t
     ) final_data
-    ORDER BY sort_order ASC, item_name ASC
+    ORDER BY sort_order ASC, item_name ASC, type ASC
   `;
 
   const cleanDate = toSqlDateOnly(orderDate);
@@ -1023,6 +1039,7 @@ async function getUserOrderHistory({ fromDate, toDate, username, appUser }) {
 module.exports = {
   getActiveOrders,
   getAdminOrderHistory,
+  getOrderHistoryUserOptions,
   getOrderWiseReport,
   getItemWiseReport,
   getNonMemberByPhone,

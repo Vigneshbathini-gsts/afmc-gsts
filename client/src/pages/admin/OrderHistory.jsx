@@ -4,6 +4,9 @@ import { Search, Download, ArrowLeft } from "lucide-react";
 import { orderAPI } from "../../services/api";
 import { exportTableToPdf } from "../../utils/pdfExport";
 import { toInitCap } from "../../utils/textFormat";
+import FilterDropdown from "../../components/common/FilterDropdown";
+
+const STORAGE_KEY = "adminOrderHistoryState";
 
 const toInputDate = (date) => {
   const d = date instanceof Date ? date : new Date(date);
@@ -45,16 +48,32 @@ const getInitialFilters = () => {
   };
 };
 
+const getStoredState = () => {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (storageError) {
+    return null;
+  }
+};
+
 export default function OrderHistory() {
   const navigate = useNavigate();
-  const [filters, setFilters] = useState(getInitialFilters);
-  const [searchValue, setSearchValue] = useState("");
+  const storedState = useMemo(() => getStoredState(), []);
+  const [filters, setFilters] = useState(
+    () => storedState?.filters || getInitialFilters()
+  );
+  const [searchValue, setSearchValue] = useState(
+    () => storedState?.searchValue || storedState?.filters?.username || ""
+  );
   const [rows, setRows] = useState([]);
+  const [userOptions, setUserOptions] = useState([]);
+  const [userOptionsLoading, setUserOptionsLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [hasSearched, setHasSearched] = useState(false);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [hasSearched, setHasSearched] = useState(() => Boolean(storedState?.hasSearched));
+  const [page, setPage] = useState(() => storedState?.page || 1);
+  const [pageSize, setPageSize] = useState(() => storedState?.pageSize || 10);
 
   const appUser = useMemo(() => {
     try {
@@ -106,14 +125,6 @@ export default function OrderHistory() {
     });
   }, [rows]);
 
-  const userOptions = useMemo(() => {
-    const names = rows
-      .map((row) => row?.first_name)
-      .filter((name) => name && name.trim());
-
-    return [...new Set(names)].sort((a, b) => a.localeCompare(b));
-  }, [rows]);
-
   const PAGE_SIZE_OPTIONS = useMemo(() => [5, 10, 25, 50], []);
 
   const totalPages = useMemo(() => Math.max(1, Math.ceil(visibleRows.length / pageSize)), [visibleRows.length, pageSize]);
@@ -134,6 +145,60 @@ export default function OrderHistory() {
   useEffect(() => {
     setPage(1);
   }, [hasSearched]);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({
+          filters,
+          searchValue,
+          hasSearched,
+          page,
+          pageSize,
+        })
+      );
+    } catch (storageError) {
+      // Ignore storage access errors.
+    }
+  }, [filters, searchValue, hasSearched, page, pageSize]);
+
+  useEffect(() => {
+    const loadUserOptions = async () => {
+      try {
+        setUserOptionsLoading(true);
+        const response = await orderAPI.getOrderHistoryUsers();
+        const options = (response.data?.data || [])
+          .map((item) => {
+            const label = String(item?.label || item?.value || "").trim();
+            const value = String(item?.value || item?.label || "").trim();
+            return label && value ? { label, value } : null;
+          })
+          .filter(Boolean);
+
+        const uniqueOptions = Array.from(
+          new Map(options.map((option) => [option.value, option])).values()
+        );
+
+        setUserOptions(
+          uniqueOptions.sort((a, b) => a.label.localeCompare(b.label))
+        );
+      } catch (fetchError) {
+        console.error("Failed to fetch order history users:", fetchError);
+        setUserOptions([]);
+      } finally {
+        setUserOptionsLoading(false);
+      }
+    };
+
+    loadUserOptions();
+  }, []);
+
+  useEffect(() => {
+    if (hasSearched && storedState?.filters) {
+      loadOrders(storedState.filters);
+    }
+  }, [hasSearched, loadOrders, storedState]);
 
   const handleSearch = () => {
     if (!filters.from || !filters.to) {
@@ -248,21 +313,16 @@ export default function OrderHistory() {
 
             <label className="col-span-2 min-w-0 md:col-span-1 md:min-w-[220px] md:max-w-[320px] md:w-full">
               <span className="mb-2 block text-sm font-medium text-gray-700">User Name</span>
-              <div className="flex items-center rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
-                <input
-                  type="text"
-                  list="admin-order-usernames"
-                  value={searchValue}
-                  onChange={(event) => setSearchValue(event.target.value)}
-                  placeholder="Search user"
-                  className="w-full bg-transparent text-gray-800 outline-none placeholder:text-gray-400"
-                />
-                <datalist id="admin-order-usernames">
-                  {userOptions.map((name) => (
-                    <option key={name} value={name} />
-                  ))}
-                </datalist>
-              </div>
+              <FilterDropdown
+                value={searchValue}
+                onChange={(next) => setSearchValue(next || "")}
+                options={userOptions}
+                placeholder="Select User Name"
+                allLabel="All Users"
+                loading={userOptionsLoading}
+                loadingLabel="Loading users..."
+                formatLabel={toInitCap}
+              />
             </label>
 
             <button

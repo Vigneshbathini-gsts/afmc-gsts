@@ -5,6 +5,7 @@ const {
   fetchActiveOrders,
   fetchAdminOrderHistory,
   fetchAttendantOrders,
+  fetchOrderHistoryUsers,
   fetchItemWiseReport,
   fetchOrderDetails,
   fetchOrderSummary,
@@ -18,6 +19,7 @@ const router = express.Router();
 router.get("/active", authMiddleware, fetchActiveOrders);
 router.get("/attendant", authMiddleware, fetchAttendantOrders);
 router.get("/history", authMiddleware, fetchAdminOrderHistory);
+router.get("/history/users", authMiddleware, fetchOrderHistoryUsers);
 router.get("/history/order-wise", authMiddleware, fetchOrderWiseReport);
 router.get("/history/item-wise", authMiddleware, fetchItemWiseReport);
 router.get("/non-member", authMiddleware, lookupNonMember);

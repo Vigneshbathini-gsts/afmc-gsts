@@ -294,6 +294,7 @@ export const orderAPI = {
 
   // Admin
   getOrderHistory: (params) => api.get("/orders/history", { params }),
+  getOrderHistoryUsers: () => api.get("/orders/history/users"),
   getOrderWiseReport: (params) => api.get("/orders/history/order-wise", { params }),
   getItemWiseReport: (params) => api.get("/orders/history/item-wise", { params }),
   getOrderSummary: (orderNumber) => api.get(`/orders/${orderNumber}/summary`),
