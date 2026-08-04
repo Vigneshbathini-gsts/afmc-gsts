@@ -2,6 +2,7 @@ const db = require("../../config/db");
 const cartModel = require("./cartModel");
 const cocktailModel = require("../../models/cocktailModel");
 const { usesNonMemberPricing } = require("../../helpers/customerPricing");
+const { isExcludedLiquorSubcategory } = require("../../helpers/pricingHelper");
 
 const getSessionUserKey = (req) =>
   String(req.user?.username || req.user?.user_name || req.user?.userId || "").trim() || "unknown";
@@ -816,8 +817,18 @@ exports.confirmOrder = async (req, res) => {
         roleId,
         loginType: req.user?.loginType,
       });
-      const profit = isNonMember ? Number(cartItem.non_member_profit || 0) : Number(cartItem.profit || 0);
-      const foodPrCharges = isNonMember ? Number(cartItem.pr_charges || 0) : Number(cartItem.food_pr_charges || 0);
+      const isNonAlcoholicLiquorItem =
+        Number(cartCategoryIdRaw) === 10 && isExcludedLiquorSubcategory(cartSubcategoryRaw);
+      const profit = isNonAlcoholicLiquorItem
+        ? 0
+        : isNonMember
+          ? Number(cartItem.non_member_profit || 0)
+          : Number(cartItem.profit || 0);
+      const foodPrCharges = isNonAlcoholicLiquorItem
+        ? 0
+        : isNonMember
+          ? Number(cartItem.pr_charges || 0)
+          : Number(cartItem.food_pr_charges || 0);
       const parentCodeRaw = cartItem?.parent_code ?? cartItem?.PARENT_CODE ?? null;
       const parentCode = parentCodeRaw === null || parentCodeRaw === undefined || parentCodeRaw === "" ? null : String(parentCodeRaw);
 

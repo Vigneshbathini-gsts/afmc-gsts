@@ -6,12 +6,15 @@ import { inventoryAPI } from "../../services/api";
 
 const BATCH_WISE_SUB_CATEGORIES = new Set([6, 7, 9, 10, 18]);
 const SINGLE_QUANTITY_SUB_CATEGORIES = new Set([1, 3, 1310]);
+const NON_ALCOHOLIC_LIQUOR_SUB_CATEGORIES = new Set([4, 6, 9, 18]);
 
 const requiresVolume = (acUnit) => String(acUnit || "").trim().toUpperCase() !== "NOS";
 const isValidBarcode = (value) => /^\d{4,15}$/.test(String(value || "").trim());
 const isBatchWiseItem = (subCategoryId) => BATCH_WISE_SUB_CATEGORIES.has(Number(subCategoryId));
 const requiresSingleQuantity = (subCategoryId) =>
   SINGLE_QUANTITY_SUB_CATEGORIES.has(Number(subCategoryId));
+const isNonAlcoholicLiquorItem = (categoryId, subCategoryId) =>
+  Number(categoryId) === 10 && NON_ALCOHOLIC_LIQUOR_SUB_CATEGORIES.has(Number(subCategoryId));
 
 const formatDate = (date) => {
   const d = date instanceof Date ? date : new Date(date);
@@ -56,7 +59,7 @@ const buildInitialStockForm = (item) => ({
   subCategoryId: item?.sub_category || "",
   itemGroup: item?.item_group || "",
   currentStock: item?.stock_quantity ?? 0,
-  profit: item?.profit ?? "",
+  profit: isNonAlcoholicLiquorItem(item?.category_id, item?.sub_category) ? 0 : item?.profit ?? "",
   rate: "",
   quantity: 1,
   volume: "",

@@ -1,5 +1,6 @@
 const db = require("../../config/db");
 const { usesNonMemberPricing } = require("../../helpers/customerPricing");
+const { isExcludedLiquorSubcategory } = require("../../helpers/pricingHelper");
 
 const CUSTOMIZATION_TABLE = "xxafmc_cart_customization";
 
@@ -736,13 +737,19 @@ const addCartItem = async (userId, itemData) => {
     if (!itemInfo) throw new Error("Item not found");
 
     const isCocktailOrMocktail = isCocktailOrMocktailInfo(itemInfo);
+    const isNonAlcoholicLiquorItem =
+      Number(itemInfo.category_id) === 10 && isExcludedLiquorSubcategory(itemInfo.sub_category);
     const isNonMember = usesNonMemberPricing({ roleId, loginType });
-    const selectedProfit = isNonMember
-      ? Number(itemInfo.non_member_profit || 0)
-      : Number(itemInfo.profit || 0);
-    const selectedCharges = isNonMember
-      ? Number(itemInfo.pr_charges || 0)
-      : Number(itemInfo.food_pr_charges || 0);
+    const selectedProfit = isNonAlcoholicLiquorItem
+      ? 0
+      : isNonMember
+        ? Number(itemInfo.non_member_profit || 0)
+        : Number(itemInfo.profit || 0);
+    const selectedCharges = isNonAlcoholicLiquorItem
+      ? 0
+      : isNonMember
+        ? Number(itemInfo.pr_charges || 0)
+        : Number(itemInfo.food_pr_charges || 0);
 
     if (isCocktailOrMocktail) {
       await ensureCustomizationTable(conn);

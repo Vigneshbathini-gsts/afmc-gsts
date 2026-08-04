@@ -1,5 +1,6 @@
 const db = require("../config/db");
 const { formatToSql, getStartOfDay, getEndOfDay, parseDate } = require("../utils/dateUtils");
+const { isExcludedLiquorSubcategory } = require("../helpers/pricingHelper");
 
 const ID_LOCKS = {
   inventory: "xxafmc_inventory_item_id_lock",
@@ -244,10 +245,12 @@ const createItem = async (payload) => {
 
     const defaults = await getCategoryDefaults(categoryId);
 
-    let foodPrCharges = defaults?.food_pr_charges ?? 0;
-    let prCharges = defaults?.pr_charges ?? 0;
-    const profit = defaults?.profit ?? 0;
-    const nonMemberProfit = defaults?.non_member_profit ?? 0;
+    const isNonAlcoholicLiquorItem =
+      Number(categoryId) === 10 && isExcludedLiquorSubcategory(subCategory);
+    let foodPrCharges = isNonAlcoholicLiquorItem ? 0 : defaults?.food_pr_charges ?? 0;
+    let prCharges = isNonAlcoholicLiquorItem ? 0 : defaults?.pr_charges ?? 0;
+    const profit = isNonAlcoholicLiquorItem ? 0 : defaults?.profit ?? 0;
+    const nonMemberProfit = isNonAlcoholicLiquorItem ? 0 : defaults?.non_member_profit ?? 0;
 
     if (String(prepCharges).toUpperCase() === "N") {
       foodPrCharges = 0;

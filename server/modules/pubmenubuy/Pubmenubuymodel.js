@@ -1,9 +1,6 @@
 const db = require("../../config/db");
 const { usesNonMemberPricing } = require("../../helpers/customerPricing");
-const {
-  NON_ALCOHOLIC_LIQUOR_SUBCATEGORY_IDS,
-  isExcludedLiquorSubcategory,
-} = require("../../helpers/pricingHelper");
+const { isExcludedLiquorSubcategory } = require("../../helpers/pricingHelper");
 
 const createValidationError = (message) => {
   const error = new Error(message);
@@ -192,8 +189,11 @@ function calculateOrderUnitPrice(inventoryItem, isNonMember) {
   let finalPrice = inventoryUnitPrice;
 
   const isExcludedLiquorItem = categoryId === 10 && (isExcludedLiquorSubcategory(subCategory) || [14, 15].includes(subCategory));
+  const isNonAlcoholicLiquorItem = categoryId === 10 && isExcludedLiquorSubcategory(subCategory);
 
-  if (isExcludedLiquorItem) {
+  if (isNonAlcoholicLiquorItem) {
+    finalPrice = inventoryBasePrice || inventoryUnitPrice;
+  } else if (isExcludedLiquorItem) {
     finalPrice = inventoryBasePrice + charges;
   } else if (categoryId === 10) {
     const pricePerPeg = inventoryUnitPrice / pegs;
@@ -1504,12 +1504,18 @@ async function createOrder(payload = {}, authUser = {}) {
     const resolvedCategoryId = Number.isFinite(categoryId) ? categoryId : Number(inventoryItem.category_id);
     const subCategory = Number(inventoryItem.sub_category ?? 0);
     const isMocktailItem = Number(resolvedCategoryId) === 10 && [14, 15].includes(subCategory);
-    const profit = isNonMember
-      ? Number(inventoryItem.non_member_profit || 0)
-      : Number(inventoryItem.profit || 0);
-    const foodPrCharges = isNonMember
-      ? Number(inventoryItem.pr_charges || 0)
-      : Number(inventoryItem.food_pr_charges || 0);
+    const isNonAlcoholicLiquorItem =
+      Number(resolvedCategoryId) === 10 && isExcludedLiquorSubcategory(subCategory);
+    const profit = isNonAlcoholicLiquorItem
+      ? 0
+      : isNonMember
+        ? Number(inventoryItem.non_member_profit || 0)
+        : Number(inventoryItem.profit || 0);
+    const foodPrCharges = isNonAlcoholicLiquorItem
+      ? 0
+      : isNonMember
+        ? Number(inventoryItem.pr_charges || 0)
+        : Number(inventoryItem.food_pr_charges || 0);
 
     const unitPrice = calculateOrderUnitPrice(inventoryItem, isNonMember);
     const subtotal = Number((unitPrice * quantity).toFixed(2));

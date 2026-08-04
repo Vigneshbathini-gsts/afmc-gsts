@@ -138,13 +138,14 @@ WHERE xso.ITEM_CODE = ?
   const nonMemberProfit = toNumber(inventory.non_member_profit);
   const memberCharges = toNumber(inventory.food_pr_charges);
   const nonMemberCharges = toNumber(inventory.pr_charges);
-  const selectedProfit = isMember ? memberProfit : nonMemberProfit;
-  const selectedCharges = isMember ? memberCharges : nonMemberCharges;
+  const isNonAlcoholicLiquorItem = categoryId === 10 && isExcludedLiquorSubcategory(subCategory);
+  const isCocktailOrMocktailItem = categoryId === 10 && [14, 15].includes(subCategory);
+  const selectedProfit = isNonAlcoholicLiquorItem ? 0 : isMember ? memberProfit : nonMemberProfit;
+  const selectedCharges = isNonAlcoholicLiquorItem ? 0 : isMember ? memberCharges : nonMemberCharges;
 
   let cocktailBasePrice = inventoryBasePrice;
-  const isExcludedLiquorItem = categoryId === 10 && (isExcludedLiquorSubcategory(subCategory) || [14, 15].includes(subCategory));
 
-  if (isExcludedLiquorItem) {
+  if (isCocktailOrMocktailItem) {
     const priceColumn = isMember ? "PRICE" : "NON_MEMBER_PRICE";
     const [detailRows] = await db.execute(
       `SELECT COALESCE(SUM(COALESCE(${priceColumn}, 0)), 0) AS detail_total_price
@@ -158,8 +159,10 @@ WHERE xso.ITEM_CODE = ?
 
   let finalPrice = inventoryUnitPrice;
 
-  if (isExcludedLiquorItem) {
+  if (isCocktailOrMocktailItem) {
     finalPrice = cocktailBasePrice + selectedCharges;
+  } else if (isNonAlcoholicLiquorItem) {
+    finalPrice = inventoryBasePrice || inventoryUnitPrice;
   } else if (categoryId === 10) {
     const pricePerPeg = inventoryUnitPrice / pegs;
     finalPrice =
