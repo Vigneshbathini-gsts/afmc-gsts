@@ -1,6 +1,9 @@
 const {
   getActiveOrders,
   getAdminOrderHistory,
+  getOrderHistoryUserOptions,
+  getOrderWiseReport,
+  getItemWiseReport,
   getNonMemberByPhone,
   getOrderDetails,
   getOrderSummary,
@@ -86,12 +89,97 @@ exports.fetchAdminOrderHistory = async (req, res) => {
   }
 };
 
+exports.fetchOrderWiseReport = async (req, res) => {
+  try {
+    const { orderDate = null, username = null, paymentStatus = null } = req.query;
+    const roleId = Number(req.user?.roleId);
+    const userId = roleId === 10 ? null : req.user?.userId || null;
+
+    if (!orderDate) {
+      return res.status(400).json({
+        success: false,
+        message: "orderDate is required.",
+      });
+    }
+
+    const data = await getOrderWiseReport({
+      orderDate,
+      username,
+      paymentStatus,
+      userId,
+    });
+
+    res.status(200).json({
+      success: true,
+      data,
+    });
+  } catch (error) {
+    console.error("Failed to fetch order-wise report:", error);
+    res.status(500).json({
+      success: false,
+      message: "Unable to fetch order-wise report.",
+      error: error.message,
+    });
+  }
+};
+
+exports.fetchOrderHistoryUsers = async (req, res) => {
+  try {
+    const data = await getOrderHistoryUserOptions();
+
+    res.status(200).json({
+      success: true,
+      data,
+    });
+  } catch (error) {
+    console.error("Failed to fetch order history users:", error);
+    res.status(500).json({
+      success: false,
+      message: "Unable to fetch order history users.",
+      error: error.message,
+    });
+  }
+};
+
+exports.fetchItemWiseReport = async (req, res) => {
+  try {
+    const { orderDate = null, username = null, paymentStatus = null } = req.query;
+    const roleId = Number(req.user?.roleId);
+    const userId = roleId === 10 ? null : req.user?.userId || null;
+
+    if (!orderDate) {
+      return res.status(400).json({
+        success: false,
+        message: "orderDate is required.",
+      });
+    }
+
+    const data = await getItemWiseReport({
+      orderDate,
+      username,
+      paymentStatus,
+      userId,
+    });
+
+    res.status(200).json({
+      success: true,
+      data,
+    });
+  } catch (error) {
+    console.error("Failed to fetch item-wise report:", error);
+    res.status(500).json({
+      success: false,
+      message: "Unable to fetch item-wise report.",
+      error: error.message,
+    });
+  }
+};
+
 exports.fetchOrderDetails = async (req, res) => {
   try {
     const { id, orderId } = req.params;
     const orderIdentifier = id || orderId;
     const data = await getOrderDetails(orderIdentifier);
-    console.log("Fetched Order Details:", data);
     res.status(200).json({
       success: true,
       data,
@@ -201,7 +289,7 @@ exports.fetchUserOrderHistory = async (req, res) => {
       toDate: to,
       appUser,
     }); 
-console.log("Fetched User Order History:", data);
+// console.log("Fetched User Order History:", data);
     res.status(200).json({
       success: true,
       data,
