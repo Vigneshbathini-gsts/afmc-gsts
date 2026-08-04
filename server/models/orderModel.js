@@ -342,7 +342,30 @@ async function getOrderWiseReport({
         ${reportItemType("od.type")} AS type,
         od.quantity,
         ROUND(${LINE_PRICE_CASE}, 2) AS price,
+        ROUND(
+          CASE
+            WHEN TRIM(UPPER(IFNULL(od.order_status, ''))) = 'CANCELLED' THEN 0
+            -- For cocktails: prep charge is food_pr_charges (once per order line)
+            WHEN od.subcategory IN (14, 15) THEN IFNULL(od.food_pr_charges, 0)
+            -- For regular items: prep charge is food_pr_charges * quantity
+            ELSE IFNULL(od.food_pr_charges, 0) * od.quantity
+          END,
+          2
+        ) AS prep_charges,
         ROUND(${LINE_SUBTOTAL_CASE}, 2) AS subtotal,
+        ROUND(
+          CASE
+            WHEN TRIM(UPPER(IFNULL(od.order_status, ''))) = 'CANCELLED' THEN 0
+            -- Calculate profit: (subtotal - prep_charges) * (profit_percent / (100 + profit_percent))
+            WHEN od.subcategory IN (14, 15) THEN
+              (${LINE_SUBTOTAL_CASE} - IFNULL(od.food_pr_charges, 0)) * 
+              (IFNULL(od.profit, 0) / (100 + IFNULL(od.profit, 0)))
+            ELSE
+              (${LINE_SUBTOTAL_CASE} - (IFNULL(od.food_pr_charges, 0) * od.quantity)) * 
+              (IFNULL(od.profit, 0) / (100 + IFNULL(od.profit, 0)))
+          END,
+          2
+        ) AS profit,
         ${reportText("xxkn.status")} AS status,
         1 AS sort_order
       FROM xxafmc_order_details od
@@ -373,19 +396,36 @@ async function getOrderWiseReport({
         )
       GROUP BY od.order_line_id, od.order_id, od.item_id, xi.item_name, xi.type, od.type,
         od.quantity, od.price, od.subtotal, od.order_status, xxkn.status,
-        scanned_totals.scanned_total, custom_totals.unit_custom_total
+        scanned_totals.scanned_total, custom_totals.unit_custom_total,
+        od.subcategory, od.food_pr_charges, od.profit
 
       UNION ALL
 
       SELECT
         NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+        ROUND(SUM(t.prep_charges), 2) AS prep_charges,
         ROUND(SUM(t.subtotal), 2) AS subtotal,
+        ROUND(SUM(t.profit), 2) AS profit,
         ${reportText("'Total'")} AS status,
         2 AS sort_order
       FROM (
         SELECT DISTINCT
           od.order_line_id,
-          ${LINE_SUBTOTAL_CASE} AS subtotal
+          CASE
+            WHEN TRIM(UPPER(IFNULL(od.order_status, ''))) = 'CANCELLED' THEN 0
+            WHEN od.subcategory IN (14, 15) THEN IFNULL(od.food_pr_charges, 0)
+            ELSE IFNULL(od.food_pr_charges, 0) * od.quantity
+          END AS prep_charges,
+          ${LINE_SUBTOTAL_CASE} AS subtotal,
+          CASE
+            WHEN TRIM(UPPER(IFNULL(od.order_status, ''))) = 'CANCELLED' THEN 0
+            WHEN od.subcategory IN (14, 15) THEN
+              (${LINE_SUBTOTAL_CASE} - IFNULL(od.food_pr_charges, 0)) * 
+              (IFNULL(od.profit, 0) / (100 + IFNULL(od.profit, 0)))
+            ELSE
+              (${LINE_SUBTOTAL_CASE} - (IFNULL(od.food_pr_charges, 0) * od.quantity)) * 
+              (IFNULL(od.profit, 0) / (100 + IFNULL(od.profit, 0)))
+          END AS profit
         FROM xxafmc_order_details od
         JOIN xxafmc_order_header xoh
           ON od.order_id = xoh.order_num
@@ -449,6 +489,28 @@ async function getItemWiseReport({
         ${reportItemType("od.type")} AS type,
         SUM(od.quantity) AS quantity,
         ROUND(AVG(${LINE_PRICE_CASE}), 2) AS price,
+        ROUND(
+          SUM(
+            CASE
+              WHEN TRIM(UPPER(IFNULL(od.order_status, ''))) = 'CANCELLED' THEN 0
+              WHEN od.subcategory IN (14, 15) THEN IFNULL(od.food_pr_charges, 0)
+              ELSE IFNULL(od.food_pr_charges, 0) * od.quantity
+            END
+          ), 2
+        ) AS prep_charges,
+        ROUND(
+          SUM(
+            CASE
+              WHEN TRIM(UPPER(IFNULL(od.order_status, ''))) = 'CANCELLED' THEN 0
+              WHEN od.subcategory IN (14, 15) THEN
+                (${LINE_SUBTOTAL_CASE} - IFNULL(od.food_pr_charges, 0)) * 
+                (IFNULL(od.profit, 0) / (100 + IFNULL(od.profit, 0)))
+              ELSE
+                (${LINE_SUBTOTAL_CASE} - (IFNULL(od.food_pr_charges, 0) * od.quantity)) * 
+                (IFNULL(od.profit, 0) / (100 + IFNULL(od.profit, 0)))
+            END
+          ), 2
+        ) AS profit,
         ROUND(SUM(${LINE_SUBTOTAL_CASE}), 2) AS subtotal,
         ${reportText("'Completed'")} AS status,
         1 AS sort_order
@@ -478,18 +540,34 @@ async function getItemWiseReport({
             ${reportCustomerName("xoh")}
           ) = UPPER(${reportText("?")})
         )
-      GROUP BY od.item_id, item_name, type
+      GROUP BY od.item_id, xi.item_name, xi.type, od.type, od.subcategory
 
       UNION ALL
 
       SELECT
         NULL, NULL, NULL, NULL, NULL,
+        ROUND(SUM(t.prep_charges), 2) AS prep_charges,
+        ROUND(SUM(t.profit), 2) AS profit,
         ROUND(SUM(t.subtotal), 2) AS subtotal,
         ${reportText("'Total'")} AS status,
         2 AS sort_order
       FROM (
         SELECT DISTINCT
           od.order_line_id,
+          CASE
+            WHEN TRIM(UPPER(IFNULL(od.order_status, ''))) = 'CANCELLED' THEN 0
+            WHEN od.subcategory IN (14, 15) THEN IFNULL(od.food_pr_charges, 0)
+            ELSE IFNULL(od.food_pr_charges, 0) * od.quantity
+          END AS prep_charges,
+          CASE
+            WHEN TRIM(UPPER(IFNULL(od.order_status, ''))) = 'CANCELLED' THEN 0
+            WHEN od.subcategory IN (14, 15) THEN
+              (${LINE_SUBTOTAL_CASE} - IFNULL(od.food_pr_charges, 0)) * 
+              (IFNULL(od.profit, 0) / (100 + IFNULL(od.profit, 0)))
+            ELSE
+              (${LINE_SUBTOTAL_CASE} - (IFNULL(od.food_pr_charges, 0) * od.quantity)) * 
+              (IFNULL(od.profit, 0) / (100 + IFNULL(od.profit, 0)))
+          END AS profit,
           ${LINE_SUBTOTAL_CASE} AS subtotal
         FROM xxafmc_order_details od
         JOIN xxafmc_order_header xoh
@@ -534,6 +612,7 @@ async function getItemWiseReport({
   ];
 
   const [rows] = await db.execute(query, params);
+  // console.log("Fetched Item-wise Report:", rows);
   return rows;
 }
 

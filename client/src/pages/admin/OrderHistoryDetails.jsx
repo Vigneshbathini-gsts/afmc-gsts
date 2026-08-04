@@ -85,13 +85,25 @@ export default function OrderHistoryDetails() {
     return rows.reduce((sum, row) => sum + Number(row?.subtotal || 0), 0);
   }, [rows]);
 
+  const totalPrepCharges = useMemo(() => {
+    const totalRow = rows.find((row) => isTotalRow(row));
+    if (totalRow) return Number(totalRow.prep_charges || 0);
+    return rows.reduce((sum, row) => sum + Number(row?.prep_charges || 0), 0);
+  }, [rows]);
+
+  const totalProfit = useMemo(() => {
+    const totalRow = rows.find((row) => isTotalRow(row));
+    if (totalRow) return Number(totalRow.profit || 0);
+    return rows.reduce((sum, row) => sum + Number(row?.profit || 0), 0);
+  }, [rows]);
+
   const handleDownload = () => {
     if (!rows.length) return;
 
     const isOrderWise = activeTab === "order-wise";
     const headers = isOrderWise
-      ? ["Order #", "Item Name", "Type", "Quantity", "Price", "Status", "Subtotal"]
-      : ["Item Name", "Type", "Quantity", "Avg. Price", "Status", "Subtotal"];
+      ? ["Order #", "Item Name", "Type", "Quantity", "Price", "Prep Charges", "Profit", "Status", "Subtotal"]
+      : ["Item Name", "Type", "Quantity", "Avg. Price", "Prep Charges", "Profit", "Status", "Subtotal"];
 
     exportTableToPdf({
       title: isOrderWise ? "Order-wise Report" : "Item-wise Report",
@@ -106,6 +118,8 @@ export default function OrderHistoryDetails() {
               isTotalRow(row) ? "" : row?.type ?? "",
               isTotalRow(row) ? "" : row?.quantity ?? "",
               isTotalRow(row) ? "" : formatCurrency(row?.price),
+              formatCurrency(row?.prep_charges),
+              formatCurrency(row?.profit),
               isTotalRow(row) ? "" : row?.status ?? "",
               formatCurrency(row?.subtotal),
             ]
@@ -114,6 +128,8 @@ export default function OrderHistoryDetails() {
               isTotalRow(row) ? "" : row?.type ?? "",
               isTotalRow(row) ? "" : row?.quantity ?? "",
               isTotalRow(row) ? "" : formatCurrency(row?.price),
+              formatCurrency(row?.prep_charges),
+              formatCurrency(row?.profit),
               isTotalRow(row) ? "" : row?.status ?? "",
               formatCurrency(row?.subtotal),
             ]
@@ -184,7 +200,7 @@ export default function OrderHistoryDetails() {
           <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
             <div className="overflow-x-auto">
               {activeTab === "order-wise" ? (
-                <table className="w-full min-w-[900px] text-sm">
+                <table className="w-full min-w-[1100px] text-sm">
                   <thead className="bg-gray-50 text-gray-600">
                     <tr>
                       <th className="px-4 py-3 text-left font-medium">Order #</th>
@@ -192,6 +208,8 @@ export default function OrderHistoryDetails() {
                       <th className="px-4 py-3 text-left font-medium">Type</th>
                       <th className="px-4 py-3 text-left font-medium">Quantity</th>
                       <th className="px-4 py-3 text-left font-medium">Price</th>
+                      <th className="px-4 py-3 text-left font-medium">Prep Charges</th>
+                      <th className="px-4 py-3 text-left font-medium">Profit</th>
                       <th className="px-4 py-3 text-left font-medium">Status</th>
                       <th className="px-4 py-3 text-left font-medium">Subtotal</th>
                     </tr>
@@ -199,7 +217,7 @@ export default function OrderHistoryDetails() {
                   <tbody>
                     {loading ? (
                       <tr>
-                        <td className="px-4 py-8 text-center text-gray-500" colSpan="7">
+                        <td className="px-4 py-8 text-center text-gray-500" colSpan="9">
                           Loading report...
                         </td>
                       </tr>
@@ -222,14 +240,22 @@ export default function OrderHistoryDetails() {
                             <td className="px-4 py-3">{totalRow ? "" : row?.type || "NA"}</td>
                             <td className="px-4 py-3">{totalRow ? "" : row?.quantity ?? ""}</td>
                             <td className="px-4 py-3">{totalRow ? "" : formatCurrency(row?.price)}</td>
+                            <td className="px-4 py-3 font-medium">
+                              {formatCurrency(row?.prep_charges)}
+                            </td>
+                            <td className="px-4 py-3 font-medium text-green-600">
+                              {formatCurrency(row?.profit)}
+                            </td>
                             <td className="px-4 py-3">{totalRow ? "" : row?.status || ""}</td>
-                            <td className="px-4 py-3">{formatCurrency(row?.subtotal)}</td>
+                            <td className="px-4 py-3 font-semibold">
+                              {formatCurrency(row?.subtotal)}
+                            </td>
                           </tr>
                         );
                       })
                     ) : (
                       <tr>
-                        <td className="px-4 py-8 text-center text-gray-500" colSpan="7">
+                        <td className="px-4 py-8 text-center text-gray-500" colSpan="9">
                           No orders found for this selection.
                         </td>
                       </tr>
@@ -237,13 +263,15 @@ export default function OrderHistoryDetails() {
                   </tbody>
                 </table>
               ) : (
-                <table className="w-full min-w-[820px] text-sm">
+                <table className="w-full min-w-[1020px] text-sm">
                   <thead className="bg-gray-50 text-gray-600">
                     <tr>
                       <th className="px-4 py-3 text-left font-medium">Item Name</th>
                       <th className="px-4 py-3 text-left font-medium">Type</th>
                       <th className="px-4 py-3 text-left font-medium">Quantity</th>
                       <th className="px-4 py-3 text-left font-medium">Avg. Price</th>
+                      <th className="px-4 py-3 text-left font-medium">Prep Charges</th>
+                      <th className="px-4 py-3 text-left font-medium">Profit</th>
                       <th className="px-4 py-3 text-left font-medium">Status</th>
                       <th className="px-4 py-3 text-left font-medium">Subtotal</th>
                     </tr>
@@ -251,7 +279,7 @@ export default function OrderHistoryDetails() {
                   <tbody>
                     {loading ? (
                       <tr>
-                        <td className="px-4 py-8 text-center text-gray-500" colSpan="6">
+                        <td className="px-4 py-8 text-center text-gray-500" colSpan="8">
                           Loading report...
                         </td>
                       </tr>
@@ -273,14 +301,22 @@ export default function OrderHistoryDetails() {
                             <td className="px-4 py-3">{totalRow ? "" : row?.type || "NA"}</td>
                             <td className="px-4 py-3">{totalRow ? "" : row?.quantity ?? ""}</td>
                             <td className="px-4 py-3">{totalRow ? "" : formatCurrency(row?.price)}</td>
+                            <td className="px-4 py-3 font-medium">
+                              {formatCurrency(row?.prep_charges)}
+                            </td>
+                            <td className="px-4 py-3 font-medium text-green-600">
+                              {formatCurrency(row?.profit)}
+                            </td>
                             <td className="px-4 py-3">{totalRow ? "" : row?.status || ""}</td>
-                            <td className="px-4 py-3">{formatCurrency(row?.subtotal)}</td>
+                            <td className="px-4 py-3 font-semibold">
+                              {formatCurrency(row?.subtotal)}
+                            </td>
                           </tr>
                         );
                       })
                     ) : (
                       <tr>
-                        <td className="px-4 py-8 text-center text-gray-500" colSpan="6">
+                        <td className="px-4 py-8 text-center text-gray-500" colSpan="8">
                           No items found for this selection.
                         </td>
                       </tr>
@@ -291,10 +327,26 @@ export default function OrderHistoryDetails() {
             </div>
           </div>
 
-          <div className="mt-4 flex justify-end rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm">
-            <span className="font-semibold text-gray-700">
-              Grand Total: <span className="text-afmc-maroon">Rs. {formatCurrency(grandTotal)}</span>
-            </span>
+          {/* Summary Footer */}
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm">
+              <span className="text-gray-600">Total Prep Charges:</span>
+              <span className="ml-2 font-semibold text-afmc-maroon">
+                Rs. {formatCurrency(totalPrepCharges)}
+              </span>
+            </div>
+            <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm">
+              <span className="text-gray-600">Total Profit:</span>
+              <span className="ml-2 font-semibold text-green-600">
+                Rs. {formatCurrency(totalProfit)}
+              </span>
+            </div>
+            <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm">
+              <span className="text-gray-600">Grand Total:</span>
+              <span className="ml-2 font-semibold text-afmc-maroon">
+                Rs. {formatCurrency(grandTotal)}
+              </span>
+            </div>
           </div>
         </div>
       </div>
