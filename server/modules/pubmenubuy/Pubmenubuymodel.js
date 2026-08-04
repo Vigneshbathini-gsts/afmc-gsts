@@ -192,7 +192,10 @@ function calculateOrderUnitPrice(inventoryItem, isNonMember) {
   const isNonAlcoholicLiquorItem = categoryId === 10 && isExcludedLiquorSubcategory(subCategory);
 
   if (isNonAlcoholicLiquorItem) {
-    finalPrice = inventoryBasePrice || inventoryUnitPrice;
+    const pricePerPeg = inventoryUnitPrice / pegs;
+    finalPrice = pricePerPeg + charges;
+    // finalPrice = inventoryBasePrice || inventoryUnitPrice;
+  
   } else if (isExcludedLiquorItem) {
     finalPrice = inventoryBasePrice + charges;
   } else if (categoryId === 10) {

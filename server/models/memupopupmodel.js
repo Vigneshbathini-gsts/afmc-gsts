@@ -162,7 +162,9 @@ WHERE xso.ITEM_CODE = ?
   if (isCocktailOrMocktailItem) {
     finalPrice = cocktailBasePrice + selectedCharges;
   } else if (isNonAlcoholicLiquorItem) {
-    finalPrice = inventoryBasePrice || inventoryUnitPrice;
+    // finalPrice = inventoryBasePrice || inventoryUnitPrice;
+     const pricePerPeg = inventoryUnitPrice / pegs;
+    finalPrice = pricePerPeg + selectedCharges;
   } else if (categoryId === 10) {
     const pricePerPeg = inventoryUnitPrice / pegs;
     finalPrice =
