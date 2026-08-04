@@ -64,15 +64,6 @@ const getOrderTransactionDetails = async (req, res) => {
     const itemNameExact = normalizeExactParam(req.query.itemNames);
     const { limit, offset } = parsePagination(req.query);
 
-    // console.log("Received filters:", {
-    //   fromDate,
-    //   toDate,
-    //   orderNumberExact,
-    //   userNameExact,
-    //   kitchenNameExact,
-    //   itemNameExact,
-    // });
-
     const dateFilterClause = buildDateFilterClause(
       "OH.ORDER_DATE",
       fromDate,
@@ -81,7 +72,6 @@ const getOrderTransactionDetails = async (req, res) => {
 
     const dateValues = buildDateValues(fromDate, toDate);
 
-    // Base WHERE clause with all filters
     let baseWhere = `
       WHERE 
         TRIM(UPPER(OD.PAYMENT_STATUS)) = 'PAID'
@@ -90,14 +80,12 @@ const getOrderTransactionDetails = async (req, res) => {
         ${dateFilterClause}
     `;
 
-    // Add order number filter if provided
     if (orderNumberExact) {
       baseWhere += ` AND CAST(OD.ORDER_ID AS CHAR) = ?`;
     } else {
       baseWhere += ` AND (? IS NULL OR CAST(OD.ORDER_ID AS CHAR) = ?)`;
     }
 
-    // Add user name filter if provided
     if (userNameExact) {
       baseWhere += ` AND (
         UPPER(TRIM(IFNULL(COALESCE(XNM.FIRST_NAME, XU.FIRST_NAME), ''))) = ?
@@ -112,14 +100,12 @@ const getOrderTransactionDetails = async (req, res) => {
       ))`;
     }
 
-    // Add kitchen name filter if provided
     if (kitchenNameExact) {
       baseWhere += ` AND UPPER(TRIM(IFNULL(XP.PUBMED_NAME, ''))) = ?`;
     } else {
       baseWhere += ` AND (? IS NULL OR UPPER(TRIM(IFNULL(XP.PUBMED_NAME, ''))) = ?)`;
     }
 
-    // Add item name filter if provided
     if (itemNameExact) {
       baseWhere += ` AND UPPER(TRIM(IFNULL(XI.ITEM_NAME, ''))) = ?`;
     } else {
@@ -175,9 +161,6 @@ const getOrderTransactionDetails = async (req, res) => {
       CASE WHEN UPPER(TRIM(IFNULL(OD.TYPE, ''))) = 'LARGE' THEN 2 ELSE 1 END
     `;
 
-    // NEW: profit is forced to 0 for non-alcoholic liquor sub-categories
-    // (soft drinks / mixers etc. filed under CATEGORY_ID = 10) so markup
-    // is never applied to items that shouldn't carry a liquor profit margin.
     const effectiveProfitExpression = `
       CASE
         WHEN XI.CATEGORY_ID = 10 AND XI.SUB_CATEGORY IN (${NON_ALCOHOLIC_LIQUOR_SUBCATEGORY_IDS.join(", ")})
@@ -186,18 +169,33 @@ const getOrderTransactionDetails = async (req, res) => {
       END
     `;
 
-    const effectiveSubtotalExpression = `
+    // For cocktails: ingredient total from scanned totals or subtotal
+    const ingredientTotalExpression = `
       CASE
-        WHEN XI.SUB_CATEGORY IN (14, 15) AND IFNULL(ST.scanned_subtotal, 0) > 0
-          THEN ST.scanned_subtotal
-        WHEN XI.SUB_CATEGORY IN (14, 15) AND IFNULL(CT.unit_custom_subtotal, 0) > 0
-          THEN CT.unit_custom_subtotal * (${multiplierExpression} * IFNULL(OD.QUANTITY, 0))
+        WHEN IFNULL(ST.scanned_subtotal, 0) > 0 THEN ST.scanned_subtotal
+        WHEN IFNULL(CT.unit_custom_subtotal, 0) > 0 THEN CT.unit_custom_subtotal * (${multiplierExpression} * IFNULL(OD.QUANTITY, 0))
         ELSE IFNULL(OD.SUBTOTAL, 0) * (${multiplierExpression})
       END
     `;
 
-    const netSubtotalExpression = `
-      (${effectiveSubtotalExpression} - IFNULL(OD.FOOD_PR_CHARGES * (${multiplierExpression} * IFNULL(OD.QUANTITY, 0)), 0))
+    // FIX: For cocktails, subtotal = ingredient total + prep charge (once per order line)
+    // For regular items, subtotal = ingredient total (no prep charge)
+    const subtotalExpression = `
+      CASE
+        WHEN XI.SUB_CATEGORY IN (14, 15) THEN 
+          ${ingredientTotalExpression} + IFNULL(OD.FOOD_PR_CHARGES, 0)
+        ELSE 
+          ${ingredientTotalExpression} - IFNULL(OD.FOOD_PR_CHARGES * (${multiplierExpression} * IFNULL(OD.QUANTITY, 0)), 0)
+      END
+    `;
+
+    // FIX: For cocktails, show the actual prep charge (15)
+    // For regular items, show the prep charge multiplied by quantity
+    const foodPrChargesExpression = `
+      CASE
+        WHEN XI.SUB_CATEGORY IN (14, 15) THEN IFNULL(OD.FOOD_PR_CHARGES, 0)
+        ELSE IFNULL(OD.FOOD_PR_CHARGES * (${multiplierExpression} * IFNULL(OD.QUANTITY, 0)), 0)
+      END
     `;
 
     const quantityExpression = `
@@ -210,25 +208,25 @@ const getOrderTransactionDetails = async (req, res) => {
         OD.ORDER_ID,
         OD.ITEM_ID,
         ${quantityExpression} AS QUANTITY,
-        ROUND(${netSubtotalExpression}, 2) AS SUBTOTAL,
+        ROUND(${subtotalExpression}, 2) AS SUBTOTAL,
         ROUND(
           CASE 
-            WHEN ${effectiveSubtotalExpression} <> 0 THEN
-              (${effectiveSubtotalExpression} - IFNULL(OD.FOOD_PR_CHARGES * (${multiplierExpression} * IFNULL(OD.QUANTITY, 0)), 0))
+            WHEN ${subtotalExpression} <> 0 THEN
+              (${subtotalExpression})
               / (1 + ((${effectiveProfitExpression}) / 100)) / NULLIF(${multiplierExpression} * IFNULL(OD.QUANTITY, 0), 0)
             ELSE 0
           END, 2
         ) AS PRICE,
-        ROUND(IFNULL(OD.FOOD_PR_CHARGES * (${multiplierExpression} * IFNULL(OD.QUANTITY, 0)), 0), 2) AS FOOD_PR_CHARGES,
+        ROUND(${foodPrChargesExpression}, 2) AS FOOD_PR_CHARGES,
         (${effectiveProfitExpression}) * (${multiplierExpression} * IFNULL(OD.QUANTITY, 0)) AS TOTALPROFIT,
         ROUND(
           ((${effectiveProfitExpression}) / 100) *
-          ((${effectiveSubtotalExpression} - IFNULL(OD.FOOD_PR_CHARGES * (${multiplierExpression} * IFNULL(OD.QUANTITY, 0)), 0)) /
+          ((${subtotalExpression}) /
           (1 + ((${effectiveProfitExpression}) / 100))), 2
         ) AS TOTAL_PROFIT,
         ROUND(
           (((${effectiveProfitExpression}) / 100) *
-          ((${effectiveSubtotalExpression} - IFNULL(OD.FOOD_PR_CHARGES * (${multiplierExpression} * IFNULL(OD.QUANTITY, 0)), 0)) /
+          ((${subtotalExpression}) /
           (1 + ((${effectiveProfitExpression}) / 100)))) / NULLIF(${multiplierExpression} * IFNULL(OD.QUANTITY, 0), 0), 2
         ) AS UNIT_PROFIT,
         (${effectiveProfitExpression}) AS TOTALPERCENT,
@@ -259,13 +257,13 @@ const getOrderTransactionDetails = async (req, res) => {
         NULL AS ORDER_ID,
         NULL AS ITEM_ID,
         'Total' AS QUANTITY,
-        ROUND(SUM(${netSubtotalExpression}),2) AS SUBTOTAL,
+        ROUND(SUM(${subtotalExpression}),2) AS SUBTOTAL,
         NULL AS PRICE,
-        ROUND(SUM(IFNULL(OD.FOOD_PR_CHARGES * (${multiplierExpression} * IFNULL(OD.QUANTITY, 0)),0)),2) AS FOOD_PR_CHARGES,
+        ROUND(SUM(${foodPrChargesExpression}),2) AS FOOD_PR_CHARGES,
         SUM((${effectiveProfitExpression}) * (${multiplierExpression} * IFNULL(OD.QUANTITY, 0))) AS TOTALPROFIT,
         ROUND(SUM(
           ((${effectiveProfitExpression}) / 100) *
-          ((${effectiveSubtotalExpression} - IFNULL(OD.FOOD_PR_CHARGES * (${multiplierExpression} * IFNULL(OD.QUANTITY, 0)), 0)) /
+          ((${subtotalExpression}) /
           (1 + ((${effectiveProfitExpression}) / 100)))
         ),2) AS TOTAL_PROFIT,
         NULL AS UNIT_PROFIT,
@@ -298,45 +296,36 @@ const getOrderTransactionDetails = async (req, res) => {
       ORDER BY ORD ASC, ORDER_NUM DESC
     `;
 
-    // Build parameters array based on which filters are provided
     const params = [];
-
-    // Add date parameters
     params.push(...dateValues);
 
-    // Add order number parameters
     if (orderNumberExact) {
       params.push(orderNumberExact);
     } else {
       params.push(null, null);
     }
 
-    // Add user name parameters (3 params for different name combinations)
     if (userNameExact) {
       params.push(userNameExact, userNameExact, userNameExact);
     } else {
       params.push(null, null, null, null);
     }
 
-    // Add kitchen name parameters (1 param for exact match)
     if (kitchenNameExact) {
       params.push(kitchenNameExact);
     } else {
       params.push(null, null);
     }
 
-    // Add item name parameters (1 param for exact match)
     if (itemNameExact) {
       params.push(itemNameExact);
     } else {
       params.push(null, null);
     }
 
-    // Duplicate params for the summary query (since it has the same WHERE clause)
     const allParams = [...params, ...params];
 
     const [results] = await db.execute(finalQuery, allParams);
-
 
     return res.json({
       success: true,
