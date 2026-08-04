@@ -44,7 +44,7 @@ const getAllowedAcUnits = (categoryId, subCategoryId) => {
       allowed.add("Pegs");
     }
 
-    if ([1, 3, 1310, 6, 9].includes(sub)) {
+    if ([1, 3, 18, 1310, 6, 9].includes(sub)) {
       allowed.add("Nos");
     }
 

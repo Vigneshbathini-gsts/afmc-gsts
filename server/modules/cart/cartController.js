@@ -2,6 +2,7 @@ const db = require("../../config/db");
 const cartModel = require("./cartModel");
 const cocktailModel = require("../../models/cocktailModel");
 const { usesNonMemberPricing } = require("../../helpers/customerPricing");
+const { isExcludedLiquorSubcategory } = require("../../helpers/pricingHelper");
 
 const getSessionUserKey = (req) =>
   String(req.user?.username || req.user?.user_name || req.user?.userId || "").trim() || "unknown";
@@ -816,8 +817,18 @@ exports.confirmOrder = async (req, res) => {
         roleId,
         loginType: req.user?.loginType,
       });
-      const profit = isNonMember ? Number(cartItem.non_member_profit || 0) : Number(cartItem.profit || 0);
-      const foodPrCharges = isNonMember ? Number(cartItem.pr_charges || 0) : Number(cartItem.food_pr_charges || 0);
+      const isNonAlcoholicLiquorItem =
+        Number(cartCategoryIdRaw) === 10 && isExcludedLiquorSubcategory(cartSubcategoryRaw);
+      const profit = isNonAlcoholicLiquorItem
+        ? 0
+        : isNonMember
+          ? Number(cartItem.non_member_profit || 0)
+          : Number(cartItem.profit || 0);
+      const foodPrCharges = isNonAlcoholicLiquorItem
+        ? 0
+        : isNonMember
+          ? Number(cartItem.pr_charges || 0)
+          : Number(cartItem.food_pr_charges || 0);
       const parentCodeRaw = cartItem?.parent_code ?? cartItem?.PARENT_CODE ?? null;
       const parentCode = parentCodeRaw === null || parentCodeRaw === undefined || parentCodeRaw === "" ? null : String(parentCodeRaw);
 
@@ -920,6 +931,18 @@ exports.confirmOrder = async (req, res) => {
       [userId]
     );
     await connection.execute("DELETE FROM xxafmc_cart_items WHERE user_id = ?", [userId]);
+
+    // Recompute order_total from order_details to ensure food/pr charges are included
+    try {
+      const [totalRows] = await connection.execute(
+        `SELECT COALESCE(ROUND(SUM(IFNULL(subtotal, 0) + IFNULL(food_pr_charges, 0) * IFNULL(quantity, 0)), 2), 0) AS computed_total FROM xxafmc_order_details WHERE order_id = ?`,
+        [orderNumber]
+      );
+      const computedTotal = Number(totalRows[0]?.computed_total || 0);
+      await connection.execute(`UPDATE xxafmc_order_header SET order_total = ? WHERE order_num = ?`, [computedTotal, orderNumber]);
+    } catch (e) {
+      console.error('Failed to recompute order_total for order', orderNumber, e);
+    }
 
     await connection.commit();
     await clearCocktailSessionCollections(req, null, orderNumber);

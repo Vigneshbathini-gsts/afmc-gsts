@@ -23,9 +23,14 @@ async function getInvoiceReportByOrderNumber(orderNumber) {
         COALESCE(xi.item_name, od.item_id) AS item_name,
         od.quantity,
         od.order_status AS order_status,
+        od.subcategory,
+        od.food_pr_charges,
         ROUND(
           CASE
             WHEN TRIM(UPPER(IFNULL(od.order_status, ''))) = 'CANCELLED' THEN 0
+            -- For cocktails (subcategory 14 or 15), use subtotal from order_details directly
+            -- DO NOT add food_pr_charges again because it's already included
+            WHEN od.subcategory IN (14, 15) THEN IFNULL(od.subtotal, 0)
             WHEN scanned_totals.scanned_total > 0 AND (od.price IS NULL OR od.price <> 0) THEN scanned_totals.scanned_total
             WHEN custom_totals.unit_custom_total > 0 THEN custom_totals.unit_custom_total * od.quantity
             ELSE IFNULL(od.subtotal, 0)
@@ -35,9 +40,14 @@ async function getInvoiceReportByOrderNumber(orderNumber) {
         ROUND(
           CASE
             WHEN TRIM(UPPER(IFNULL(od.order_status, ''))) = 'CANCELLED' THEN 0
-            WHEN scanned_totals.scanned_total > 0 AND (od.price IS NULL OR od.price <> 0) THEN scanned_totals.scanned_total / NULLIF(od.quantity, 0)
+            -- For cocktails (subcategory 14 or 15), calculate price from subtotal directly
+            -- FIX: Use NULLIF(od.quantity, 0) instead of NULLIF(od.quantity, 1)
+            WHEN od.subcategory IN (14, 15) THEN 
+              ROUND(IFNULL(od.subtotal, 0) / NULLIF(od.quantity, 0), 2)
+            WHEN scanned_totals.scanned_total > 0 AND (od.price IS NULL OR od.price <> 0) THEN 
+              ROUND(scanned_totals.scanned_total / NULLIF(od.quantity, 0), 2)
             WHEN custom_totals.unit_custom_total > 0 THEN custom_totals.unit_custom_total
-            ELSE COALESCE(od.price, od.subtotal / NULLIF(od.quantity, 0), 0)
+            ELSE COALESCE(od.price, ROUND(od.subtotal / NULLIF(od.quantity, 0), 2), 0)
           END,
           2
         ) AS price,
@@ -90,6 +100,7 @@ async function getInvoiceReportByOrderNumber(orderNumber) {
       LEFT JOIN xxafmc_inventory xi
         ON xi.item_code = od.item_id
       WHERE od.order_id = ?
+        AND TRIM(UPPER(IFNULL(od.order_status, ''))) != 'CANCELLED'
       ORDER BY od.order_line_id ASC
     `,
     [normalizedOrderNumber]
@@ -144,10 +155,18 @@ async function getInvoiceReportByOrderNumber(orderNumber) {
       invoice_amount: computedTotal,
     },
     items: detailRows.map((row) => ({
-      ...row,
+      order_line_id: row.order_line_id,
+      order_id: row.order_id,
+      item_id: row.item_id,
+      item_name: row.item_name,
       quantity: Number(row.quantity || 0),
+      order_status: row.order_status,
       subtotal: Number(row.subtotal || 0),
       price: Number(row.price || 0),
+      created_by: row.created_by,
+      creation_date: row.creation_date,
+      last_updated_date: row.last_updated_date,
+      last_updated_by: row.last_updated_by,
     })),
     summary: {
       total_quantity: totalQuantity,
