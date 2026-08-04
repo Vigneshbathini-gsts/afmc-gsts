@@ -541,22 +541,17 @@ return (
                 <p className="mt-2 text-sm text-[#6d655e]">{form.imageFileName}</p>
               )}
             </div>
+
+           
           </div>
 
           {/* Pr Charges inputs - side by side on mobile too, 4 cols on xl */}
           <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-            {/* <input
-              type="number"
-              value={form.memberProfit}
-              
-              onChange={(event) =>
-                updateField("memberProfit", event.target.value)
-              }
-              placeholder="Member Profit"
-              className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 outline-none focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
-            /> */}
+             <div>
+              <label className="mb-1 block text-sm text-[#4d4640]">Member charges</label>
             <input
               type="number"
+              min={0}
               value={form.memberPrCharges}
               onChange={(event) =>
                 updateField("memberPrCharges", event.target.value)
@@ -564,17 +559,12 @@ return (
               placeholder="Member Pr Charges"
               className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-3 sm:px-4 py-3 outline-none focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
             />
-            {/* <input
-               type="number"
-              value={form.nonMemberProfit}
-              onChange={(event) =>
-                updateField("nonMemberProfit", event.target.value)
-              }
-              placeholder="Non Member Profit"
-              className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 outline-none focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
-            /> */}
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-[#4d4640]">Non Member charges</label>
             <input
                type="number"
+                min={0}
               value={form.nonMemberPrCharges}
               onChange={(event) =>
                 updateField("nonMemberPrCharges", event.target.value)
@@ -582,6 +572,8 @@ return (
               placeholder="Non Member Pr Charges"
               className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-3 sm:px-4 py-3 outline-none focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
             />
+              </div>
+
           </div>
 
           <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
