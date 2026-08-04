@@ -141,12 +141,25 @@ WHERE xso.ITEM_CODE = ?
   const selectedProfit = isMember ? memberProfit : nonMemberProfit;
   const selectedCharges = isMember ? memberCharges : nonMemberCharges;
 
-  let finalPrice = inventoryUnitPrice;
-
+  let cocktailBasePrice = inventoryBasePrice;
   const isExcludedLiquorItem = categoryId === 10 && (isExcludedLiquorSubcategory(subCategory) || [14, 15].includes(subCategory));
 
   if (isExcludedLiquorItem) {
-    finalPrice = inventoryBasePrice + selectedCharges;
+    const priceColumn = isMember ? "PRICE" : "NON_MEMBER_PRICE";
+    const [detailRows] = await db.execute(
+      `SELECT COALESCE(SUM(COALESCE(${priceColumn}, 0)), 0) AS detail_total_price
+       FROM xxafmc_cocktails_mocktails_details
+       WHERE INVENTORY_ITEM_CODE = ?`,
+      [normalizedItemCode]
+    );
+
+    cocktailBasePrice = toNumber(detailRows[0]?.detail_total_price || 0);
+  }
+
+  let finalPrice = inventoryUnitPrice;
+
+  if (isExcludedLiquorItem) {
+    finalPrice = cocktailBasePrice + selectedCharges;
   } else if (categoryId === 10) {
     const pricePerPeg = inventoryUnitPrice / pegs;
     finalPrice =

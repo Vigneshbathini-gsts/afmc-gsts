@@ -248,58 +248,59 @@ export default function OrderHistory() {
     setDetailsError("");
   };
 
-  const handleOrderClick = useCallback(async (orderNumber) => {
-    if (!orderNumber) return;
+const handleOrderClick = useCallback(async (orderNumber) => {
+  if (!orderNumber) return;
 
-    setSelectedOrder(orderNumber);
-    setDetailsError("");
+  setSelectedOrder(orderNumber);
+  setDetailsError("");
 
-    if (detailsByOrder[orderNumber]) {
-      return;
-    }
+  if (detailsByOrder[orderNumber]) {
+    return;
+  }
 
-    try {
-      setDetailsLoading(true);
-      // Fetch both Bar and Kitchen scoped details so admin modal shows all item types (including snacks)
-      const [barRes, kitchenRes] = await Promise.allSettled([
-        barOrdersAPI.getOrderHistoryItemDetails(orderNumber, "Bar"),
-        barOrdersAPI.getOrderHistoryItemDetails(orderNumber, "Kitchen"),
-      ]);
+  try {
+    setDetailsLoading(true);
+    // Fetch both Bar and Kitchen scoped details so admin modal shows all item types (including snacks)
+    const [barRes, kitchenRes] = await Promise.allSettled([
+      barOrdersAPI.getOrderHistoryItemDetails(orderNumber, "Bar"),
+      barOrdersAPI.getOrderHistoryItemDetails(orderNumber, "Kitchen"),
+    ]);
 
-      const barPayload = barRes.status === "fulfilled" ? barRes.value.data?.data || {} : { items: [], summary: { totalAmount: 0 } };
-      const kitchenPayload = kitchenRes.status === "fulfilled" ? kitchenRes.value.data?.data || {} : { items: [], summary: { totalAmount: 0 } };
+    const barPayload = barRes.status === "fulfilled" ? barRes.value.data?.data || {} : { items: [], summary: { totalAmount: 0 } };
+    const kitchenPayload = kitchenRes.status === "fulfilled" ? kitchenRes.value.data?.data || {} : { items: [], summary: { totalAmount: 0 } };
 
-      // Merge items, prefer bar items first, then kitchen items; dedupe by order_line_id or item_id+index
-      const mergedMap = new Map();
-      (barPayload.items || []).forEach((it, i) => {
-        const key = it.order_line_id ?? `${it.item_id}::bar::${i}`;
-        mergedMap.set(key, it);
-      });
-      (kitchenPayload.items || []).forEach((it, i) => {
-        const key = it.order_line_id ?? `${it.item_id}::kitchen::${i}`;
-        if (!mergedMap.has(key)) mergedMap.set(key, it);
-      });
+    // Merge items, prefer bar items first, then kitchen items; dedupe by order_line_id or item_id+index
+    const mergedMap = new Map();
+    (barPayload.items || []).forEach((it, i) => {
+      const key = it.order_line_id ?? `${it.item_id}::bar::${i}`;
+      mergedMap.set(key, it);
+    });
+    (kitchenPayload.items || []).forEach((it, i) => {
+      const key = it.order_line_id ?? `${it.item_id}::kitchen::${i}`;
+      if (!mergedMap.has(key)) mergedMap.set(key, it);
+    });
 
-      const mergedItems = Array.from(mergedMap.values());
-      const totalAmount = (Number(barPayload.summary?.totalAmount || 0) + Number(kitchenPayload.summary?.totalAmount || 0)) || mergedItems.reduce((s, it) => s + Number(it?.subtotal || 0), 0);
+    const mergedItems = Array.from(mergedMap.values());
+    
+    // FIX: Calculate total from merged items, not by adding both summaries
+    const totalAmount = mergedItems.reduce((sum, item) => sum + Number(item?.subtotal || 0), 0);
 
-      setDetailsByOrder((prev) => ({
-        ...prev,
-        [orderNumber]: {
-          items: mergedItems,
-          summary: { totalAmount },
-        },
-      }));
-    } catch (fetchError) {
-      console.error("Failed to fetch order history item details:", fetchError);
-      setDetailsError(
-        fetchError.response?.data?.message || "Unable to load order details."
-      );
-    } finally {
-      setDetailsLoading(false);
-    }
-  }, [detailsByOrder]);
-
+    setDetailsByOrder((prev) => ({
+      ...prev,
+      [orderNumber]: {
+        items: mergedItems,
+        summary: { totalAmount },
+      },
+    }));
+  } catch (fetchError) {
+    console.error("Failed to fetch order history item details:", fetchError);
+    setDetailsError(
+      fetchError.response?.data?.message || "Unable to load order details."
+    );
+  } finally {
+    setDetailsLoading(false);
+  }
+}, [detailsByOrder]);
   const selectedOrderDetails = selectedOrder ? detailsByOrder[selectedOrder] : null;
   const selectedOrderItems = selectedOrderDetails?.items || [];
   const selectedOrderTotal =

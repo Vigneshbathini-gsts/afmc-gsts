@@ -84,7 +84,7 @@ const OrderHistoryPage = () => {
                 username: filters.username?.trim() || null,
                 app_user: appUser || null,
             });
-            // console.log("Order history response:", response.data);
+            console.log("Order history response:", response.data);
             setOrders(response.data?.data || []);
         } catch (fetchError) {
             console.error("Order history fetch failed:", fetchError);

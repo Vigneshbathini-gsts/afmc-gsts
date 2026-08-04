@@ -921,6 +921,18 @@ exports.confirmOrder = async (req, res) => {
     );
     await connection.execute("DELETE FROM xxafmc_cart_items WHERE user_id = ?", [userId]);
 
+    // Recompute order_total from order_details to ensure food/pr charges are included
+    try {
+      const [totalRows] = await connection.execute(
+        `SELECT COALESCE(ROUND(SUM(IFNULL(subtotal, 0) + IFNULL(food_pr_charges, 0) * IFNULL(quantity, 0)), 2), 0) AS computed_total FROM xxafmc_order_details WHERE order_id = ?`,
+        [orderNumber]
+      );
+      const computedTotal = Number(totalRows[0]?.computed_total || 0);
+      await connection.execute(`UPDATE xxafmc_order_header SET order_total = ? WHERE order_num = ?`, [computedTotal, orderNumber]);
+    } catch (e) {
+      console.error('Failed to recompute order_total for order', orderNumber, e);
+    }
+
     await connection.commit();
     await clearCocktailSessionCollections(req, null, orderNumber);
 

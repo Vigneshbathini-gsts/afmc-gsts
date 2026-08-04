@@ -91,7 +91,7 @@ exports.fetchOrderDetails = async (req, res) => {
     const { id, orderId } = req.params;
     const orderIdentifier = id || orderId;
     const data = await getOrderDetails(orderIdentifier);
-    console.log("Fetched Order Details:", data);
+    // console.log("Fetched Order Details:", data);
     res.status(200).json({
       success: true,
       data,
@@ -110,7 +110,7 @@ exports.fetchOrderSummary = async (req, res) => {
   try {
     const { id } = req.params;
     const data = await getOrderSummary(id);
-
+// console.log("Fetched Order Summary:", data);
     if (!data) {
       return res.status(404).json({
         success: false,
@@ -200,19 +200,19 @@ exports.fetchUserOrderHistory = async (req, res) => {
       fromDate: from,
       toDate: to,
       appUser,
-    }); 
-console.log("Fetched User Order History:", data);
+    });
+
     res.status(200).json({
       success: true,
       data,
     });
   } catch (error) {
     console.error("Failed to fetch user order history:", error);
-    res.status(500).json({  
+    res.status(500).json({
       success: false,
       message: "Unable to fetch order history.",
       error: error.message,
     });
-  } 
+  }
 };
 

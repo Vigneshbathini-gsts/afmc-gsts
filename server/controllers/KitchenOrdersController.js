@@ -499,6 +499,11 @@ exports.updateBarOrderStatus = async (req, res) => {
       const sessionKey = getScanSessionKey(req, ORDERNUMBER);
       const scannedItems = req.session[sessionKey] || [];
 
+      console.log('=== COMPLETION DEBUG ===');
+      console.log('Order Number:', ORDERNUMBER);
+      console.log('Scanned Items Count:', scannedItems.length);
+      console.log('Scanned Items:', JSON.stringify(scannedItems, null, 2));
+
       connection = await pool.getConnection();
       await connection.beginTransaction();
 
@@ -566,9 +571,7 @@ exports.updateBarOrderStatus = async (req, res) => {
               [qty, item.barcode]
             );
 
-
-
-            // Decrement reserved totals for this item (does not touch stock_out buckets)
+            // Decrement reserved totals for this item
             if (physicalItemCode) {
               await connection.query(
                 `INSERT IGNORE INTO xxafmc_stock_reservation_totals (item_code, reserved_qty) VALUES (?, 0)`,
@@ -587,23 +590,95 @@ exports.updateBarOrderStatus = async (req, res) => {
           }
         }
 
-        // Update prices specifically by order_line_id for standard items
-        const linePrices = new Map();
+        // ============ FIX: Calculate subtotals with preparation charges ============
+        
+        // console.log('=== CALCULATING SUBTOTALS ===');
+        
+        // Step 1: Calculate ingredient totals per order line
+        const lineTotals = new Map();
         scannedItems.forEach(si => {
           if (si.orderLineId) {
-            const current = linePrices.get(si.orderLineId) || 0;
-            if (Number(si.itemPrice) > 0 || current === 0) {
-              linePrices.set(si.orderLineId, Number(si.itemPrice));
-            }
+            const contribution = Number(si.itemPrice || 0) * Number(si.scanQuantity || 0);
+            lineTotals.set(si.orderLineId, (lineTotals.get(si.orderLineId) || 0) + contribution);
+            console.log(`Line ${si.orderLineId}: Item ${si.itemCode} - ${si.scanQuantity} x ${si.itemPrice} = ${contribution}`);
           }
         });
 
-        for (const [lineId, price] of linePrices.entries()) {
+        // console.log('Line totals:', Array.from(lineTotals.entries()));
+
+        // Step 2: For each order line, add preparation charges if it's a cocktail/mocktail
+        for (const [lineId, ingredientTotal] of lineTotals.entries()) {
+          // Get the item details for this order line
+          const [[lineInfo]] = await connection.query(
+            `SELECT od.item_id, od.subcategory, od.food_pr_charges, od.quantity 
+             FROM xxafmc_order_details od
+             WHERE od.order_line_id = ?`,
+            [lineId]
+          );
+          
+          const subcategory = Number(lineInfo?.subcategory || 0);
+          const prepCharge = Number(lineInfo?.food_pr_charges || 0);
+          const itemId = lineInfo?.item_id;
+          
+          // Check if this is a cocktail/mocktail (subcategory 14 or 15)
+          const isCocktail = [14, 15].includes(subcategory);
+          
+          let finalSubtotal = ingredientTotal;
+          
+          if (isCocktail) {
+            // For cocktails: ingredient total + preparation charge (added once)
+            finalSubtotal = ingredientTotal + prepCharge;
+            // console.log(`✅ Cocktail ${itemId} (Line ${lineId}): Ingredients total = ${ingredientTotal}, Prep charge = ${prepCharge}, Final = ${finalSubtotal}`);
+          } else {
+            // For regular items: just the ingredient total
+            console.log(`📦 Regular item ${itemId} (Line ${lineId}): Total = ${ingredientTotal}`);
+          }
+          
+          // Update the order line with the correct subtotal and status
           await connection.query(
-            `UPDATE xxafmc_order_details SET price = ?, subtotal = ROUND(? * quantity, 2), ORDER_STATUS = 'COMPLETED' WHERE ORDER_LINE_ID = ?`,
-            [price, price, lineId]
+            `UPDATE xxafmc_order_details 
+             SET subtotal = ROUND(?, 2), 
+                 ORDER_STATUS = 'COMPLETED' 
+             WHERE ORDER_LINE_ID = ?`,
+            [finalSubtotal, lineId]
           );
         }
+
+        // Step 3: Also update price for items that don't have scanned ingredients
+        // (For items where we just need to mark them completed)
+        const [pendingLines] = await connection.query(
+          `SELECT order_line_id 
+           FROM xxafmc_order_details 
+           WHERE order_id = ? 
+             AND (order_status IS NULL OR order_status = '')
+             AND subcategory NOT IN (14, 15)`,
+          [ORDERNUMBER]
+        );
+        
+        // console.log('Pending lines without scans:', pendingLines.length);
+        
+        for (const line of pendingLines) {
+          // Check if this line already has scanned items (skip if already updated above)
+          const [[hasScans]] = await connection.query(
+            `SELECT COUNT(*) as count 
+             FROM order_scan_collection 
+             WHERE order_number = ? AND order_line_id = ?`,
+            [ORDERNUMBER, line.order_line_id]
+          );
+          
+          if (Number(hasScans.count) === 0) {
+            // No scans for this line, just mark it completed with existing subtotal
+            // console.log(`Marking line ${line.order_line_id} as COMPLETED (no scans)`);
+            await connection.query(
+              `UPDATE xxafmc_order_details 
+               SET ORDER_STATUS = 'COMPLETED' 
+               WHERE ORDER_LINE_ID = ?`,
+              [line.order_line_id]
+            );
+          }
+        }
+
+        // console.log('=== SUBTOTALS CALCULATED AND UPDATED ===');
       }
 
       // Then update the order status
@@ -628,6 +703,8 @@ exports.updateBarOrderStatus = async (req, res) => {
       // Clear the session only after commit succeeds.
       delete req.session[sessionKey];
       await saveSession(req);
+      
+      console.log('✅ Order completed successfully');
     } else {
       [result] = await pool.query(
         `
@@ -820,6 +897,15 @@ exports.processBarcodeScan = async (req, res) => {
     const stockQuantity = Number(item.STOCK_QUANTITY) || 0;
     const acUnit = (item.ac_unit || "").toString().trim();
 
+    console.log('=== SCAN DEBUG ===');
+    console.log('Scanned Barcode:', BARCODE);
+    console.log('Scanned Item Code:', scanItemCode);
+    console.log('Item Name:', item.ITEM_NAME);
+    console.log('Profit from inventory:', item.PROFIT);
+    console.log('Non-member profit from inventory:', item.NON_MEMBER_PROFIT);
+    console.log('Unit Price:', item.UNIT_PRICE);
+    console.log('PEGS:', item.PEGS);
+
     // Kitchen validation
     const categoryId = Number(item.CATEGORY_ID) || 0;
     if (kitchen === "Bar" && categoryId === 14) {
@@ -853,9 +939,41 @@ exports.processBarcodeScan = async (req, res) => {
       });
     }
 
+    // ================= GET CUSTOMER TYPE (Member/Non-Member) =================
+    const [orderHeaderRows] = await connection.query(
+      `
+      SELECT 
+        oh.user_id,
+        oh.member_id,
+        xu.login_type AS customer_login_type,
+        xu.role_id AS customer_role_id
+      FROM xxafmc_order_header oh
+      LEFT JOIN xxafmc_users xu ON xu.user_id = oh.user_id
+      WHERE oh.order_num = ?
+      LIMIT 1
+      `,
+      [ORDERNUMBER]
+    );
+
+    const orderHeader = orderHeaderRows[0] || {};
+
+    // Determine if customer is Non-Member
+    // A customer is Non-Member if:
+    // 1. They have login_type = 'NON MEMBER' OR
+    // 2. They have role_id != 20 (assuming 20 is Member role) OR
+    // 3. They have a member_id (which means they're a non-member in the non_members table)
+    const isNonMember = 
+      String(orderHeader.customer_login_type || "").trim().toUpperCase() === "NON MEMBER" ||
+      (orderHeader.customer_role_id != null && Number(orderHeader.customer_role_id) !== 20) ||
+      (orderHeader.member_id != null && orderHeader.member_id > 0);
+
+    console.log('=== CUSTOMER TYPE DEBUG ===');
+    console.log('Customer Login Type:', orderHeader.customer_login_type);
+    console.log('Customer Role ID:', orderHeader.customer_role_id);
+    console.log('Member ID:', orderHeader.member_id);
+    console.log('Is Non-Member:', isNonMember);
+
     // Get parent item (cocktail/mocktail item code)
-    // If an ingredient belongs to multiple cocktails/mocktails in the same order,
-    // we must know which parent item it should be attributed to.
     const forcedParentItem = String(PARENT_ITEM || "").trim();
 
     const [standaloneRows] = await connection.query(
@@ -867,6 +985,11 @@ exports.processBarcodeScan = async (req, res) => {
       `,
       [ORDERNUMBER, scanItemCode]
     );
+
+    console.log('Standalone rows found:', standaloneRows.length > 0 ? 'Yes' : 'No');
+    if (standaloneRows.length > 0) {
+      console.log('Standalone item_id:', standaloneRows[0].item_id);
+    }
 
     if (!forcedParentItem) {
       const [possibleParentRows] = await connection.query(
@@ -896,6 +1019,8 @@ exports.processBarcodeScan = async (req, res) => {
         .map((r) => String(r.inventory_item_code || "").trim())
         .filter(Boolean);
 
+      console.log('Possible parents found:', possibleParents);
+
       if (possibleParents.length > 1 && standaloneRows.length === 0) {
         await connection.rollback();
         return res.status(400).json({
@@ -905,10 +1030,7 @@ exports.processBarcodeScan = async (req, res) => {
       }
     }
 
-    // --- Parent resolution (FIXED) ---
-    // Prefer standalone order details when the scanned item exactly matches a
-    // normal order item. Only fall back to recipe parent items when there is
-    // no active standalone row or when a recipe has been explicitly selected.
+    // --- Parent resolution ---
     let parentItem = forcedParentItem || null;
 
     if (!parentItem && standaloneRows.length > 0) {
@@ -946,7 +1068,9 @@ exports.processBarcodeScan = async (req, res) => {
       parentItem = String(scanItemCode);
     }
 
-    // Fetch the order_line_id for the parent item (cocktail/mocktail) from xxafmc_order_details
+    console.log('Final Parent Item:', parentItem);
+
+    // Fetch the order_line_id for the parent item
     let parentOrderLineId = null;
     if (parentItem) {
       const [parentOrderLineRows] = await connection.query(
@@ -958,13 +1082,15 @@ exports.processBarcodeScan = async (req, res) => {
       }
     }
 
+    console.log('Parent Order Line ID:', parentOrderLineId);
+
     // Get role
     const [userRows] = await connection.query(
       `SELECT DISTINCT xu.ROLE_ID FROM xxafmc_users xu JOIN xxafmc_kitchen_notification xkn ON xu.USER_ID = xkn.USER_NAME 
        WHERE xkn.ORDERNUMBER = ? LIMIT 1`, [ORDERNUMBER]);
     const roleId = userRows.length > 0 ? Number(userRows[0].ROLE_ID) : null;
 
-    // Get ordered quantity (l_ord_qty_item)
+    // Get ordered quantity
     const [orderQtyRows] = await connection.query(`
       SELECT SUM(quantity) AS total_quantity FROM (
         SELECT (COALESCE(x.pegs, 1) * COALESCE(x.quantity, 0)) AS quantity FROM xxafmc_custom_cocktails_mocktails_details x 
@@ -1018,18 +1144,15 @@ exports.processBarcodeScan = async (req, res) => {
       ]);
 
     const orderedQty = Number(orderQtyRows[0]?.total_quantity || 0);
+    console.log('Ordered Quantity:', orderedQty);
 
     if (orderedQty <= 0) {
       await connection.rollback();
       return res.status(400).json({ success: false, message: `Scanned item does not belong to order ${ORDERNUMBER}` });
     }
 
-    // === Collection metrics (like apex_collections) ===
+    // === Collection metrics ===
     const scannedCollection = req.session[sessionKey] || [];
-
-    // const l_scan_item_qty = scannedCollection
-    //   .filter(s => sameCode(s.itemCode, scanItemCode))
-    //   .reduce((sum, s) => sum + Number(s.scanQuantity || 0), 0);
 
     const l_scan_item_qty = scannedCollection
       .filter(s =>
@@ -1096,35 +1219,44 @@ exports.processBarcodeScan = async (req, res) => {
       }
     }
 
-    // ================= PRICE CALCULATION (FINAL - ORACLE MATCH) =================
+    // ================= PRICE CALCULATION (FIXED - With Member/Non-Member support) =================
 
-    const targetOrderItemCode = String(parentItem || scanItemCode).trim();
-    const [orderPricingRows] = await connection.query(
-      `
-      SELECT
-        od.subcategory,
-        od.profit,
-        od.food_pr_charges,
-        xu.login_type AS customer_login_type,
-        xu.role_id AS customer_role_id
-      FROM xxafmc_order_details od
-      LEFT JOIN xxafmc_order_header oh
-        ON oh.order_num = od.order_id
-      LEFT JOIN xxafmc_users xu
-        ON xu.user_id = oh.user_id
-      WHERE od.item_id = ?
-        AND od.order_id = ?
-        AND (od.order_status IS NULL OR od.order_status = '')
-      ORDER BY od.order_line_id ASC
-      LIMIT 1
-      `,
-      [targetOrderItemCode || scanItemCode, ORDERNUMBER]
-    );
+    // IMPORTANT: The price should ALWAYS be based on the scanned item's own profit
+    // The parent is only for grouping and validation, NOT for pricing
 
-    const orderPricing = orderPricingRows[0] || {};
-    const subCategory = orderPricingRows.length > 0
-      ? Number(orderPricing.subcategory)
-      : null;
+    // Get the scanned item's profit from the inventory data we already fetched
+    // Use NON_MEMBER_PROFIT for non-members, PROFIT for members
+    const profitPercent = isNonMember 
+      ? Number(item.NON_MEMBER_PROFIT) || 0 
+      : Number(item.PROFIT) || 0;
+
+    console.log('=== PRICE CALCULATION DEBUG ===');
+    console.log('Customer Type:', isNonMember ? 'Non-Member' : 'Member');
+    console.log('Profit from inventory:', item.PROFIT);
+    console.log('Non-member profit from inventory:', item.NON_MEMBER_PROFIT);
+    console.log('Profit percent used:', profitPercent);
+
+    // Check if this is an excluded liquor item
+    const itemCategoryId = Number(item.CATEGORY_ID ?? 0);
+    const itemSubCategory = Number(item.SUB_CATEGORY ?? 0);
+    const isExcludedLiquorItem = itemCategoryId === 10 && isExcludedLiquorSubcategory(itemSubCategory);
+
+    // Calculate price
+    const unitPrice = Number(item.UNIT_PRICE) || 0;
+    const pegsFromStock = Number(item.PEGS) || 1;
+    const basePrice = pegsFromStock > 0 ? unitPrice / pegsFromStock : unitPrice;
+
+    // For excluded liquor items, no profit markup
+    // For regular items, apply profit markup
+    const calculatedPaidPrice = Number(
+      isExcludedLiquorItem ? basePrice : basePrice * (1 + profitPercent / 100)
+    ).toFixed(2);
+
+    console.log('Unit Price:', unitPrice);
+    console.log('PEGS:', pegsFromStock);
+    console.log('Base Price per peg:', basePrice);
+    console.log('Is Excluded Liquor:', isExcludedLiquorItem);
+    console.log('Final Calculated Price:', calculatedPaidPrice);
 
     // STEP B: Check FREE ITEM
     const [freeItemRows] = await connection.query(
@@ -1141,36 +1273,6 @@ exports.processBarcodeScan = async (req, res) => {
     );
 
     const isFreeItem = freeItemRows.length > 0 && Number(freeItemRows[0].price) === 0;
-
-    // STEP C: Base values
-    const unitPrice = Number(item.UNIT_PRICE) || 0;
-    const itemCategoryId = Number(item.CATEGORY_ID ?? item.category_id ?? 0);
-    const itemSubCategory = Number(item.SUB_CATEGORY ?? item.sub_category ?? subCategory ?? 0);
-    const isExcludedLiquorItem =
-      itemCategoryId === 10 && isExcludedLiquorSubcategory(itemSubCategory);
-    const hasOrderProfit =
-      orderPricing.profit !== null &&
-      orderPricing.profit !== undefined &&
-      orderPricing.profit !== "";
-    const hasOrderCharges =
-      orderPricing.food_pr_charges !== null &&
-      orderPricing.food_pr_charges !== undefined &&
-      orderPricing.food_pr_charges !== "";
-    const orderProfit = Number(orderPricing.profit);
-    const orderCharges = Number(orderPricing.food_pr_charges);
-    const isOrderNonMember =
-      String(orderPricing.customer_login_type || "").trim().toUpperCase() === "NON MEMBER" ||
-      (orderPricing.customer_role_id != null && Number(orderPricing.customer_role_id) !== 20);
-    const fallbackProfit = isOrderNonMember ? Number(item.NON_MEMBER_PROFIT) : Number(item.PROFIT);
-    const fallbackCharges = isOrderNonMember ? Number(item.PR_CHARGES) : Number(item.FOOD_PR_CHARGES);
-    const profitPercent = hasOrderProfit && Number.isFinite(orderProfit) ? orderProfit : fallbackProfit || 0;
-    const prCharges = hasOrderCharges && Number.isFinite(orderCharges) ? orderCharges : fallbackCharges || 0;
-    const pegsFromStock = Number(item.PEGS) || 1;
-    const basePrice = pegsFromStock > 0 ? unitPrice / pegsFromStock : unitPrice;
-    const priceWithMarkup = basePrice * (1 + profitPercent / 100);
-    const calculatedPaidPrice = Number(
-      isExcludedLiquorItem ? basePrice + prCharges : priceWithMarkup + prCharges
-    ).toFixed(2);
 
     const [componentRows] = await connection.query(`
       SELECT 
@@ -1240,16 +1342,6 @@ exports.processBarcodeScan = async (req, res) => {
       ]);
     const currentScanned = req.session[sessionKey] || [];
 
-    // Each cocktail/mocktail parent item on the order has its OWN order_line_id.
-    // `parentOrderLineId` above is only correct for the single item that
-    // scanItemCode was resolved against (which, when a standalone line for the
-    // same item code also exists, may not even be a cocktail at all). When one
-    // scan event's leftover quantity spills over into ingredient rows for
-    // DIFFERENT cocktails (e.g. Manhattan and Cosmopolitan both using Johny
-    // Walker Red Label), each of those rows must be tagged with that specific
-    // cocktail's own order_line_id — not the possibly-unrelated
-    // parentOrderLineId — or its scan value silently won't match any order
-    // line when totals are computed later.
     const moParentItemCodes = [...new Set(
       componentRows
         .filter((c) => c.Mix === 'MO')
@@ -1345,8 +1437,19 @@ exports.processBarcodeScan = async (req, res) => {
         isCocktailIngredient: comp.Mix === 'MO',
         pegs: Number(item.PEGS) || 1,
         roleId,
-        acUnit
+        acUnit,
+        customerType: isNonMember ? 'NON_MEMBER' : 'MEMBER'
       };
+
+      console.log('Added scan entry:', {
+        itemCode: newEntry.itemCode,
+        itemPrice: newEntry.itemPrice,
+        scanQuantity: newEntry.scanQuantity,
+        lineTotalPrice: newEntry.lineTotalPrice,
+        orderLineId: newEntry.orderLineId,
+        parentItem: newEntry.parentItem,
+        customerType: newEntry.customerType
+      });
 
       req.session[sessionKey] = req.session[sessionKey] || [];
       req.session[sessionKey].push(newEntry);
@@ -1372,6 +1475,7 @@ exports.processBarcodeScan = async (req, res) => {
         ).toFixed(2),
         barcode: BARCODE,
         isCocktailIngredient: addedThisScan.some((entry) => entry.isCocktailIngredient),
+        customerType: isNonMember ? 'NON_MEMBER' : 'MEMBER',
         addedThisScan
       }
     });
@@ -1917,7 +2021,7 @@ exports.getOrderHistory = async (req, res) => {
   try {
     const { fromDate, toDate, page = 1, limit = 10, kitchen = "Bar" } = req.query;
     const { categoryId } = getKitchenConfig(kitchen);
-    // console.log("Fetching order history with params:", { fromDate, toDate, page, limit });
+    
     let from = getStartOfDay(fromDate);
     let to = getEndOfDay(toDate);
 
@@ -1940,127 +2044,50 @@ exports.getOrderHistory = async (req, res) => {
     `;
 
     const query = `
-    SELECT 
-  kn.ordernumber AS order_num,
-  nm.order_date,
-
-   COALESCE(NULLIF(TRIM(xnm.first_name), ''), NULLIF(TRIM(xu.first_name), ''), CONCAT('Order ', kn.ordernumber)) AS first_name,
-   COALESCE(NULLIF(TRIM(xnm.phone_number), ''), NULLIF(TRIM(xu.phone_number), ''), '') AS phone_number,
-
-  COALESCE(
-    CONCAT(UPPER(LEFT(xp.pubmed_name, 1)), LOWER(SUBSTRING(xp.pubmed_name, 2))),
-    'N/A'
-  ) AS pubmed_name,
-
-  FORMAT(IFNULL(MAX(order_totals.subtotal), 0), 2) AS subtotal,
-
-  CASE
-    WHEN SUM(CASE WHEN UPPER(kn.status) = 'CANCELLED' THEN 1 ELSE 0 END) = COUNT(*)
-    THEN 'CANCELLED'
-
-    WHEN SUM(CASE WHEN UPPER(kn.status) = 'PREPARING' THEN 1 ELSE 0 END) > 0
-         AND SUM(CASE WHEN UPPER(kn.status) = 'COMPLETED' THEN 1 ELSE 0 END) > 0
-    THEN 'PARTIALLY COMPLETED'
-
-    WHEN SUM(CASE WHEN UPPER(kn.status) = 'RECEIVED' THEN 1 ELSE 0 END) > 0
-         AND SUM(CASE WHEN UPPER(kn.status) = 'COMPLETED' THEN 1 ELSE 0 END) > 0
-    THEN 'PARTIALLY COMPLETED'
-
-    WHEN SUM(CASE WHEN UPPER(kn.status) IN ('COMPLETED','CANCELLED') THEN 1 ELSE 0 END) = COUNT(*)
-    THEN 'COMPLETED'
-
-    ELSE 'PREPARING'
-  END AS status
-
-FROM xxafmc_kitchen_notification kn
-JOIN (${inventorySummarySql}) inv
-  ON inv.item_code = kn.item_id
-
-LEFT JOIN xxafmc_order_header nm 
-  ON nm.order_num = kn.ordernumber
-
-LEFT JOIN xxafmc_non_members xnm 
-  ON xnm.id = nm.member_id
-
-LEFT JOIN xxafmc_users xu 
-  ON xu.user_id = nm.user_id
-
-LEFT JOIN xxafmc_pubmed xp 
-  ON xp.pubmed_id = nm.pubmed
-
-LEFT JOIN (
-  SELECT
-    od.order_id,
-    ROUND(SUM(
-      CASE
-        WHEN IFNULL(od.price, 0) = 0 OR UPPER(TRIM(IFNULL(od.type, ''))) = 'FREE ITEM' THEN 0
-        WHEN (
-          SELECT ROUND(SUM(IFNULL(osc.scan_quantity, 0) * IFNULL(osc.item_price, 0)), 2)
-          FROM order_scan_collection osc
-          WHERE osc.collection_name = 'S_COLLECTION'
-            AND osc.order_number = od.order_id
-            AND osc.inventory_item_code = od.item_id
-            AND (osc.order_line_id = od.order_line_id OR osc.order_line_id IS NULL)
-        ) > 0 THEN (
-          SELECT ROUND(SUM(IFNULL(osc.scan_quantity, 0) * IFNULL(osc.item_price, 0)), 2)
-          FROM order_scan_collection osc
-          WHERE osc.collection_name = 'S_COLLECTION'
-            AND osc.order_number = od.order_id
-            AND osc.inventory_item_code = od.item_id
-            AND (osc.order_line_id = od.order_line_id OR osc.order_line_id IS NULL)
-        )
-        WHEN custom_totals.unit_custom_total > 0 THEN custom_totals.unit_custom_total * od.quantity
-        ELSE IFNULL(od.subtotal, 0)
-      END
-    ), 2) AS subtotal
-  FROM xxafmc_order_details od
-  JOIN (${inventorySummarySql}) total_inv
-    ON total_inv.item_code = od.item_id
-  LEFT JOIN (
-    SELECT
-      cm.order_number,
-      cm.inventory_item_code,
-      ROUND(SUM(
-        IFNULL(cm.pegs, 0) *
-        (
-          IFNULL(stock_prices.base_peg_price, 0) * (1 + IFNULL(od_price.profit, 0) / 100) +
-          IFNULL(od_price.food_pr_charges, 0)
-        )
-      ), 2) AS unit_custom_total
-    FROM xxafmc_custom_cocktails_mocktails_details cm
-    JOIN xxafmc_order_details od_price
-      ON od_price.order_id = cm.order_number
-      AND od_price.item_id = cm.inventory_item_code
-    LEFT JOIN (
-      SELECT
-        item_code,
-        MAX(IFNULL(unit_price, 0) / IFNULL(NULLIF(pegs, 0), 1)) AS base_peg_price
-      FROM xxafmc_stock_out
-      WHERE IFNULL(stock_quantity, 0) > 0
-      GROUP BY item_code
-    ) stock_prices
-      ON stock_prices.item_code = cm.item_code
-    GROUP BY cm.order_number, cm.inventory_item_code
-  ) custom_totals
-    ON custom_totals.order_number = od.order_id
-    AND custom_totals.inventory_item_code = od.item_id
-  WHERE total_inv.category_id = ?
-    AND TRIM(UPPER(IFNULL(od.order_status, ''))) != 'CANCELLED'
-  GROUP BY od.order_id
-) order_totals
-  ON order_totals.order_id = kn.ordernumber
-
-WHERE inv.category_id = ?
-  AND ${dateExpression} BETWEEN ? AND ?
-
-GROUP BY kn.ordernumber, nm.order_date, first_name, phone_number, xp.pubmed_name
-
-HAVING 
-  SUM(CASE WHEN UPPER(kn.status) = 'COMPLETED' THEN 1 ELSE 0 END) > 0
-
-ORDER BY kn.ordernumber DESC
-LIMIT ? OFFSET ?
-`;
+      SELECT 
+        kn.ordernumber AS order_num,
+        nm.order_date,
+        COALESCE(NULLIF(TRIM(xnm.first_name), ''), NULLIF(TRIM(xu.first_name), ''), CONCAT('Order ', kn.ordernumber)) AS first_name,
+        COALESCE(NULLIF(TRIM(xnm.phone_number), ''), NULLIF(TRIM(xu.phone_number), ''), '') AS phone_number,
+        COALESCE(
+          CONCAT(UPPER(LEFT(xp.pubmed_name, 1)), LOWER(SUBSTRING(xp.pubmed_name, 2))),
+          'N/A'
+        ) AS pubmed_name,
+        FORMAT(IFNULL(oh.order_total, 0), 2) AS subtotal,
+        CASE
+          WHEN SUM(CASE WHEN UPPER(kn.status) = 'CANCELLED' THEN 1 ELSE 0 END) = COUNT(*)
+          THEN 'CANCELLED'
+          WHEN SUM(CASE WHEN UPPER(kn.status) = 'PREPARING' THEN 1 ELSE 0 END) > 0
+               AND SUM(CASE WHEN UPPER(kn.status) = 'COMPLETED' THEN 1 ELSE 0 END) > 0
+          THEN 'PARTIALLY COMPLETED'
+          WHEN SUM(CASE WHEN UPPER(kn.status) = 'RECEIVED' THEN 1 ELSE 0 END) > 0
+               AND SUM(CASE WHEN UPPER(kn.status) = 'COMPLETED' THEN 1 ELSE 0 END) > 0
+          THEN 'PARTIALLY COMPLETED'
+          WHEN SUM(CASE WHEN UPPER(kn.status) IN ('COMPLETED','CANCELLED') THEN 1 ELSE 0 END) = COUNT(*)
+          THEN 'COMPLETED'
+          ELSE 'PREPARING'
+        END AS status
+      FROM xxafmc_kitchen_notification kn
+      JOIN (${inventorySummarySql}) inv
+        ON inv.item_code = kn.item_id
+      LEFT JOIN xxafmc_order_header nm 
+        ON nm.order_num = kn.ordernumber
+      LEFT JOIN xxafmc_order_header oh
+        ON oh.order_num = kn.ordernumber
+      LEFT JOIN xxafmc_non_members xnm 
+        ON xnm.id = nm.member_id
+      LEFT JOIN xxafmc_users xu 
+        ON xu.user_id = nm.user_id
+      LEFT JOIN xxafmc_pubmed xp 
+        ON xp.pubmed_id = nm.pubmed
+      WHERE inv.category_id = ?
+        AND ${dateExpression} BETWEEN ? AND ?
+      GROUP BY kn.ordernumber, nm.order_date, first_name, phone_number, xp.pubmed_name, oh.order_total
+      HAVING 
+        SUM(CASE WHEN UPPER(kn.status) = 'COMPLETED' THEN 1 ELSE 0 END) > 0
+      ORDER BY kn.ordernumber DESC
+      LIMIT ? OFFSET ?
+    `;
 
     const countQuery = `
       SELECT COUNT(*) as total
@@ -2084,11 +2111,11 @@ LIMIT ? OFFSET ?
     const totalRecords = countResult[0]?.total || 0;
     const totalPages = Math.ceil(totalRecords / limitNum);
 
-    // Critical fix for MySQL 8.0.22+ bug
-    const queryParams = [categoryId, categoryId, from, to, String(limitNum), String(offset)];
+    const queryParams = [categoryId, from, to, String(limitNum), String(offset)];
 
     const [rows] = await pool.execute(query, queryParams);
 
+    // // console.log('Order history rows:', rows);
 
     res.json({
       success: true,
@@ -2120,6 +2147,7 @@ exports.getOrderHistoryItemDetails = async (req, res) => {
     const { orderNumber } = req.params;
     const { kitchen = "Bar" } = req.query;
     const { categoryId } = getKitchenConfig(kitchen);
+    
     // console.log("Fetching item details for order:", orderNumber);
     if (!orderNumber) {
       return res.status(400).json({
@@ -2128,7 +2156,7 @@ exports.getOrderHistoryItemDetails = async (req, res) => {
       });
     }
 
-    // 🔹 Item details query
+    // 🔹 Item details query - DIRECTLY use subtotal column from order_details
     const itemsQuery = `
       SELECT 
         xo.order_line_id,
@@ -2137,191 +2165,49 @@ exports.getOrderHistoryItemDetails = async (req, res) => {
         IFNULL(xo.type, 'NA') AS type,
         xi.item_name,
         xo.quantity,
-
-        ROUND(
-          CASE
-            WHEN IFNULL(xo.price, 0) = 0 OR UPPER(TRIM(IFNULL(xo.type, ''))) = 'FREE ITEM' THEN 0
-            WHEN MAX(scanned_totals.scanned_total) > 0 THEN MAX(scanned_totals.scanned_total)
-            WHEN MAX(custom_totals.unit_custom_total) > 0 THEN MAX(custom_totals.unit_custom_total) * xo.quantity
-            ELSE IFNULL(xo.subtotal, 0)
-          END,
-          2
-        ) AS subtotal,
-        ROUND(
-          CASE
-            WHEN MAX(scanned_totals.scanned_total) > 0 THEN MAX(scanned_totals.scanned_total) / NULLIF(xo.quantity, 0)
-            WHEN MAX(custom_totals.unit_custom_total) > 0 THEN MAX(custom_totals.unit_custom_total)
-            ELSE COALESCE(xo.price, xo.subtotal / NULLIF(xo.quantity, 0), 0)
-          END - IFNULL(xo.food_pr_charges, 0),
-          2
-        ) AS price,
+        ROUND(IFNULL(xo.subtotal, 0), 2) AS subtotal,
+        ROUND(IFNULL(xo.price, 0), 2) AS price,
         IFNULL(xo.food_pr_charges, 0) AS pr_charges,
-
         xo.created_by,
         xo.creation_date,
         xo.last_updated_date,
         xo.last_updated_by,
-
         COALESCE(
           NULLIF(xo.order_status, ''), 
-          MAX(
-            CASE 
-              WHEN xxkn.status = 'Completed' THEN '3-Completed'
-              WHEN xxkn.status = 'Preparing' THEN '2-Preparing'
-              ELSE '1-Received'
-            END), 
-          NULLIF(oh.order_status, ''), 
-          'Received'
+          'Completed'
         ) AS status
-
       FROM xxafmc_order_details xo
-
-      LEFT JOIN xxafmc_order_header oh
-        ON oh.order_num = xo.order_id
-
       JOIN (${inventorySummarySql}) xi
         ON xo.item_id = xi.item_code
-
-      LEFT JOIN (
-        SELECT
-          order_number,
-          inventory_item_code,
-          order_line_id,
-          ROUND(SUM(IFNULL(scan_quantity, 0) * IFNULL(item_price, 0)), 2) AS scanned_total
-        FROM order_scan_collection
-        WHERE collection_name = 'S_COLLECTION'
-        GROUP BY order_number, inventory_item_code, order_line_id
-      ) scanned_totals
-        ON scanned_totals.order_number = xo.order_id
-       AND scanned_totals.inventory_item_code = xo.item_id
-       AND (scanned_totals.order_line_id = xo.order_line_id OR scanned_totals.order_line_id IS NULL)
-
-      LEFT JOIN (
-        SELECT
-          cm.order_number,
-          cm.inventory_item_code,
-          ROUND(SUM(
-            IFNULL(cm.pegs, 0) *
-            (
-              IFNULL(stock_prices.base_peg_price, 0) * (1 + IFNULL(od_price.profit, 0) / 100) +
-              IFNULL(od_price.food_pr_charges, 0)
-            )
-          ), 2) AS unit_custom_total
-        FROM xxafmc_custom_cocktails_mocktails_details cm
-        JOIN xxafmc_order_details od_price
-          ON od_price.order_id = cm.order_number
-         AND od_price.item_id = cm.inventory_item_code
-        LEFT JOIN (
-          SELECT
-            item_code,
-            MAX(IFNULL(unit_price, 0) / IFNULL(NULLIF(pegs, 0), 1)) AS base_peg_price
-          FROM xxafmc_stock_out
-          WHERE IFNULL(stock_quantity, 0) > 0
-          GROUP BY item_code
-        ) stock_prices
-          ON stock_prices.item_code = cm.item_code
-        GROUP BY cm.order_number, cm.inventory_item_code
-      ) custom_totals
-        ON custom_totals.order_number = xo.order_id
-       AND custom_totals.inventory_item_code = xo.item_id
-
-      --   critical join (same as APEX)
-      LEFT JOIN xxafmc_kitchen_notification xxkn 
-        ON xxkn.ordernumber = xo.order_id
-       AND TRIM(CAST(xxkn.item_id AS CHAR)) = TRIM(CAST(xo.item_id AS CHAR))
-
       WHERE xo.order_id = ?
         AND xi.category_id = ?
-
-      GROUP BY 
-        xo.order_line_id,
-        xo.order_id,
-        xo.item_id,
-        xo.type,
-        xi.item_name,
-        xo.quantity,
-        xo.price,
-        xo.subtotal,
-        xo.order_status,
-        xo.food_pr_charges,
-        xo.created_by,
-        xo.creation_date,
-        xo.last_updated_date,
-        xo.last_updated_by,
-        oh.order_status
+        AND TRIM(UPPER(IFNULL(xo.order_status, ''))) != 'CANCELLED'
       ORDER BY xo.order_line_id
     `;
 
-    // 🔹 Total query
+    // 🔹 Total query - DIRECTLY sum subtotals from order_details
     const totalQuery = `
       SELECT 
-        ROUND(SUM(
-          CASE
-            WHEN IFNULL(xo.price, 0) = 0 OR UPPER(TRIM(IFNULL(xo.type, ''))) = 'FREE ITEM' THEN 0
-            WHEN (
-              SELECT ROUND(SUM(IFNULL(osc.scan_quantity, 0) * IFNULL(osc.item_price, 0)), 2)
-              FROM order_scan_collection osc
-              WHERE osc.collection_name = 'S_COLLECTION'
-                AND osc.order_number = xo.order_id
-                AND osc.inventory_item_code = xo.item_id
-                AND (osc.order_line_id = xo.order_line_id OR osc.order_line_id IS NULL)
-            ) > 0 THEN (
-              SELECT ROUND(SUM(IFNULL(osc.scan_quantity, 0) * IFNULL(osc.item_price, 0)), 2)
-              FROM order_scan_collection osc
-              WHERE osc.collection_name = 'S_COLLECTION'
-                AND osc.order_number = xo.order_id
-                AND osc.inventory_item_code = xo.item_id
-                AND (osc.order_line_id = xo.order_line_id OR osc.order_line_id IS NULL)
-            )
-            WHEN custom_totals.unit_custom_total > 0 THEN custom_totals.unit_custom_total * xo.quantity
-            ELSE IFNULL(xo.subtotal, 0)
-          END
-        ), 2) AS total_amount
-      FROM xxafmc_order_details xo
-      JOIN (${inventorySummarySql}) xi
-        ON xo.item_id = xi.item_code
-      LEFT JOIN (
-        SELECT
-          cm.order_number,
-          cm.inventory_item_code,
-          ROUND(SUM(
-            IFNULL(cm.pegs, 0) *
-            (
-              IFNULL(stock_prices.base_peg_price, 0) * (1 + IFNULL(od_price.profit, 0) / 100) +
-              IFNULL(od_price.food_pr_charges, 0)
-            )
-          ), 2) AS unit_custom_total
-        FROM xxafmc_custom_cocktails_mocktails_details cm
-        JOIN xxafmc_order_details od_price
-          ON od_price.order_id = cm.order_number
-          AND od_price.item_id = cm.inventory_item_code
-        LEFT JOIN (
-          SELECT
-            item_code,
-            MAX(IFNULL(unit_price, 0) / IFNULL(NULLIF(pegs, 0), 1)) AS base_peg_price
-          FROM xxafmc_stock_out
-          WHERE IFNULL(stock_quantity, 0) > 0
-          GROUP BY item_code
-        ) stock_prices
-          ON stock_prices.item_code = cm.item_code
-        GROUP BY cm.order_number, cm.inventory_item_code
-      ) custom_totals
-        ON custom_totals.order_number = xo.order_id
-        AND custom_totals.inventory_item_code = xo.item_id
-      WHERE xo.order_id = ?
-        AND xi.category_id = ?
+        ROUND(SUM(IFNULL(subtotal, 0)), 2) AS total_amount
+      FROM xxafmc_order_details
+      WHERE order_id = ?
+        AND TRIM(UPPER(IFNULL(order_status, ''))) != 'CANCELLED'
     `;
 
     const [items] = await pool.execute(itemsQuery, [orderNumber, categoryId]);
-    const [totalResult] = await pool.execute(totalQuery, [orderNumber, categoryId]);
+    const [totalResult] = await pool.execute(totalQuery, [orderNumber]);
 
-    // Clean up the status string if it used the priority prefix
     const formattedItems = items.map(item => ({
       ...item,
       status: item.status.replace(/^\d-/, '')
     }));
 
     const totalAmount = totalResult[0]?.total_amount || 0;
+    
+    // console.log('Order details found:', formattedItems.length, 'items');
+    // console.log('Total amount:', totalAmount);
+    // console.log('Items:', JSON.stringify(formattedItems, null, 2));
+
     res.json({
       success: true,
       data: {
