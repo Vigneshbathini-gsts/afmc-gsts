@@ -68,11 +68,10 @@ function CategoryButton({ active, label, onClick }) {
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-full px-5 py-2.5 text-sm font-bold transition-all duration-300 transform ${
-        active
+      className={`rounded-full px-5 py-2.5 text-sm font-bold transition-all duration-300 transform ${active
           ? "bg-gradient-to-r from-afmc-maroon to-afmc-maroon/80 text-white shadow-lg shadow-afmc-maroon/30 scale-105"
           : "bg-white text-gray-700 ring-2 ring-gray-200 hover:ring-afmc-maroon/30 hover:text-afmc-maroon hover:shadow-md"
-      }`}
+        }`}
     >
       {toInitCap(label)}
     </button>
@@ -212,7 +211,7 @@ function MenuPopup({ item, loading, onClose }) {
                   </div>
 
                   <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
-                     
+
                     <div className="flex items-center justify-between gap-3">
                       <div className="text-xs font-bold uppercase tracking-wider text-gray-500">Unit</div>
                       <div className="text-sm font-bold text-gray-900">
@@ -313,11 +312,10 @@ function MenuGrid({ items, showStockStatus = false, ignoreStockStatus = false, o
             }}
             disabled={stockDisabled}
             key={item.item_id || item.item_code || `${item.item_name}-${index}`}
-            className={`group relative overflow-hidden rounded-xl border border-gray-200 bg-white text-left shadow-[0_6px_18px_rgba(15,23,42,0.06)] transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-afmc-maroon ${
-              stockDisabled
+            className={`group relative overflow-hidden rounded-xl border border-gray-200 bg-white text-left shadow-[0_6px_18px_rgba(15,23,42,0.06)] transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-afmc-maroon ${stockDisabled
                 ? "cursor-not-allowed opacity-75"
                 : "hover:-translate-y-0.5 hover:border-afmc-maroon/30 hover:shadow-[0_14px_30px_rgba(15,23,42,0.11)]"
-            }`}
+              }`}
           >
             {/* Image Container */}
             <div className="relative aspect-square w-full overflow-hidden bg-gradient-to-br from-gray-50 via-white to-[#f7f0e5]">
@@ -325,9 +323,8 @@ function MenuGrid({ items, showStockStatus = false, ignoreStockStatus = false, o
               <img
                 src={`${BASEAPI}${item.image || "default.jpg"}`}
                 alt={item.item_name}
-                className={`relative h-full w-full object-contain p-3.5 transition-transform duration-300 ${
-                  stockDisabled ? "blur-[2px] grayscale opacity-60" : "group-hover:scale-105"
-                }`}
+                className={`relative h-full w-full object-contain p-3.5 transition-transform duration-300 ${stockDisabled ? "blur-[2px] grayscale opacity-60" : "group-hover:scale-105"
+                  }`}
               />
 
               {/* Stock Status Badge */}
@@ -669,63 +666,63 @@ function MenuPopupCompact({ item, loading, onClose, onBuy }) {
                     </div>
 
                     <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
-                    <div className="text-[14px] font-semibold leading-5 text-stone-600">
-                      {toInitCap("A/C Unit")}
-                    </div>
-                    <div>
-                      <div className="h-11 w-full rounded border border-stone-300 bg-white px-3 text-[15px] font-medium text-stone-700">
-                        <span className="flex h-full items-center">{toInitCap(acUnit) || "Nos"}</span>
+                      <div className="text-[14px] font-semibold leading-5 text-stone-600">
+                        {toInitCap("A/C Unit")}
+                      </div>
+                      <div>
+                        <div className="h-11 w-full rounded border border-stone-300 bg-white px-3 text-[15px] font-medium text-stone-700">
+                          <span className="flex h-full items-center">{toInitCap(acUnit) || "Nos"}</span>
+                        </div>
+                      </div>
+
+                      <div className="text-[14px] font-semibold leading-5 text-stone-600">
+                        {toInitCap("Quantity")}
+                      </div>
+                      <div>
+                        <input
+                          type="number"
+                          min="1"
+                          value={qty}
+                          onChange={(e) =>
+                            Number(e.target.value) <= 999 && setQty(e.target.value)
+                          }
+                          className="h-11 w-full rounded border border-stone-300 bg-white px-3 text-[15px] font-medium text-stone-900 outline-none transition focus:border-afmc-maroon focus:ring-2 focus:ring-afmc-maroon/20"
+                          inputMode="numeric"
+                        />
+                      </div>
+
+                      {isPegsUnit ? (
+                        <>
+                          <div className="text-[14px] font-semibold leading-5 text-stone-600">
+                            {toInitCap("Type")}
+                          </div>
+                          <div>
+                            <select
+                              value={pegType}
+                              onChange={(e) => setPegType(e.target.value)}
+                              className="h-11 w-full rounded border border-stone-300 bg-white px-3 text-[15px] font-medium text-stone-800 outline-none transition focus:border-afmc-maroon focus:ring-2 focus:ring-afmc-maroon/20"
+                            >
+                              <option value="Small">{toInitCap("Small")}</option>
+                              <option value="Large">{toInitCap("Large")}</option>
+                            </select>
+                          </div>
+                        </>
+                      ) : null}
+
+                      <div className="text-[14px] font-semibold leading-5 text-stone-600">
+                        {toInitCap("Remarks")}
+                      </div>
+                      <div>
+                        <select
+                          value={remarks}
+                          onChange={(e) => setRemarks(e.target.value)}
+                          className="h-11 w-full rounded border border-stone-300 bg-white px-3 text-[15px] font-medium text-stone-800 outline-none transition focus:border-afmc-maroon focus:ring-2 focus:ring-afmc-maroon/20"
+                        >
+                          <option value="Din">{toInitCap("Dine In")}</option>
+                          <option value="Take Away">{toInitCap("Take Away")}</option>
+                        </select>
                       </div>
                     </div>
-
-                    <div className="text-[14px] font-semibold leading-5 text-stone-600">
-                      {toInitCap("Quantity")}
-                    </div>
-                    <div>
-                      <input
-                        type="number"
-                        min="1"
-                        value={qty}
-                        onChange={(e) =>
-                          Number(e.target.value) <= 999 && setQty(e.target.value)
-                        }
-                        className="h-11 w-full rounded border border-stone-300 bg-white px-3 text-[15px] font-medium text-stone-900 outline-none transition focus:border-afmc-maroon focus:ring-2 focus:ring-afmc-maroon/20"
-                        inputMode="numeric"
-                      />
-                    </div>
-
-                    {isPegsUnit ? (
-                      <>
-                        <div className="text-[14px] font-semibold leading-5 text-stone-600">
-                          {toInitCap("Type")}
-                        </div>
-                        <div>
-                          <select
-                            value={pegType}
-                            onChange={(e) => setPegType(e.target.value)}
-                            className="h-11 w-full rounded border border-stone-300 bg-white px-3 text-[15px] font-medium text-stone-800 outline-none transition focus:border-afmc-maroon focus:ring-2 focus:ring-afmc-maroon/20"
-                          >
-                            <option value="Small">{toInitCap("Small")}</option>
-                            <option value="Large">{toInitCap("Large")}</option>
-                          </select>
-                        </div>
-                      </>
-                    ) : null}
-
-                    <div className="text-[14px] font-semibold leading-5 text-stone-600">
-                      {toInitCap("Remarks")}
-                    </div>
-                    <div>
-                      <select
-                        value={remarks}
-                        onChange={(e) => setRemarks(e.target.value)}
-                        className="h-11 w-full rounded border border-stone-300 bg-white px-3 text-[15px] font-medium text-stone-800 outline-none transition focus:border-afmc-maroon focus:ring-2 focus:ring-afmc-maroon/20"
-                      >
-                        <option value="Din">{toInitCap("Dine In")}</option>
-                        <option value="Take Away">{toInitCap("Take Away")}</option>
-                      </select>
-                    </div>
-                  </div>
                   </div>
 
                   <div className="grid grid-cols-[auto_auto] items-start justify-start gap-x-4 gap-y-1 md:justify-end">
@@ -990,11 +987,10 @@ function ScrollTabs({ items, activeKey, onChange }) {
                   key={it.key}
                   type="button"
                   onClick={() => onChange(it.key)}
-                  className={`w-full rounded-full px-5 py-2 text-sm font-extrabold transition ${
-                    active
+                  className={`w-full rounded-full px-5 py-2 text-sm font-extrabold transition ${active
                       ? "bg-gray-950 text-white shadow-sm"
                       : "bg-transparent text-gray-700 hover:bg-gray-50 hover:text-afmc-maroon"
-                  }`}
+                    }`}
                   aria-pressed={active}
                 >
                   {it.label}
@@ -1012,11 +1008,10 @@ function ScrollTabs({ items, activeKey, onChange }) {
                 key={it.key}
                 type="button"
                 onClick={() => onChange(it.key)}
-                className={`shrink-0 snap-start rounded-full px-4 py-2 text-sm font-bold transition ${
-                  active
+                className={`shrink-0 snap-start rounded-full px-4 py-2 text-sm font-bold transition ${active
                     ? "bg-gradient-to-r from-afmc-maroon to-afmc-maroon/80 text-white shadow-sm"
                     : "text-gray-700 hover:bg-white hover:text-afmc-maroon"
-                }`}
+                  }`}
                 aria-current={active ? "page" : undefined}
               >
                 <span className="whitespace-nowrap">{it.label}</span>
@@ -1045,11 +1040,10 @@ function MainTabsBar({ activeKey, onChange }) {
               key={key}
               type="button"
               onClick={() => onChange(key)}
-              className={`relative flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-extrabold transition ${
-                active
+              className={`relative flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-extrabold transition ${active
                   ? "bg-gradient-to-r from-afmc-maroon to-[#8f1234] text-white shadow-lg shadow-afmc-maroon/20"
                   : "text-gray-600 hover:bg-gray-50 hover:text-afmc-maroon"
-              }`}
+                }`}
               aria-current={active ? "page" : undefined}
             >
               <Icon className={`h-4 w-4 ${active ? "text-white" : "text-gray-500"}`} />
@@ -1079,11 +1073,10 @@ function SubTabsPills({ items, activeKey, onChange }) {
               key={it.key}
               type="button"
               onClick={() => onChange(it.key)}
-              className={`rounded-full px-5 py-2 text-sm font-extrabold transition ${
-                active
+              className={`rounded-full px-5 py-2 text-sm font-extrabold transition ${active
                   ? "bg-gray-950 text-white shadow-sm"
                   : "bg-transparent text-gray-700 hover:bg-gray-50 hover:text-afmc-maroon"
-              }`}
+                }`}
               aria-current={active ? "page" : undefined}
             >
               {it.label}
@@ -1212,7 +1205,7 @@ function EnduserOtherSection({ onItemClick }) {
   const categoryOptions = useMemo(() => {
     const map = new Map();
     (Array.isArray(data) ? data : []).forEach((item) => {
-      const id = item?.sub_category;  
+      const id = item?.sub_category;
       const name = item?.sub_category_name;
       if (id === null || id === undefined || id === "") return;
       if (!map.has(String(id))) {

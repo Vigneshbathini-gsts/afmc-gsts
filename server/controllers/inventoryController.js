@@ -288,3 +288,49 @@ exports.addStockOut = async (req, res) => {
 };
 
 
+exports.updateItemStatus = async (req, res) => {
+  try {
+    const { itemCode } = req.params;
+    const { status } = req.body;
+
+    if (!itemCode || !status) {
+      return res.status(400).json({
+        success: false,
+        message: "Item code and status are required",
+      });
+    }
+
+    const normalizedStatus = status.toUpperCase();
+
+    if (!["ACTIVE", "INACTIVE"].includes(normalizedStatus)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid status",
+      });
+    }
+
+    const updated = await inventoryModel.updateItemStatus(
+      itemCode,
+      normalizedStatus
+    );
+
+    if (updated === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Item not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Item status updated successfully",
+    });
+  } catch (error) {
+    console.error("Error updating item status:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update item status",
+    });
+  }
+};

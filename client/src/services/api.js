@@ -232,6 +232,7 @@ export const inventoryAPI = {
   addStock: (data) => api.post("/inventory/add-stock", data),
   updateStock: (id, data) => api.put(`/inventory/${id}`, data),
   deleteStock: (id) => api.delete(`/inventory/${id}`),
+  updateItemStatus: (itemCode, status) => api.put(`/inventory/${itemCode}/status`, { status })
 };
 
 export const cartAPI = {

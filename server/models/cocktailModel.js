@@ -209,6 +209,7 @@ const getCocktailIngredientOptions = async (search = "", pagination = {}) => {
       AND TRIM(ITEM_NAME) <> ''
       AND (CATEGORY_ID IS NULL OR CATEGORY_ID <> 14)
       AND (SUB_CATEGORY IS NULL OR SUB_CATEGORY NOT IN (14, 15))
+      AND STATUS = 'ACTIVE'  -- Only show active items
       AND (
         ? IS NULL
         OR UPPER(ITEM_NAME) LIKE CONCAT('%', UPPER(?), '%')
@@ -223,7 +224,6 @@ const getCocktailIngredientOptions = async (search = "", pagination = {}) => {
     normalizedSearch,
     normalizedSearch,
   ]);
-
   return rows;
 };
 
@@ -417,7 +417,7 @@ const getCocktailItemById = async (itemId) => {
   }
 
   const details = await getCocktailDetailRows(item.ITEM_CODE || item.ITEM_ID);
-
+// console.log("details", details);
   return {
     ...item,
     details,

@@ -44,7 +44,8 @@ const buildInventoryQuery = ({ categoryId, itemCode, search }) => {
         xi.FLAG AS prep_charges,
         xi.ITEM_CODE AS itemid,
         xi.FILE_NAME AS file_name,
-        xi.MIME_TYPE AS mime_type
+        xi.MIME_TYPE AS mime_type,
+        xi.STATUS AS status  -- ADD THIS
     FROM xxafmc_inventory xi
     LEFT JOIN xxafmc_sub_categories xs ON xs.SUB_CATEGORY_ID = xi.SUB_CATEGORY
     ${whereClause}
@@ -59,7 +60,8 @@ const buildInventoryQuery = ({ categoryId, itemCode, search }) => {
              xi.\`A/C_UNIT\`,
              xi.ITEM_ID,
              xi.FILE_NAME,
-             xi.MIME_TYPE
+             xi.MIME_TYPE,
+             xi.STATUS  -- ADD THIS
     ORDER BY xi.ITEM_ID DESC
   `;
 
@@ -74,6 +76,7 @@ const getInventoryList = async (filters) => {
     Number.isInteger(limit) && limit > 0 && Number.isInteger(offset) && offset >= 0;
   const pagedSql = hasPagination ? `${sql} LIMIT ${limit} OFFSET ${offset}` : sql;
   const [rows] = await db.execute(pagedSql, params);
+  // console.log("rows", rows);
   return rows;
 };
 
@@ -109,6 +112,7 @@ const getItems = async (categoryId) => {
     ORDER BY ITEM_NAME
   `;
   const [rows] = await db.execute(sql, params);
+  // console.log("rows", rows);
   return rows;
 };
 
@@ -706,7 +710,7 @@ const getStockInReport = async ({ fromDate, toDate, limit, offset }) => {
   `;
   const [rows] = await db.execute(sql, [start, end]);
   return mapAcUnitRows(rows);
- }; 
+};
 // ROUND(SUM(IFNULL(XIT.RATE, 0) * IFNULL(XIT.STOCK, 0)), 2) AS total_price,
 
 const getStockInReportSummary = async ({ fromDate, toDate }) => {
@@ -799,6 +803,20 @@ const getTodayStockOutDetails = async () => {
   return rows;
 };
 
+
+const updateItemStatus = async (itemCode, status) => {
+  const sql = `
+    UPDATE xxafmc_inventory
+    SET status = ?
+    WHERE item_code = ?
+  `;
+
+  const [result] = await db.execute(sql, [status.toUpperCase(), itemCode]);
+
+  return result.affectedRows;
+};
+
+
 module.exports = {
   getInventoryList,
   getCategories,
@@ -818,4 +836,5 @@ module.exports = {
   getStockOutReport,
   getStockOutReportSummary,
   getTodayStockOutDetails,
+  updateItemStatus,
 };

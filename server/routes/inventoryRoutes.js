@@ -20,6 +20,7 @@ router.post("/", upload.single("image"), inventoryController.createItem);
 router.put("/:itemCode/image", upload.single("image"), inventoryController.updateItemImage);
 router.post("/add-stock", addStockController.addStock);
 router.post("/stock-out", inventoryController.addStockOut);
+router.put("/:itemCode/status", inventoryController.updateItemStatus);
 
 module.exports = router;
 

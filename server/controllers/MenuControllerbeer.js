@@ -1,6 +1,7 @@
 const Menuservicebeer = require('../services/Menuservicebeer');
 
 exports.getInventory = async (req,res) => {
+    // console.log("req.query", req.query);
     try {
         const { itemCode, subCategory } = req.query;
         
@@ -29,6 +30,7 @@ exports.fetchmenubar = async (req, res) => {
     try {
          const { itemcode } = req.query;
     const data = await Menuservicebeer.fetchmocktail(itemcode || null);
+    // console.log("data", data);
     res.status(200).json({
         message: "data sent",
         data
