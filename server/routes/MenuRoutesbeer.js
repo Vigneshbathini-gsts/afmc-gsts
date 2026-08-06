@@ -3,9 +3,10 @@ const router = express.Router();
 const menuControllerbeer = require('../controllers/MenuControllerbeer');
 const memuPopupController = require("../controllers/memupopupcontroller");
 const authMiddleware = require("../middleware/authMiddleware");
-const barStatusMiddleware = require("../middleware/barStatusMiddleware");
+// const barStatusMiddleware = require("../middleware/barStatusMiddleware");
+const messTimingsMiddleware = require("../middleware/messTimingsMiddleware");
 
-const checkBarOpen = [authMiddleware, barStatusMiddleware];
+const checkBarOpen = [authMiddleware, messTimingsMiddleware];
 
 router.get("/menubar", checkBarOpen, menuControllerbeer.getInventory);
 router.get("/fetchmocktail", checkBarOpen, menuControllerbeer.fetchmenubar);

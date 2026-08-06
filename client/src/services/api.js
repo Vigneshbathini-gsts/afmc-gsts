@@ -430,6 +430,13 @@ export const barStatusAPI = {
   updateStatus: (status) => api.put("/bar-status", { status }),
 };
 
+export const messTimingsAPI = {
+  getWeeklyTimings: () => api.get("/mess-timings"),
+  updateWeeklyTimings: (timings) =>
+    api.put("/mess-timings", {
+      timings,
+    }),
+};
 
 
 export default api;

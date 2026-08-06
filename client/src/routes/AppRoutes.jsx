@@ -101,6 +101,7 @@ import OutletOrderDetails from "../pages/kitchen/OutletOrderDetails";
 
 //Bar status
 import BarClosed from "../pages/common/BarClosed";
+import MessTimings from "../pages/admin/MessTimings";
 
 
 export default function AppRoutes() {
@@ -310,6 +311,10 @@ export default function AppRoutes() {
       />
 
       <Route path="/bar-closed" element={<BarClosed />}/>
+
+      <Route
+    path="/admin/mess-timings"  element={<MessTimings />}
+/>
 
       {/* 404 */}
       <Route path="*" element={<NotFound />} />

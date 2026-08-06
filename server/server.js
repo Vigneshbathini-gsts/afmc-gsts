@@ -134,6 +134,7 @@ const orderHistoryRoutes = require("./routes/orderHistoryRoutes");
 const paymentRoutes = require("./modules/payment/paymentRoutes");
 const orderEvents = require("./utils/orderEvents");
 const barStatusRoutes = require("./routes/BarStatusRoutes");
+const messTimingsRoutes = require("./routes/MessTimingsRoutes");
 
 const apiPrefixes = ["/api", API_BASE_PATH];
 for (const prefix of apiPrefixes) {
@@ -162,6 +163,7 @@ for (const prefix of apiPrefixes) {
   app.use(`${prefix}/payment`, haltOnTimeout, paymentRoutes);
   app.get(`${prefix}/order-events`, orderEvents.authenticateEventRequest, orderEvents.subscribe);
   app.use(`${prefix}/bar-status`, haltOnTimeout, barStatusRoutes);
+  app.use(`${prefix}/mess-timings`, haltOnTimeout, messTimingsRoutes);
 }
 
 // Global Custom Error Middleware (Catches timeout exceptions and file rules)

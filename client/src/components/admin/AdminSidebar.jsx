@@ -107,14 +107,22 @@ export default function AdminSidebar({ isOpen, onClose }) {
           )}
 
           {!isInventoryOnlyUser && (
+            // <NavLink
+            //   to="/admin/bar-status"
+            //   className={navLinkClass}
+            //   onClick={onClose}
+            // >
+            //   <FaClock />
+            //   Bar Status
+            // </NavLink>
             <NavLink
-              to="/admin/bar-status"
-              className={navLinkClass}
-              onClick={onClose}
-            >
-              <FaClock />
-              Bar Status
-            </NavLink>
+  to="/admin/mess-timings"
+  className={navLinkClass}
+  onClick={onClose}
+>
+  <FaClock />
+  Mess Timings
+</NavLink>
           )}
         </div>
       </aside>

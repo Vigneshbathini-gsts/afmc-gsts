@@ -1,0 +1,161 @@
+const db = require("../config/db");
+const MessTimingsModel = require("../models/MessTimingsModel");
+
+let cachedTimings = null;
+let cachedAt = 0;
+const CACHE_TTL_MS = 5000;
+
+const getWeeklyTimings = async () => {
+  const now = Date.now();
+
+  if (cachedTimings && now - cachedAt < CACHE_TTL_MS) {
+    return cachedTimings;
+  }
+
+  cachedTimings = await MessTimingsModel.getWeeklyTimings();
+  cachedAt = now;
+
+  return cachedTimings;
+};
+
+const DAYS = [
+  "SUNDAY",
+  "MONDAY",
+  "TUESDAY",
+  "WEDNESDAY",
+  "THURSDAY",
+  "FRIDAY",
+  "SATURDAY",
+];
+
+const parseTimeToMinutes = (value) => {
+  if (!value) return null;
+
+  const [hours, minutes] = String(value)
+    .split(":")
+    .map((part) => Number(part));
+
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) {
+    return null;
+  }
+
+  return hours * 60 + minutes;
+};
+
+const isCurrentTimeBetween = (from, to, nowMinutes) => {
+  if (from === null || to === null) return false;
+
+  if (from < to) {
+    return nowMinutes >= from && nowMinutes <= to;
+  }
+
+  return nowMinutes >= from || nowMinutes <= to;
+};
+
+const isMessOpen = async () => {
+  const timings = await MessTimingsModel.getWeeklyTimings();
+
+  const now = new Date();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  const todayIndex = now.getDay();
+  const today = DAYS[todayIndex];
+  const previousDay = DAYS[(todayIndex + 6) % 7];
+
+  const candidateDays = [today, previousDay];
+
+  for (const dayName of candidateDays) {
+    const dayTiming = timings.find((row) => row.day_name === dayName);
+
+    if (!dayTiming || dayTiming.active_flag !== "Y") {
+      continue;
+    }
+
+    const shift1Open = parseTimeToMinutes(dayTiming.shift1_open_time);
+    const shift1Close = parseTimeToMinutes(dayTiming.shift1_close_time);
+    const shift2Open = parseTimeToMinutes(dayTiming.shift2_open_time);
+    const shift2Close = parseTimeToMinutes(dayTiming.shift2_close_time);
+
+    if (
+      isCurrentTimeBetween(shift1Open, shift1Close, currentMinutes) ||
+      isCurrentTimeBetween(shift2Open, shift2Close, currentMinutes)
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
+const updateWeeklyTimings = async ({ timings, updatedBy }) => {
+  if (!Array.isArray(timings) || timings.length !== 7) {
+    throw new Error("Seven day timings are required.");
+  }
+
+  const connection = await db.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    for (const day of timings) {
+      // Validate Shift 1
+      if (
+        day.shift1_open_time &&
+        day.shift1_close_time &&
+        day.shift1_open_time >= day.shift1_close_time
+      ) {
+        throw new Error(`${day.day_name}: Shift 1 opening time must be before closing time.`);
+      }
+
+      // Validate Shift 2
+      if (
+        day.shift2_open_time &&
+        day.shift2_close_time &&
+        day.shift2_open_time >= day.shift2_close_time
+      ) {
+        throw new Error(`${day.day_name}: Shift 2 opening time must be before closing time.`);
+      }
+
+      await connection.execute(
+        `
+        UPDATE xxafmc_mess_timings_week
+        SET
+          shift1_open_time=?,
+          shift1_close_time=?,
+          shift2_open_time=?,
+          shift2_close_time=?,
+          active_flag=?,
+          updated_by=?,
+          updated_on=NOW()
+        WHERE id=?
+        `,
+        [
+          day.shift1_open_time,
+          day.shift1_close_time,
+          day.shift2_open_time,
+          day.shift2_close_time,
+          day.active_flag,
+          updatedBy,
+          day.id,
+        ]
+      );
+    }
+
+    await connection.commit();
+
+    cachedTimings = await MessTimingsModel.getWeeklyTimings();
+    cachedAt = Date.now();
+
+    return cachedTimings;
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+};
+
+module.exports = {
+  getWeeklyTimings,
+  updateWeeklyTimings,
+    isMessOpen,
+};
