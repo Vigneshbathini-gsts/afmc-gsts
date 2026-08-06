@@ -168,6 +168,14 @@ export default function AppRoutes() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="mess-timings"
+          element={
+            <ProtectedRoute allowedRoles={[10]}>
+              <MessTimings />
+            </ProtectedRoute>
+          }
+        />
       </Route>
 
       {/* ================= ATTENDANT ================= */}
@@ -311,10 +319,6 @@ export default function AppRoutes() {
       />
 
       <Route path="/bar-closed" element={<BarClosed />}/>
-
-      <Route
-    path="/admin/mess-timings"  element={<MessTimings />}
-/>
 
       {/* 404 */}
       <Route path="*" element={<NotFound />} />

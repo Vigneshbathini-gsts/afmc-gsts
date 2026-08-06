@@ -3,7 +3,7 @@
 
 const express = require("express");
 const authMiddleware = require("../../middleware/authMiddleware");
-const barStatusMiddleware = require("../../middleware/barStatusMiddleware");
+const messTimingsMiddleware = require("../../middleware/messTimingsMiddleware");
 const router = express.Router();
 
 const {
@@ -12,7 +12,7 @@ const {
 } = require("./paymentController");
 
 const validatePayment = require("./validatePayment");
-const checkBarOpen = [authMiddleware, barStatusMiddleware];
+const checkBarOpen = [authMiddleware, messTimingsMiddleware];
 
 router.get("/modes", checkBarOpen, getPaymentModes);
 router.put("/update", checkBarOpen, validatePayment, updatePayment);

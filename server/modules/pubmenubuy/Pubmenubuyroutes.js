@@ -1,10 +1,10 @@
 const express = require("express");
 const router = express.Router();
 const authMiddleware = require("../../middleware/authMiddleware");
-const barStatusMiddleware = require("../../middleware/barStatusMiddleware");
+const messTimingsMiddleware = require("../../middleware/messTimingsMiddleware");
 const PubmenubuyController = require("./PubmenubuyController");
 
-const checkBarOpen = [authMiddleware, barStatusMiddleware];
+const checkBarOpen = [authMiddleware, messTimingsMiddleware];
 
 router.post("/Pubmenubuy/create", checkBarOpen, PubmenubuyController.createPubMenuOrder);
 router.get("/Pubmenubuy/:ORDER_NUMBER", checkBarOpen, PubmenubuyController.getPubMenuOrderSummary);

@@ -26,15 +26,14 @@ const BarClosed = () => {
 
             <div className="mt-5 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-afmc-gold ring-1 ring-white/15">
               <FaWineGlassAlt />
-              Bar Access Closed
+              Access Paused
             </div>
 
             <h1 className="mt-4 font-display text-3xl font-bold md:text-4xl">
-              Time is Up
+              Service is Currently Closed
             </h1>
             <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-white/80 md:text-base">
-              The bar is currently closed. Ordering access will resume once the
-              admin opens the bar again.
+              Access is temporarily paused because the current timing window is closed. Ordering will resume once the admin reopens the schedule.
             </p>
           </div>
 
@@ -45,7 +44,7 @@ const BarClosed = () => {
                   Current Status
                 </div>
                 <div className="mt-2 font-bold text-red-700">
-                  Closed
+                  Paused
                 </div>
               </div>
 
@@ -63,13 +62,13 @@ const BarClosed = () => {
                   Next Step
                 </div>
                 <div className="mt-2 font-bold text-gray-700">
-                  Login Later
+                  Try Again Later
                 </div>
               </div>
             </div>
 
             <div className="mt-6 rounded-2xl border border-afmc-maroon/10 bg-afmc-bg p-4 text-center text-sm font-semibold text-gray-600">
-              Please logout now. You can login again after the bar is reopened.
+              Please logout now. You can log in again after the schedule is reopened.
             </div>
 
             <div className="mt-6 flex justify-center">

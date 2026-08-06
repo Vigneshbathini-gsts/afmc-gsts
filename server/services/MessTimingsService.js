@@ -97,6 +97,23 @@ const updateWeeklyTimings = async ({ timings, updatedBy }) => {
     await connection.beginTransaction();
 
     for (const day of timings) {
+      const hasShift1 = Boolean(day.shift1_open_time && day.shift1_close_time);
+      const hasShift2 = Boolean(day.shift2_open_time && day.shift2_close_time);
+
+      if (day.active_flag === "Y") {
+        if (!hasShift1 && !hasShift2) {
+          throw new Error(`${day.day_name}: Please set at least one complete shift before marking it active.`);
+        }
+
+        if ((day.shift1_open_time && !day.shift1_close_time) || (!day.shift1_open_time && day.shift1_close_time)) {
+          throw new Error(`${day.day_name}: Shift 1 must have both start and end time.`);
+        }
+
+        if ((day.shift2_open_time && !day.shift2_close_time) || (!day.shift2_open_time && day.shift2_close_time)) {
+          throw new Error(`${day.day_name}: Shift 2 must have both start and end time.`);
+        }
+      }
+
       // Validate Shift 1
       if (
         day.shift1_open_time &&

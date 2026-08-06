@@ -5,7 +5,7 @@ const messTimingsMiddleware = require("../middleware/messTimingsMiddleware");
 const ConfirmOrdercontroller = require("../controllers/ConfirmOrdercontroller");
 
 const router = express.Router();
-const checkBarOpen = [authMiddleware, barStatusMiddleware];
+const checkBarOpen = [authMiddleware, messTimingsMiddleware];
 
 router.post(
   "/confirm-order/:ORDER_NUMBER",
