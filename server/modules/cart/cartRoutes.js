@@ -1,11 +1,12 @@
 const express = require("express");
 const cartController = require("./cartController");
 const authMiddleware = require("../../middleware/authMiddleware");
-const barStatusMiddleware = require("../../middleware/barStatusMiddleware");
+// const barStatusMiddleware = require("../../middleware/barStatusMiddleware");
+const messTimingsMiddleware = require("../../middleware/messTimingsMiddleware");
 
 const router = express.Router();
 
-const checkBarOpen = [authMiddleware, barStatusMiddleware];
+const checkBarOpen = [authMiddleware, messTimingsMiddleware];
 
 router.post("/", checkBarOpen, cartController.addCartItem);
 router.post("/add", checkBarOpen, cartController.addCartItem);

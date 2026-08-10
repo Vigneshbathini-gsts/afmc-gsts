@@ -49,9 +49,13 @@ export default function BarStatusGuard({ children }) {
         const response = await barStatusAPI.getStatus();
         handleStatus(response.data?.data);
       } catch (error) {
-        if (error.response?.data?.code !== "BAR_CLOSED") {
-          console.error("Unable to check bar status:", error);
+        const closureCode = error.response?.data?.code;
+        if (closureCode === "BAR_CLOSED" || closureCode === "MESS_CLOSED") {
+          navigate("/bar-closed", { replace: true });
+          return;
         }
+
+        console.error("Unable to check bar status:", error);
       }
     };
 

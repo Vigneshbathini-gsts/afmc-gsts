@@ -101,6 +101,7 @@ import OutletOrderDetails from "../pages/kitchen/OutletOrderDetails";
 
 //Bar status
 import BarClosed from "../pages/common/BarClosed";
+import MessTimings from "../pages/admin/MessTimings";
 
 
 export default function AppRoutes() {
@@ -164,6 +165,14 @@ export default function AppRoutes() {
           element={
             <ProtectedRoute allowedRoles={[10]}>
               <BarStatus />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="mess-timings"
+          element={
+            <ProtectedRoute allowedRoles={[10]}>
+              <MessTimings />
             </ProtectedRoute>
           }
         />

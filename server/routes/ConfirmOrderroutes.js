@@ -1,10 +1,11 @@
 const express = require("express");
 const authMiddleware = require("../middleware/authMiddleware");
-const barStatusMiddleware = require("../middleware/barStatusMiddleware");
+// const barStatusMiddleware = require("../middleware/barStatusMiddleware");
+const messTimingsMiddleware = require("../middleware/messTimingsMiddleware");
 const ConfirmOrdercontroller = require("../controllers/ConfirmOrdercontroller");
 
 const router = express.Router();
-const checkBarOpen = [authMiddleware, barStatusMiddleware];
+const checkBarOpen = [authMiddleware, messTimingsMiddleware];
 
 router.post(
   "/confirm-order/:ORDER_NUMBER",

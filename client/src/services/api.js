@@ -71,7 +71,7 @@ api.interceptors.response.use(
   (err) => {
     if (
       err.response?.status === 403 &&
-      err.response?.data?.code === "BAR_CLOSED" &&
+      (err.response?.data?.code === "BAR_CLOSED" || err.response?.data?.code === "MESS_CLOSED") &&
       !window.location.pathname.includes("/bar-closed")
     ) {
       window.location.href = "/bar-closed";
@@ -125,7 +125,7 @@ export async function authFetchJson(input, init = {}) {
   if (!res.ok) {
     if (
       res.status === 403 &&
-      data?.code === "BAR_CLOSED" &&
+      (data?.code === "BAR_CLOSED" || data?.code === "MESS_CLOSED") &&
       !window.location.pathname.includes("/bar-closed")
     ) {
       window.location.href = "/bar-closed";
@@ -431,6 +431,13 @@ export const barStatusAPI = {
   updateStatus: (status) => api.put("/bar-status", { status }),
 };
 
+export const messTimingsAPI = {
+  getWeeklyTimings: () => api.get("/mess-timings"),
+  updateWeeklyTimings: (timings) =>
+    api.put("/mess-timings", {
+      timings,
+    }),
+};
 
 
 export default api;
