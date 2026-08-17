@@ -5,7 +5,7 @@ import BarcodeScanner from "../../components/common/BarcodeScanner";
 import { inventoryAPI } from "../../services/api";
 
 const BATCH_WISE_SUB_CATEGORIES = new Set([6, 7, 9, 10, 18]);
-const SINGLE_QUANTITY_SUB_CATEGORIES = new Set([1, 3, 1310]);
+const SINGLE_QUANTITY_SUB_CATEGORIES = new Set([3, 1310]);
 const NON_ALCOHOLIC_LIQUOR_SUB_CATEGORIES = new Set([4, 6, 9, 18]);
 
 const requiresVolume = (acUnit) => String(acUnit || "").trim().toUpperCase() !== "NOS";
@@ -13,6 +13,14 @@ const isValidBarcode = (value) => /^\d{4,15}$/.test(String(value || "").trim());
 const isBatchWiseItem = (subCategoryId) => BATCH_WISE_SUB_CATEGORIES.has(Number(subCategoryId));
 const requiresSingleQuantity = (subCategoryId) =>
   SINGLE_QUANTITY_SUB_CATEGORIES.has(Number(subCategoryId));
+const requiresSingleQuantityForUnit = (subCategoryId, acUnit) => {
+  // Beer subcategory (1): Nos and Can require quantity=1, but Glass allows multiple
+  if (Number(subCategoryId) === 1) {
+    const unit = String(acUnit || "").trim().toUpperCase();
+    return unit === "NOS" || unit === "CAN";
+  }
+  return false;
+};
 const isNonAlcoholicLiquorItem = (categoryId, subCategoryId) =>
   Number(categoryId) === 10 && NON_ALCOHOLIC_LIQUOR_SUB_CATEGORIES.has(Number(subCategoryId));
 
@@ -157,6 +165,11 @@ export default function AddStockModal({
 
     if (requiresSingleQuantity(stockForm.subCategoryId) && Number(stockForm.quantity) !== 1) {
       setStockError("Quantity must be 1 for this item group.");
+      return;
+    }
+
+    if (requiresSingleQuantityForUnit(stockForm.subCategoryId, stockForm.acUnit) && Number(stockForm.quantity) !== 1) {
+      setStockError("Quantity must be 1 for Nos/Can units.");
       return;
     }
 
