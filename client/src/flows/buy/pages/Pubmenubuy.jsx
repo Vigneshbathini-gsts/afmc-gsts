@@ -20,7 +20,7 @@ function getBuyflowOverrideDetails(orderNumber, itemCode) {
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     const details = parsed?.details;
-    console.log("details", details);
+    // console.log("details", details);
     return Array.isArray(details) ? details : null;
   } catch {
     return null;

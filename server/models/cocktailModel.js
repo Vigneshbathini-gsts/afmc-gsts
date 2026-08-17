@@ -326,33 +326,50 @@ const getCocktailDetailRows = async (inventoryItemCode, connection = db) => {
       recipe.NON_MEMBER_PRICE,
       recipe.CATEGORY_ID,
       recipe.SUBCATEGORY_ID,
+
+      inventory.STATUS AS INGREDIENT_STATUS,
+
       GREATEST(
         IFNULL(stock_summary.stock_quantity, 0)
           - IFNULL(reserved_summary.reserved_quantity, 0),
         0
       ) AS AVAILABLE_STOCK_QUANTITY
+
     FROM ${DETAIL_TABLE} recipe
+
+    INNER JOIN xxafmc_inventory inventory
+      ON inventory.ITEM_CODE = recipe.ITEM_CODE
+      AND inventory.STATUS = 'ACTIVE'
+
     LEFT JOIN (
-      SELECT item_code, IFNULL(SUM(stock_quantity), 0) AS stock_quantity
+      SELECT
+        item_code,
+        IFNULL(SUM(stock_quantity), 0) AS stock_quantity
       FROM xxafmc_stock_out
       GROUP BY item_code
     ) stock_summary
       ON stock_summary.item_code = recipe.ITEM_CODE
+
     LEFT JOIN (
-      SELECT item_code, IFNULL(reserved_qty, 0) AS reserved_quantity
+      SELECT
+        item_code,
+        IFNULL(reserved_qty, 0) AS reserved_quantity
       FROM xxafmc_stock_reservation_totals
     ) reserved_summary
       ON reserved_summary.item_code = recipe.ITEM_CODE
+
     WHERE recipe.INVENTORY_ITEM_CODE = ?
+
     ORDER BY COALESCE(recipe.MOC_ID, 0), recipe.ITEM_NAME
   `;
 
   const [rows] = await connection.execute(query, [inventoryItemCode]);
+
   return rows.map((row) => {
     const pegs = row.PEGS !== null ? Number(row.PEGS) : null;
     const stockQuantity = Number(row.AVAILABLE_STOCK_QUANTITY || 0);
 
-    return ({
+    return {
       MOC_ID: row.MOC_ID,
       ITEM_CODE: row.ITEM_CODE,
       ITEM_NAME: row.ITEM_NAME,
@@ -362,6 +379,8 @@ const getCocktailDetailRows = async (inventoryItemCode, connection = db) => {
       NON_MEMBER_PRICE: row.NON_MEMBER_PRICE,
       CATEGORY_ID: row.CATEGORY_ID,
       SUBCATEGORY_ID: row.SUBCATEGORY_ID,
+      INGREDIENT_STATUS: row.INGREDIENT_STATUS,
+
       mocId: row.MOC_ID,
       itemCode: row.ITEM_CODE,
       itemName: row.ITEM_NAME,
@@ -371,15 +390,24 @@ const getCocktailDetailRows = async (inventoryItemCode, connection = db) => {
       nonMemberPrice: row.NON_MEMBER_PRICE,
       categoryId: row.CATEGORY_ID,
       subcategoryId: row.SUBCATEGORY_ID,
+
       memberPrice: Number(row.PRICE || row.NON_MEMBER_PRICE || 0),
+
       STOCK_QUANTITY: stockQuantity,
       stockQuantity,
-      STOCK_STATUS: stockQuantity >= (Number(pegs || 1)) ? "In Stock" : "Out Of Stock",
-      stockStatus: stockQuantity >= (Number(pegs || 1)) ? "In Stock" : "Out Of Stock",
-    });
+
+      STOCK_STATUS:
+        stockQuantity >= Number(pegs || 1)
+          ? "In Stock"
+          : "Out Of Stock",
+
+      stockStatus:
+        stockQuantity >= Number(pegs || 1)
+          ? "In Stock"
+          : "Out Of Stock",
+    };
   });
 };
-
 const getCocktailItemById = async (itemId) => {
   const query = `
     SELECT

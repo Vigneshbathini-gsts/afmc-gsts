@@ -1651,7 +1651,8 @@ exports.markAllNotificationsAsRead = async (req, res) => {
 exports.getCocktailDetailsById = async (req, res) => {
   try {
     const { itemId } = req.params;
-    const { orderNumber } = req.query; // You might need order number too
+    const { orderNumber } = req.query;
+    console.log(req.params, req.query);
 
     if (!itemId) {
       return res.status(400).json({
@@ -1680,19 +1681,24 @@ exports.getCocktailDetailsById = async (req, res) => {
       });
     }
 
-    // Get ingredients - based on your SQL logic
+    // Get ingredients - ONLY ACTIVE ingredients
     const [ingredients] = await pool.query(
       `
       SELECT DISTINCT 
         XCMD.ITEM_NAME,
         XCMD.ITEM_CODE,
         XCMD.PEGS,
-        COALESCE(XOD.QUANTITY, XCMD.QUANTITY) AS QUANTITY
+        COALESCE(XOD.QUANTITY, XCMD.QUANTITY) AS QUANTITY,
+        inv.STATUS AS INGREDIENT_STATUS  -- Get status from inventory
       FROM xxafmc_order_details XOD
-      JOIN xxafmc_custom_cocktails_mocktails_details XCMD ON XOD.ITEM_ID = XCMD.INVENTORY_ITEM_CODE
+      JOIN xxafmc_custom_cocktails_mocktails_details XCMD 
+        ON XOD.ITEM_ID = XCMD.INVENTORY_ITEM_CODE
+      JOIN xxafmc_inventory inv  -- JOIN WITH INVENTORY TO CHECK STATUS
+        ON inv.ITEM_CODE = XCMD.ITEM_CODE
       WHERE XOD.ORDER_ID = ?
         AND XCMD.ORDER_NUMBER = ?
         AND XCMD.INVENTORY_ITEM_CODE = ?
+        AND inv.STATUS = 'ACTIVE'  -- ONLY ACTIVE INGREDIENTS
 
       UNION
 
@@ -1700,12 +1706,17 @@ exports.getCocktailDetailsById = async (req, res) => {
         XCMD.ITEM_NAME,
         XCMD.ITEM_CODE,
         XCMD.PEGS,
-        COALESCE(XOD.QUANTITY, XCMD.QUANTITY) AS QUANTITY
+        COALESCE(XOD.QUANTITY, XCMD.QUANTITY) AS QUANTITY,
+        inv.STATUS AS INGREDIENT_STATUS
       FROM xxafmc_order_details XOD
-      JOIN xxafmc_custom_cocktails_mocktails_details_dummy XCMD ON XOD.ITEM_ID = XCMD.INVENTORY_ITEM_CODE
+      JOIN xxafmc_custom_cocktails_mocktails_details_dummy XCMD 
+        ON XOD.ITEM_ID = XCMD.INVENTORY_ITEM_CODE
+      JOIN xxafmc_inventory inv  -- JOIN WITH INVENTORY TO CHECK STATUS
+        ON inv.ITEM_CODE = XCMD.ITEM_CODE
       WHERE XOD.ORDER_ID = ?
         AND XCMD.ORDER_NUMBER = ?
         AND XCMD.INVENTORY_ITEM_CODE = ?
+        AND inv.STATUS = 'ACTIVE'  -- ONLY ACTIVE INGREDIENTS
       
       UNION
       
@@ -1713,11 +1724,16 @@ exports.getCocktailDetailsById = async (req, res) => {
         XCMD.ITEM_NAME,
         XCMD.ITEM_CODE,
         XCMD.PEGS,
-        COALESCE(XOD.QUANTITY, XCMD.QUANTITY) AS QUANTITY
+        COALESCE(XOD.QUANTITY, XCMD.QUANTITY) AS QUANTITY,
+        inv.STATUS AS INGREDIENT_STATUS
       FROM xxafmc_order_details XOD
-      JOIN xxafmc_cocktails_mocktails_details XCMD ON XOD.ITEM_ID = XCMD.INVENTORY_ITEM_CODE
+      JOIN xxafmc_cocktails_mocktails_details XCMD 
+        ON XOD.ITEM_ID = XCMD.INVENTORY_ITEM_CODE
+      JOIN xxafmc_inventory inv  -- JOIN WITH INVENTORY TO CHECK STATUS
+        ON inv.ITEM_CODE = XCMD.ITEM_CODE
       WHERE XOD.ORDER_ID = ?
         AND XCMD.INVENTORY_ITEM_CODE = ?
+        AND inv.STATUS = 'ACTIVE'  -- ONLY ACTIVE INGREDIENTS
         AND NOT EXISTS (
           SELECT 1 
           FROM xxafmc_custom_cocktails_mocktails_details X 
@@ -1731,7 +1747,7 @@ exports.getCocktailDetailsById = async (req, res) => {
     if (ingredients.length === 0) {
       return res.status(404).json({
         success: false,
-        message: "No ingredients found for this cocktail/mocktail",
+        message: "No active ingredients found for this cocktail/mocktail",
       });
     }
 
@@ -1746,7 +1762,8 @@ exports.getCocktailDetailsById = async (req, res) => {
           ITEM_CODE: ing.ITEM_CODE,
           ITEM_NAME: ing.ITEM_NAME,
           PEGS: ing.PEGS,
-          QUANTITY: ing.QUANTITY || 1
+          QUANTITY: ing.QUANTITY || 1,
+          STATUS: ing.INGREDIENT_STATUS  // Include status in response
         }))
       }
     };
@@ -1762,7 +1779,6 @@ exports.getCocktailDetailsById = async (req, res) => {
     });
   }
 };
-
 
 
 exports.getCancelledOrders = async (req, res) => {

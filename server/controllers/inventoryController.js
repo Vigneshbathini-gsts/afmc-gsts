@@ -121,13 +121,14 @@ exports.getBarTypes = async (_req, res) => {
 exports.getItemById = async (req, res) => {
   try {
     const { id } = req.params;
+    // console.log("Fetching item with ID:", id);
     if (!id) {
       return res.status(400).json({ success: false, message: "Item ID is required" });
     }
 
     // First try to get as cocktail/mocktail
     let item = await cocktailModel.getCocktailItemById(id);
-    
+    // console.log("Fetched item from cocktail model:", item);
     // If not found as cocktail, try regular inventory item
     if (!item) {
       item = await inventoryModel.getItemById(id);

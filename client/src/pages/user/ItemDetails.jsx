@@ -181,8 +181,8 @@ export default function ItemDetails() {
                 if (response.data.success) {
                     const fetchedItem = response.data.data;
                     let details = fetchedItem.details || [];
-                    console.log("inventoryAPI", details);
-                    console.log("inventoryAPIwwww", fetchedItem);
+                    // console.log("inventoryAPI", details);
+                    // console.log("inventoryAPIwwww", fetchedItem);
                     let initialQuantities = {};
 
                     if (!isEditingCartItem && Array.isArray(prefillDetails) && prefillDetails.length > 0) {
@@ -267,7 +267,7 @@ export default function ItemDetails() {
                                     isEditingCartItem ? Number(cartId) : undefined
                                 );
                                 const stockMap = stockRes?.data?.data || {};
-                                console.log("stockMap3", stockMap)
+                                // console.log("stockMap3", stockMap)
                                 details = details.map((detail, idx) => {
                                     const itemCode = Number(getDetailItemCode(detail));
                                     const stockQuantity = stockMap?.[String(itemCode)];

@@ -1456,7 +1456,6 @@ const getLovIngredients = async (subCategory) => {
 
     const normalizedSubCategory = Number(subCategory);
 
-
     const allowedSubCategories =
       normalizedSubCategory === 15
         ? [9, 6, 4, 18]
@@ -1494,6 +1493,7 @@ const getLovIngredients = async (subCategory) => {
         ON reserved_summary.item_code = xi.item_code
       WHERE xi.sub_category IN (${placeholders})
         AND xi.\`A/C_UNIT\` <> 'Glass'
+        AND xi.STATUS = 'ACTIVE'  -- ADD THIS - Only show active items
         AND GREATEST(
           GREATEST(IFNULL(xi.stock_quantity, 0), IFNULL(stock_summary.stock_quantity, 0))
             - IFNULL(reserved_summary.reserved_quantity, 0),

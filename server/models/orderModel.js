@@ -838,7 +838,7 @@ async function getOrderDetails(orderNumber) {
   `;
 
   const [rows] = await db.execute(query, [orderNumber]);
-  console.log("Order Details Query Result:", rows);
+  // console.log("Order Details Query Result:", rows);
   return rows;
 }
 
@@ -861,7 +861,7 @@ async function getOrderSummary(orderNumber) {
   `;
 
   const [rows] = await db.execute(query, [orderNumber]);
-  console.log("Order Summary Query Result:", rows);
+  // console.log("Order Summary Query Result:", rows);
   return rows[0] || null;
 }
 
