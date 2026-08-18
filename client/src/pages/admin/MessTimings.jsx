@@ -14,6 +14,7 @@ export default function MessTimings() {
   const loadData = async () => {
     try {
       const res = await messTimingsAPI.getWeeklyTimings();
+      console.log("timings",res)
       setTimings(res.data.data || []);
     } catch (err) {
       console.error(err);

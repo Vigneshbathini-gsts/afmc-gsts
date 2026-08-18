@@ -2,7 +2,7 @@ const db = require("../config/db");
 const { formatToSql, parseDate } = require("../utils/dateUtils");
 
 const TRANSACTION_LOCK = "xxafmc_items_transactions_id_lock";
-const SINGLE_QUANTITY_SUB_CATEGORIES = new Set([1, 3, 1310]);
+const SINGLE_QUANTITY_SUB_CATEGORIES = new Set([3, 1310]);
 
 const acquireNamedLock = async (connection, lockName) => {
   const [rows] = await connection.execute("SELECT GET_LOCK(?, 10) AS acquired", [lockName]);
@@ -50,6 +50,15 @@ const validateStockInItem = (item) => {
 
 const requiresSingleQuantity = (subCategory) =>
   SINGLE_QUANTITY_SUB_CATEGORIES.has(Number(subCategory));
+
+const requiresSingleQuantityForUnit = (subCategoryId, acUnit) => {
+  // Beer subcategory (1): Nos and Can require quantity=1, but Glass allows multiple
+  if (Number(subCategoryId) === 1) {
+    const unit = String(acUnit || "").trim().toUpperCase();
+    return unit === "NOS" || unit === "CAN";
+  }
+  return false;
+};
 
 const normalizeBatchPart = (value) =>
   String(value || "")
@@ -204,6 +213,12 @@ const addStockTransactions = async (payload) => {
       }
 
       if (requiresSingleQuantity(inventoryItem.sub_category) && numericQuantity !== 1) {
+        const error = new Error("INVALID_SINGLE_QUANTITY");
+        error.code = "INVALID_SINGLE_QUANTITY";
+        throw error;
+      }
+
+      if (requiresSingleQuantityForUnit(inventoryItem.sub_category, effectiveAcUnit) && numericQuantity !== 1) {
         const error = new Error("INVALID_SINGLE_QUANTITY");
         error.code = "INVALID_SINGLE_QUANTITY";
         throw error;
