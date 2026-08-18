@@ -166,7 +166,7 @@ export default function CartPage({ isAttendant = false }) {
         try {
             const response = await cartAPI.getByUserId(userId);
             const items = response.data.data || [];
-            console.log("Fetched cart items:", items);
+            // console.log("Fetched cart items:", items);
             setCartItems(items);
             setCartCount(items.length);
             // Pre-fetch cocktail details for cocktail/mocktail items

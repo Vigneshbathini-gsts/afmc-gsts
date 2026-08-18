@@ -55,7 +55,7 @@ export default function ItemDetails() {
     const fromBuyFlow = Boolean(location.state?.fromBuyFlow);
     const buyOrderNumber = location.state?.orderNumber;
     const [item, setItem] = useState(null);
-    console.log("itemss", item);
+    // console.log("itemss", item);
     // console.log("setItem", setItem);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -215,7 +215,7 @@ export default function ItemDetails() {
                     if (isEditingCartItem) {
                         try {
                             const savedResponse = await cartAPI.getCocktailDetails(cartId);
-                            console.log("Fetched saved cocktail details for cart item:", savedResponse.data);
+                            // console.log("Fetched saved cocktail details for cart item:", savedResponse.data);
                             const savedCollection = savedResponse.data?.data || {};
                             const savedIngredients = savedCollection?.ingredients || [];
                             if (savedIngredients.length > 0) {
@@ -289,6 +289,7 @@ export default function ItemDetails() {
                                         stockStatus,
                                     });
                                 });
+                                // console.log("details",details)
                             }
                         } catch (err) {
                             console.warn("Could not enrich ingredient stocks:", err);
@@ -805,12 +806,7 @@ return;
                             <p className="text-xs text-stone-500">Ingredients</p>
                             <h3 className="mt-1 text-xl font-semibold text-stone-900">{item.details?.length || 0}</h3>
                         </div>
-                        {/* <div className="rounded-xl border border-afmc-gold/20 bg-gradient-to-br from-white to-afmc-gold/5 p-3">
-                            <p className="text-xs text-stone-500">Mode</p>
-                            <h3 className="mt-1 text-xl font-semibold text-afmc-maroon">
-                                {isEditingCartItem ? "Cart Edit" : fromBuyFlow ? "Buy Flow" : "Cart"}
-                            </h3>
-                        </div> */}
+                        
                     </div>
                 </div>
 

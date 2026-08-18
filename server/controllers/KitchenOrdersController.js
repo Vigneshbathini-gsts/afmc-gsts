@@ -499,10 +499,7 @@ exports.updateBarOrderStatus = async (req, res) => {
       const sessionKey = getScanSessionKey(req, ORDERNUMBER);
       const scannedItems = req.session[sessionKey] || [];
 
-      console.log('=== COMPLETION DEBUG ===');
-      console.log('Order Number:', ORDERNUMBER);
-      console.log('Scanned Items Count:', scannedItems.length);
-      console.log('Scanned Items:', JSON.stringify(scannedItems, null, 2));
+    
 
       connection = await pool.getConnection();
       await connection.beginTransaction();
@@ -590,23 +587,14 @@ exports.updateBarOrderStatus = async (req, res) => {
           }
         }
 
-        // ============ FIX: Calculate subtotals with preparation charges ============
-        
-        // console.log('=== CALCULATING SUBTOTALS ===');
-        
-        // Step 1: Calculate ingredient totals per order line
         const lineTotals = new Map();
         scannedItems.forEach(si => {
           if (si.orderLineId) {
             const contribution = Number(si.itemPrice || 0) * Number(si.scanQuantity || 0);
             lineTotals.set(si.orderLineId, (lineTotals.get(si.orderLineId) || 0) + contribution);
-            console.log(`Line ${si.orderLineId}: Item ${si.itemCode} - ${si.scanQuantity} x ${si.itemPrice} = ${contribution}`);
           }
         });
 
-        // console.log('Line totals:', Array.from(lineTotals.entries()));
-
-        // Step 2: For each order line, add preparation charges if it's a cocktail/mocktail
         for (const [lineId, ingredientTotal] of lineTotals.entries()) {
           // Get the item details for this order line
           const [[lineInfo]] = await connection.query(
@@ -628,10 +616,8 @@ exports.updateBarOrderStatus = async (req, res) => {
           if (isCocktail) {
             // For cocktails: ingredient total + preparation charge (added once)
             finalSubtotal = ingredientTotal + prepCharge;
-            // console.log(`✅ Cocktail ${itemId} (Line ${lineId}): Ingredients total = ${ingredientTotal}, Prep charge = ${prepCharge}, Final = ${finalSubtotal}`);
           } else {
             // For regular items: just the ingredient total
-            console.log(`📦 Regular item ${itemId} (Line ${lineId}): Total = ${ingredientTotal}`);
           }
           
           // Update the order line with the correct subtotal and status
@@ -704,7 +690,6 @@ exports.updateBarOrderStatus = async (req, res) => {
       delete req.session[sessionKey];
       await saveSession(req);
       
-      console.log('✅ Order completed successfully');
     } else {
       [result] = await pool.query(
         `
@@ -897,14 +882,6 @@ exports.processBarcodeScan = async (req, res) => {
     const stockQuantity = Number(item.STOCK_QUANTITY) || 0;
     const acUnit = (item.ac_unit || "").toString().trim();
 
-    console.log('=== SCAN DEBUG ===');
-    console.log('Scanned Barcode:', BARCODE);
-    console.log('Scanned Item Code:', scanItemCode);
-    console.log('Item Name:', item.ITEM_NAME);
-    console.log('Profit from inventory:', item.PROFIT);
-    console.log('Non-member profit from inventory:', item.NON_MEMBER_PROFIT);
-    console.log('Unit Price:', item.UNIT_PRICE);
-    console.log('PEGS:', item.PEGS);
 
     // Kitchen validation
     const categoryId = Number(item.CATEGORY_ID) || 0;
@@ -957,21 +934,13 @@ exports.processBarcodeScan = async (req, res) => {
 
     const orderHeader = orderHeaderRows[0] || {};
 
-    // Determine if customer is Non-Member
-    // A customer is Non-Member if:
-    // 1. They have login_type = 'NON MEMBER' OR
-    // 2. They have role_id != 20 (assuming 20 is Member role) OR
-    // 3. They have a member_id (which means they're a non-member in the non_members table)
+    
     const isNonMember = 
       String(orderHeader.customer_login_type || "").trim().toUpperCase() === "NON MEMBER" ||
       (orderHeader.customer_role_id != null && Number(orderHeader.customer_role_id) !== 20) ||
       (orderHeader.member_id != null && orderHeader.member_id > 0);
 
-    console.log('=== CUSTOMER TYPE DEBUG ===');
-    console.log('Customer Login Type:', orderHeader.customer_login_type);
-    console.log('Customer Role ID:', orderHeader.customer_role_id);
-    console.log('Member ID:', orderHeader.member_id);
-    console.log('Is Non-Member:', isNonMember);
+
 
     // Get parent item (cocktail/mocktail item code)
     const forcedParentItem = String(PARENT_ITEM || "").trim();
@@ -986,10 +955,7 @@ exports.processBarcodeScan = async (req, res) => {
       [ORDERNUMBER, scanItemCode]
     );
 
-    console.log('Standalone rows found:', standaloneRows.length > 0 ? 'Yes' : 'No');
-    if (standaloneRows.length > 0) {
-      console.log('Standalone item_id:', standaloneRows[0].item_id);
-    }
+  
 
     if (!forcedParentItem) {
       const [possibleParentRows] = await connection.query(
@@ -1019,7 +985,6 @@ exports.processBarcodeScan = async (req, res) => {
         .map((r) => String(r.inventory_item_code || "").trim())
         .filter(Boolean);
 
-      console.log('Possible parents found:', possibleParents);
 
       if (possibleParents.length > 1 && standaloneRows.length === 0) {
         await connection.rollback();
@@ -1068,7 +1033,6 @@ exports.processBarcodeScan = async (req, res) => {
       parentItem = String(scanItemCode);
     }
 
-    console.log('Final Parent Item:', parentItem);
 
     // Fetch the order_line_id for the parent item
     let parentOrderLineId = null;
@@ -1082,7 +1046,7 @@ exports.processBarcodeScan = async (req, res) => {
       }
     }
 
-    console.log('Parent Order Line ID:', parentOrderLineId);
+    // console.log('Parent Order Line ID:', parentOrderLineId);
 
     // Get role
     const [userRows] = await connection.query(
@@ -1144,7 +1108,7 @@ exports.processBarcodeScan = async (req, res) => {
       ]);
 
     const orderedQty = Number(orderQtyRows[0]?.total_quantity || 0);
-    console.log('Ordered Quantity:', orderedQty);
+    // console.log('Ordered Quantity:', orderedQty);
 
     if (orderedQty <= 0) {
       await connection.rollback();
@@ -1230,12 +1194,7 @@ exports.processBarcodeScan = async (req, res) => {
       ? Number(item.NON_MEMBER_PROFIT) || 0 
       : Number(item.PROFIT) || 0;
 
-    console.log('=== PRICE CALCULATION DEBUG ===');
-    console.log('Customer Type:', isNonMember ? 'Non-Member' : 'Member');
-    console.log('Profit from inventory:', item.PROFIT);
-    console.log('Non-member profit from inventory:', item.NON_MEMBER_PROFIT);
-    console.log('Profit percent used:', profitPercent);
-
+   
     // Check if this is an excluded liquor item
     const itemCategoryId = Number(item.CATEGORY_ID ?? 0);
     const itemSubCategory = Number(item.SUB_CATEGORY ?? 0);
@@ -1252,11 +1211,7 @@ exports.processBarcodeScan = async (req, res) => {
       isExcludedLiquorItem ? basePrice : basePrice * (1 + profitPercent / 100)
     ).toFixed(2);
 
-    console.log('Unit Price:', unitPrice);
-    console.log('PEGS:', pegsFromStock);
-    console.log('Base Price per peg:', basePrice);
-    console.log('Is Excluded Liquor:', isExcludedLiquorItem);
-    console.log('Final Calculated Price:', calculatedPaidPrice);
+
 
     // STEP B: Check FREE ITEM
     const [freeItemRows] = await connection.query(
@@ -1441,15 +1396,7 @@ exports.processBarcodeScan = async (req, res) => {
         customerType: isNonMember ? 'NON_MEMBER' : 'MEMBER'
       };
 
-      console.log('Added scan entry:', {
-        itemCode: newEntry.itemCode,
-        itemPrice: newEntry.itemPrice,
-        scanQuantity: newEntry.scanQuantity,
-        lineTotalPrice: newEntry.lineTotalPrice,
-        orderLineId: newEntry.orderLineId,
-        parentItem: newEntry.parentItem,
-        customerType: newEntry.customerType
-      });
+  
 
       req.session[sessionKey] = req.session[sessionKey] || [];
       req.session[sessionKey].push(newEntry);
@@ -1652,7 +1599,6 @@ exports.getCocktailDetailsById = async (req, res) => {
   try {
     const { itemId } = req.params;
     const { orderNumber } = req.query;
-    console.log(req.params, req.query);
 
     if (!itemId) {
       return res.status(400).json({
@@ -1967,19 +1913,13 @@ WHERE kn.ordernumber = ?
     const lineItem = lineItems[0];
     const lineCategoryId = Number(lineItem.category_id) || categoryId;
 
-    // console.log("Single item cancel - Line item details:", {
-    //   ORDER_LINE_ID,
-    //   orderId: lineItem.order_id,
-    //   itemId: lineItem.item_id,
-    //   lineCategoryId
-    // });
-
+   
     const reservationRows = await getReservationReleaseRowsForCancel(connection, {
       orderLineId: ORDER_LINE_ID,
       categoryId: lineCategoryId,
     });
 
-    console.log("Reservation rows to release:", reservationRows);
+    // console.log("Reservation rows to release:", reservationRows);
 
     const [updateResult] = await connection.query(
       `
@@ -2253,7 +2193,7 @@ exports.getOrderDetailsByOrderNumber = async (req, res) => {
     const { orderNumber } = req.params;
     const { kitchen = "Bar" } = req.query;
     const { categoryId } = getKitchenConfig(kitchen);
-    console.log("Fetching order details for order number:", orderNumber, "and kitchen:", kitchen);
+    // console.log("Fetching order details for order number:", orderNumber, "and kitchen:", kitchen);
     if (!orderNumber) {
       return res.status(400).json({
         success: false,
@@ -2292,7 +2232,7 @@ exports.getOrderDetailsByOrderNumber = async (req, res) => {
       status: row.status ? String(row.status).replace(/^\d-/, '') : 'Received'
     }));
 
-    console.log("Fetched order details:", formattedRows.length, "items");
+    // console.log("Fetched order details:", formattedRows.length, "items");
 
     res.json({
       success: true,

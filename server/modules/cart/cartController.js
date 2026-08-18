@@ -205,6 +205,7 @@ const getCartItemById = async (req, cartId) => {
 
 const getCartItemByCode = async (req, itemCode) => {
   const userId = req.user?.userId;
+  // console.log(userId)
   if (!userId || itemCode == null) {
     return null;
   }
@@ -366,7 +367,7 @@ exports.getCocktailDetails = async (req, res) => {
   try {
     const userId = req.user?.userId;
     const { cartId } = req.params;
-
+// console.log("cartID",cartId)
     if (!userId) {
       return res.status(400).json({ success: false, message: "User ID is required" });
     }
@@ -376,8 +377,9 @@ exports.getCocktailDetails = async (req, res) => {
 
     const cartItem = await cartModel.getCartItemById(Number(cartId), userId);
     validateCocktailItemOrFail(cartItem);
-
+// console.log("cartItem",cartItem)
     const collection = await cartModel.getCartCustomization(Number(cartId), userId);
+    // console.log("collection",collection)
 
     return res.status(200).json({ success: true, data: collection });
   } catch (error) {

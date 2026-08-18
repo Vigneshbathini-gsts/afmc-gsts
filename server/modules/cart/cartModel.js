@@ -526,16 +526,30 @@ const getCartCustomization = async (cartId, userId) => {
         cc.quantity,
         cc.unit_price,
         cc.line_total,
-        c.quantity AS cart_quantity
+        c.quantity AS cart_quantity,
+        inv.STATUS AS ingredient_status  
       FROM ${CUSTOMIZATION_TABLE} cc
       INNER JOIN xxafmc_cart_items c
         ON c.cart_id = cc.cart_id
+      INNER JOIN xxafmc_inventory inv  
+        ON inv.ITEM_CODE = cc.ingredient_item_code
       WHERE cc.cart_id = ?
         AND c.user_id = ?
+        AND inv.STATUS = 'ACTIVE'  
       ORDER BY cc.id
     `,
     [cartId, userId]
   );
+
+  // If no active ingredients found, return empty
+  if (rows.length === 0) {
+    return {
+      cartId: Number(cartId),
+      cartItemQuantity: 1,
+      ingredients: [],
+      totalPrice: 0,
+    };
+  }
 
   const itemCodes = rows.map((row) => row.ingredient_item_code);
   const stockMap = await getIngredientStockQuantities(db, itemCodes);
@@ -561,8 +575,11 @@ const getCartCustomization = async (cartId, userId) => {
       lineTotal: Number(row.line_total || 0),
       stockQuantity: availableQuantity,
       stockStatus,
+      ingredientStatus: row.ingredient_status,
     };
   });
+
+  // console.log("Active ingredients:", ingredients);
 
   return {
     cartId: Number(cartId),
@@ -571,7 +588,6 @@ const getCartCustomization = async (cartId, userId) => {
     totalPrice: Number(ingredients.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0).toFixed(2)),
   };
 };
-
 const updateCartCustomization = async (cartId, userId, updates) => {
   const conn = await db.getConnection();
 
@@ -780,12 +796,7 @@ const addCartItem = async (userId, itemData) => {
       ingredientsToUse = await getDefaultCocktailIngredientRows(conn, resolvedItemCode, loginType, quantity, roleId);
     }
 
-    // For cocktails/mocktails, allow adding to cart even if ingredients are out of stock.
-    // Users can adjust ingredients later via the cart edit flow, and stock will be validated at purchase time.
-    // if (!isCocktailOrMocktail && existingCartQty + quantity + reservedQty + ingredientConsumptionQty > stockQty) {
-    //   const availableQty = Math.max(0, stockQty - reservedQty - existingCartQty - ingredientConsumptionQty);
-    //   throw createValidationError(`Out of stock. Available quantity: ${availableQty}`);
-    // }
+
 
     const pegMultiplier = getPegMultiplierForType(type);
     const requiredQty = quantity * pegMultiplier;
@@ -798,23 +809,9 @@ const addCartItem = async (userId, itemData) => {
     // 2. CHECK EXISTING CART ITEM
     // -------------------------------
     const selectedType = String(type || "").trim();
-    console.log("Selected type:", selectedType);
+    // console.log("Selected type:", selectedType);
     const cartDescription = selectedType || "NA";
 
-    // if (selectedType) {
-    //   const [differentTypeRows] = await conn.execute(
-    //     `SELECT cart_id, description FROM xxafmc_cart_items
-    //      WHERE user_id = ?
-    //        AND item_id = ?
-    //        AND price != 0
-    //        AND UPPER(IFNULL(description, '')) != UPPER(?)`,
-    //     [userId, resolvedItemCode, selectedType]
-    //   );
-
-    //   if (differentTypeRows.length > 0) {
-    //     throw createValidationError("Item already added. Visit the cart to increase the quantity.");
-    //   }
-    // }
 
     const existingSql = selectedType
       ? `SELECT cart_id, quantity FROM xxafmc_cart_items
@@ -1414,7 +1411,7 @@ const getCartItemById = async (cartId, userId) => {
      LIMIT 1`,
     [cartId, userId]
   );
-
+  // console.log("row",rows)
   return rows[0] || null;
 };
 
@@ -1440,7 +1437,6 @@ const getCartItemByCode = async (userId, itemCode) => {
      LIMIT 1`,
     [userId, itemCode]
   );
-
   return rows[0] || null;
 };
 
@@ -1633,9 +1629,9 @@ const getIngredientStockMap = async (itemCodes, excludeOrderNumber = null, userI
       return acc;
     }, {});
 
-   if (!userId || ignoreOwnCart) {
-       return baseStock;
-     }
+    if (!userId || ignoreOwnCart) {
+      return baseStock;
+    }
 
     const cartConsumptionMap = await getCartConsumptionMap(connection, userId, normalizedCodes, excludeCartId);
 

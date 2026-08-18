@@ -173,16 +173,10 @@ function resolveCocktailOutOfStock(item, override) {
   const serverSaysOOS = String(item?.stockStatus || "").trim().toLowerCase() === "out of stock"
     || String(item?.stockIssueMessage || "").trim().length > 0;
 
-  // The server recomputes stock_status live (against current DB stock/reservations,
-  // excluding this order) every time the order summary is fetched — it is NOT a
-  // stale snapshot. It is authoritative: if it says out of stock, it stays out of
-  // stock regardless of what the client-side recheck concludes.
+
   if (serverSaysOOS) return true;
 
-  // Server says in stock. The client recheck can still catch something that
-  // changed in this browsing session (e.g. ingredient quantity edited locally,
-  // not yet saved) — but it can only escalate to "out of stock", never
-  // downgrade a real server-reported issue.
+
   if (override?.hasDetails && Boolean(override.isOutOfStock)) {
     return true;
   }
@@ -1738,7 +1732,7 @@ export default function Pubmenubuy({
     }
   };
 
-  
+
 
   const handleConfirmOrder = async () => {
     // Comprehensive validation before confirming
@@ -2198,58 +2192,55 @@ export default function Pubmenubuy({
 
                           {/* Controls */}
                           {/* Controls */}
-{!item.isFreeItem ? (
-  <div className="flex items-center justify-between rounded-xl bg-stone-50 px-3 py-2">
-    <div className="flex items-center gap-1">
-      <button
-        type="button"
-        onClick={() => handleQtyClick(item, -1)}
-        aria-disabled={disableMinusButton}
-        disabled={disableMinusButton}
-        className={`rounded-md bg-white p-1.5 text-stone-700 shadow-sm transition hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-afmc-gold/40 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-50 ${
-          disableMinusButton
-            ? "opacity-50 cursor-default"
-            : "cursor-pointer"
-        }`}
-      >
-        <Minus className="h-4 w-4" />
-      </button>
+                          {!item.isFreeItem ? (
+                            <div className="flex items-center justify-between rounded-xl bg-stone-50 px-3 py-2">
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleQtyClick(item, -1)}
+                                  aria-disabled={disableMinusButton}
+                                  disabled={disableMinusButton}
+                                  className={`rounded-md bg-white p-1.5 text-stone-700 shadow-sm transition hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-afmc-gold/40 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-50 ${disableMinusButton
+                                      ? "opacity-50 cursor-default"
+                                      : "cursor-pointer"
+                                    }`}
+                                >
+                                  <Minus className="h-4 w-4" />
+                                </button>
 
-      <span className="min-w-[28px] text-center text-sm font-semibold text-stone-900">
-        {item.quantity}
-      </span>
+                                <span className="min-w-[28px] text-center text-sm font-semibold text-stone-900">
+                                  {item.quantity}
+                                </span>
 
-      <button
-        type="button"
-        onClick={() => handleQtyClick(item, 1)}
-        aria-disabled={disablePlusButton}
-        disabled={disablePlusButton}
-        className={`rounded-md bg-afmc-maroon p-1.5 text-white shadow-sm transition hover:bg-afmc-maroon2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-afmc-gold/50 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-50 ${
-          disablePlusButton
-            ? "opacity-60 cursor-default"
-            : "cursor-pointer"
-        }`}
-      >
-        <Plus className="h-4 w-4" />
-      </button>
-    </div>
+                                <button
+                                  type="button"
+                                  onClick={() => handleQtyClick(item, 1)}
+                                  aria-disabled={disablePlusButton}
+                                  disabled={disablePlusButton}
+                                  className={`rounded-md bg-afmc-maroon p-1.5 text-white shadow-sm transition hover:bg-afmc-maroon2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-afmc-gold/50 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-50 ${disablePlusButton
+                                      ? "opacity-60 cursor-default"
+                                      : "cursor-pointer"
+                                    }`}
+                                >
+                                  <Plus className="h-4 w-4" />
+                                </button>
+                              </div>
 
-    <button
-      type="button"
-      onClick={() => removeItem(item.id)}
-      disabled={disableEdit}
-      className={`rounded-md bg-red-50 p-1.5 text-red-600 transition hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-50 ${
-        disableEdit ? "opacity-50 cursor-not-allowed" : ""
-      }`}
-    >
-      <Trash2 className="h-4 w-4" />
-    </button>
-  </div>
-) : !missingCocktailIngredients ? (
-  <div className="rounded-xl bg-stone-50 px-3 py-2 text-xs font-medium text-stone-600">
-    Free item
-  </div>
-) : null}
+                              <button
+                                type="button"
+                                onClick={() => removeItem(item.id)}
+                                disabled={disableEdit}
+                                className={`rounded-md bg-red-50 p-1.5 text-red-600 transition hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-50 ${disableEdit ? "opacity-50 cursor-not-allowed" : ""
+                                  }`}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          ) : !missingCocktailIngredients ? (
+                            <div className="rounded-xl bg-stone-50 px-3 py-2 text-xs font-medium text-stone-600">
+                              Free item
+                            </div>
+                          ) : null}
                         </div>
                       </div>
                     );
