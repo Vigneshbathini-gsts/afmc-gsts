@@ -257,7 +257,7 @@ exports.getTodayStockOutDetails = async (req, res) => {
 exports.addStockOut = async (req, res) => {
   try {
     const payload = req.body?.items ? req.body.items : req.body;
-    console.log("Received payload for stock-out:", payload);
+    // console.log("Received payload for stock-out:", payload);
     const createdBy =
       req.user?.username ||
       req.user?.user_name ||
