@@ -149,47 +149,65 @@ export default function AddStockModal({
     const normalizedBarcode = String(barcodeValue || "").trim();
 
     if (!stockForm.itemCode || !stockForm.rate || !normalizedBarcode || !stockForm.transactionDate) {
-      setStockError("Item code, barcode, rate, and transaction date are required.");
+      const message = "Item code, barcode, rate, and transaction date are required.";
+      setStockError(message);
+      toast.error(message);
       return;
     }
 
     if (!Number.isFinite(Number(stockForm.rate)) || Number(stockForm.rate) <= 0) {
-      setStockError("Unit selling rate must be greater than 0.");
+      const message = "Unit selling rate must be greater than 0.";
+      setStockError(message);
+      toast.error(message);
       return;
     }
 
     if (!Number.isInteger(Number(stockForm.quantity)) || Number(stockForm.quantity) <= 0) {
-      setStockError("Quantity must be a whole number greater than 0.");
+      const message = "Quantity must be a whole number greater than 0.";
+      setStockError(message);
+      toast.error(message);
       return;
     }
 
     if (requiresSingleQuantity(stockForm.subCategoryId) && Number(stockForm.quantity) !== 1) {
-      setStockError("Quantity must be 1 for this item group.");
+      const message = "Quantity must be 1 for this item group.";
+      setStockError(message);
+      toast.error(message);
       return;
     }
 
     if (requiresSingleQuantityForUnit(stockForm.subCategoryId, stockForm.acUnit) && Number(stockForm.quantity) !== 1) {
-      setStockError("Quantity must be 1 for Nos/Can units.");
+      const message = "Quantity must be 1 for Nos/Can units.";
+      setStockError(message);
+      toast.error(message);
       return;
     }
 
     if (!stockForm.stockType) {
-      setStockError("Type is required.");
+      const message = "Type is required.";
+      setStockError(message);
+      toast.error(message);
       return;
     }
 
     if (!isValidBarcode(normalizedBarcode)) {
-      setStockError("Barcode must be 4 to 15 digits.");
+      const message = "Barcode must be 4 to 15 digits.";
+      setStockError(message);
+      toast.error(message);
       return;
     }
 
     if (requiresVolume(stockForm.acUnit) && !String(stockForm.volume || "").trim()) {
-      setStockError("Volume is required for the selected type.");
+      const message = "Volume is required for the selected type.";
+      setStockError(message);
+      toast.error(message);
       return;
     }
 
     if (stockRows.some((row) => row.barcode === normalizedBarcode)) {
-      setStockError("This barcode is already staged.");
+      const message = "This barcode is already staged.";
+      setStockError(message);
+      toast.error(message);
       return;
     }
 
@@ -199,12 +217,16 @@ export default function AddStockModal({
     try {
       const response = await inventoryAPI.checkBarcodeExists(normalizedBarcode);
       if (response.data?.exists) {
-        setStockError("This barcode already exists.");
+        const message = "This barcode already exists.";
+        setStockError(message);
+        toast.error(message);
         return;
       }
     } catch (err) {
       console.error("Failed to verify barcode:", err);
-      setStockError("Unable to verify barcode uniqueness.");
+      const message = "Unable to verify barcode uniqueness.";
+      setStockError(message);
+      toast.error(message);
       return;
     }
 
@@ -240,6 +262,7 @@ export default function AddStockModal({
 
     setShowLowerSection(true);
     setStockInfo("Stock row staged.");
+    toast.success("Stock row staged.");
     setStockForm((prev) => ({ ...prev, barcode: "" }));
   }, [generatedBatchId, nextBatchSequence, stockForm, stockRows]);
 
@@ -255,7 +278,9 @@ export default function AddStockModal({
       if (stockForm.itemCode && stockForm.rate && stockForm.transactionDate) {
         await stageStockRow(normalizedBarcode);
       } else {
-        setStockInfo("Scanned. Enter rate/date and click Add Stock to stage.");
+        const message = "Scanned. Enter rate/date and click Add Stock to stage.";
+        setStockInfo(message);
+        toast.info(message);
       }
     },
     [stageStockRow, stockForm.itemCode, stockForm.rate, stockForm.transactionDate]

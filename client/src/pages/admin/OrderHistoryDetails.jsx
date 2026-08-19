@@ -19,6 +19,15 @@ const formatDateForDisplay = (value) => {
 
 const isTotalRow = (row) => row?.status === "Total";
 
+const isFreeItemRow = (row) => {
+  if (isTotalRow(row)) return false;
+  const status = String(row?.status || "").trim().toUpperCase();
+  if (status === "CANCELLED") return false;
+  const priceValue = Number(row?.price || 0);
+  const subtotalValue = Number(row?.subtotal || 0);
+  return priceValue === 0 && subtotalValue === 0;
+};
+
 const TABS = [
   { key: "order-wise", label: "Order-wise Report" },
   { key: "item-wise", label: "Item-wise Report" },
@@ -110,11 +119,16 @@ export default function OrderHistoryDetails() {
       fileName: `admin-order-history-${activeTab}-${orderDate}.pdf`,
       subtitle: `Date: ${formatDateForDisplay(orderDate)}   User: ${username || "All"}   Payment: ${paymentStatus || "All"}`,
       headers,
-      rows: rows.map((row) =>
-        isOrderWise
+      rows: rows.map((row) => {
+        const freeItem = isFreeItemRow(row);
+        const itemNameLabel = isTotalRow(row)
+          ? "Total"
+          : `${toInitCap(row?.item_name) ?? ""}${freeItem ? " (Free item)" : ""}`;
+
+        return isOrderWise
           ? [
               isTotalRow(row) ? "" : row?.order_num ?? "",
-              isTotalRow(row) ? "Total" : toInitCap(row?.item_name) ?? "",
+              itemNameLabel,
               isTotalRow(row) ? "" : row?.type ?? "",
               isTotalRow(row) ? "" : row?.quantity ?? "",
               isTotalRow(row) ? "" : formatCurrency(row?.price),
@@ -124,7 +138,7 @@ export default function OrderHistoryDetails() {
               formatCurrency(row?.subtotal),
             ]
           : [
-              isTotalRow(row) ? "Total" : toInitCap(row?.item_name) ?? "",
+              itemNameLabel,
               isTotalRow(row) ? "" : row?.type ?? "",
               isTotalRow(row) ? "" : row?.quantity ?? "",
               isTotalRow(row) ? "" : formatCurrency(row?.price),
@@ -132,8 +146,8 @@ export default function OrderHistoryDetails() {
               formatCurrency(row?.profit),
               isTotalRow(row) ? "" : row?.status ?? "",
               formatCurrency(row?.subtotal),
-            ]
-      ),
+            ];
+      }),
     });
   };
 
@@ -224,6 +238,7 @@ export default function OrderHistoryDetails() {
                     ) : orderWiseRows.length ? (
                       orderWiseRows.map((row, index) => {
                         const totalRow = isTotalRow(row);
+                        const freeItem = isFreeItemRow(row);
                         return (
                           <tr
                             key={`${row?.order_line_id ?? "total"}-${index}`}
@@ -235,7 +250,12 @@ export default function OrderHistoryDetails() {
                           >
                             <td className="px-4 py-3">{totalRow ? "" : row?.order_num ?? ""}</td>
                             <td className="px-4 py-3">
-                              {totalRow ? "Total" : toInitCap(row?.item_name) || "NA"}
+                              <div className="flex flex-col gap-1">
+                                <span>{totalRow ? "Total" : toInitCap(row?.item_name) || "NA"}</span>
+                                {freeItem && (
+                                  <span className="text-xs font-semibold text-amber-600">Free item</span>
+                                )}
+                              </div>
                             </td>
                             <td className="px-4 py-3">{totalRow ? "" : row?.type || "NA"}</td>
                             <td className="px-4 py-3">{totalRow ? "" : row?.quantity ?? ""}</td>
@@ -286,6 +306,7 @@ export default function OrderHistoryDetails() {
                     ) : itemWiseRows.length ? (
                       itemWiseRows.map((row, index) => {
                         const totalRow = isTotalRow(row);
+                        const freeItem = isFreeItemRow(row);
                         return (
                           <tr
                             key={`${row?.item_id ?? "total"}-${index}`}
@@ -296,7 +317,12 @@ export default function OrderHistoryDetails() {
                             }`}
                           >
                             <td className="px-4 py-3">
-                              {totalRow ? "Total" : toInitCap(row?.item_name) || "NA"}
+                              <div className="flex flex-col gap-1">
+                                <span>{totalRow ? "Total" : toInitCap(row?.item_name) || "NA"}</span>
+                                {freeItem && (
+                                  <span className="text-xs font-semibold text-amber-600">Free item</span>
+                                )}
+                              </div>
                             </td>
                             <td className="px-4 py-3">{totalRow ? "" : row?.type || "NA"}</td>
                             <td className="px-4 py-3">{totalRow ? "" : row?.quantity ?? ""}</td>
