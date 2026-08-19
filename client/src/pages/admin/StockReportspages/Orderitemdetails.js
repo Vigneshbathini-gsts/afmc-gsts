@@ -48,7 +48,7 @@ const formatRowNumber = (row, keys, digits = 2) => {
 
 const formatQuantity = (value) => {
   if (!value) return "-";
-  if (String(value).toUpperCase() === "TOTAL") return "Total";
+  if (String(value).toUpperCase() === "TOTAL") return "";
   return Number(value);
 };
 
