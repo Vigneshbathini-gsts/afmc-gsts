@@ -179,7 +179,8 @@ exports.fetchOrderDetails = async (req, res) => {
   try {
     const { id, orderId } = req.params;
     const orderIdentifier = id || orderId;
-    const data = await getOrderDetails(orderIdentifier);
+    const includeCancelled = req.query.includeCancelled === "true";
+    const data = await getOrderDetails(orderIdentifier, { includeCancelled });
     res.status(200).json({
       success: true,
       data,

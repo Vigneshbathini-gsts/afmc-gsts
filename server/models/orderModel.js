@@ -724,7 +724,7 @@ ORDER BY creation_date DESC, oh.order_num DESC;
 /**
  * Get order details with subtotal including preparation charges for cocktails
  */
-async function getOrderDetails(orderNumber) {
+async function getOrderDetails(orderNumber, { includeCancelled = false } = {}) {
   const query = `
   SELECT
     od.order_line_id,
@@ -833,11 +833,11 @@ async function getOrderDetails(orderNumber) {
   ) xi
     ON xi.item_code = od.item_id
   WHERE od.order_id = ?
-    AND TRIM(UPPER(IFNULL(od.order_status, ''))) != 'CANCELLED'
+    AND (? OR TRIM(UPPER(IFNULL(od.order_status, ''))) != 'CANCELLED')
   ORDER BY od.order_line_id ASC;
   `;
 
-  const [rows] = await db.execute(query, [orderNumber]);
+  const [rows] = await db.execute(query, [orderNumber, includeCancelled]);
   // console.log("Order Details Query Result:", rows);
   return rows;
 }

@@ -375,6 +375,7 @@ export default function CancelledOrders() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         orderNumber={selectedOrderNumber}
+        includeCancelled
       />
     </div>
   );

@@ -32,7 +32,7 @@ const formatCurrency = (value) =>
     maximumFractionDigits: 2,
   });
 
-export default function OrderDetailsModal({ isOpen, onClose, orderNumber }) {
+export default function OrderDetailsModal({ isOpen, onClose, orderNumber, includeCancelled = false }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -50,7 +50,7 @@ export default function OrderDetailsModal({ isOpen, onClose, orderNumber }) {
         setLoading(true);
         setError("");
 
-        const response = await orderAPI.getOrderDetails(orderNumber);
+        const response = await orderAPI.getOrderDetails(orderNumber, { includeCancelled });
         const responseData = response.data?.data;
         const fetchedItems = Array.isArray(responseData)
           ? responseData
@@ -68,7 +68,7 @@ export default function OrderDetailsModal({ isOpen, onClose, orderNumber }) {
     };
 
     fetchOrderDetails();
-  }, [isOpen, orderNumber]);
+  }, [includeCancelled, isOpen, orderNumber]);
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 bg-black/40 z-[100] flex items-center justify-center px-4">

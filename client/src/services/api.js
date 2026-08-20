@@ -274,7 +274,7 @@ export const orderAPI = {
   create: (orderData) => api.post("/orders", orderData),
   getAll: () => api.get("/orders"),
   getById: (id) => api.get(`/orders/${id}`),
-  getOrderDetails: (id) => api.get(`/orders/${id}`),
+  getOrderDetails: (id, params) => api.get(`/orders/${id}`, { params }),
   updateStatus: (id, data) => api.put(`/orders/${id}/status`, data),
   cancelOrder: (id, data) => api.put(`/orders/${id}/cancel`, data),
 
