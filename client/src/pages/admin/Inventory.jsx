@@ -415,6 +415,18 @@ export default function Inventory() {
     [formValues.subCategory, subCategories]
   );
 
+  const isLiquorCategory = useMemo(
+    () =>
+      String(selectedAddCategory?.category_name || "").trim().toLowerCase() === "liquor",
+    [selectedAddCategory]
+  );
+
+  useEffect(() => {
+    if (isLiquorCategory && formValues.prepCharges !== "N") {
+      setFormValues((prev) => ({ ...prev, prepCharges: "N" }));
+    }
+  }, [isLiquorCategory, formValues.prepCharges]);
+
   const acUnitOptions = useMemo(() => {
     return getAllowedAcUnits(formValues.categoryId, formValues.subCategory);
   }, [formValues.categoryId, formValues.subCategory]);
@@ -470,7 +482,7 @@ export default function Inventory() {
       return;
     }
 
-    if (!formValues.prepCharges) {
+    if (!isLiquorCategory && !formValues.prepCharges) {
       setAddItemError("Preparation charges selection is required.");
       return;
     }
@@ -495,7 +507,7 @@ export default function Inventory() {
       formData.append("subCategory", formValues.subCategory);
       formData.append("acUnit", formValues.acUnit);
       formData.append("servingVolume", getServingVolume(formValues.subCategory, formValues.acUnit));
-      formData.append("prepCharges", formValues.prepCharges);
+      formData.append("prepCharges", isLiquorCategory ? "N" : formValues.prepCharges);
       formData.append("createdBy", currentLoggedInUser);
       if (formValues.image) {
         formData.append("image", formValues.image);
@@ -1268,41 +1280,43 @@ export default function Inventory() {
                 </div>
               </div>
 
-              <div className="col-span-1 sm:col-span-2 flex items-center gap-6">
-                <span className="text-sm font-medium text-gray-700">
-                  Preparation charges
-                </span>
-                <label className="flex items-center gap-2 text-sm text-gray-700">
-                  <input
-                    type="radio"
-                    name="prepCharges"
-                    value="N"
-                    checked={formValues.prepCharges === "N"}
-                    onChange={(e) =>
-                      setFormValues((prev) => ({
-                        ...prev,
-                        prepCharges: e.target.value,
-                      }))
-                    }
-                  />
-                  No
-                </label>
-                <label className="flex items-center gap-2 text-sm text-gray-700">
-                  <input
-                    type="radio"
-                    name="prepCharges"
-                    value="Y"
-                    checked={formValues.prepCharges === "Y"}
-                    onChange={(e) =>
-                      setFormValues((prev) => ({
-                        ...prev,
-                        prepCharges: e.target.value,
-                      }))
-                    }
-                  />
-                  Yes
-                </label>
-              </div>
+              {!isLiquorCategory && (
+                <div className="col-span-1 sm:col-span-2 flex items-center gap-6">
+                  <span className="text-sm font-medium text-gray-700">
+                    Preparation charges
+                  </span>
+                  <label className="flex items-center gap-2 text-sm text-gray-700">
+                    <input
+                      type="radio"
+                      name="prepCharges"
+                      value="N"
+                      checked={formValues.prepCharges === "N"}
+                      onChange={(e) =>
+                        setFormValues((prev) => ({
+                          ...prev,
+                          prepCharges: e.target.value,
+                        }))
+                      }
+                    />
+                    No
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-gray-700">
+                    <input
+                      type="radio"
+                      name="prepCharges"
+                      value="Y"
+                      checked={formValues.prepCharges === "Y"}
+                      onChange={(e) =>
+                        setFormValues((prev) => ({
+                          ...prev,
+                          prepCharges: e.target.value,
+                        }))
+                      }
+                    />
+                    Yes
+                  </label>
+                </div>
+              )}
             </div>
 
             <div className="mt-8 flex flex-row items-center justify-between gap-3">

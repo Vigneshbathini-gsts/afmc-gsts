@@ -106,6 +106,8 @@ export default function OrderTransactionUI() {
     return Number.isFinite(numberValue) ? numberValue : 0;
   };
 
+  const isFreeItem = (row) => parseNumber(row.SUBTOTAL) === 0;
+
   const handleChange = (event) => {
     const { name, value } = event.target;
     setFilters((current) => ({
@@ -268,9 +270,10 @@ export default function OrderTransactionUI() {
         "User",
         "Kitchen",
         "Item Name",
+        "Type",
         "Quantity",
         "Profit %",
-        "Total Profit",
+        "Total Profit(Amount)",
         "Preparation Charges",
         "Subtotal",
       ],
@@ -280,13 +283,15 @@ export default function OrderTransactionUI() {
           row.FIRST_NAME || "-",
           row.PUBMED_NAME || "-",
           toInitCap(stripHtml(row.ITEM_NAME) || "-"),
+          row.TYPE || row.type || "NA",
           row.QUANTITY || "-",
           row.TOTALPERCENT || "0.00",
-          row.TOTAL_PROFIT || "0.00",
+          isFreeItem(row) ? "Free Item" : row.TOTAL_PROFIT || "0.00",
           row.FOOD_PR_CHARGES || "0.00",
           row.SUBTOTAL || "0.00",
         ]),
         [
+          "",
           "",
           "",
           "",
@@ -504,10 +509,13 @@ export default function OrderTransactionUI() {
                           Item Name
                         </th>
                         <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
+                          Type
+                        </th>
+                        <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
                           Quantity
                         </th>
                         <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
-                          Total Profit
+                          Total Profit(Amount)
                         </th>
                         <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
                           Preparation Charges
@@ -520,7 +528,7 @@ export default function OrderTransactionUI() {
                     <tbody>
                       {loading ? (
                         <tr>
-                          <td colSpan="6" className="text-center py-8">
+                          <td colSpan="7" className="text-center py-8">
                             <div className="flex justify-center items-center">
                               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-afmc-maroon"></div>
                               <span className="ml-2">Loading data...</span>
@@ -529,7 +537,7 @@ export default function OrderTransactionUI() {
                         </tr>
                       ) : data.length === 0 ? (
                         <tr>
-                          <td colSpan="6" className="px-4 py-6 text-center text-gray-500">
+                          <td colSpan="7" className="px-4 py-6 text-center text-gray-500">
                             No records found for the selected criteria.
                           </td>
                         </tr>
@@ -547,10 +555,17 @@ export default function OrderTransactionUI() {
                                 {toInitCap(stripHtml(row.ITEM_NAME || "-"))}
                               </td>
                               <td className="px-4 py-3 whitespace-nowrap">
+                                {row.TYPE || row.type || "NA"}
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap">
                                 {row.QUANTITY || "-"}
                               </td>
                               <td className="px-4 py-3 whitespace-nowrap">
-                                {row.TOTAL_PROFIT || "0.00"}
+                                {isFreeItem(row) ? (
+                                  <span className="text-green-600 font-medium">Free Item</span>
+                                ) : (
+                                  row.TOTAL_PROFIT || "0.00"
+                                )}
                               </td>
                               <td className="px-4 py-3 whitespace-nowrap">
                                 {row.FOOD_PR_CHARGES || "0.00"}
@@ -563,6 +578,7 @@ export default function OrderTransactionUI() {
                           <tr className="border-t border-gray-200 bg-gray-100 font-semibold">
                             <td className="px-4 py-3 whitespace-nowrap" />
                             <td className="px-4 py-3 whitespace-nowrap">TOTAL</td>
+                            <td className="px-4 py-3 whitespace-nowrap" />
                             <td className="px-4 py-3 whitespace-nowrap" />
                             <td className="px-4 py-3 whitespace-nowrap">{formatMoney(totals.totalProfit)}</td>
                             <td className="px-4 py-3 whitespace-nowrap">{formatMoney(totals.prepCharges)}</td>

@@ -226,6 +226,7 @@ export const inventoryAPI = {
   getStockInReport: (params) => api.get("/inventory/stock-in-report", { params }),
   getStockOutReport: (params) => api.get("/inventory/stock-out-report", { params }),
   getTodayStockOutDetails: () => api.get("/inventory/today-stock-out-details"),
+  getNextBatchId: (params) => api.get("/inventory/batch-id/next", { params }),
   getStockOutItemByBarcode: (barcode) => api.get(`/inventory/stock-out/barcode/${barcode}`),
   createStockOut: (data) => api.post("/inventory/stock-out", data),
   getById: (id) => api.get(`/inventory/${id}`),
@@ -273,7 +274,7 @@ export const orderAPI = {
   create: (orderData) => api.post("/orders", orderData),
   getAll: () => api.get("/orders"),
   getById: (id) => api.get(`/orders/${id}`),
-  getOrderDetails: (id) => api.get(`/orders/${id}`),
+  getOrderDetails: (id, params) => api.get(`/orders/${id}`, { params }),
   updateStatus: (id, data) => api.put(`/orders/${id}/status`, data),
   cancelOrder: (id, data) => api.put(`/orders/${id}/cancel`, data),
 

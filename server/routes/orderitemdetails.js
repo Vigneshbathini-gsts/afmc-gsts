@@ -201,6 +201,7 @@ const getOrderItemDetails = async (req, res) => {
 
         MAX(oh.order_date) AS order_date,
         xi.item_name,
+        od.TYPE AS TYPE,
         od.TYPE AS peg_type
 
     FROM xxafmc_order_details od
@@ -245,7 +246,9 @@ const getOrderItemDetails = async (req, res) => {
         ROUND(SUM(total_profit), 2) AS total_profit,
         NULL AS unit_profit,
         NULL AS order_date,
-        NULL AS item_name
+        NULL AS item_name,
+        NULL AS TYPE,
+        NULL AS peg_type
     FROM (${baseQuery}) a
   `;
 

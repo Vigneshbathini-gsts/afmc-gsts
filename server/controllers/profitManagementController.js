@@ -132,9 +132,19 @@ exports.getPricingReport = async (req, res) => {
       SELECT 
         category_name,
         MAX(PROFIT) AS PROFIT,
-        MAX(CAST(COALESCE(FOOD_PR_CHARGES, 0) AS DECIMAL(10,2))) AS FOOD_PR_CHARGES,
+        MAX(
+          CASE
+            WHEN category_name = 'Liquor' THEN CAST(0 AS DECIMAL(10,2))
+            ELSE CAST(COALESCE(FOOD_PR_CHARGES, 0) AS DECIMAL(10,2))
+          END
+        ) AS FOOD_PR_CHARGES,
         MAX(NON_MEMBER_PROFIT) AS NON_MEMBER_PROFIT,
-        MAX(CAST(COALESCE(PR_CHARGES, 0) AS DECIMAL(10,2))) AS PR_CHARGES
+        MAX(
+          CASE
+            WHEN category_name = 'Liquor' THEN CAST(0 AS DECIMAL(10,2))
+            ELSE CAST(COALESCE(PR_CHARGES, 0) AS DECIMAL(10,2))
+          END
+        ) AS PR_CHARGES
       FROM (
         SELECT 
           CASE
