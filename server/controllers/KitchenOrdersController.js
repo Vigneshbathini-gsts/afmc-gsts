@@ -79,8 +79,8 @@ async function getReservationReleaseRowsForCancel(connection, { orderNumber, ord
   let filterSql = "";
 
   if (orderLineId) {
-    filterSql = "xod.ORDER_LINE_ID = ?";
-    params.push(orderLineId);
+    filterSql = "(xod.ORDER_LINE_ID = ? OR (xod.ORDER_ID = ? AND xod.BARCODE = ?))";
+    params.push(orderLineId, orderNumber, String(orderLineId));
   } else {
     filterSql = "xod.ORDER_ID = ? AND inv.category_id = ?";
     params.push(orderNumber, categoryId);
@@ -1909,6 +1909,7 @@ WHERE kn.ordernumber = ?
    
     const reservationRows = await getReservationReleaseRowsForCancel(connection, {
       orderLineId: ORDER_LINE_ID,
+      orderNumber: lineItem.order_id,
       categoryId: lineCategoryId,
     });
 
@@ -1918,10 +1919,10 @@ WHERE kn.ordernumber = ?
       `
       UPDATE xxafmc_order_details
       SET ORDER_STATUS = 'CANCELLED'
-      WHERE ORDER_LINE_ID = ?
+      WHERE (ORDER_LINE_ID = ? OR (ORDER_ID = ? AND BARCODE = ?))
         AND (ORDER_STATUS IS NULL OR TRIM(ORDER_STATUS) = '')
       `,
-      [ORDER_LINE_ID]
+      [ORDER_LINE_ID, lineItem.order_id, String(ORDER_LINE_ID)]
     );
 
     if (updateResult.affectedRows === 0) {
@@ -1939,9 +1940,11 @@ WHERE kn.ordernumber = ?
        SET kn.status = 'Cancelled'
        WHERE EXISTS (
          SELECT 1 FROM xxafmc_order_details od
-         WHERE od.order_line_id = ? AND od.order_id = kn.ordernumber AND od.item_id = kn.item_id
+         WHERE (od.order_line_id = ? OR (od.order_id = ? AND od.barcode = ?))
+           AND od.order_id = kn.ordernumber
+           AND od.item_id = kn.item_id
        )`,
-      [ORDER_LINE_ID]
+      [ORDER_LINE_ID, lineItem.order_id, String(ORDER_LINE_ID)]
     );
 
     await connection.commit();
