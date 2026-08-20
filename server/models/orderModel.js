@@ -61,6 +61,10 @@ const LINE_PRICE_CASE = `
   END
 `;
 
+const LINE_DISPLAY_PRICE_CASE = `
+  (${LINE_PRICE_CASE} - IFNULL(od.food_pr_charges, 0))
+`;
+
 // Per-order-line subtotal (excludes cancelled lines).
 // FIX: For cocktails (subcategory 14 or 15), subtotal already includes prep charge
 const LINE_SUBTOTAL_CASE = `
@@ -341,7 +345,7 @@ async function getOrderWiseReport({
         ${reportItemName} AS item_name,
         ${reportItemType("od.type")} AS type,
         od.quantity,
-        ROUND(${LINE_PRICE_CASE}, 2) AS price,
+        ROUND(${LINE_DISPLAY_PRICE_CASE}, 2) AS price,
         ROUND(
           CASE
             WHEN TRIM(UPPER(IFNULL(od.order_status, ''))) = 'CANCELLED' THEN 0
@@ -488,7 +492,7 @@ async function getItemWiseReport({
         ${reportItemName} AS item_name,
         ${reportItemType("od.type")} AS type,
         SUM(od.quantity) AS quantity,
-        ROUND(AVG(${LINE_PRICE_CASE}), 2) AS price,
+        ROUND(AVG(${LINE_DISPLAY_PRICE_CASE}), 2) AS price,
         ROUND(
           SUM(
             CASE
