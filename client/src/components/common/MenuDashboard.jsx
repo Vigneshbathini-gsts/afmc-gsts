@@ -484,7 +484,7 @@ function MenuPopupCompact({ item, loading, onClose, onBuy }) {
               }
             }
           } catch (err) {
-            // ignore ingredient check failures — do not hard-block
+            throw err;
           }
         } else if (Number.isFinite(itemCode) && itemCode > 0) {
           // For regular items, check available quantity (reservation-aware via API)
@@ -501,11 +501,13 @@ function MenuPopupCompact({ item, loading, onClose, onBuy }) {
               }
             }
           } catch (err) {
-            // ignore stock check failure
+            throw err;
           }
         }
       } catch (err) {
-        // ignore reservation check errors
+        const message = err?.response?.data?.message || err?.message || "Unable to verify item stock.";
+        toast.error(message);
+        return;
       }
 
       const response = await cartAPI.addItem(cartData);

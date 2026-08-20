@@ -472,7 +472,6 @@ exports.confirmOrder = async (req, res) => {
     const lockInventoryItem = async (itemCode) => {
       const normalized = Number(itemCode);
       if (!Number.isFinite(normalized) || normalized <= 0) return;
-      // Serialize confirm-order for the same item to avoid concurrent overselling.
       await connection.execute(
         `SELECT item_code FROM xxafmc_inventory WHERE item_code = ? LIMIT 1 FOR UPDATE`,
         [normalized]
@@ -482,8 +481,6 @@ exports.confirmOrder = async (req, res) => {
     const getStockQuantity = async (itemCode, categoryId = null) => {
       const normalizedCategory = categoryId == null ? null : Number(categoryId);
 
-      // For Bar items (category 10) scanning/decrement happens in `xxafmc_stock_out` (barcode buckets),
-      // so the available stock for ordering must be based on stock_out, not the inventory master total.
       if (normalizedCategory === 10) {
         const [[row]] = await connection.execute(
           `
@@ -518,7 +515,6 @@ exports.confirmOrder = async (req, res) => {
         `SELECT IFNULL(reserved_qty, 0) AS reserved_qty FROM xxafmc_stock_reservation_totals WHERE item_code = ? LIMIT 1`,
         [itemCode]
       );
-
       return Number(totalsRow?.reserved_qty || 0);
     };
 
@@ -559,7 +555,6 @@ exports.confirmOrder = async (req, res) => {
       );
 
       if (!rows.length) {
-        // Cocktail/mocktail must have ingredients; if missing, block checkout.
         const error = new Error("Cocktail/mocktail ingredients are missing");
         error.statusCode = 400;
         throw error;
@@ -593,23 +588,12 @@ exports.confirmOrder = async (req, res) => {
       for (const cartItem of cartRows) {
         const quantity = Number(cartItem.quantity || 0);
         const pegType = String(cartItem.description ?? cartItem.DESCRIPTION ?? cartItem.type ?? cartItem.TYPE ?? "").trim();
-        const stockMultiplier = pegType.toLowerCase() === "large" ? 2 : 1;
-
-        const stockQuantity = quantity * stockMultiplier;
-
-        console.log({
-  cartId: cartItem.cart_id,
-  itemId: cartItem.item_id,
-  type: cartItem.type,
-  quantity,
-  stockMultiplier,
-  stockQuantity,
-});
+        const pegMultiplier = getPegMultiplierForType(pegType);
+        const stockQuantity = quantity * pegMultiplier;
 
         // Normal Item
         if (![14, 15].includes(Number(cartItem.sub_category || 0))) {
           const itemCode = Number(cartItem.item_id);
-
           stockConsumption.set(
             itemCode,
             (stockConsumption.get(itemCode) || 0) + stockQuantity
@@ -619,21 +603,18 @@ exports.confirmOrder = async (req, res) => {
 
         // Cocktail / Mocktail
         const cartId = Number(cartItem.cart_id);
-
         const [ingredients] = await connection.execute(
           `
-      SELECT ingredient_item_code, ingredient_name, quantity
-      FROM xxafmc_cart_customization
-      WHERE cart_id = ?
-      `,
+            SELECT ingredient_item_code, ingredient_name, quantity
+            FROM xxafmc_cart_customization
+            WHERE cart_id = ?
+          `,
           [cartId]
         );
 
         for (const ingredient of ingredients) {
           const ingredientCode = Number(ingredient.ingredient_item_code);
-          const requiredQty =
-            Number(ingredient.quantity || 0) * stockQuantity;
-
+          const requiredQty = Number(ingredient.quantity || 0) * stockQuantity;
           stockConsumption.set(
             ingredientCode,
             (stockConsumption.get(ingredientCode) || 0) + requiredQty
@@ -641,13 +622,10 @@ exports.confirmOrder = async (req, res) => {
         }
       }
 
-      // Validate total consumption
       for (const [itemCode, requiredQty] of stockConsumption.entries()) {
         await lockInventoryItem(itemCode);
-
         const stockQty = await getStockQuantity(itemCode);
         const reservedQty = await getReservedInventoryQty(itemCode);
-
         const availableQty = Math.max(0, stockQty - reservedQty);
 
         if (requiredQty > availableQty) {
@@ -658,9 +636,14 @@ exports.confirmOrder = async (req, res) => {
       }
     };
 
-    
+    // Helper function to get peg multiplier (same as cart model)
+    const getPegMultiplierForType = (type) => {
+      const raw = String(type || "").trim();
+      return raw.toLowerCase() === "large" ? 2 : 1;
+    };
+
     // 1. Fetch Cart Items and join with inventory to get names and categories
-    const [cartRows] = await connection.execute(
+    const [rawCartRows] = await connection.execute(
       `SELECT
         c.*,
         xi.category_id,
@@ -677,9 +660,56 @@ exports.confirmOrder = async (req, res) => {
       [userId]
     );
 
-    if (cartRows.length === 0) {
+    if (rawCartRows.length === 0) {
       throw new Error("Cart is empty");
     }
+
+    // Defensive de-dupe: collapse duplicate free/BOGO cart rows
+    const dedupeFreeCartRows = (rows) => {
+      const freeRowKey = (row) => {
+        const itemId = row?.item_id ?? row?.ITEM_ID ?? "";
+        const parentCode = row?.parent_code ?? row?.PARENT_CODE ?? "";
+        const type = String(row?.type ?? row?.TYPE ?? "").trim().toUpperCase() || "NA";
+        return `${itemId}|${parentCode}|${type}`;
+      };
+
+      const keptFreeRowByKey = new Map();
+      const result = [];
+
+      for (const row of rows) {
+        const price = Number(row?.price ?? row?.PRICE ?? 0);
+        const total = Number(row?.total ?? row?.TOTAL ?? 0);
+        const isFreeRow = price === 0 && total === 0;
+
+        if (!isFreeRow) {
+          result.push(row);
+          continue;
+        }
+
+        const key = freeRowKey(row);
+        const existing = keptFreeRowByKey.get(key);
+
+        if (!existing) {
+          keptFreeRowByKey.set(key, row);
+          result.push(row);
+          continue;
+        }
+
+        const existingQty = Number(existing?.quantity ?? existing?.QUANTITY ?? 0);
+        const rowQty = Number(row?.quantity ?? row?.QUANTITY ?? 0);
+
+        if (rowQty > existingQty) {
+          const idx = result.indexOf(existing);
+          if (idx !== -1) result.splice(idx, 1);
+          keptFreeRowByKey.set(key, row);
+          result.push(row);
+        }
+      }
+
+      return result;
+    };
+
+    const cartRows = dedupeFreeCartRows(rawCartRows);
 
     await validateCombinedStock(cartRows);
 
@@ -764,32 +794,27 @@ exports.confirmOrder = async (req, res) => {
       return Number(row?.nextId || 1);
     };
 
-    // Map paid item_id -> quantity (used to link free lines during migration)
-    const paidQtyByItemId = new Map();
-    for (const row of cartRows) {
-      const itemId = row?.item_id ?? row?.ITEM_ID ?? null;
-      const qtyRaw = row?.quantity ?? row?.QUANTITY ?? null;
+    const typeKeyOf = (row) => {
+      const raw = String(row?.type ?? row?.TYPE ?? "").trim();
+      return (raw || "NA").toUpperCase();
+    };
+
+    const isFreeCartRow = (row) => {
       const priceRaw = row?.price ?? row?.PRICE ?? null;
       const totalRaw = row?.total ?? row?.TOTAL ?? null;
+      return Number(priceRaw ?? 0) === 0 && Number(totalRaw ?? 0) === 0;
+    };
 
-      const quantity = Number(qtyRaw ?? 0);
-      const unitPrice = Number(priceRaw ?? 0);
-      const subtotal = Number(totalRaw ?? 0);
-      const isFreeRow = unitPrice === 0 && subtotal === 0;
-      if (isFreeRow) continue;
+    const paidCartRows = cartRows.filter((row) => !isFreeCartRow(row));
+    const freeCartRows = cartRows.filter((row) => isFreeCartRow(row));
 
-      if (itemId !== null && itemId !== undefined && Number.isFinite(Number(itemId)) && Number(itemId) > 0) {
-        paidQtyByItemId.set(Number(itemId), quantity);
-      }
-    }
-
-    for (const cartItem of cartRows) {
+    // Builds the fields shared by both INSERT branches
+    const buildOrderLineFields = (cartItem) => {
       const itemId = cartItem?.item_id ?? cartItem?.ITEM_ID ?? cartItem?.itemId ?? null;
       if (itemId === null || itemId === undefined) {
         throw new Error("Cart item is missing item_id");
       }
 
-      // Cart rows come from MySQL; column keys can be uppercase (e.g. QUANTITY/PRICE/TOTAL).
       const cartQtyRaw = cartItem?.quantity ?? cartItem?.QUANTITY ?? null;
       const cartPriceRaw = cartItem?.price ?? cartItem?.PRICE ?? null;
       const cartTotalRaw = getCartLineTotal(cartItem);
@@ -797,19 +822,7 @@ exports.confirmOrder = async (req, res) => {
       const cartSubcategoryRaw =
         cartItem?.sub_category ?? cartItem?.SUB_CATEGORY ?? cartItem?.subCategory ?? cartItem?.SUBCATEGORY ?? null;
       const cartCategoryIdRaw = cartItem?.category_id ?? cartItem?.CATEGORY_ID ?? null;
-      const cartItemName = cartItem?.item_name ?? cartItem?.ITEM_NAME ?? null;
-      const stockCheckQty = Number(cartQtyRaw || 0);
 
-      const isCocktailOrMocktail = [14, 15].includes(Number(cartSubcategoryRaw || 0));
-      // if (isCocktailOrMocktail) {
-      //   const cartId = cartItem?.cart_id ?? cartItem?.CART_ID ?? null;
-      //   await validateCocktailIngredientsStock(cartId, stockCheckQty);
-      // } else {
-      //   await validateInventoryQty(itemId, stockCheckQty, cartCategoryIdRaw, cartItemName || itemId);
-      // }
-
-      // 3. Insert into Order Details (aligned to existing schema; no `description` column)
-      const orderLineId = await getNextOrderLineId();
       const quantity = Number(cartQtyRaw ?? 0);
       const rawUnitPrice = cartPriceRaw ?? null;
       const lineSubtotal = cartTotalRaw ?? null;
@@ -831,17 +844,29 @@ exports.confirmOrder = async (req, res) => {
         : isNonMember
           ? Number(cartItem.pr_charges || 0)
           : Number(cartItem.food_pr_charges || 0);
-      const parentCodeRaw = cartItem?.parent_code ?? cartItem?.PARENT_CODE ?? null;
-      const parentCode = parentCodeRaw === null || parentCodeRaw === undefined || parentCodeRaw === "" ? null : String(parentCodeRaw);
 
       const isFreeRow = Number(rawUnitPrice || 0) === 0 && Number(lineSubtotal || 0) === 0;
-      // Reserve stock on confirm: paid rows keep PRICE NULL + ORDER_STATUS NULL until kitchen scan completes.
       const unitPrice = isFreeRow ? rawUnitPrice : null;
-      const parentItemIdForFree = parentCode ? Number(parentCode) : Number.NaN;
-      const parentQtyForFree =
-        Number.isFinite(parentItemIdForFree) && paidQtyByItemId.has(parentItemIdForFree)
-          ? Number(paidQtyByItemId.get(parentItemIdForFree) || 0)
-          : quantity;
+
+      return {
+        itemId,
+        quantity,
+        unitPrice,
+        lineSubtotal,
+        subCategory,
+        profit,
+        foodPrCharges,
+        cartCategoryIdRaw,
+        cartDescriptionRaw,
+        isFreeRow,
+      };
+    };
+
+    const insertOrderDetailRow = async (cartItem, fields, { orderLineId, barcode, totalQuantity }) => {
+      const {
+        itemId, quantity, unitPrice, lineSubtotal,
+        subCategory, profit, foodPrCharges, cartCategoryIdRaw, cartDescriptionRaw,
+      } = fields;
 
       if (Number(cartCategoryIdRaw) === 10) {
         const typeName = String(cartDescriptionRaw ?? cartItem.ac_unit ?? "Nos").trim() || "Nos";
@@ -864,12 +889,12 @@ exports.confirmOrder = async (req, res) => {
             typeName,
             unitPrice,
             lineSubtotal,
-            isFreeRow ? parentQtyForFree : quantity,
+            totalQuantity,
             req.user?.username || "SYSTEM",
             subCategory,
             profit,
             foodPrCharges,
-            isFreeRow ? parentCode : null,
+            barcode,
           ]
         );
       } else {
@@ -884,20 +909,84 @@ exports.confirmOrder = async (req, res) => {
             quantity,
             unitPrice,
             lineSubtotal,
-            isFreeRow ? parentQtyForFree : quantity,
+            totalQuantity,
             req.user?.username || "SYSTEM",
             subCategory,
             profit,
             foodPrCharges,
-            isFreeRow ? parentCode : null,
+            barcode,
           ]
         );
       }
+    };
 
-      // Kitchen notifications for cart-confirm are intentionally omitted here to match
-      // the Pub menu buy-flow behavior. Notifications will be created by the
-      // dedicated buy/confirm flow (Pubmenubuy) when appropriate, which allows
-      // the order to be cancellable immediately after confirmation from the cart.
+    // Pass 1: insert every PAID line first
+    const paidLineByKey = new Map(); // "itemId|TYPEKEY" -> { orderLineId, quantity, pegMultiplier }
+
+    for (const cartItem of paidCartRows) {
+      const fields = buildOrderLineFields(cartItem);
+      const orderLineId = await getNextOrderLineId();
+
+      await insertOrderDetailRow(cartItem, fields, {
+        orderLineId,
+        barcode: null,
+        totalQuantity: fields.quantity,
+      });
+
+      const key = `${fields.itemId}|${typeKeyOf(cartItem)}`;
+      const pegMultiplier = getPegMultiplierForType(cartItem?.description ?? cartItem?.DESCRIPTION ?? '');
+      paidLineByKey.set(key, { 
+        orderLineId, 
+        quantity: fields.quantity,
+        pegMultiplier,
+        cartItem // Store the original cart item for later reference
+      });
+    }
+
+    // Pass 2: insert every FREE line with PEG MULTIPLIER applied
+    for (const cartItem of freeCartRows) {
+      const fields = buildOrderLineFields(cartItem);
+      const parentCodeRaw = cartItem?.parent_code ?? cartItem?.PARENT_CODE ?? null;
+      const hasParentCode = parentCodeRaw !== null && parentCodeRaw !== undefined && parentCodeRaw !== "";
+      const parentItemId = hasParentCode ? Number(parentCodeRaw) : fields.itemId;
+      const parentKey = `${parentItemId}|${typeKeyOf(cartItem)}`;
+      const parentLine = paidLineByKey.get(parentKey);
+
+      if (!parentLine) {
+        console.error(
+          `Skipping free/BOGO cart row for order ${orderNumber}: no matching paid line found for parent key ${parentKey} (item_id ${fields.itemId})`
+        );
+        continue;
+      }
+
+      // CRITICAL FIX: Apply peg multiplier to free item quantity!
+      // The free item quantity in the cart is the BASE quantity.
+      // For Large items, it needs to be multiplied by 2.
+      const pegMultiplier = parentLine.pegMultiplier || 1;
+      const freeQuantity = fields.quantity * pegMultiplier;
+
+      console.log(`[CONFIRM-ORDER] Free item ${fields.itemId} (parent type multiplier: ${pegMultiplier}):`, {
+        cartQuantity: fields.quantity,
+        pegMultiplier,
+        freeQuantity,
+        parentLineId: parentLine.orderLineId
+      });
+
+      const orderLineId = await getNextOrderLineId();
+      
+      // Update fields with peg-multiplied quantity
+      const freeFields = {
+        ...fields,
+        quantity: freeQuantity,
+        lineSubtotal: 0, // Free items have zero subtotal
+        unitPrice: 0,
+      };
+
+      await insertOrderDetailRow(cartItem, freeFields, {
+        orderLineId,
+        barcode: String(parentLine.orderLineId),
+        totalQuantity: parentLine.quantity,
+      });
     }
 
     // 4. Migrate Customizations from cart to order
@@ -934,7 +1023,7 @@ exports.confirmOrder = async (req, res) => {
     );
     await connection.execute("DELETE FROM xxafmc_cart_items WHERE user_id = ?", [userId]);
 
-    // Recompute order_total from order_details to ensure food/pr charges are included
+    // Recompute order_total from order_details
     try {
       const [totalRows] = await connection.execute(
         `SELECT COALESCE(ROUND(SUM(IFNULL(subtotal, 0) + IFNULL(food_pr_charges, 0) * IFNULL(quantity, 0)), 2), 0) AS computed_total FROM xxafmc_order_details WHERE order_id = ?`,
@@ -944,6 +1033,43 @@ exports.confirmOrder = async (req, res) => {
       await connection.execute(`UPDATE xxafmc_order_header SET order_total = ? WHERE order_num = ?`, [computedTotal, orderNumber]);
     } catch (e) {
       console.error('Failed to recompute order_total for order', orderNumber, e);
+    }
+
+    // 6. RESERVE STOCK for confirmed order
+    try {
+      // Get all order lines (both paid and free)
+      const [orderLines] = await connection.execute(
+        `
+          SELECT item_id, quantity, type, price, subtotal
+          FROM xxafmc_order_details
+          WHERE order_id = ?
+        `,
+        [orderNumber]
+      );
+
+      console.log(`[CONFIRM-ORDER] Reserving stock for order ${orderNumber}:`, orderLines);
+
+      for (const line of orderLines) {
+        const itemCode = Number(line.item_id);
+        const isFreeRow = Number(line.price || 0) === 0 && Number(line.subtotal || 0) === 0;
+        // Free rows are already peg-weighted from the fix above
+        // Paid rows need the peg multiplier applied
+        const pegMultiplier = getPegMultiplierForType(line.type || '');
+        const quantity = isFreeRow 
+          ? Number(line.quantity || 0) // Already peg-weighted
+          : Number(line.quantity || 0) * pegMultiplier;
+        
+        if (!Number.isFinite(itemCode) || itemCode <= 0 || !Number.isFinite(quantity) || quantity <= 0) {
+          continue;
+        }
+
+        console.log(`[CONFIRM-ORDER] Reserving ${quantity} units for item ${itemCode} (${isFreeRow ? 'free' : 'paid'})`);
+        await reserveInventoryQty(connection, itemCode, quantity);
+      }
+    } catch (stockError) {
+      console.error('Error reserving stock:', stockError);
+      // Don't throw - we want the order to complete even if stock reservation fails
+      // The order is already created, just log the error
     }
 
     await connection.commit();

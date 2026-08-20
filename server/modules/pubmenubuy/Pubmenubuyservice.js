@@ -16,8 +16,8 @@ const updateOrderItemQuantity = async (orderNumber, itemCode, delta, authUser) =
   return Pubmenubuymodel.updateOrderItemQuantity(orderNumber, itemCode, delta, authUser);
 };
 
-const deleteOrderItem = async (orderNumber, itemCode) => {
-  return Pubmenubuymodel.deleteOrderItem(orderNumber, itemCode);
+const deleteOrderItem = async (orderNumber, itemCode, orderLineId = null) => {
+  return Pubmenubuymodel.deleteOrderItem(orderNumber, itemCode, orderLineId);
 };
 
 const updateOrderLineQuantity = async (orderNumber, orderLineId, userId, quantity) => {

@@ -28,6 +28,7 @@ exports.getPubMenuOrderSummary = async (req, res) => {
     }
 
     const data = await Pubmenubuyservice.getOrderSummary(ORDER_NUMBER);
+    // console.log("getPubMenuOrderSummary", { ORDER_NUMBER, header: data.header, items: data.items });
     return res.status(200).json({
       success: true,
       message: "Order summary fetched successfully",
@@ -70,6 +71,7 @@ exports.cancelPubMenuOrder = async (req, res) => {
 exports.updatePubMenuOrderItemQuantity = async (req, res) => {
   try {
     const { ORDER_NUMBER, ITEM_CODE } = req.params;
+    const { orderLineId } = req.query || {};
     const { delta } = req.body || {};
 
     if (!ORDER_NUMBER || !ITEM_CODE) {
@@ -103,6 +105,7 @@ exports.updatePubMenuOrderItemQuantity = async (req, res) => {
 exports.deletePubMenuOrderItem = async (req, res) => {
   try {
     const { ORDER_NUMBER, ITEM_CODE } = req.params;
+    const { orderLineId } = req.query || {};
 
     if (!ORDER_NUMBER || !ITEM_CODE) {
       return res.status(400).json({
@@ -111,7 +114,7 @@ exports.deletePubMenuOrderItem = async (req, res) => {
       });
     }
 
-    const data = await Pubmenubuyservice.deleteOrderItem(ORDER_NUMBER, ITEM_CODE);
+    const data = await Pubmenubuyservice.deleteOrderItem(ORDER_NUMBER, ITEM_CODE, orderLineId);
 
     return res.status(200).json({
       success: true,

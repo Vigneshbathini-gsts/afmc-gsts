@@ -294,6 +294,7 @@ async function syncOfferFreeItemsForOrder(connection, orderNumber, createdBy) {
         od.quantity,
         od.subcategory,
         od.created_by,
+        COALESCE(NULLIF(TRIM(od.type), ''), xi.description) AS description,
         xi.sub_category
       FROM xxafmc_order_details od
       JOIN xxafmc_inventory xi
@@ -342,9 +343,11 @@ async function syncOfferFreeItemsForOrder(connection, orderNumber, createdBy) {
     if (!Number.isFinite(parentCode) || parentCode <= 0) continue;
     if ([14, 15].includes(Number(parent.sub_category ?? parent.subcategory))) continue;
 
+    const pegMultiplier = getPegReservationMultiplier(parent.description);
+    const effectiveQuantity = Number(parent.quantity || 0) * pegMultiplier;
     const offer = pickBestOfferForQuantity(
       offersByItemCode.get(parentCode) || [],
-      Number(parent.quantity || 0)
+      effectiveQuantity
     );
 
     if (!offer) {
@@ -364,20 +367,26 @@ async function syncOfferFreeItemsForOrder(connection, orderNumber, createdBy) {
     const offerQty = Number(offer.offer_quantity || 0);
     const freeQty = Number(offer.free_item_quantity || 0);
     const freeItemCode = Number(offer.free_item_code || 0);
-    const computedFreeQty = offerQty > 0 ? Math.floor(Number(parent.quantity || 0) / offerQty) * freeQty : 0;
+    const computedFreeQty = offerQty > 0 ? Math.floor(effectiveQuantity / offerQty) * freeQty : 0;
 
     const [freeRows] = await connection.execute(
       `
-        SELECT order_line_id, quantity
+        SELECT order_line_id, quantity, barcode
         FROM xxafmc_order_details
         WHERE order_id = ?
           AND item_id = ?
-          AND barcode = ?
+            AND (barcode = ? OR barcode = ?)
           AND IFNULL(price, 0) = 0
           AND IFNULL(subtotal, 0) = 0
-        ORDER BY order_line_id ASC
+        ORDER BY (barcode = ?) DESC, order_line_id ASC
       `,
-      [orderNumber, freeItemCode, String(parentCode)]
+        [
+          orderNumber,
+          freeItemCode,
+          String(parent.order_line_id),
+          String(parentCode),
+          String(parent.order_line_id),
+        ]
     );
 
     const canonicalFreeRow = freeRows[0] || null;
@@ -451,7 +460,7 @@ async function syncOfferFreeItemsForOrder(connection, orderNumber, createdBy) {
         Number(parent.quantity || 0),
         parent.created_by || createdBy,
         freeInventoryRow?.sub_category ?? parent.subcategory ?? null,
-        String(parentCode),
+        String(parent.order_line_id),
       ]
     );
   }

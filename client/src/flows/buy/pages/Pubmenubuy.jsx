@@ -351,6 +351,97 @@ function buildAvailableStockByCode(items = []) {
   return availableByCode;
 }
 
+function getLinkedFreeItems(items, parentItem) {
+  const parentLineId = String(parentItem?.orderLineId ?? parentItem?.id ?? "").trim();
+  const parentCode = String(parentItem?.item_code || "").trim();
+  const lineLinkedItems = parentLineId
+    ? items.filter(
+      (item) => item?.isFreeItem && String(item?.parentCode || "").trim() === parentLineId
+    )
+    : [];
+
+  if (lineLinkedItems.length > 0) {
+    return lineLinkedItems;
+  }
+
+  return parentCode
+    ? items.filter(
+      (item) => item?.isFreeItem && String(item?.parentCode || "").trim() === parentCode
+    )
+    : [];
+}
+
+function buildPubStockConsumptionMap(items = [], { getCocktailDetails = null } = {}) {
+  const consumption = new Map();
+  const debugRows = [];
+
+  for (const item of Array.isArray(items) ? items : []) {
+    if (!item) continue;
+
+    const quantity = Number(item.quantity || 0);
+    if (!Number.isFinite(quantity) || quantity <= 0) continue;
+
+    const itemCode = Number(item.itemId ?? item.item_id ?? item.item_code ?? item.ITEM_CODE ?? 0);
+    if (!Number.isFinite(itemCode) || itemCode <= 0) continue;
+
+    if (item.isFreeItem) {
+      consumption.set(String(itemCode), (consumption.get(String(itemCode)) || 0) + quantity);
+      debugRows.push({
+        kind: "free",
+        lineId: item.orderLineId ?? item.id,
+        itemCode,
+        quantity,
+        required: quantity,
+        type: item.type || item.description || null,
+      });
+      continue;
+    }
+
+    if (isCocktailOrMocktail(item)) {
+      const details = typeof getCocktailDetails === "function" ? getCocktailDetails(item) : [];
+      const multiplier = getItemPegMultiplier(item);
+      for (const detail of Array.isArray(details) ? details : []) {
+        const ingredientCode = Number(detail?.ITEM_CODE ?? detail?.itemCode ?? 0);
+        const pegs = Number(detail?.PEGS ?? detail?.pegs ?? detail?.QUANTITY ?? detail?.quantity ?? 0);
+        if (!Number.isFinite(ingredientCode) || ingredientCode <= 0 || !Number.isFinite(pegs) || pegs <= 0) continue;
+        const required = pegs * quantity * multiplier;
+        consumption.set(String(ingredientCode), (consumption.get(String(ingredientCode)) || 0) + required);
+        debugRows.push({
+          kind: "cocktail-ingredient",
+          parentLineId: item.orderLineId ?? item.id,
+          parentCode: itemCode,
+          ingredientCode,
+          pegs,
+          quantity,
+          multiplier,
+          required,
+        });
+      }
+      continue;
+    }
+
+    const multiplier = getItemPegMultiplier(item);
+    const required = quantity * multiplier;
+    consumption.set(String(itemCode), (consumption.get(String(itemCode)) || 0) + required);
+    debugRows.push({
+      kind: "paid",
+      lineId: item.orderLineId ?? item.id,
+      itemCode,
+      quantity,
+      multiplier,
+      required,
+      type: item.type || item.description || null,
+    });
+  }
+
+  console.log("[PUB-BUY][consumption-map]", {
+    rows: debugRows,
+    totals: Object.fromEntries(consumption),
+  });
+
+  return consumption;
+}
+
 function ActionButton({ children, className = "", ...props }) {
   return (
     <button
@@ -512,7 +603,7 @@ export default function Pubmenubuy({
         const stockCodes = [...new Set([...currentConsumption.keys()])]
           .filter((code) => Number.isFinite(Number(code)) && Number(code) > 0);
 
-        const stockRes = await cartAPI.getIngredientStocks(stockCodes, undefined, undefined, undefined, true);
+        const stockRes = await cartAPI.getIngredientStocks(stockCodes, orderNumber);
         const stockMap = stockRes?.data?.data || {};
 
         const next = {};
@@ -715,10 +806,10 @@ export default function Pubmenubuy({
       return row;
     });
 
-    const projectedConsumption = buildStockConsumptionMap(projectedItems, {
+    const projectedConsumption = buildPubStockConsumptionMap(projectedItems, {
       getCocktailDetails: getCocktailDetailsForStockCheck,
     });
-    const targetUnitConsumption = buildStockConsumptionMap([{ ...targetItem, quantity: 1 }], {
+    const targetUnitConsumption = buildPubStockConsumptionMap([{ ...targetItem, quantity: 1 }], {
       getCocktailDetails: getCocktailDetailsForStockCheck,
     });
     const targetIngredientNameByCode = new Map(
@@ -732,7 +823,7 @@ export default function Pubmenubuy({
     );
     const normalAvailableByCode = buildAvailableStockByCode(projectedItems);
 
-    const codes = [...new Set([...targetUnitConsumption.keys()])]
+    const codes = [...new Set([...projectedConsumption.keys()])]
       .filter((code) => Number.isFinite(Number(code)) && Number(code) > 0);
 
     if (codes.length === 0) {
@@ -740,18 +831,40 @@ export default function Pubmenubuy({
     }
 
     try {
-      const stockRes = await cartAPI.getIngredientStocks(codes, undefined, undefined, undefined, true);
+      const stockRes = await cartAPI.getIngredientStocks(codes, orderNumber);
       const stockMap = stockRes?.data?.data || {};
+
+      console.log("[PUB-BUY][combined-check]", {
+        orderNumber,
+        target: {
+          lineId: targetLineId,
+          itemCode: targetItem.item_code,
+          currentQty,
+          nextQtyCandidate,
+          type: getItemType(targetItem),
+        },
+        projectedItems: projectedItems.map((item) => ({
+          lineId: item.orderLineId ?? item.id,
+          itemCode: item.item_code,
+          quantity: item.quantity,
+          type: getItemType(item),
+          isFreeItem: Boolean(item.isFreeItem),
+          parentCode: item.parentCode,
+        })),
+        projectedConsumption: Object.fromEntries(projectedConsumption),
+        targetUnitConsumption: Object.fromEntries(targetUnitConsumption),
+        stockResponse: stockMap,
+        summaryAvailable: Object.fromEntries(normalAvailableByCode),
+      });
 
       for (const code of codes) {
         const projectedRequired = Number(projectedConsumption.get(code) || 0);
         const targetRequiredPerUnit = Number(targetUnitConsumption.get(code) || 0);
-        if (!Number.isFinite(targetRequiredPerUnit) || targetRequiredPerUnit <= 0) {
-          continue;
-        }
 
         const normalAvailable = normalAvailableByCode.get(String(code));
-        const availableRaw = normalAvailable ?? stockMap[String(code)];
+        // Prefer the fresh stock response, which excludes this order's existing
+        // reservation. The summary value can be stale after another line changes.
+        const availableRaw = stockMap[String(code)] ?? normalAvailable;
         if (availableRaw === undefined || availableRaw === null || availableRaw === "") {
           continue;
         }
@@ -762,6 +875,20 @@ export default function Pubmenubuy({
         }
 
         if (projectedRequired > availableApi) {
+          console.warn("[PUB-BUY][combined-check][BLOCK]", {
+            code,
+            projectedRequired,
+            availableApi,
+            targetRequiredPerUnit,
+            otherRequired: Math.max(0, projectedRequired - (targetRequiredPerUnit * nextQuantity)),
+          });
+          if (!Number.isFinite(targetRequiredPerUnit) || targetRequiredPerUnit <= 0) {
+            return {
+              ok: false,
+              message: `Out of stock. Available quantity: ${availableApi}`,
+            };
+          }
+
           const otherRequired = Math.max(0, projectedRequired - (targetRequiredPerUnit * nextQuantity));
           const adjustedAvailable = Math.max(0, Math.floor((availableApi - otherRequired) / targetRequiredPerUnit));
           const ingredientName = targetIngredientNameByCode.get(String(code));
@@ -775,6 +902,7 @@ export default function Pubmenubuy({
           };
         }
       }
+      console.log("[PUB-BUY][combined-check][ALLOW]", { orderNumber, codes });
     } catch (err) {
       console.warn("Could not validate combined stock demand:", err);
     }
@@ -935,7 +1063,7 @@ export default function Pubmenubuy({
 
     const parents = cleanedItems.filter((row) => !row?.isFreeItem);
     const children = cleanedItems.filter((row) => row?.isFreeItem);
-    const hasChildForParent = new Set(
+    const hasChildForParentLine = new Set(
       children
         .map((row) => String(row?.parentCode || "").trim())
         .filter(Boolean)
@@ -945,20 +1073,28 @@ export default function Pubmenubuy({
 
     for (const parent of parents) {
       const parentCode = String(parent?.item_code || "").trim();
+      const parentLineId = String(parent?.orderLineId ?? parent?.id ?? "").trim();
 
       if (!parentCode) continue;
 
       const expectedFreeQty = calculateFreeQuantity(
         parent?.quantity,
         parent?.offer_quantity,
-        parent?.free_item_quantity
+        parent?.free_item_quantity,
+        getItemPegMultiplier(parent)
       );
 
       if (expectedFreeQty <= 0) {
         continue;
       }
 
-      if (hasChildForParent.has(parentCode)) {
+      // Persisted free rows point to their paid row through barcode/order_line_id.
+      // Only use the item-code fallback for legacy rows without a line id.
+      const hasPersistedChild = parentLineId
+        ? hasChildForParentLine.has(parentLineId)
+        : children.some((row) => String(row?.parentCode || "").trim() === parentCode);
+
+      if (hasPersistedChild) {
         continue;
       }
 
@@ -1027,8 +1163,8 @@ export default function Pubmenubuy({
     );
   }, []);
 
-  const calculateFreeQuantity = (paidQuantity, offerQuantity, freeItemQuantity) => {
-    const paid = Number(paidQuantity || 0);
+  const calculateFreeQuantity = (paidQuantity, offerQuantity, freeItemQuantity, pegMultiplier = 1) => {
+    const paid = Number(paidQuantity || 0) * Number(pegMultiplier || 1);
     if (!Number.isFinite(paid) || paid <= 0) return 0;
 
     const offerQty = Number(offerQuantity);
@@ -1058,7 +1194,7 @@ export default function Pubmenubuy({
         const response = await Pubmenubuyservice.getByOrderNumber(orderNumber);
         const data = response?.data?.data || {};
         const rows = Array.isArray(data?.items) ? data.items : [];
-        // console.log("[getByOrderNumberssssss] FETCH RESPONSE", response.data);
+        console.log("[getByOrderNumberssssss] FETCH RESPONSE", response.data);
         if (!ignore) {
           setOrderHeader(data?.header || null);
           const normalized = rows.map((item, index) => normalizeItem(item, index));
@@ -1142,6 +1278,7 @@ export default function Pubmenubuy({
       const refreshed = await Pubmenubuyservice.getByOrderNumber(orderNumber);
       const refreshedData = refreshed?.data?.data || {};
       const refreshedRows = Array.isArray(refreshedData?.items) ? refreshedData.items : [];
+      // console.log("[refreshOrderSummary] REFRESH RESPONSE", refreshed.data);
       setOrderHeader(refreshedData?.header || null);
       const normalized = refreshedRows.map((item, index) => normalizeItem(item, index));
       setItems(ensureOfferFreeRows(normalized));
@@ -1228,14 +1365,11 @@ export default function Pubmenubuy({
       const expectedFreeQty = calculateFreeQuantity(
         nextQtyCandidate,
         targetItem.offer_quantity,
-        targetItem.free_item_quantity);
+        targetItem.free_item_quantity,
+        getItemPegMultiplier(targetItem));
 
       const targetCode = String(targetItem.item_code || "").trim();
-      const linkedFreeItems = targetCode
-        ? current.filter(
-          (item) => item.isFreeItem && String(item.parentCode || "").trim() === targetCode
-        )
-        : [];
+      const linkedFreeItems = getLinkedFreeItems(current, targetItem);
 
       let freeAvailableQty = null;
       for (const freeItem of linkedFreeItems) {
@@ -1293,10 +1427,7 @@ export default function Pubmenubuy({
             };
           }
 
-          if (
-            item.isFreeItem &&
-            String(item.parentCode || "").trim() === targetCode
-          ) {
+          if (linkedFreeItems.includes(item)) {
             if (expectedFreeQty <= 0) {
               return null;
             }
@@ -1433,7 +1564,7 @@ export default function Pubmenubuy({
 
     try {
       const codes = [...new Set(ingredients.map((ing) => ing.itemCode))];
-      const stockRes = await cartAPI.getIngredientStocks(codes, undefined, undefined, undefined, true);
+      const stockRes = await cartAPI.getIngredientStocks(codes, orderNumber);
       const stockMap = stockRes?.data?.data || {};
 
       for (const ing of ingredients) {
@@ -1495,6 +1626,25 @@ export default function Pubmenubuy({
 
       const nextQtyCandidate = currentQty + delta;
 
+      console.log("[PUB-BUY][quantity-click]", {
+        orderNumber,
+        lineId,
+        itemCode: liveItem?.item_code,
+        currentQty,
+        delta,
+        nextQtyCandidate,
+        type: getItemType(liveItem),
+        isFreeItem: Boolean(liveItem?.isFreeItem),
+        allItems: items.map((row) => ({
+          lineId: row.orderLineId ?? row.id,
+          itemCode: row.item_code,
+          quantity: row.quantity,
+          type: getItemType(row),
+          isFreeItem: Boolean(row.isFreeItem),
+          parentCode: row.parentCode,
+        })),
+      });
+
       if (delta > 0) {
         if (isCocktailOrMocktail(liveItem)) {
           const validation = await validateCocktailNextQuantity(liveItem, nextQtyCandidate);
@@ -1550,14 +1700,13 @@ export default function Pubmenubuy({
       const expectedFreeQty = calculateFreeQuantity(
         nextQtyCandidate,
         liveItem?.offer_quantity,
-        liveItem?.free_item_quantity
+        liveItem?.free_item_quantity,
+        getItemPegMultiplier(liveItem)
       );
 
       const parentCode = String(liveItem?.item_code || "").trim();
       if (parentCode && expectedFreeQty > 0) {
-        const linkedFreeItems = items.filter(
-          (row) => row?.isFreeItem && String(row?.parentCode || "").trim() === parentCode
-        );
+        const linkedFreeItems = getLinkedFreeItems(items, liveItem);
 
         let freeAvailableQty = null;
         for (const freeItem of linkedFreeItems) {
@@ -1605,6 +1754,11 @@ export default function Pubmenubuy({
       }
 
       await adjustQuantity(lineId, delta);
+      console.log("[PUB-BUY][quantity-click][API-COMPLETE]", {
+        orderNumber,
+        lineId,
+        delta,
+      });
     } finally {
       setUpdatingLineId(null);
     }
@@ -1640,6 +1794,7 @@ export default function Pubmenubuy({
     }
 
     const targetCode = String(target.item_code || "").trim();
+    const targetLineId = Number(target.orderLineId ?? target.id);
     if (!orderNumber || !targetCode) {
       showToast("Unable to delete this order item.", "error");
       return;
@@ -1648,11 +1803,12 @@ export default function Pubmenubuy({
     try {
       setUpdatingLineId(Number(target.orderLineId ?? target.id) || null);
       setError("");
-      await Pubmenubuyservice.deleteItem(orderNumber, targetCode);
+      await Pubmenubuyservice.deleteItem(orderNumber, targetCode, targetLineId);
 
+      const linkedFreeItems = getLinkedFreeItems(items, target);
       const updatedItems = items.filter((item) => {
         if (Number(item.id) === Number(id)) return false;
-        return String(item.parentCode || "") !== targetCode;
+        return !linkedFreeItems.includes(item);
       });
 
       setItems(updatedItems);
@@ -1854,6 +2010,20 @@ export default function Pubmenubuy({
       const payload = {};
       if (cocktailCustomizations.length > 0) payload.cocktailCustomizations = cocktailCustomizations;
       if (validItems.length > 0) payload.items = validItems;
+
+      console.log("[PUB-BUY][confirm-payload]", {
+        orderNumber,
+        visibleItems: confirmedItems.map((item) => ({
+          lineId: item.orderLineId ?? item.id,
+          itemCode: item.item_code,
+          quantity: item.quantity,
+          type: getItemType(item),
+          isFreeItem: Boolean(item.isFreeItem),
+          parentCode: item.parentCode,
+        })),
+        validItems,
+        cocktailCustomizations,
+      });
 
       await ConfirmOrderservice.confirmOrder(orderNumber, payload);
 

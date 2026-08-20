@@ -18,6 +18,18 @@ const getPegMultiplierForType = (type) => {
   return getPegTypeValue(type).toLowerCase() === "large" ? 2 : 1;
 };
 
+// Canonical key used ONLY for the TYPE column when storing/looking up a
+// cart row's paid or free-item counterpart. Trims + uppercases so "Small",
+// " small", and "SMALL " all resolve to the same key, and blank/undefined
+// always resolves to the same "NA" sentinel. This must be the ONLY place
+// that decides the TYPE-column value so add/update/delete never disagree
+// on what an empty type normalizes to (that mismatch was the cause of
+// duplicate "Free Item (BOGO)" rows for the same item/type).
+const normalizeCartTypeKey = (type) => {
+  const raw = String(type ?? "").trim();
+  return (raw || "NA").toUpperCase();
+};
+
 const getEffectiveAvailableQuantityForType = (rawAvailableQty, type) => {
   const rawQty = Number(rawAvailableQty);
   if (!Number.isFinite(rawQty) || rawQty <= 0) return 0;
@@ -28,10 +40,13 @@ const getEffectiveAvailableQuantityForType = (rawAvailableQty, type) => {
 // Sums quantity * pegMultiplier across all cart rows for this item (optionally excluding one cart_id).
 // This makes stock checks type-aware: a Large row consumes 2x the pegs of an equal-quantity Small row.
 const getCartPegWeightedQuantity = async (conn, userId, itemCode, excludeCartId = null) => {
-  let query = `SELECT quantity, description, type FROM xxafmc_cart_items
+  // NOTE: intentionally NOT filtering by price != 0 here. Free/BOGO rows of this
+  // same item (e.g. free Gilded Frost from a BOGO offer) still occupy physical
+  // stock and must count toward consumption, or stock checks will overstate
+  // what's actually available.
+  let query = `SELECT quantity, description, type, price FROM xxafmc_cart_items
      WHERE user_id = ?
-       AND item_id = ?
-       AND price != 0`;
+       AND item_id = ?`;
   const params = [userId, itemCode];
 
   if (excludeCartId != null && !Number.isNaN(Number(excludeCartId))) {
@@ -40,10 +55,17 @@ const getCartPegWeightedQuantity = async (conn, userId, itemCode, excludeCartId 
   }
 
   const [rows] = await conn.execute(query, params);
-  return rows.reduce(
-    (sum, row) => sum + Number(row.quantity || 0) * getPegMultiplierForType(row.type),
-    0
-  );
+  return rows.reduce((sum, row) => {
+    const qty = Number(row.quantity || 0);
+    // Free/BOGO rows (price = 0) already store their quantity in peg-weighted
+    // UNITS (see addCartItem/updateCartItemQuantity: totalFreeUnits is computed
+    // in units before being saved), so applying the peg multiplier again here
+    // would double-count them. Only paid rows store a raw item count that still
+    // needs the multiplier applied.
+    const isFreeRow = Number(row.price) === 0;
+    const multiplier = isFreeRow ? 1 : getPegMultiplierForType(row.type);
+    return sum + qty * multiplier;
+  }, 0);
 };
 const getStockQuantity = async (conn, itemCode, categoryId = null) => {
   const normalizedCategory = categoryId == null ? null : Number(categoryId);
@@ -219,12 +241,14 @@ const getCartConsumptionMap = async (conn, userId, itemCodes, excludeCartId = nu
     params.push(Number(excludeCartId));
   }
 
+  // NOTE: intentionally NOT filtering by price != 0 here, for the same reason as
+  // getCartPegWeightedQuantity above — a free/BOGO row of Gilded Frost (or any
+  // other item) still consumes real stock and must be counted.
   const [directRows] = await conn.execute(
-    `SELECT item_id AS item_code, quantity, description, type
+    `SELECT item_id AS item_code, quantity, description, type, price
      FROM xxafmc_cart_items
      WHERE user_id = ?
-       AND item_id IN (${placeholders})
-       AND price != 0${excludeSql}`,
+       AND item_id IN (${placeholders})${excludeSql}`,
     params
   );
 
@@ -242,7 +266,13 @@ const getCartConsumptionMap = async (conn, userId, itemCodes, excludeCartId = nu
   const map = {};
   for (const row of directRows) {
     const key = String(row.item_code);
-    const multiplier = getPegMultiplierForType(row);
+    // Same reasoning as getCartPegWeightedQuantity: free/BOGO rows (price = 0)
+    // already store their quantity in peg-weighted UNITS (see addCartItem /
+    // updateCartItemQuantity, which computes totalFreeUnits before saving), so
+    // re-applying the peg multiplier here would double-count them. Only paid
+    // rows still hold a raw item count that needs the multiplier applied.
+    const isFreeRow = Number(row.price) === 0;
+    const multiplier = isFreeRow ? 1 : getPegMultiplierForType(row);
     map[key] = Number(map[key] || 0) + Number(row.quantity || 0) * multiplier;
   }
   for (const row of ingredientRows) {
@@ -314,14 +344,17 @@ const getDefaultCocktailIngredientRows = async (
   const [rows] = await conn.execute(
     `
       SELECT
-        ITEM_CODE,
-        ITEM_NAME,
-        PEGS,
-        PRICE,
-        NON_MEMBER_PRICE
-      FROM xxafmc_cocktails_mocktails_details
-      WHERE INVENTORY_ITEM_CODE = ?
-      ORDER BY COALESCE(MOC_ID, 0), ITEM_NAME
+        recipe.ITEM_CODE,
+        recipe.ITEM_NAME,
+        recipe.PEGS,
+        recipe.PRICE,
+        recipe.NON_MEMBER_PRICE
+      FROM xxafmc_cocktails_mocktails_details recipe
+      INNER JOIN xxafmc_inventory inventory
+        ON inventory.ITEM_CODE = recipe.ITEM_CODE
+      WHERE recipe.INVENTORY_ITEM_CODE = ?
+        AND inventory.STATUS = 'ACTIVE'
+      ORDER BY COALESCE(recipe.MOC_ID, 0), recipe.ITEM_NAME
     `,
     [parentItemCode]
   );
@@ -709,13 +742,9 @@ const updateCartCustomization = async (cartId, userId, updates) => {
 const addCartItem = async (userId, itemData) => {
   const { item_id, quantity = 1, unit_price = 0, remarks, type, loginType, roleId, customIngredients } = itemData;
 
-  // console.log("Adding cart item:", {type });
-
   const conn = await db.getConnection();
 
   try {
-    // `item_id` from clients is expected to be the inventory ITEM_CODE, but some older
-    // flows send inventory ITEM_ID. Resolve to ITEM_CODE to keep stock/cart logic consistent.
     const requestedId = Number(item_id);
     const [[resolvedRow]] = await conn.execute(
       `
@@ -773,12 +802,76 @@ const addCartItem = async (userId, itemData) => {
 
     await conn.beginTransaction();
 
+    // -------------------------------
+    // GET PEG MULTIPLIER FOR TYPE
+    // -------------------------------
+    const pegMultiplier = getPegMultiplierForType(type);
+    const requestedUnits = quantity * pegMultiplier;
 
     // -------------------------------
-    // 1. VALIDATE MAIN ITEM STOCK
+    // CHECK EXISTING CART ITEM
+    // -------------------------------
+    const selectedType = String(type || "").trim();
+    const cartDescription = selectedType || "NA";
+    // typeKey is the canonical, always-non-blank value written to the TYPE
+    // column and used for every existing-row lookup (paid + free). Using the
+    // same key everywhere (instead of raw selectedType in some places and
+    // "" / "NA" defaults in others) is what keeps add/update/delete from
+    // creating duplicate rows for the same logical item+type.
+    const typeKey = normalizeCartTypeKey(selectedType);
+
+    const existingSql = `SELECT cart_id, quantity FROM xxafmc_cart_items
+       WHERE user_id = ? AND item_id = ? AND price != 0 AND UPPER(TYPE) = UPPER(?)`;
+    const existingParams = [userId, resolvedItemCode, typeKey];
+    const [existing] = await conn.execute(existingSql, existingParams);
+
+    const totalQuantityAfterUpdate = existing.length > 0 ? existing[0].quantity + quantity : quantity;
+    const totalUnitsAfterUpdate = totalQuantityAfterUpdate * pegMultiplier;
+
+    // -------------------------------
+    // FETCH OFFER FIRST
+    // -------------------------------
+    const [offers] = await conn.execute(
+      `SELECT * FROM xxafmc_offers
+       WHERE item_code = ?
+       AND (
+         (END_DATE IS NULL AND CURDATE() >= DATE(OFFER_DATE))
+         OR (CURDATE() BETWEEN DATE(OFFER_DATE) AND END_DATE)
+       )
+       LIMIT 1`,
+      [resolvedItemCode]
+    );
+
+    let freeItemCode = null;
+    let totalFreeUnits = 0;
+    let offerExists = false;
+
+    if (offers.length > 0) {
+      const offer = offers[0];
+      offerExists = true;
+      const offerQty = offer.OFFER_QUANTITY;
+      freeItemCode = offer.FREE_ITEM_CODE;
+      const freeItemQty = offer.FREE_ITEM_QUANTITY;
+
+      // Calculate free items in UNITS
+      totalFreeUnits = Math.floor(totalUnitsAfterUpdate / offerQty) * freeItemQty;
+
+      // Validate free item exists
+      if (totalFreeUnits > 0) {
+        const [[freeItemInfo]] = await conn.execute(
+          `SELECT category_id FROM xxafmc_inventory WHERE item_code = ?`,
+          [freeItemCode]
+        );
+        if (!freeItemInfo) {
+          throw createValidationError(`Free item (${freeItemCode}) not found in inventory`);
+        }
+      }
+    }
+
+    // -------------------------------
+    // VALIDATE STOCK (in UNITS)
     // -------------------------------
     const reservedQty = await getOrderReservedQuantity(conn, resolvedItemCode);
-    // const existingCartQty = isCocktailOrMocktail ? 0 : await getCartQuantity(conn, userId, resolvedItemCode, false);
     const existingCartQty = isCocktailOrMocktail ? 0 : await getCartPegWeightedQuantity(conn, userId, resolvedItemCode);
     const ingredientConsumptionQty = isCocktailOrMocktail ? 0 : await getCartIngredientConsumption(conn, userId, resolvedItemCode);
 
@@ -787,48 +880,88 @@ const addCartItem = async (userId, itemData) => {
       stockQty = await getStockQuantity(conn, resolvedItemCode, itemInfo.category_id);
     }
 
-    // If cocktail, we must have ingredients
+    // Calculate total units needed (main + free if same item)
+    // NOTE: totalFreeUnits (computed above) is the FULL free-item total after
+    // this update, not just the incremental amount being added. existingCartQty
+    // (via getCartPegWeightedQuantity) already includes whatever free units of
+    // this item are already sitting in the cart, so adding the full new total
+    // on top would double-count the portion that already existed. Only the
+    // DELTA of free units — the newly-earned free stock — should be added here.
+    let totalUnitsNeeded = requestedUnits;
+    let existingFreeUnitsForType = 0;
+    if (offerExists && freeItemCode === resolvedItemCode && totalFreeUnits > 0) {
+      const [existingFreeForDelta] = await conn.execute(
+        `SELECT quantity FROM xxafmc_cart_items
+         WHERE user_id = ? AND item_id = ? AND price = 0 AND UPPER(TYPE) = UPPER(?) AND parent_code IS NULL`,
+        [userId, resolvedItemCode, typeKey]
+      );
+      existingFreeUnitsForType = existingFreeForDelta.length > 0 ? Number(existingFreeForDelta[0].quantity || 0) : 0;
+
+      // Same item: add only the newly-earned free units, not the running total
+      totalUnitsNeeded += Math.max(0, totalFreeUnits - existingFreeUnitsForType);
+    }
+
+    // Stock validation for main item (in UNITS)
+    if (!isCocktailOrMocktail && existingCartQty + totalUnitsNeeded + reservedQty + ingredientConsumptionQty > stockQty) {
+      const availableQty = Math.max(0, stockQty - reservedQty - existingCartQty - ingredientConsumptionQty);
+      const effectiveAvailableQty = getEffectiveAvailableQuantityForType(availableQty, type);
+      throw createValidationError(`Out of stock. Available quantity: ${effectiveAvailableQty}`);
+    }
+
+    // Validate free item stock if different item (in UNITS)
+    if (offerExists && totalFreeUnits > 0 && freeItemCode !== resolvedItemCode) {
+      const [[freeItemInfo]] = await conn.execute(
+        `SELECT category_id FROM xxafmc_inventory WHERE item_code = ?`,
+        [freeItemCode]
+      );
+      
+      const freeStockQty = await getStockQuantity(conn, freeItemCode, freeItemInfo.category_id);
+      const freeReservedQty = await getOrderReservedQuantity(conn, freeItemCode);
+      
+      // Get existing free items for this parent (in UNITS)
+      const [existingFree] = await conn.execute(
+        `SELECT quantity FROM xxafmc_cart_items
+         WHERE user_id = ? AND item_id = ? AND price = 0 AND parent_code = ?`,
+        [userId, freeItemCode, resolvedItemCode]
+      );
+      const existingFreeUnits = existingFree.length > 0 ? Number(existingFree[0].quantity) : 0;
+
+      // Get all existing free items of this type (in UNITS)
+      const [allFree] = await conn.execute(
+        `SELECT SUM(quantity) as total_qty FROM xxafmc_cart_items
+         WHERE user_id = ? AND item_id = ? AND price = 0`,
+        [userId, freeItemCode]
+      );
+      const allFreeUnits = Number(allFree[0]?.total_qty || 0);
+
+      const futureFreeUnits = allFreeUnits - existingFreeUnits + totalFreeUnits;
+
+      if (futureFreeUnits + freeReservedQty > freeStockQty) {
+        const availableFreeQty = Math.max(0, freeStockQty - freeReservedQty - (allFreeUnits - existingFreeUnits));
+        throw createValidationError(
+          `Out of stock for free item (${freeItemCode}). Available quantity: ${availableFreeQty} units`
+        );
+      }
+    }
+
+    // -------------------------------
+    // If cocktail, get ingredients
+    // -------------------------------
     let ingredientsToUse;
     if (customIngredients && customIngredients.length > 0) {
-      // Enrich custom ingredients with stock information
       ingredientsToUse = await enrichIngredientsWithStock(conn, customIngredients, quantity);
     } else {
       ingredientsToUse = await getDefaultCocktailIngredientRows(conn, resolvedItemCode, loginType, quantity, roleId);
     }
 
-
-
-    const pegMultiplier = getPegMultiplierForType(type);
-    const requiredQty = quantity * pegMultiplier;
-    if (!isCocktailOrMocktail && existingCartQty + requiredQty + reservedQty + ingredientConsumptionQty > stockQty) {
-      const availableQty = Math.max(0, stockQty - reservedQty - existingCartQty - ingredientConsumptionQty);
-      const effectiveAvailableQty = getEffectiveAvailableQuantityForType(availableQty, type);
-      throw createValidationError(`Out of stock. Available quantity: ${effectiveAvailableQty}`);
-    }
     // -------------------------------
-    // 2. CHECK EXISTING CART ITEM
+    // INSERT/UPDATE MAIN CART ITEM
     // -------------------------------
-    const selectedType = String(type || "").trim();
-    // console.log("Selected type:", selectedType);
-    const cartDescription = selectedType || "NA";
-
-
-    const existingSql = selectedType
-      ? `SELECT cart_id, quantity FROM xxafmc_cart_items
-         WHERE user_id = ? AND item_id = ? AND price != 0 AND UPPER(description) = UPPER(?)`
-      : `SELECT cart_id, quantity FROM xxafmc_cart_items
-         WHERE user_id = ? AND item_id = ? AND price != 0`;
-    const existingParams = selectedType
-      ? [userId, resolvedItemCode, selectedType]
-      : [userId, resolvedItemCode];
-    const [existing] = await conn.execute(existingSql, existingParams);
-
     let newQty = quantity;
     let insertId = null;
 
     if (existing.length > 0) {
       newQty = existing[0].quantity + quantity;
-
       await conn.execute(
         `UPDATE xxafmc_cart_items
          SET quantity = ?, total = price * ?
@@ -839,22 +972,23 @@ const addCartItem = async (userId, itemData) => {
     } else {
       const [insertResult] = await conn.execute(
         `INSERT INTO xxafmc_cart_items
-        (user_id, item_id, quantity, price, total, description, profit, food_pr_charges, created_by, creation_date,TYPE)
+        (user_id, item_id, quantity, price, total, description, profit, food_pr_charges, created_by, creation_date, TYPE)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)`,
         [
           userId,
           resolvedItemCode,
-          quantity,
+          quantity,  // Store as item count for main items
           unit_price,
           unit_price * quantity,
           cartDescription,
           selectedProfit,
           selectedCharges,
           userId,
-          selectedType
+          typeKey
         ]
       );
       insertId = insertResult.insertId;
+      
       if (isCocktailOrMocktail) {
         const normalized = await normalizeCustomizationUpdates(conn, ingredientsToUse, quantity);
         await replaceCartCustomization(conn, insertId, normalized);
@@ -868,106 +1002,104 @@ const addCartItem = async (userId, itemData) => {
           [customizedUnitPrice, customizedUnitPrice, insertId]
         );
       }
-
     }
 
     // -------------------------------
-    // 2. FETCH OFFER
+    // ADD FREE ITEMS (Store in UNITS only)
     // -------------------------------
-    const [offers] = await conn.execute(
-      `SELECT * FROM xxafmc_offers
-       WHERE item_code = ?
-       AND (
-         (END_DATE IS NULL AND CURDATE() >= DATE(OFFER_DATE))
-         OR (CURDATE() BETWEEN DATE(OFFER_DATE) AND END_DATE)
-       )
-       LIMIT 1`,
-      [resolvedItemCode]
-    );
+    if (offerExists && totalFreeUnits > 0) {
+      if (freeItemCode === resolvedItemCode) {
+        // SAME ITEM: Add free items as separate entry with price=0
+        // Store quantity in UNITS (not items)
+        const [existingFreeSame] = await conn.execute(
+          `SELECT cart_id, quantity FROM xxafmc_cart_items
+           WHERE user_id = ? AND item_id = ? AND price = 0 AND UPPER(TYPE) = UPPER(?) AND parent_code IS NULL`,
+          [userId, resolvedItemCode, typeKey]
+        );
 
-    if (offers.length === 0) {
-      await conn.commit();
-      return { message: "Item added (no offer)", insertId, isCocktailItem: isCocktailOrMocktail };
-    }
+        if (existingFreeSame.length > 0) {
+          // totalFreeUnits is already the correct FULL total after this update
+          // (derived from totalUnitsAfterUpdate, which is main qty after update).
+          // REPLACE the stored value rather than adding to it, matching the
+          // DIFFERENT-ITEM branch below (line ~1025) — adding here was
+          // compounding the free quantity upward on every single increment.
+          await conn.execute(
+            `UPDATE xxafmc_cart_items
+             SET quantity = ?
+             WHERE cart_id = ?`,
+            [totalFreeUnits, existingFreeSame[0].cart_id]  // Store in UNITS (replace, not add)
+          );
+        } else {
+          await conn.execute(
+            `INSERT INTO xxafmc_cart_items
+            (user_id, item_id, quantity, price, total, description, created_by, creation_date, TYPE)
+            VALUES (?, ?, ?, 0, 0, ?, ?, NOW(), ?)`,
+            [
+              userId,
+              resolvedItemCode,
+              totalFreeUnits,  // Store free quantity in UNITS
+              "Free Item (BOGO)",
+              userId,
+              typeKey
+            ]
+          );
+        }
+      } else {
+        // DIFFERENT ITEM: Store free quantity in UNITS
+        const [freeExisting] = await conn.execute(
+          `SELECT cart_id FROM xxafmc_cart_items
+           WHERE user_id = ? AND item_id = ? AND price = 0 AND parent_code = ? AND UPPER(TYPE) = UPPER(?)`,
+          [userId, freeItemCode, resolvedItemCode, typeKey]
+        );
 
-    const offer = offers[0];
-
-    const offerQty = offer.OFFER_QUANTITY;
-    const freeItemCode = offer.FREE_ITEM_CODE;
-    const freeItemQty = offer.FREE_ITEM_QUANTITY;
-
-    // -------------------------------
-    // 3. CHECK ELIGIBILITY
-    // -------------------------------
-    if (newQty < offerQty) {
-
-      await conn.commit();
-      return { message: "Item added (offer not applicable yet)", insertId, isCocktailItem: isCocktailOrMocktail };
-    }
-
-    // -------------------------------
-    // 4. CALCULATE FREE ITEMS
-    // -------------------------------
-    const totalFree = Math.floor(newQty / offerQty) * freeItemQty;
-
-    // -------------------------------
-    // 5. VALIDATE FREE ITEM STOCK
-    // -------------------------------
-    const freeStockQty = await getStockQuantity(conn, freeItemCode);
-    const freeReservedQty = await getOrderReservedQuantity(conn, freeItemCode);
-    const existingFreeQtyGlobal = await getCartQuantity(conn, userId, freeItemCode, true);
-    const existingFreeQtyForParent = await getCartQuantity(conn, userId, freeItemCode, true, resolvedItemCode);
-    const futureFreeQty = existingFreeQtyGlobal - existingFreeQtyForParent + totalFree;
-
-    if (futureFreeQty + freeReservedQty > freeStockQty) {
-      const availableFreeQty = Math.max(0, freeStockQty - freeReservedQty - (existingFreeQtyGlobal - existingFreeQtyForParent));
-      throw createValidationError(`Out of stock for free item. Available quantity: ${availableFreeQty}`);
-    }
-
-    // -------------------------------
-    // 6. INSERT / UPDATE FREE ITEM
-    // -------------------------------
-    const [freeExisting] = await conn.execute(
-      `SELECT cart_id FROM xxafmc_cart_items
-       WHERE user_id = ? AND item_id = ? AND price = 0 AND parent_code = ?`,
-      [userId, freeItemCode, resolvedItemCode]
-    );
-
-    if (freeExisting.length > 0) {
-
-      await conn.execute(
-        `UPDATE xxafmc_cart_items
-         SET quantity = ?
-         WHERE cart_id = ?`,
-        [totalFree, freeExisting[0].cart_id]
-      );
-    } else {
-      await conn.execute(
-        `INSERT INTO xxafmc_cart_items
-        (user_id, item_id, quantity, price, total, description, created_by, creation_date, parent_code)
-        VALUES (?, ?, ?, 0, 0, ?, ?, NOW(), ?)`,
-        [
-          userId,
-          freeItemCode,
-          totalFree,
-          "Free Item",
-          userId,
-          resolvedItemCode,
-        ]
-      );
+        if (freeExisting.length > 0) {
+          await conn.execute(
+            `UPDATE xxafmc_cart_items
+             SET quantity = ?
+             WHERE cart_id = ?`,
+            [totalFreeUnits, freeExisting[0].cart_id]  // Store in UNITS
+          );
+        } else {
+          await conn.execute(
+            `INSERT INTO xxafmc_cart_items
+            (user_id, item_id, quantity, price, total, description, created_by, creation_date, parent_code, TYPE)
+            VALUES (?, ?, ?, 0, 0, ?, ?, NOW(), ?, ?)`,
+            [
+              userId,
+              freeItemCode,
+              totalFreeUnits,  // Store free quantity in UNITS
+              "Free Item (BOGO)",
+              userId,
+              resolvedItemCode,
+              typeKey
+            ]
+          );
+        }
+      }
     }
 
     await conn.commit();
 
-    return {
-      message: "Item + free item added successfully",
+    // -------------------------------
+    // RESPONSE
+    // -------------------------------
+    const response = {
+      message: offerExists && totalFreeUnits > 0 ? "Item + free item added successfully" : "Item added successfully",
       insertId,
       isCocktailItem: isCocktailOrMocktail,
-      freeItem: {
-        item_id: freeItemCode,
-        quantity: totalFree,
-      },
+      // Include the quantity in units for frontend to display correctly
+      addedQuantity: quantity,
+      addedUnits: requestedUnits
     };
+
+    if (offerExists && totalFreeUnits > 0) {
+      response.freeItem = {
+        item_id: freeItemCode,
+        quantity: totalFreeUnits  // ✅ Send free quantity in UNITS only
+      };
+    }
+
+    return response;
 
   } catch (err) {
     await conn.rollback();
@@ -1193,6 +1325,40 @@ const updateCartItemQuantity = async (cartId, userId, quantity) => {
     const itemId = current[0].item_id;
     const isCocktailOrMocktail = isCocktailOrMocktailInfo(current[0]);
     const pegMultiplier = getPegMultiplierForType(current[0].type);
+    // Must match the exact same normalization addCartItem used when it wrote
+    // this row's TYPE column, or the free-row lookups below silently miss
+    // the existing row and insert a duplicate instead of updating it.
+    const selectedType = normalizeCartTypeKey(current[0].type);
+
+    // -------------------------------
+    // 1. FETCH OFFER FIRST
+    // -------------------------------
+    const [offers] = await conn.execute(
+      `SELECT * FROM xxafmc_offers
+       WHERE ITEM_CODE = ?
+       AND (
+         (END_DATE IS NULL AND CURDATE() >= DATE(OFFER_DATE))
+         OR (CURDATE() BETWEEN DATE(OFFER_DATE) AND END_DATE)
+       )
+       LIMIT 1`,
+      [itemId]
+    );
+
+    let freeItemCode = null;
+    let totalFreeUnits = 0;
+    let offerExists = false;
+
+    if (offers.length > 0) {
+      const offer = offers[0];
+      offerExists = true;
+      const offerQty = offer.OFFER_QUANTITY;
+      freeItemCode = offer.FREE_ITEM_CODE;
+      const freeItemQty = offer.FREE_ITEM_QUANTITY;
+
+      // Calculate free items based on quantity in UNITS
+      const totalUnits = quantity * pegMultiplier;
+      totalFreeUnits = Math.floor(totalUnits / offerQty) * freeItemQty;
+    }
 
     // -------------------------------
     // 2. VALIDATE MAIN ITEM STOCK ON QUANTITY CHANGE
@@ -1200,31 +1366,45 @@ const updateCartItemQuantity = async (cartId, userId, quantity) => {
     if (!isCocktailOrMocktail) {
       const stockQty = await getStockQuantity(conn, itemId, current[0].category_id);
       const reservedQty = await getOrderReservedQuantity(conn, itemId);
-      // const otherDirectQty = await getCartQuantityExcludingCartId(conn, userId, itemId, false, cartId);
       const otherWeightedQty = await getCartPegWeightedQuantity(conn, userId, itemId, cartId);
-
       const ingredientConsumptionQty = await getCartIngredientConsumption(conn, userId, itemId, cartId);
 
-      // if (quantity + otherDirectQty + reservedQty + ingredientConsumptionQty > stockQty) {
-      //   const availableQty = Math.max(0, stockQty - reservedQty - otherDirectQty - ingredientConsumptionQty);
-      //   throw createValidationError(`Out of stock. Available quantity: ${availableQty}`);
-      // }
+      // Calculate total units needed (main + free if same item)
+      // NOTE: otherWeightedQty (via getCartPegWeightedQuantity, excluding only
+      // this main row's cartId) already includes the OLD free-item row's
+      // weighted units, since that row has its own separate cart_id. totalFreeUnits
+      // is the FULL new free total after this update, not a delta — so only the
+      // newly-earned portion (delta over what's already stored) should be added,
+      // or the old free amount gets counted twice.
+      let requiredQty = quantity * pegMultiplier;
+      if (offerExists && freeItemCode === itemId) {
+        const [existingFreeForDelta] = await conn.execute(
+          `SELECT quantity FROM xxafmc_cart_items
+           WHERE user_id = ? AND item_id = ? AND price = 0 AND UPPER(TYPE) = UPPER(?) AND parent_code IS NULL`,
+          [userId, itemId, selectedType]
+        );
+        const existingFreeUnitsForType = existingFreeForDelta.length > 0 ? Number(existingFreeForDelta[0].quantity || 0) : 0;
+        // Same item offer: add only the newly-earned free units, not the running total
+        requiredQty += Math.max(0, totalFreeUnits - existingFreeUnitsForType);
+      }
 
-      const requiredQty = quantity * pegMultiplier;
       if (requiredQty + otherWeightedQty + reservedQty + ingredientConsumptionQty > stockQty) {
         const availableQty = Math.max(0, stockQty - reservedQty - otherWeightedQty - ingredientConsumptionQty);
         const effectiveAvailableQty = getEffectiveAvailableQuantityForType(availableQty, current[0]);
         throw createValidationError(`Out of stock. Available quantity: ${effectiveAvailableQty}`);
       }
     }
-    if (isCocktailOrMocktail) {
 
+    // -------------------------------
+    // 3. VALIDATE CUSTOMIZATION STOCK (for cocktails)
+    // -------------------------------
+    if (isCocktailOrMocktail) {
       const customization = await getCartCustomization(cartId, userId);
 
       const [[parentItem]] = await conn.execute(
         `SELECT item_name
-     FROM xxafmc_inventory
-     WHERE item_code = ?`,
+         FROM xxafmc_inventory
+         WHERE item_code = ?`,
         [itemId]
       );
 
@@ -1238,7 +1418,9 @@ const updateCartItemQuantity = async (cartId, userId, quantity) => {
       }
     }
 
-    // Update the main item quantity
+    // -------------------------------
+    // 4. UPDATE MAIN ITEM QUANTITY
+    // -------------------------------
     await conn.execute(
       `UPDATE xxafmc_cart_items
        SET quantity = ?, total = price * ?
@@ -1246,69 +1428,138 @@ const updateCartItemQuantity = async (cartId, userId, quantity) => {
       [quantity, quantity, cartId, userId]
     );
 
-    // Fetch offer
-    const [offers] = await conn.execute(
-      `SELECT * FROM xxafmc_offers
-       WHERE ITEM_CODE = ?
-       AND (
-         (END_DATE IS NULL AND CURDATE() >= DATE(OFFER_DATE))
-         OR (CURDATE() BETWEEN DATE(OFFER_DATE) AND END_DATE)
-       )
-       LIMIT 1`,
-      [itemId]
-    );
+    // -------------------------------
+    // 5. HANDLE FREE ITEMS
+    // -------------------------------
+    if (offerExists) {
+      // Validate free item stock for different item offers
+      if (freeItemCode !== itemId && totalFreeUnits > 0) {
+        const [[freeItemInfo]] = await conn.execute(
+          `SELECT category_id FROM xxafmc_inventory WHERE item_code = ?`,
+          [freeItemCode]
+        );
+        
+        if (!freeItemInfo) {
+          throw createValidationError(`Free item (${freeItemCode}) not found in inventory`);
+        }
 
-    if (offers.length > 0) {
-      const offer = offers[0];
-      const offerQty = offer.OFFER_QUANTITY;
-      const freeItemCode = offer.FREE_ITEM_CODE;
-      const freeItemQty = offer.FREE_ITEM_QUANTITY;
-
-      // Calculate new free items
-      const totalFree = Math.floor(quantity / offerQty) * freeItemQty;
-
-      // -------------------------------
-      // VALIDATE FREE ITEM STOCK ON QUANTITY CHANGE
-      // -------------------------------
-      const freeStockQty = await getStockQuantity(conn, freeItemCode);
-      const freeReservedQty = await getOrderReservedQuantity(conn, freeItemCode);
-      const existingFreeQtyGlobal = await getCartQuantity(conn, userId, freeItemCode, true);
-      const existingFreeQtyForParent = await getCartQuantity(conn, userId, freeItemCode, true, itemId);
-      const futureFreeQty = existingFreeQtyGlobal - existingFreeQtyForParent + totalFree;
-
-      if (futureFreeQty + freeReservedQty > freeStockQty) {
-        const availableFreeQty = Math.max(0, freeStockQty - freeReservedQty - (existingFreeQtyGlobal - existingFreeQtyForParent));
-        throw createValidationError(`Out of stock for free item. Available quantity: ${availableFreeQty}`);
-      }
-
-      // Update or delete free item
-      if (totalFree > 0) {
-        const [freeExisting] = await conn.execute(
-          `SELECT cart_id FROM xxafmc_cart_items
+        const freeStockQty = await getStockQuantity(conn, freeItemCode, freeItemInfo.category_id);
+        const freeReservedQty = await getOrderReservedQuantity(conn, freeItemCode);
+        
+        // Get existing free items for this parent
+        const [existingFreeForParent] = await conn.execute(
+          `SELECT quantity FROM xxafmc_cart_items
            WHERE user_id = ? AND item_id = ? AND price = 0 AND parent_code = ?`,
           [userId, freeItemCode, itemId]
         );
+        const existingFreeForParentUnits = existingFreeForParent.length > 0 ? Number(existingFreeForParent[0].quantity) : 0;
 
-        if (freeExisting.length > 0) {
-          await conn.execute(
-            `UPDATE xxafmc_cart_items SET quantity = ? WHERE cart_id = ?`,
-            [totalFree, freeExisting[0].cart_id]
-          );
+        // Get all existing free items of this type
+        const [allFree] = await conn.execute(
+          `SELECT SUM(quantity) as total_qty FROM xxafmc_cart_items
+           WHERE user_id = ? AND item_id = ? AND price = 0`,
+          [userId, freeItemCode]
+        );
+        const allFreeUnits = Number(allFree[0]?.total_qty || 0);
+
+        const futureFreeQty = allFreeUnits - existingFreeForParentUnits + totalFreeUnits;
+
+        if (futureFreeQty + freeReservedQty > freeStockQty) {
+          const availableFreeQty = Math.max(0, freeStockQty - freeReservedQty - (allFreeUnits - existingFreeForParentUnits));
+          throw createValidationError(`Out of stock for free item. Available quantity: ${availableFreeQty}`);
+        }
+      }
+
+      // Handle same item offer
+      if (freeItemCode === itemId) {
+        // Get existing free entry for this item (price = 0, same item, same type)
+        const [existingFreeSame] = await conn.execute(
+          `SELECT cart_id, quantity FROM xxafmc_cart_items
+           WHERE user_id = ? AND item_id = ? AND price = 0 AND UPPER(TYPE) = UPPER(?) AND parent_code IS NULL`,
+          [userId, itemId, selectedType]
+        );
+
+        if (totalFreeUnits > 0) {
+          if (existingFreeSame.length > 0) {
+            // Update existing free entry
+            await conn.execute(
+              `UPDATE xxafmc_cart_items 
+               SET quantity = ? 
+               WHERE cart_id = ?`,
+              [totalFreeUnits, existingFreeSame[0].cart_id]
+            );
+          } else {
+            // Insert new free entry
+            await conn.execute(
+              `INSERT INTO xxafmc_cart_items
+              (user_id, item_id, quantity, price, total, description, created_by, creation_date, TYPE)
+              VALUES (?, ?, ?, 0, 0, ?, ?, NOW(), ?)`,
+              [
+                userId,
+                itemId,
+                totalFreeUnits,
+                "Free Item (BOGO)",
+                userId,
+                selectedType
+              ]
+            );
+          }
         } else {
+          // Delete free entry if no free items
           await conn.execute(
-            `INSERT INTO xxafmc_cart_items
-            (user_id, item_id, quantity, price, total, description, created_by, creation_date, parent_code)
-            VALUES (?, ?, ?, 0, 0, ?, ?, NOW(), ?)`,
-            [userId, freeItemCode, totalFree, "Free Item", userId, itemId]
+            `DELETE FROM xxafmc_cart_items
+             WHERE user_id = ? AND item_id = ? AND price = 0 AND UPPER(TYPE) = UPPER(?) AND parent_code IS NULL`,
+            [userId, itemId, selectedType]
           );
         }
       } else {
-        // Delete free item if quantity 0 for this parent item only
-        await conn.execute(
-          `DELETE FROM xxafmc_cart_items
-           WHERE user_id = ? AND item_id = ? AND price = 0 AND parent_code = ?`,
-          [userId, freeItemCode, itemId]
-        );
+        // Handle different item offer
+        if (totalFreeUnits > 0) {
+          // Check if free item already exists for this parent (scoped to
+          // this parent's specific peg type, same as the same-item branch
+          // above — otherwise a Small and a Large row of the same parent
+          // item would fight over one shared free row).
+          const [freeExisting] = await conn.execute(
+            `SELECT cart_id FROM xxafmc_cart_items
+             WHERE user_id = ? AND item_id = ? AND price = 0 AND parent_code = ? AND UPPER(TYPE) = UPPER(?)`,
+            [userId, freeItemCode, itemId, selectedType]
+          );
+
+          if (freeExisting.length > 0) {
+            // Update existing free entry
+            await conn.execute(
+              `UPDATE xxafmc_cart_items 
+               SET quantity = ? 
+               WHERE cart_id = ?`,
+              [totalFreeUnits, freeExisting[0].cart_id]
+            );
+          } else {
+            // Insert new free entry
+            await conn.execute(
+              `INSERT INTO xxafmc_cart_items
+              (user_id, item_id, quantity, price, total, description, created_by, creation_date, parent_code, TYPE)
+              VALUES (?, ?, ?, 0, 0, ?, ?, NOW(), ?, ?)`,
+              [
+                userId,
+                freeItemCode,
+                totalFreeUnits,
+                "Free Item (BOGO)",
+                userId,
+                itemId,
+                selectedType
+              ]
+            );
+          }
+        } else {
+          // Delete free item if quantity is 0 (scoped to this parent's type,
+          // so clearing the Large row's free item doesn't also wipe out a
+          // still-valid free row earned by the Small row of the same item).
+          await conn.execute(
+            `DELETE FROM xxafmc_cart_items
+             WHERE user_id = ? AND item_id = ? AND price = 0 AND parent_code = ? AND UPPER(TYPE) = UPPER(?)`,
+            [userId, freeItemCode, itemId, selectedType]
+          );
+        }
       }
     }
 
@@ -1335,7 +1586,7 @@ const deleteCartItem = async (cartId, userId) => {
 
     // Get item details before deleting
     const [item] = await conn.execute(
-      `SELECT item_id, price FROM xxafmc_cart_items WHERE cart_id = ? AND user_id = ?`,
+      `SELECT item_id, price, type FROM xxafmc_cart_items WHERE cart_id = ? AND user_id = ?`,
       [cartId, userId]
     );
 
@@ -1345,10 +1596,12 @@ const deleteCartItem = async (cartId, userId) => {
 
     const itemId = item[0].item_id;
     const price = item[0].price;
+    // Same normalization as addCartItem/updateCartItemQuantity — must match
+    // exactly, or the same-item-offer branch below misses the free row.
+    const type = normalizeCartTypeKey(item[0].type);
 
+    // Delete customization entries
     await conn.execute(`DELETE FROM ${CUSTOMIZATION_TABLE} WHERE cart_id = ?`, [cartId]);
-
-    // console.log(`Deleting old ingredients for Cart ID: ${cartId}`);
 
     // Delete the item
     const [result] = await conn.execute(
@@ -1356,7 +1609,7 @@ const deleteCartItem = async (cartId, userId) => {
       [cartId, userId]
     );
 
-    // If it's a main item (price != 0), delete associated free item
+    // If it's a main item (price != 0), delete associated free items
     if (price !== 0) {
       const [offers] = await conn.execute(
         `SELECT FREE_ITEM_CODE FROM xxafmc_offers
@@ -1371,11 +1624,26 @@ const deleteCartItem = async (cartId, userId) => {
 
       if (offers.length > 0) {
         const freeItemCode = offers[0].FREE_ITEM_CODE;
-        await conn.execute(
-          `DELETE FROM xxafmc_cart_items
-           WHERE user_id = ? AND parent_code = ? AND price = 0`,
-          [userId, itemId]
-        );
+        
+        // Check if it's a same-item offer or different-item offer
+        if (freeItemCode === itemId) {
+          // SAME ITEM OFFER: Free item has price = 0, same item_id, same type, no parent_code
+          await conn.execute(
+            `DELETE FROM xxafmc_cart_items
+             WHERE user_id = ? AND item_id = ? AND price = 0 AND UPPER(TYPE) = UPPER(?) AND parent_code IS NULL`,
+            [userId, itemId, type]
+          );
+        } else {
+          // DIFFERENT ITEM OFFER: Free item has price = 0, parent_code = itemId.
+          // Scope by type too — otherwise deleting just the Small line would
+          // also wipe out the free row earned by a separate Large line of
+          // the same parent item still sitting in the cart.
+          await conn.execute(
+            `DELETE FROM xxafmc_cart_items
+             WHERE user_id = ? AND parent_code = ? AND price = 0 AND UPPER(TYPE) = UPPER(?)`,
+            [userId, itemId, type]
+          );
+        }
       }
     }
 

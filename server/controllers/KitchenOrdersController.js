@@ -1690,13 +1690,6 @@ exports.getCocktailDetailsById = async (req, res) => {
       [orderNumber, orderNumber, itemId, orderNumber, orderNumber, itemId, orderNumber, itemId, orderNumber]
     );
 
-    if (ingredients.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: "No active ingredients found for this cocktail/mocktail",
-      });
-    }
-
     // Format response to match your frontend's expected structure
     const response = {
       success: true,
