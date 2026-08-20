@@ -46,6 +46,11 @@ const formatRowNumber = (row, keys, digits = 2) => {
   return value === null ? "-" : formatNumber(value, digits);
 };
 
+const isFreeItem = (row) => {
+  const value = getRowValue(row, "subtotal", "SUBTOTAL");
+  return Number(value) === 0;
+};
+
 const formatQuantity = (value) => {
   if (!value) return "-";
   if (String(value).toUpperCase() === "TOTAL") return "";
@@ -253,9 +258,10 @@ export default function Orderitemdetails() {
       }`,
       headers: [
         "Item",
+        "Type",
         "Quantity",
         "Price",
-        "Total Profit",
+        "Total Profit(Amount)",
         "Unit Profit",
         "Prep Charges",
         "Profit %",
@@ -263,9 +269,12 @@ export default function Orderitemdetails() {
       ],
       rows: pdfRows.map((row) => [
         row.item_id ? getDisplayItemName(row) : "Total",
+        row.item_id ? getRowValue(row, "type", "TYPE", "category_type", "CATEGORY_TYPE", "peg_type", "PEG_TYPE") || "NA" : "",
         String(formatQuantity(getRowValue(row, "quantity", "QUANTITY"))),
         formatRowNumber(row, ["price", "PRICE"]),
-        formatRowNumber(row, ["total_profit", "TOTAL_PROFIT", "totalProfit"]),
+        row.item_id && isFreeItem(row)
+          ? "Free Item"
+          : formatRowNumber(row, ["total_profit", "TOTAL_PROFIT", "totalProfit"]),
         formatRowNumber(row, ["unit_profit", "UNIT_PROFIT", "unitProfit"]),
         formatRowNumber(row, ["food_pr_charges", "FOOD_PR_CHARGES", "foodPrCharges"]),
         getRowValue(row, "totalprofit", "TOTALPROFIT") !== null
@@ -423,10 +432,13 @@ export default function Orderitemdetails() {
                         Item
                       </th>
                       <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
+                        Type
+                      </th>
+                      <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
                         Quantity
                       </th>
                       <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
-                        Total Profit
+                        Total Profit(Amount)
                       </th>
                       <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
                         Prep Charges
@@ -453,10 +465,17 @@ export default function Orderitemdetails() {
                             {row.item_id ? getDisplayItemName(row) : "Total"}
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
+                            {row.item_id ? getRowValue(row, "type", "TYPE", "category_type", "CATEGORY_TYPE", "peg_type", "PEG_TYPE") || "NA" : ""}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
                             {formatQuantity(getRowValue(row, "quantity", "QUANTITY"))}
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
-                            {formatRowNumber(row, ["total_profit", "TOTAL_PROFIT", "totalProfit"])}
+                            {row.item_id && isFreeItem(row) ? (
+                              <span className="text-green-600 font-medium">Free Item</span>
+                            ) : (
+                              formatRowNumber(row, ["total_profit", "TOTAL_PROFIT", "totalProfit"])
+                            )}
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
                             {formatRowNumber(row, ["food_pr_charges", "FOOD_PR_CHARGES", "foodPrCharges"])}
@@ -467,7 +486,7 @@ export default function Orderitemdetails() {
                       ))
                     ) : (
                       <tr className="border-t border-gray-100">
-                        <td className="px-4 py-6 text-center text-gray-500" colSpan="5">
+                        <td className="px-4 py-6 text-center text-gray-500" colSpan="6">
                           No records found.
                         </td>
                       </tr>

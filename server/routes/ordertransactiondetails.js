@@ -207,6 +207,7 @@ const getOrderTransactionDetails = async (req, res) => {
         OD.ORDER_LINE_ID,
         OD.ORDER_ID,
         OD.ITEM_ID,
+        OD.TYPE AS TYPE,
         ${quantityExpression} AS QUANTITY,
         ROUND(${subtotalExpression}, 2) AS SUBTOTAL,
         ROUND(
@@ -256,6 +257,7 @@ const getOrderTransactionDetails = async (req, res) => {
         NULL AS ORDER_LINE_ID,
         NULL AS ORDER_ID,
         NULL AS ITEM_ID,
+        NULL AS TYPE,
         'Total' AS QUANTITY,
         ROUND(SUM(${subtotalExpression}),2) AS SUBTOTAL,
         NULL AS PRICE,
