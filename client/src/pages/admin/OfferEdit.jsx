@@ -354,7 +354,7 @@ export default function OfferEdit() {
               className="px-6 py-2.5 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl shadow-md transition flex items-center gap-2 disabled:opacity-50 text-sm"
             >
               <FaSave className="text-sm" />
-              {saving ? "Deactivating..." : "Deactivate Offer"}
+              {saving ? "Deactivating..." : "Save"}
             </button>
           </div>
         </div>
