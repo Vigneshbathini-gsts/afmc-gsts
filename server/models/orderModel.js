@@ -345,7 +345,7 @@ async function getOrderWiseReport({
         ${reportItemName} AS item_name,
         ${reportItemType("od.type")} AS type,
         od.quantity,
-        ROUND(${LINE_DISPLAY_PRICE_CASE}, 2) AS price,
+        ROUND(${LINE_PRICE_CASE}, 2) AS price,
         ROUND(
           CASE
             WHEN TRIM(UPPER(IFNULL(od.order_status, ''))) = 'CANCELLED' THEN 0
@@ -492,7 +492,7 @@ async function getItemWiseReport({
         ${reportItemName} AS item_name,
         ${reportItemType("od.type")} AS type,
         SUM(od.quantity) AS quantity,
-        ROUND(AVG(${LINE_DISPLAY_PRICE_CASE}), 2) AS price,
+        ROUND(AVG(${LINE_PRICE_CASE}), 2) AS price,
         ROUND(
           SUM(
             CASE
