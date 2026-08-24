@@ -17,6 +17,15 @@ const getOfferItemAvailability = async (itemCode) => {
 // Get All Offers
 exports.getAllOffers = async (req, res) => {
   try {
+    const includeExpired = req.query.includeExpired === "true";
+    const availabilityFilter = includeExpired
+      ? ""
+      : `WHERE (
+          ofr.END_DATE IS NULL
+          OR CURDATE() <= ofr.END_DATE
+        )
+        AND UPPER(IFNULL(ofr.STATUS, '')) <> 'INACTIVE'`;
+
     const [offers] = await db.query(`
       SELECT 
           ofr.OFFER_ID as offer_id,
@@ -28,6 +37,7 @@ exports.getAllOffers = async (req, res) => {
           DATE_FORMAT(ofr.OFFER_DATE, '%Y-%m-%d') as offer_date,
 
           CASE 
+            WHEN UPPER(IFNULL(ofr.STATUS, '')) = 'INACTIVE' THEN 'Inactive'
             WHEN CURDATE() < ofr.OFFER_DATE THEN 'Scheduled'
             WHEN ofr.END_DATE IS NULL AND CURDATE() >= ofr.OFFER_DATE THEN 'Active'
             WHEN CURDATE() BETWEEN ofr.OFFER_DATE AND ofr.END_DATE THEN 'Active'
@@ -43,10 +53,7 @@ LEFT JOIN xxafmc_inventory inv
   ON ofr.ITEM_CODE = inv.item_code
 LEFT JOIN xxafmc_inventory freeinv 
   ON ofr.FREE_ITEM_CODE = freeinv.item_code
-WHERE (
-    ofr.END_DATE IS NULL
-    OR CURDATE() <= ofr.END_DATE
-)
+${availabilityFilter}
 GROUP BY
     ofr.OFFER_ID, 
     ofr.ITEM_CODE, 
@@ -56,7 +63,15 @@ GROUP BY
     ofr.MESSAGE, 
     ofr.END_DATE, 
     ofr.FREE_ITEM_QUANTITY
-ORDER BY ofr.OFFER_ID DESC
+ORDER BY
+  CASE
+    WHEN UPPER(IFNULL(ofr.STATUS, '')) = 'INACTIVE' THEN 1
+    WHEN CURDATE() < ofr.OFFER_DATE THEN 1
+    WHEN ofr.END_DATE IS NULL OR CURDATE() <= ofr.END_DATE THEN 0
+    ELSE 1
+  END ASC,
+  ofr.CREATION_DATE DESC,
+  ofr.OFFER_ID DESC
     `);
 
     res.status(200).json({
@@ -87,7 +102,12 @@ exports.getOfferById = async (req, res) => {
           DATE_FORMAT(ofr.OFFER_DATE, '%Y-%m-%d') as offer_date,
           ofr.MESSAGE as message,
           ofr.FREE_ITEM_QUANTITY as free_item_quantity,
-          ofr.STATUS as status,
+          CASE
+            WHEN UPPER(IFNULL(ofr.STATUS, '')) = 'INACTIVE' THEN 'Inactive'
+            WHEN CURDATE() < ofr.OFFER_DATE THEN 'Scheduled'
+            WHEN ofr.END_DATE IS NULL OR CURDATE() <= ofr.END_DATE THEN 'Active'
+            ELSE 'Inactive'
+          END as status,
           DATE_FORMAT(ofr.END_DATE, '%Y-%m-%d') as end_date
       FROM xxafmc_offers ofr
       LEFT JOIN xxafmc_inventory inv 
@@ -227,12 +247,17 @@ exports.updateOffer = async (req, res) => {
   try {
     const { id } = req.params;
     const username = req.user?.username || "SYSTEM";
-    const { endDate } = req.body;
+    const { endDate, status } = req.body;
 
     // console.log("Updating Offer - ID:", id, "EndDate:", endDate);
 
-    if (!endDate) {
-      return res.status(400).json({ message: "End date is required" });
+    if (!endDate || !status) {
+      return res.status(400).json({ message: "End date and status are required" });
+    }
+
+    const normalizedStatus = String(status).trim().toUpperCase();
+    if (!['ACTIVE', 'INACTIVE'].includes(normalizedStatus)) {
+      return res.status(400).json({ message: "Invalid offer status" });
     }
 
     // Check if offer exists
@@ -245,14 +270,23 @@ exports.updateOffer = async (req, res) => {
       return res.status(404).json({ message: "Offer not found" });
     }
 
-    // ✅ ONLY update END_DATE (NO STATUS)
+    const [currentOffer] = await db.query(
+      "SELECT STATUS FROM xxafmc_offers WHERE OFFER_ID = ?",
+      [id]
+    );
+
+    if (String(currentOffer[0].STATUS || '').toUpperCase() === 'INACTIVE' && normalizedStatus === 'ACTIVE') {
+      return res.status(400).json({ message: "Inactive offers cannot be activated again" });
+    }
+
     await db.query(
       `UPDATE xxafmc_offers 
        SET END_DATE = ?,
+           STATUS = ?,
            LAST_UPDATED_BY = ?,
            LAST_UPDATED_DATE = NOW()
        WHERE OFFER_ID = ?`,
-      [endDate, username, id]
+      [endDate, normalizedStatus === 'INACTIVE' ? 'Inactive' : 'Active', username, id]
     );
 
     res.status(200).json({

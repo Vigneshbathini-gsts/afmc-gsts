@@ -1762,6 +1762,7 @@ function MenuDashboard() {
         const res = await offersAPI.getAllOffers();
         const list = res?.data?.offers ?? res?.data?.data ?? res?.data ?? [];
         if (!alive) return;
+        // console.log("Fetched offers:", list);       
         setOffers(Array.isArray(list) ? list : []);
       } catch (error) {
         if (!alive) return;

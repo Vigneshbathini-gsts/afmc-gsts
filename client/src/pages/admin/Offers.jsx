@@ -36,7 +36,7 @@ export default function Offers() {
       setLoading(true);
       setError("");
 
-      const res = await offersAPI.getAllOffers();
+      const res = await offersAPI.getAllOffers(true);
       const offersData = res.data.offers || [];
       console.log("Raw Offers Data:", offersData);
       const initcapOffers = offersData.map(offer => ({

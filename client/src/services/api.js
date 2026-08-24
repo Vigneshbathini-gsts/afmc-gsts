@@ -357,7 +357,8 @@ export const collectionAPI = {
 // OFFERS API
 // ================================
 export const offersAPI = {
-  getAllOffers: () => api.get("/offers"),
+  getAllOffers: (includeExpired = false) =>
+    api.get(includeExpired ? "/offers?includeExpired=true" : "/offers"),
   getOfferById: (id) => api.get(`/offers/${id}`),
   createOffer: (data) => api.post('/offers', data),
   updateOffer: (id, data) => api.put(`/offers/${id}`, data),

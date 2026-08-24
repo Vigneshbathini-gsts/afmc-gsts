@@ -834,6 +834,7 @@ const addCartItem = async (userId, itemData) => {
     const [offers] = await conn.execute(
       `SELECT * FROM xxafmc_offers
        WHERE item_code = ?
+        AND UPPER(IFNULL(STATUS, '')) <> 'INACTIVE'
        AND (
          (END_DATE IS NULL AND CURDATE() >= DATE(OFFER_DATE))
          OR (CURDATE() BETWEEN DATE(OFFER_DATE) AND END_DATE)
@@ -1336,6 +1337,7 @@ const updateCartItemQuantity = async (cartId, userId, quantity) => {
     const [offers] = await conn.execute(
       `SELECT * FROM xxafmc_offers
        WHERE ITEM_CODE = ?
+        AND UPPER(IFNULL(STATUS, '')) <> 'INACTIVE'
        AND (
          (END_DATE IS NULL AND CURDATE() >= DATE(OFFER_DATE))
          OR (CURDATE() BETWEEN DATE(OFFER_DATE) AND END_DATE)
@@ -1614,6 +1616,7 @@ const deleteCartItem = async (cartId, userId) => {
       const [offers] = await conn.execute(
         `SELECT FREE_ITEM_CODE FROM xxafmc_offers
          WHERE ITEM_CODE = ?
+         AND UPPER(IFNULL(STATUS, '')) <> 'INACTIVE'
          AND (
            (END_DATE IS NULL AND CURDATE() >= DATE(OFFER_DATE))
            OR (CURDATE() BETWEEN DATE(OFFER_DATE) AND END_DATE)

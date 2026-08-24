@@ -370,11 +370,11 @@ async function syncFreeItemForOrderItem(
   connection,
   { orderNumber, itemCode, quantity, appUser, parentOrderLineId, reserveStock = false }
 ) {
-  console.log(`[SYNC-FREE] Called for order ${orderNumber}, item ${itemCode}:`, {
-    quantity,
-    parentOrderLineId,
-    reserveStock
-  });
+  // console.log(`[SYNC-FREE] Called for order ${orderNumber}, item ${itemCode}:`, {
+  //   quantity,
+  //   parentOrderLineId,
+  //   reserveStock
+  // });
 
   const normalizedParentOrderLineId = Number(parentOrderLineId);
   if (!Number.isFinite(normalizedParentOrderLineId) || normalizedParentOrderLineId <= 0) {
@@ -389,7 +389,7 @@ async function syncFreeItemForOrderItem(
 
   const subCategory = Number(inventoryItem.sub_category ?? 0);
   if ([14, 15].includes(subCategory) || await hasCocktailRecipe(connection, itemCode)) {
-    console.log(`[SYNC-FREE] Skipping - item is cocktail/mocktail`);
+    // console.log(`[SYNC-FREE] Skipping - item is cocktail/mocktail`);
     return;
   }
 
@@ -397,15 +397,15 @@ async function syncFreeItemForOrderItem(
   const effectiveQuantity = quantity * pegMultiplier;
   const offer = await getActiveOffer(connection, itemCode, effectiveQuantity);
   
-  console.log(`[SYNC-FREE] Item ${itemCode} (${inventoryItem.type}, multiplier: ${pegMultiplier}):`, {
-    quantity,
-    effectiveQuantity,
-    offer: offer?.offer_id || null,
-    freeItemCode: offer?.free_item_code || null
-  });
+  // console.log(`[SYNC-FREE] Item ${itemCode} (${inventoryItem.type}, multiplier: ${pegMultiplier}):`, {
+  //   quantity,
+  //   effectiveQuantity,
+  //   offer: offer?.offer_id || null,
+  //   freeItemCode: offer?.free_item_code || null
+  // });
 
   if (!offer) {
-    console.log(`[SYNC-FREE] No active offer, deleting free rows for parent ${parentOrderLineKey}`);
+    // console.log(`[SYNC-FREE] No active offer, deleting free rows for parent ${parentOrderLineKey}`);
     await connection.execute(
       `
         DELETE FROM xxafmc_order_details
@@ -425,7 +425,7 @@ async function syncFreeItemForOrderItem(
       ? Math.floor((quantity * pegMultiplier) / offerQuantity) * freeItemQuantity
       : 0;
 
-  console.log(`[SYNC-FREE] Computed free quantity: ${computedFreeQty}`);
+  // console.log(`[SYNC-FREE] Computed free quantity: ${computedFreeQty}`);
 
   const [existingFreeRows] = await connection.execute(
     `
@@ -445,7 +445,7 @@ async function syncFreeItemForOrderItem(
 
   if (computedFreeQty <= 0) {
     if (existingFreeRow) {
-      console.log(`[SYNC-FREE] Deleting existing free row ${existingFreeRow.order_line_id}`);
+      // console.log(`[SYNC-FREE] Deleting existing free row ${existingFreeRow.order_line_id}`);
       await connection.execute(
         `
           DELETE FROM xxafmc_order_details
@@ -461,12 +461,12 @@ async function syncFreeItemForOrderItem(
   const currentExistingQty = Number(existingFreeRow?.quantity || 0);
   const freeQtyDelta = computedFreeQty - currentExistingQty;
 
-  console.log(`[SYNC-FREE] Free item ${freeItemCode}:`, {
-    currentQty: currentExistingQty,
-    newQty: computedFreeQty,
-    delta: freeQtyDelta,
-    reserveStock
-  });
+  // console.log(`[SYNC-FREE] Free item ${freeItemCode}:`, {
+  //   currentQty: currentExistingQty,
+  //   newQty: computedFreeQty,
+  //   delta: freeQtyDelta,
+  //   reserveStock
+  // });
 
   // Only validate stock for free items, don't reserve (reservation happens on completion)
   if (Number.isFinite(freeItemCode) && freeItemCode > 0 && freeQtyDelta > 0) {
@@ -499,7 +499,7 @@ async function syncFreeItemForOrderItem(
     );
     
     if (freeQtyDelta > freeAvailableQty) {
-      console.log(`[SYNC-FREE] ❌ Out of stock for free item: ${freeAvailableQty} available, ${freeQtyDelta} needed`);
+      // // console.log(`[SYNC-FREE] ❌ Out of stock for free item: ${freeAvailableQty} available, ${freeQtyDelta} needed`);
       throw createValidationError(`Out of stock for free item. Available quantity: ${freeAvailableQty}`);
     }
   }
@@ -520,7 +520,7 @@ async function syncFreeItemForOrderItem(
   );
 
   if (existingFreeRow) {
-    console.log(`[SYNC-FREE] Updating free row ${existingFreeRow.order_line_id} to ${computedFreeQty}`);
+    // // console.log(`[SYNC-FREE] Updating free row ${existingFreeRow.order_line_id} to ${computedFreeQty}`);
     await connection.execute(
       `
         UPDATE xxafmc_order_details
@@ -531,7 +531,7 @@ async function syncFreeItemForOrderItem(
       [computedFreeQty, quantity, existingFreeRow.order_line_id]
     );
   } else {
-    console.log(`[SYNC-FREE] Creating new free row with quantity ${computedFreeQty}`);
+    // // console.log(`[SYNC-FREE] Creating new free row with quantity ${computedFreeQty}`);
     const freeInventoryItem = await getInventoryItem(connection, offer.free_item_code);
     const freeOrderLineId = await getNextOrderLineId(connection);
 
@@ -573,7 +573,7 @@ async function syncFreeItemForOrderItem(
 // Get reserved quantities from COMPLETED orders only (xxafmc_stock_reservation_totals)
 // This table only has data for completed/confirmed orders
 async function getReservedQuantitiesExcludingOrder(connection, itemCodes, orderNumber) {
-  console.log(`[RESERVED-EXCLUDING] Called for order ${orderNumber}, items:`, itemCodes);
+  // // console.log(`[RESERVED-EXCLUDING] Called for order ${orderNumber}, items:`, itemCodes);
 
   const normalizedCodes = [...new Set((Array.isArray(itemCodes) ? itemCodes : [])
     .map((code) => Number(code))
@@ -598,14 +598,14 @@ async function getReservedQuantitiesExcludingOrder(connection, itemCodes, orderN
     return map;
   }, new Map());
 
-  console.log(`[RESERVED-EXCLUDING] Reserved from completed orders:`, Object.fromEntries(result));
+  // // console.log(`[RESERVED-EXCLUDING] Reserved from completed orders:`, Object.fromEntries(result));
   return result;
 }
 
 // Every direct order line (paid Small/Large + Free BOGO) for a given order,
 // grouped by item_code, with each line's peg-weighted quantity.
 async function getOrderDirectConsumptionByItemCode(connection, orderNumber) {
-  console.log(`[DIRECT-CONSUMPTION] Getting direct consumption for order ${orderNumber}`);
+  // // console.log(`[DIRECT-CONSUMPTION] Getting direct consumption for order ${orderNumber}`);
   
   const normalizedOrderNumber = Number(orderNumber);
   if (!Number.isFinite(normalizedOrderNumber) || normalizedOrderNumber <= 0) {
@@ -632,14 +632,14 @@ async function getOrderDirectConsumptionByItemCode(connection, orderNumber) {
     map.get(code).push({ order_line_id: Number(row.order_line_id), weighted });
   }
 
-  console.log(`[DIRECT-CONSUMPTION] Found ${rows.length} lines:`, Object.fromEntries(map));
+  // // console.log(`[DIRECT-CONSUMPTION] Found ${rows.length} lines:`, Object.fromEntries(map));
   return map;
 }
 
 // Every cocktail/mocktail parent line in a given order, grouped by the
 // ingredient item_code it consumes
 async function getOrderIngredientConsumptionByItemCode(connection, orderNumber) {
-  console.log(`[INGREDIENT-CONSUMPTION] Getting ingredient consumption for order ${orderNumber}`);
+  // // console.log(`[INGREDIENT-CONSUMPTION] Getting ingredient consumption for order ${orderNumber}`);
   
   const normalizedOrderNumber = Number(orderNumber);
   if (!Number.isFinite(normalizedOrderNumber) || normalizedOrderNumber <= 0) {
@@ -676,7 +676,7 @@ async function getOrderIngredientConsumptionByItemCode(connection, orderNumber) 
     map.get(ingredientCode).push({ parent_item_id: parentId, weighted });
   }
 
-  console.log(`[INGREDIENT-CONSUMPTION] Found ${rows.length} ingredient rows:`, Object.fromEntries(map));
+  // // console.log(`[INGREDIENT-CONSUMPTION] Found ${rows.length} ingredient rows:`, Object.fromEntries(map));
   return map;
 }
 
@@ -705,7 +705,7 @@ async function getIngredientStockQuantities(connection, ingredientCodes) {
 }
 
 async function getCocktailStockStatusMap(connection, orderNumber, cocktailItemIds, parentQuantityMap = new Map()) {
-  console.log(`[COCKTAIL-STATUS] Getting stock status for cocktails:`, cocktailItemIds);
+  // // console.log(`[COCKTAIL-STATUS] Getting stock status for cocktails:`, cocktailItemIds);
   
   const normalizedOrderNumber = Number(orderNumber);
   const normalizedItems = [...new Set((Array.isArray(cocktailItemIds) ? cocktailItemIds : [])
@@ -765,10 +765,10 @@ async function getCocktailStockStatusMap(connection, orderNumber, cocktailItemId
   const directWeightedByCode = await getOrderDirectConsumptionByItemCode(connection, normalizedOrderNumber);
   const ingredientWeightedByCode = await getOrderIngredientConsumptionByItemCode(connection, normalizedOrderNumber);
 
-  console.log(`[COCKTAIL-STATUS] Stock map:`, stockMap);
-  console.log(`[COCKTAIL-STATUS] Reserved from completed orders:`, Object.fromEntries(reservedMap));
-  console.log(`[COCKTAIL-STATUS] Direct consumption:`, Object.fromEntries(directWeightedByCode));
-  console.log(`[COCKTAIL-STATUS] Ingredient consumption:`, Object.fromEntries(ingredientWeightedByCode));
+  // console.log(`[COCKTAIL-STATUS] Stock map:`, stockMap);
+  // console.log(`[COCKTAIL-STATUS] Reserved from completed orders:`, Object.fromEntries(reservedMap));
+  // console.log(`[COCKTAIL-STATUS] Direct consumption:`, Object.fromEntries(directWeightedByCode));
+  // console.log(`[COCKTAIL-STATUS] Ingredient consumption:`, Object.fromEntries(ingredientWeightedByCode));
 
   const statusMap = new Map();
 
@@ -781,7 +781,7 @@ async function getCocktailStockStatusMap(connection, orderNumber, cocktailItemId
     const overrideParentQtyRaw = parentQuantityMap.get(parentId);
     const overrideParentQty = Number(overrideParentQtyRaw);
     
-    console.log(`[COCKTAIL-STATUS] Checking cocktail ${parentId} with ${ingredients.length} ingredients:`);
+    // console.log(`[COCKTAIL-STATUS] Checking cocktail ${parentId} with ${ingredients.length} ingredients:`);
     
     for (const ingredient of ingredients) {
       const stockQuantity = Number(stockMap[String(ingredient.itemCode)] || 0);
@@ -808,23 +808,23 @@ async function getCocktailStockStatusMap(connection, orderNumber, cocktailItemId
         maxPossibleQty = Math.min(maxPossibleQty, Math.floor(availableQuantity / perCocktailPegs));
       }
 
-      console.log(`[COCKTAIL-STATUS]   Ingredient ${ingredient.itemName} (${ingredient.itemCode}):`, {
-        stock: stockQuantity,
-        reserved: reservedQuantity,
-        directConsumed,
-        otherCocktailsConsumed,
-        available: availableQuantity,
-        required: requiredQuantity,
-        perPeg: perCocktailPegs,
-        maxPossible: maxPossibleQty
-      });
+      // console.log(`[COCKTAIL-STATUS]   Ingredient ${ingredient.itemName} (${ingredient.itemCode}):`, {
+      //   stock: stockQuantity,
+      //   reserved: reservedQuantity,
+      //   directConsumed,
+      //   otherCocktailsConsumed,
+      //   available: availableQuantity,
+      //   required: requiredQuantity,
+      //   perPeg: perCocktailPegs,
+      //   maxPossible: maxPossibleQty
+      // });
 
       if (requiredQuantity > availableQuantity) {
         failing = {
           itemName: ingredient.itemName || String(ingredient.itemCode),
           availableQuantity,
         };
-        console.log(`[COCKTAIL-STATUS]   ❌ OUT OF STOCK: ${ingredient.itemName} needs ${requiredQuantity}, only ${availableQuantity} available`);
+        // console.log(`[COCKTAIL-STATUS]   ❌ OUT OF STOCK: ${ingredient.itemName} needs ${requiredQuantity}, only ${availableQuantity} available`);
         break;
       }
     }
@@ -844,12 +844,12 @@ async function getCocktailStockStatusMap(connection, orderNumber, cocktailItemId
     }
   }
 
-  console.log(`[COCKTAIL-STATUS] Final status map:`, Object.fromEntries(statusMap));
+  // console.log(`[COCKTAIL-STATUS] Final status map:`, Object.fromEntries(statusMap));
   return statusMap;
 }
 
 async function getOrderSummary(orderNumber) {
-  console.log(`[ORDER-SUMMARY] Getting summary for order ${orderNumber}`);
+  // console.log(`[ORDER-SUMMARY] Getting summary for order ${orderNumber}`);
   
   const normalizedOrderNumber = Number(orderNumber);
   if (!Number.isFinite(normalizedOrderNumber) || normalizedOrderNumber <= 0) {
@@ -972,7 +972,7 @@ async function getOrderSummary(orderNumber) {
   // Get reserved from COMPLETED orders only
   const reservedMap = await getReservedQuantitiesExcludingOrder(db, itemCodes, normalizedOrderNumber);
 
-  console.log(`[ORDER-SUMMARY] Reserved from completed orders:`, Object.fromEntries(reservedMap));
+  // console.log(`[ORDER-SUMMARY] Reserved from completed orders:`, Object.fromEntries(reservedMap));
 
   // Get this order's own consumption
   const directWeightedByCode = await getOrderDirectConsumptionByItemCode(db, normalizedOrderNumber);
@@ -1060,13 +1060,13 @@ async function getOrderSummary(orderNumber) {
         ? null
         : Math.max(0, stockQuantity - reservedQuantity - otherLinesWeighted - ingredientConsumed);
 
-    console.log(`[ORDER-SUMMARY] Item ${row.item_code} (${row.type}):`, {
-      stock: stockQuantity,
-      reserved: reservedQuantity,
-      otherLines: otherLinesWeighted,
-      ingredientConsumed,
-      available: availableQuantity
-    });
+    // console.log(`[ORDER-SUMMARY] Item ${row.item_code} (${row.type}):`, {
+    //   stock: stockQuantity,
+    //   reserved: reservedQuantity,
+    //   otherLines: otherLinesWeighted,
+    //   ingredientConsumed,
+    //   available: availableQuantity
+    // });
 
     const cocktailStatus = isCocktailItem ? cocktailStatusMap.get(Number(row.item_id)) : null;
     const stockStatus = isCocktailItem
@@ -1140,11 +1140,11 @@ async function getOrderSummary(orderNumber) {
     return { ...row, quantity: Number(expected), parent_order_line_id: Number(parentOrderLineKey) || null };
   });
 
-  console.log(`[ORDER-SUMMARY] Final order summary:`, {
-    orderNumber: normalizedOrderNumber,
-    itemCount: reconciledItems.length,
-    total: orderTotal
-  });
+  // console.log(`[ORDER-SUMMARY] Final order summary:`, {
+  //   orderNumber: normalizedOrderNumber,
+  //   itemCount: reconciledItems.length,
+  //   total: orderTotal
+  // });
 
   return {
     header: {

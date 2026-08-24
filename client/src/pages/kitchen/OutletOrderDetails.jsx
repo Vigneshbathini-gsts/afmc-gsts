@@ -154,7 +154,7 @@ export default function OutletOrderDetails() {
       });
       const itemsData = itemsRes.data?.data || itemsRes.data || [];
 
-      console.log("Fetched order items:", itemsData);
+      // console.log("Fetched order items:", itemsData);
 
       const scannedRes = await barOrdersAPI.getScannedItems(orderData.ORDERNUMBER);
       const scannedData = scannedRes.data?.data || [];

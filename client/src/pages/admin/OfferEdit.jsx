@@ -34,6 +34,7 @@ export default function OfferEdit() {
     freeItemQuantity: "",
     offerDate: "",
     endDate: "",
+    status: "Active",
     message: "",
   });
 
@@ -60,6 +61,7 @@ export default function OfferEdit() {
           freeItemQuantity: offer.free_item_quantity,
           offerDate: offer.offer_date ? offer.offer_date.split("T")[0] : "",
           endDate: offer.end_date ? offer.end_date.split("T")[0] : "",
+          status: offer.status?.toLowerCase() === "inactive" ? "Inactive" : "Active",
           message: toInitCap(offer.message) || "",
         });
       } catch (err) {
@@ -100,6 +102,7 @@ export default function OfferEdit() {
       // Pass the end date from formData to the API
       const res = await offersAPI.updateOffer(id, {
         endDate: formData.endDate,
+        status: formData.status,
       });
 
       // Check if status code is 200 (success)
@@ -316,6 +319,28 @@ export default function OfferEdit() {
                 <p className="text-xs text-gray-400 mt-1">
                   End Date is read-only and cannot be changed here.
                 </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Status <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={formData.status}
+                  onChange={(event) =>
+                    setFormData((previous) => ({ ...previous, status: event.target.value }))
+                  }
+                  disabled={formData.status === "Inactive" || saving}
+                  className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 shadow-sm outline-none focus:ring-2 focus:ring-afmc-maroon disabled:cursor-not-allowed disabled:bg-gray-100"
+                >
+                  <option value="Active">Active</option>
+                  <option value="Inactive">Inactive</option>
+                </select>
+                {formData.status === "Inactive" && (
+                  <p className="text-xs text-gray-400 mt-1">
+                    Inactive offers cannot be activated again.
+                  </p>
+                )}
               </div>
             </div>
           </div>
