@@ -482,8 +482,9 @@ FROM
     xxafmc_inventory inv
 WHERE 1=1
     AND inv.category_id = 10
-    AND inv.sub_category IN (14)
+    AND inv.sub_category IN (15)
     AND inv.item_code = IFNULL(null, inv.item_code)
+    AND inv.status = 'ACTIVE'
 
 ORDER BY
     inv.item_id ASC;
@@ -520,8 +521,9 @@ FROM
     xxafmc_inventory inv
 WHERE 1=1
     AND inv.category_id = 10
-    AND inv.sub_category IN (15)
+    AND inv.sub_category IN (14)
     AND inv.item_code = IFNULL(?, inv.item_code)
+    AND inv.status = 'ACTIVE'
 ORDER BY
     inv.item_id ASC`;
 
