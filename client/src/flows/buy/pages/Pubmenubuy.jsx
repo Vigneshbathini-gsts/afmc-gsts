@@ -799,12 +799,30 @@ export default function Pubmenubuy({
       return { ok: true, message: "" };
     }
 
+    const linkedFreeItems = getLinkedFreeItems(items, targetItem);
+    const expectedFreeQty = calculateFreeQuantity(
+      nextQuantity,
+      targetItem.offer_quantity,
+      targetItem.free_item_quantity,
+      getItemPegMultiplier(targetItem)
+    );
     const projectedItems = items.map((row) => {
       if (Number(row.orderLineId ?? row.id) === targetLineId) {
         return { ...row, quantity: nextQuantity };
       }
+      if (linkedFreeItems.includes(row)) {
+        return { ...row, quantity: expectedFreeQty };
+      }
       return row;
     });
+
+    if (expectedFreeQty > 0 && linkedFreeItems.length === 0) {
+      projectedItems.push({
+        item_code: targetItem.free_item_code,
+        quantity: expectedFreeQty,
+        isFreeItem: true,
+      });
+    }
 
     const projectedConsumption = buildPubStockConsumptionMap(projectedItems, {
       getCocktailDetails: getCocktailDetailsForStockCheck,
