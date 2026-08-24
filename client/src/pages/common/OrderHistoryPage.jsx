@@ -170,7 +170,7 @@ const OrderHistoryPage = () => {
         exportTableToPdf({
             title: "Order History",
             fileName: `order-history-${getTodayDate()}.pdf`,
-            subtitle: `From: ${formatDisplayDate(filters.fromDate)}   To: ${formatDisplayDate(filters.toDate)}   Order #: ${filters.orderNumber || "All"}`,
+            subtitle: `From: ${formatDisplayDate(filters.fromDate)}   To: ${formatDisplayDate(filters.toDate)}   Order ID: ${filters.orderNumber || "All"}`,
             headers: [
                 "Order Number",
                 "Date",
