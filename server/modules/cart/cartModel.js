@@ -1724,17 +1724,19 @@ const getLovIngredients = async (subCategory) => {
     const normalizedSubCategory = Number(subCategory);
 
     const allowedSubCategories =
-      normalizedSubCategory === 15
-        ? [9, 6, 4, 18]
-        : normalizedSubCategory === 14
-          ? [2, 5, 6, 11, 12, 1310, 17, 16, 18]
+      normalizedSubCategory === 14
+        ? [6, 9, 4, 18]
+        : normalizedSubCategory === 15
+          ? null
           : [];
 
-    if (allowedSubCategories.length === 0) {
+    if (allowedSubCategories && allowedSubCategories.length === 0) {
       return [];
     }
 
-    const placeholders = allowedSubCategories.map(() => "?").join(",");
+    const subCategoryCondition = normalizedSubCategory === 15
+      ? "xi.sub_category NOT IN (1, 6, 9, 4, 14, 15, 7, 10, 3, 1310, 18)"
+      : "xi.sub_category IN (?, ?, ?, ?)";
 
     const query = `
       SELECT
@@ -1758,8 +1760,8 @@ const getLovIngredients = async (subCategory) => {
         FROM xxafmc_stock_reservation_totals
       ) reserved_summary
         ON reserved_summary.item_code = xi.item_code
-      WHERE xi.sub_category IN (${placeholders})
-        AND xi.\`A/C_UNIT\` <> 'Glass'
+      WHERE ${subCategoryCondition}
+        AND (xi.\`A/C_UNIT\` IS NULL OR UPPER(TRIM(xi.\`A/C_UNIT\`)) <> 'GLASS')
         AND xi.STATUS = 'ACTIVE'  -- ADD THIS - Only show active items
         AND GREATEST(
           GREATEST(IFNULL(xi.stock_quantity, 0), IFNULL(stock_summary.stock_quantity, 0))
@@ -1769,7 +1771,7 @@ const getLovIngredients = async (subCategory) => {
       ORDER BY xi.item_name
     `;
 
-    const [rows] = await connection.query(query, allowedSubCategories);
+    const [rows] = await connection.query(query, allowedSubCategories || []);
 
     return rows;
 
