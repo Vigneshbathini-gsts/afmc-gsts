@@ -22,6 +22,8 @@ export const exportTableToPdf = ({
   showLogo = true,
   orientation = "landscape",
   format = "a4",
+  bodyStyles = {},
+  columnStyles = {},
 }) => {
   const exportDoc = async () => {
     const doc = new jsPDF({
@@ -120,6 +122,8 @@ export const exportTableToPdf = ({
         fontSize: 10,
         halign: "center",
       },
+      bodyStyles,
+      columnStyles,
       alternateRowStyles: {
         fillColor: [248, 248, 248],
       },

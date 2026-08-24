@@ -14,6 +14,14 @@ const getDetailPegs = (detail) => detail?.pegs ?? detail?.PEGS;
 const getDetailStockQuantity = (detail) => detail?.stockQuantity ?? detail?.STOCK_QUANTITY ?? detail?.stock_quantity ?? null;
 const getDetailStockStatus = (detail) => detail?.stockStatus ?? detail?.STOCK_STATUS ?? detail?.stock_status;
 const getDetailRequiredQuantity = (detail) => detail?.requiredQuantity ?? detail?.REQUIRED_QUANTITY;
+const getLovStockQuantity = (ingredient) =>
+    ingredient?.stockQuantity ??
+    ingredient?.STOCK_QUANTITY ??
+    ingredient?.stock_quantity ??
+    ingredient?.availableQuantity ??
+    ingredient?.AVAILABLE_QUANTITY ??
+    ingredient?.available_quantity ??
+    null;
 const normalizeDetail = (detail) => detail && ({
     ...detail,
     stockQuantity: getDetailStockQuantity(detail),
@@ -536,9 +544,16 @@ return;
     }
 };
 
-    const filteredLovData = lovData.filter(item =>
-        item.d.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredLovData = lovData
+        .filter((ingredient) => {
+            const rawStockQuantity = getLovStockQuantity(ingredient);
+            const stockQuantity = rawStockQuantity == null || rawStockQuantity === "" ? null : Number(rawStockQuantity);
+
+            return Number.isFinite(stockQuantity) ? stockQuantity > 0 : true;
+        })
+        .filter(item =>
+            item.d.toLowerCase().includes(searchTerm.toLowerCase())
+        );
 
     const isDetailOutOfStock = (detail, index) => {
         const stockQuantity = Number(getDetailStockQuantity(detail));
@@ -791,7 +806,7 @@ return;
                                     className="inline-flex items-center gap-2 rounded-full bg-afmc-maroon px-4 py-2 text-sm font-semibold text-white shadow-sm ring-1 ring-afmc-gold/30 transition hover:bg-afmc-maroon/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-afmc-gold/60 focus-visible:ring-offset-2 focus-visible:ring-offset-afmc-maroon disabled:cursor-not-allowed disabled:bg-stone-300"
                                 >
                                     <FaSave className="text-xs" />
-                                    {isEditingCartItem ? "Save Customization" : fromBuyFlow ? "Save Ingredients" : "Add to Cart"}
+                                    {isEditingCartItem ? "Save" : fromBuyFlow ? "Save Ingredients" : "Add to Cart"}
                                 </button>
                             </div>
                         </div>

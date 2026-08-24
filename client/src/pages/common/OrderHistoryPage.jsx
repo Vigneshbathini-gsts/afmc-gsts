@@ -170,7 +170,7 @@ const OrderHistoryPage = () => {
         exportTableToPdf({
             title: "Order History",
             fileName: `order-history-${getTodayDate()}.pdf`,
-            subtitle: `From: ${formatDisplayDate(filters.fromDate)}   To: ${formatDisplayDate(filters.toDate)}   Order #: ${filters.orderNumber || "All"}`,
+            subtitle: `From: ${formatDisplayDate(filters.fromDate)}   To: ${formatDisplayDate(filters.toDate)}   Order ID: ${filters.orderNumber || "All"}`,
             headers: [
                 "Order Number",
                 "Date",
@@ -189,6 +189,9 @@ const OrderHistoryPage = () => {
                 toInitCap(order.payment_status ?? order.payment_status1),
                 Number(order.subtotal ?? order.order_total ?? 0).toFixed(2),
             ].filter((value) => value !== null)),
+            bodyStyles: {
+                halign: "center",
+            },
         });
     };
 
@@ -289,7 +292,7 @@ const OrderHistoryPage = () => {
 
             <div className="mt-3 flex flex-col gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs md:text-sm text-gray-600 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                    Showing {showingFrom} to {showingTo} of {visibleOrders.length} orders
+                    {/* Showing {showingFrom} to {showingTo} of {visibleOrders.length} orders */}
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
