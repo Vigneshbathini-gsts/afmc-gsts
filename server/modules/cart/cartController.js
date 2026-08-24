@@ -333,10 +333,14 @@ exports.addCartItem = async (req, res) => {
     if (unit_price == null || Number.isNaN(Number(unit_price))) {
       return res.status(400).json({ success: false, message: "Unit price is required" });
     }
+    const normalizedQuantity = Number(quantity);
+    if (!Number.isInteger(normalizedQuantity) || normalizedQuantity < 1) {
+      return res.status(400).json({ success: false, message: "Quantity must be at least 1" });
+    }
 
     const itemData = {
       item_id,
-      quantity: Number(quantity) || 1,
+      quantity: normalizedQuantity,
       unit_price: Number(unit_price),
       remarks: remarks || "Din",
       type: typeof type === "string" ? type.trim() : type,
@@ -965,12 +969,12 @@ exports.confirmOrder = async (req, res) => {
       const pegMultiplier = parentLine.pegMultiplier || 1;
       const freeQuantity = fields.quantity * pegMultiplier;
 
-      console.log(`[CONFIRM-ORDER] Free item ${fields.itemId} (parent type multiplier: ${pegMultiplier}):`, {
-        cartQuantity: fields.quantity,
-        pegMultiplier,
-        freeQuantity,
-        parentLineId: parentLine.orderLineId
-      });
+      // console.log(`[CONFIRM-ORDER] Free item ${fields.itemId} (parent type multiplier: ${pegMultiplier}):`, {
+      //   cartQuantity: fields.quantity,
+      //   pegMultiplier,
+      //   freeQuantity,
+      //   parentLineId: parentLine.orderLineId
+      // });
 
       const orderLineId = await getNextOrderLineId();
       
@@ -1033,43 +1037,6 @@ exports.confirmOrder = async (req, res) => {
       await connection.execute(`UPDATE xxafmc_order_header SET order_total = ? WHERE order_num = ?`, [computedTotal, orderNumber]);
     } catch (e) {
       console.error('Failed to recompute order_total for order', orderNumber, e);
-    }
-
-    // 6. RESERVE STOCK for confirmed order
-    try {
-      // Get all order lines (both paid and free)
-      const [orderLines] = await connection.execute(
-        `
-          SELECT item_id, quantity, type, price, subtotal
-          FROM xxafmc_order_details
-          WHERE order_id = ?
-        `,
-        [orderNumber]
-      );
-
-      console.log(`[CONFIRM-ORDER] Reserving stock for order ${orderNumber}:`, orderLines);
-
-      for (const line of orderLines) {
-        const itemCode = Number(line.item_id);
-        const isFreeRow = Number(line.price || 0) === 0 && Number(line.subtotal || 0) === 0;
-        // Free rows are already peg-weighted from the fix above
-        // Paid rows need the peg multiplier applied
-        const pegMultiplier = getPegMultiplierForType(line.type || '');
-        const quantity = isFreeRow 
-          ? Number(line.quantity || 0) // Already peg-weighted
-          : Number(line.quantity || 0) * pegMultiplier;
-        
-        if (!Number.isFinite(itemCode) || itemCode <= 0 || !Number.isFinite(quantity) || quantity <= 0) {
-          continue;
-        }
-
-        console.log(`[CONFIRM-ORDER] Reserving ${quantity} units for item ${itemCode} (${isFreeRow ? 'free' : 'paid'})`);
-        await reserveInventoryQty(connection, itemCode, quantity);
-      }
-    } catch (stockError) {
-      console.error('Error reserving stock:', stockError);
-      // Don't throw - we want the order to complete even if stock reservation fails
-      // The order is already created, just log the error
     }
 
     await connection.commit();

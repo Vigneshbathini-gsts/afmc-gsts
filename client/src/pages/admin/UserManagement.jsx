@@ -604,7 +604,7 @@ export default function UserManagement() {
                     name="userName"
                     value={formData.userName}
                     onChange={handleFormChange}
-                     maxLength={25}
+                     maxLength={100}
                     placeholder="Enter username same as email"
                     className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-2 text-sm text-gray-800 outline-none transition focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
                   />

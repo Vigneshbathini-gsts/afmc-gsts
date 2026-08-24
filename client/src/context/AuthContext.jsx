@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { cartAPI } from "../services/api";
 import { storeAuthData, clearAuthData, getStoredUser } from "../utils/authStorage";
+import { getCartCount } from "../utils/cartCount";
 
 const AuthContext = createContext(null);
 const AUTH_USER_STORAGE_KEY = "authUser";
@@ -65,7 +66,7 @@ export function AuthProvider({ children }) {
     try {
       const response = await cartAPI.getByUserId(userId);
       const items = response.data?.data || [];
-      setCartCount(items.length);
+      setCartCount(getCartCount(items));
     } catch (error) {
       console.error("Failed to load cart count:", error);
       setCartCount(0);

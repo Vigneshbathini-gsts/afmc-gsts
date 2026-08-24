@@ -741,6 +741,13 @@ const updateCartCustomization = async (cartId, userId, updates) => {
 
 const addCartItem = async (userId, itemData) => {
   const { item_id, quantity = 1, unit_price = 0, remarks, type, loginType, roleId, customIngredients } = itemData;
+  const normalizedQuantity = Number(quantity);
+
+  if (!Number.isInteger(normalizedQuantity) || normalizedQuantity < 1) {
+    const error = new Error("Quantity must be at least 1");
+    error.status = 400;
+    throw error;
+  }
 
   const conn = await db.getConnection();
 
@@ -806,7 +813,7 @@ const addCartItem = async (userId, itemData) => {
     // GET PEG MULTIPLIER FOR TYPE
     // -------------------------------
     const pegMultiplier = getPegMultiplierForType(type);
-    const requestedUnits = quantity * pegMultiplier;
+    const requestedUnits = normalizedQuantity * pegMultiplier;
 
     // -------------------------------
     // CHECK EXISTING CART ITEM
@@ -825,7 +832,9 @@ const addCartItem = async (userId, itemData) => {
     const existingParams = [userId, resolvedItemCode, typeKey];
     const [existing] = await conn.execute(existingSql, existingParams);
 
-    const totalQuantityAfterUpdate = existing.length > 0 ? existing[0].quantity + quantity : quantity;
+    const totalQuantityAfterUpdate = existing.length > 0
+      ? existing[0].quantity + normalizedQuantity
+      : normalizedQuantity;
     const totalUnitsAfterUpdate = totalQuantityAfterUpdate * pegMultiplier;
 
     // -------------------------------
@@ -950,19 +959,19 @@ const addCartItem = async (userId, itemData) => {
     // -------------------------------
     let ingredientsToUse;
     if (customIngredients && customIngredients.length > 0) {
-      ingredientsToUse = await enrichIngredientsWithStock(conn, customIngredients, quantity);
+      ingredientsToUse = await enrichIngredientsWithStock(conn, customIngredients, normalizedQuantity);
     } else {
-      ingredientsToUse = await getDefaultCocktailIngredientRows(conn, resolvedItemCode, loginType, quantity, roleId);
+      ingredientsToUse = await getDefaultCocktailIngredientRows(conn, resolvedItemCode, loginType, normalizedQuantity, roleId);
     }
 
     // -------------------------------
     // INSERT/UPDATE MAIN CART ITEM
     // -------------------------------
-    let newQty = quantity;
+    let newQty = normalizedQuantity;
     let insertId = null;
 
     if (existing.length > 0) {
-      newQty = existing[0].quantity + quantity;
+      newQty = existing[0].quantity + normalizedQuantity;
       await conn.execute(
         `UPDATE xxafmc_cart_items
          SET quantity = ?, total = price * ?
@@ -978,9 +987,9 @@ const addCartItem = async (userId, itemData) => {
         [
           userId,
           resolvedItemCode,
-          quantity,  // Store as item count for main items
+          normalizedQuantity,  // Store as item count for main items
           unit_price,
-          unit_price * quantity,
+          unit_price * normalizedQuantity,
           cartDescription,
           selectedProfit,
           selectedCharges,
@@ -991,7 +1000,7 @@ const addCartItem = async (userId, itemData) => {
       insertId = insertResult.insertId;
       
       if (isCocktailOrMocktail) {
-        const normalized = await normalizeCustomizationUpdates(conn, ingredientsToUse, quantity);
+        const normalized = await normalizeCustomizationUpdates(conn, ingredientsToUse, normalizedQuantity);
         await replaceCartCustomization(conn, insertId, normalized);
 
         const customizedUnitPrice = Number(

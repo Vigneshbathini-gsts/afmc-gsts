@@ -9,6 +9,7 @@ import Pubmenubuyservice from "../../flows/buy/services/Pubmenubuyservice";
 import FilterDropdown from "./FilterDropdown";
 import OffersMarquee from "./OffersMarquee";
 import { toInitCap } from "../../utils/textFormat";
+import { getCartCount } from "../../utils/cartCount";
 import { getPegTypeOrderLimitMessage } from "../../utils/stockValidation";
 import {
   clearSelectedAttendantCustomer,
@@ -50,6 +51,7 @@ const menuConfig = {
 };
 
 const hardDrinkCategories = [
+  { label: "All", value: "all" },
   { label: "Beer", value: "beer" },
   { label: "Brandy", value: "brandy" },
   { label: "Breezer", value: "breezer" },
@@ -387,7 +389,7 @@ function MenuPopupCompact({ item, loading, onClose, onBuy }) {
     try {
       const response = await cartAPI.getByUserId(userId);
       const items = response?.data?.data || [];
-      setCartCount?.(items.length);
+      setCartCount?.(getCartCount(items));
     } catch (err) {
       console.error("Error fetching cart count:", err);
     }
@@ -399,6 +401,12 @@ function MenuPopupCompact({ item, loading, onClose, onBuy }) {
 
   const handleAddToCart = async () => {
     if (!item) return;
+
+    const quantityValue = Number(qty);
+    if (!Number.isInteger(quantityValue) || quantityValue < 1) {
+      toast.error("Quantity must be at least 1");
+      return;
+    }
 
     if (isPegsUnit && !pegType) {
       toast.error("Select the type");
@@ -438,7 +446,7 @@ function MenuPopupCompact({ item, loading, onClose, onBuy }) {
         // Menu popup also has `item_id` (inventory ITEM_ID), which would break stock lookup.
         item_id: item?.item_code ?? item?.item_id,
         item_name: item?.item_name,
-        quantity: parseInt(qty, 10) || 1,
+        quantity: quantityValue,
         unit_price: item?.unit_price,
         remarks,
         type: isPegsUnit ? pegType : null,
@@ -525,6 +533,8 @@ function MenuPopupCompact({ item, loading, onClose, onBuy }) {
       setIsSubmitting(false);
     }
   };
+
+  const isQuantityValid = Number.isInteger(Number(qty)) && Number(qty) >= 1;
 
   const handleBuyNow = () => {
     const trimmedRemarks = String(remarks || "").trim();
@@ -745,7 +755,7 @@ function MenuPopupCompact({ item, loading, onClose, onBuy }) {
                   <button
                     type="button"
                     onClick={handleAddToCart}
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || !isQuantityValid}
                     className="min-w-[170px] rounded-full bg-afmc-maroon px-8 py-3 text-sm font-semibold text-white shadow-sm ring-1 ring-afmc-gold/25 transition hover:bg-afmc-maroon/90 disabled:cursor-not-allowed disabled:opacity-70"
                   >
                     {isSubmitting ? toInitCap("Adding...") : toInitCap("Add to cart")}
@@ -1322,15 +1332,29 @@ function DrinkHardDrinkSection({ onItemClick }) {
   const [data, setData] = useState([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [category, setCategory] = useState("beer");
+  const [category, setCategory] = useState("all");
   const [selectedItem, setSelectedItem] = useState("");
 
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const result = await authFetchJson(`${API_BASE_URL}/Drinkhard${category}`);
-        setData(result?.data || []);
+        const categories = category === "all"
+          ? hardDrinkCategories.filter((item) => item.value !== "all")
+          : hardDrinkCategories.filter((item) => item.value === category);
+        const results = await Promise.all(
+          categories.map((item) => authFetchJson(`${API_BASE_URL}/Drinkhard${item.value}`))
+        );
+        const combinedItems = results.flatMap((result) => result?.data || []);
+        const uniqueItems = Array.from(
+          new Map(
+            combinedItems.map((item) => [
+              String(item.item_code ?? item.item_id ?? item.item_name),
+              item,
+            ])
+          ).values()
+        );
+        setData(uniqueItems);
       } catch (fetchError) {
         setError(fetchError.message);
       } finally {
@@ -1350,7 +1374,7 @@ function DrinkHardDrinkSection({ onItemClick }) {
   }, [data, selectedItem]);
 
   return (
-    <div className="space-y-6 rounded-2xl border border-white/60 bg-white/70 p-5 shadow-sm backdrop-blur-sm">
+    <div className="space-y-6 rounded-2xl border border-white/60 bg-white/70 p-5 shadow-sm backdrop-blur-sm mt-8">
       <InlineError message={error} />
       <div className="flex flex-wrap gap-3">
         {hardDrinkCategories.map((item) => (
@@ -1386,7 +1410,7 @@ function DrinkHardDrinkSection({ onItemClick }) {
         <ProgressiveMenuGrid
           items={visibleItems}
           showStockStatus
-          ignoreStockStatus={category === "cocktail"}
+          ignoreStockStatus={category === "cocktail" || category === "all"}
           onItemClick={onItemClick}
         />
       )}
@@ -1544,7 +1568,7 @@ function MenuDashboard() {
       try {
         const response = await cartAPI.getByUserId(user.userId);
         const items = response?.data?.data || [];
-        setCartCount(items.length);
+        setCartCount(getCartCount(items));
       } catch (err) {
         console.error("Error refreshing cart count on menu dashboard:", err);
       }

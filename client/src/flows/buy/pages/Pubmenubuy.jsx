@@ -6,6 +6,8 @@ import ConfirmOrderservice from "../../../services/ConfirmOrderservice";
 import { buildStockConsumptionMap, getEffectiveAvailableQuantity, getMaxAllowedQuantity, getPegTypeOrderLimitMessage, isCocktailOrMocktail, isOutOfStock, validateNextQuantity } from "../../../utils/stockValidation";
 import { barOrdersAPI, cartAPI } from "../../../services/api";
 import { toInitCap } from "../../../utils/textFormat";
+import { getCartCount } from "../../../utils/cartCount";
+import { useAuth } from "../../../context/AuthContext";
 import { toast } from "react-toastify";
 
 const BASEAPI = "https://afmc.globalsparkteksolutions.com/AFMCIMAGES/";
@@ -462,6 +464,7 @@ export default function Pubmenubuy({
 }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user, setCartCount } = useAuth();
   const [searchParams] = useSearchParams();
   const orderNumber = searchParams.get("orderNumber") || location.state?.orderNumber || "";
   const [items, setItems] = useState([]);
@@ -2044,6 +2047,15 @@ export default function Pubmenubuy({
       });
 
       await ConfirmOrderservice.confirmOrder(orderNumber, payload);
+
+      if (user?.userId) {
+        try {
+          const cartResponse = await cartAPI.getByUserId(user.userId);
+          setCartCount(getCartCount(cartResponse?.data?.data));
+        } catch (cartError) {
+          console.error("Unable to refresh cart count after order confirmation:", cartError);
+        }
+      }
 
       showToast("Order confirmed successfully", "success");
 

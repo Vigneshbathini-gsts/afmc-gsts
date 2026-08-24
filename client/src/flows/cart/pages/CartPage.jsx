@@ -9,6 +9,7 @@ import { getMaxAllowedQuantity, getItemPegMultiplier, getPegTypeOrderLimitMessag
 // Cache cocktail details per cart item
 // so we can validate ingredient-level stock before quantity changes.
 import { toInitCap } from "../../../utils/textFormat";
+import { getCartCount } from "../../../utils/cartCount";
 import {
     clearSelectedAttendantCustomer,
     getSelectedAttendantCustomerPayload,
@@ -169,7 +170,7 @@ export default function CartPage({ isAttendant = false }) {
             const items = response.data.data || [];
             // console.log("Fetched cart items:", items);
             setCartItems(items);
-            setCartCount(items.length);
+            setCartCount(getCartCount(items));
             // Pre-fetch cocktail details for cocktail/mocktail items
             try {
                 const cocktailMap = {};
@@ -304,7 +305,7 @@ console.log("Multiplier:", getItemPegMultiplier(currentItem));
             const response = await cartAPI.updateQuantity(cartId, newQuantity);
             const items = response.data.data || [];
             setCartItems(items);
-            setCartCount(items.length);
+            setCartCount(getCartCount(items));
             showToast("Quantity updated successfully");
             return true;
         } catch (err) {
@@ -348,7 +349,7 @@ console.log("Multiplier:", getItemPegMultiplier(currentItem));
             const response = await cartAPI.deleteItem(cartId);
             const items = response.data.data || [];
             setCartItems(items);
-            setCartCount(items.length);
+            setCartCount(getCartCount(items));
             showToast("Item removed from cart");
 
             if (items.length === 0) {
