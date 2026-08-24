@@ -58,7 +58,7 @@ export default function CocktailEdit() {
 
   // Fetches a single page of ingredient options, filtered by `query` on the
   // backend (real search: matches ITEM_NAME or ITEM_CODE server-side).
-  const fetchIngredientOptions = useCallback(async ({ reset = true, nextPage = 0, query = "" } = {}) => {
+  const fetchIngredientOptions = useCallback(async ({ reset = true, nextPage = 0, query = "", subCategory = "" } = {}) => {
       const requestId = ++ingredientRequestIdRef.current;
       if (!reset) setIngredientsLoadingMore(true);
       else setIngredientsLoading(true);
@@ -66,6 +66,7 @@ export default function CocktailEdit() {
         const response = await cocktailAPI.getIngredientOptions(query, {
           limit: INGREDIENT_PAGE_SIZE,
           offset: nextPage * INGREDIENT_PAGE_SIZE,
+          subCategory,
         });
 
         // Ignore this result if a newer search/page request has since started
@@ -98,10 +99,10 @@ export default function CocktailEdit() {
   // the backend for matching items directly — no scrolling needed to find them.
   useEffect(() => {
     const handle = setTimeout(() => {
-      fetchIngredientOptions({ reset: true, nextPage: 0, query: ingredientSearch });
+      fetchIngredientOptions({ reset: true, nextPage: 0, query: ingredientSearch, subCategory: form.subCategory });
     }, 300);
     return () => clearTimeout(handle);
-  }, [ingredientSearch, fetchIngredientOptions]);
+  }, [ingredientSearch, form.subCategory, fetchIngredientOptions]);
 
   const handleIngredientSearchChange = useCallback((nextQuery) => {
     setIngredientSearch(nextQuery);
@@ -109,8 +110,8 @@ export default function CocktailEdit() {
   }, []);
 
   const handleIngredientMenuScroll = useCallback(() => {
-    fetchIngredientOptions({ reset: false, nextPage: ingredientPage, query: ingredientSearch });
-  }, [fetchIngredientOptions, ingredientPage, ingredientSearch]);
+    fetchIngredientOptions({ reset: false, nextPage: ingredientPage, query: ingredientSearch, subCategory: form.subCategory });
+  }, [fetchIngredientOptions, ingredientPage, ingredientSearch, form.subCategory]);
 
   const updateField = (field, value) => {
     setForm((current) => ({ ...current, [field]: value }));
@@ -510,8 +511,8 @@ return (
                 className="h-[52px] w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 outline-none focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
               >
                 <option value="">Sub Category</option>
-                <option value="14">COCKTAIL</option>
-                <option value="15">MOCKTAIL</option>
+                <option value="14">MOCKTAIL</option>
+                <option value="15">COCKTAIL</option>
               </select>
             </div>
 
@@ -548,7 +549,7 @@ return (
           {/* Pr Charges inputs - side by side on mobile too, 4 cols on xl */}
           <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
              <div>
-              <label className="mb-1 block text-sm text-[#4d4640]">Member charges</label>
+              <label className="mb-1 block text-sm text-[#4d4640]">Member Pr charges</label>
             <input
               type="number"
               min={0}
@@ -561,7 +562,7 @@ return (
             />
             </div>
             <div>
-              <label className="mb-1 block text-sm text-[#4d4640]">Non Member charges</label>
+              <label className="mb-1 block text-sm text-[#4d4640]">Non Member Pr charges</label>
             <input
                type="number"
                 min={0}

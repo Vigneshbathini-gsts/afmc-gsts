@@ -68,6 +68,7 @@ export default function CartPage({ isAttendant = false }) {
     const [confirmModal, setConfirmModal] = useState({ isOpen: false, cartId: null });
     const [proceedConfirmOpen, setProceedConfirmOpen] = useState(false);
     const [stockLimitImageMessages, setStockLimitImageMessages] = useState({});
+    const [failedImageKeys, setFailedImageKeys] = useState({});
     const quantityDebounceRef = useRef({});
     const pendingQuantityRef = useRef({});
     const confirmedQuantityRef = useRef({});
@@ -605,6 +606,9 @@ console.log("Multiplier:", getItemPegMultiplier(currentItem));
             {/* Cart Items Grid */}
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {cartItems.map((item) => {
+                    const imageKey = String(item.cartId);
+                    const imageUrl = item.image ? `${BASEAPI}${item.image}` : "";
+                    const showImagePlaceholder = !imageUrl || failedImageKeys[imageKey];
                     const isCocktailItem = isCocktailOrMocktail(item);
                     const cocktailDetails = isCocktailItem ? cocktailDetailsByCartId[String(item.cartId)] : null;
                     const cocktailDetailsStockStatus = Array.isArray(cocktailDetails) && cocktailDetails.length > 0
@@ -649,14 +653,20 @@ console.log("Multiplier:", getItemPegMultiplier(currentItem));
                             {/* Image and Action Buttons Row */}
                             <div className="relative mb-2 flex items-center justify-center bg-gray-50 rounded-lg overflow-hidden">
                                 <div className="relative w-full h-32 flex items-center justify-center">
-                                    <img
-                                        src={`${BASEAPI}${item.image || "default.jpg"}`}
-                                        alt={item.itemName || "Item"}
-                                        className={`w-full h-full object-contain rounded-lg ${imageStockMessage ? "opacity-45" : ""}`}
-                                        onError={(e) => {
-                                            e.target.src = "https://via.placeholder.com/200x150?text=No+Image";
-                                        }}
-                                    />
+                                    {showImagePlaceholder ? (
+                                        <div className="flex h-full w-full items-center justify-center bg-gray-100 px-4 text-center text-sm font-semibold text-gray-500">
+                                            {toInitCap(item.itemName) || toInitCap("No Image")}
+                                        </div>
+                                    ) : (
+                                        <img
+                                            src={imageUrl}
+                                            alt={item.itemName || "Item"}
+                                            className={`w-full h-full object-contain rounded-lg ${imageStockMessage ? "opacity-45" : ""}`}
+                                            onError={() => {
+                                                setFailedImageKeys((current) => ({ ...current, [imageKey]: true }));
+                                            }}
+                                        />
+                                    )}
                                     {imageStockMessage ? (
                                         <div className="absolute inset-0 z-[5] flex items-center justify-center bg-black/35 px-3 text-center">
                                             <span className="rounded-md bg-red-600 px-3 py-1.5 text-sm font-bold uppercase tracking-wide text-white shadow-sm">

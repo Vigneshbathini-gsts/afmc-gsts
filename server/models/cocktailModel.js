@@ -161,8 +161,8 @@ const getCocktailItems = async (search = "", pagination = {}) => {
       UNIT_PRICE,
       FOOD_PR_CHARGES,
       CASE
-        WHEN SUB_CATEGORY = 14 THEN 'COCKTAIL'
-        WHEN SUB_CATEGORY = 15 THEN 'MOCKTAIL'
+        WHEN SUB_CATEGORY = 14 THEN 'MOCKTAIL'
+        WHEN SUB_CATEGORY = 15 THEN 'COCKTAIL'
         ELSE 'UNKNOWN'
       END AS CATEGORY_NAME,
       CASE
@@ -198,6 +198,13 @@ const getCocktailIngredientOptions = async (search = "", pagination = {}) => {
   const offset = Number(pagination.offset);
   const hasPagination =
     Number.isInteger(limit) && limit > 0 && Number.isInteger(offset) && offset >= 0;
+  const subCategory = Number(pagination.subCategory);
+  const hasSubCategoryFilter = [14, 15].includes(subCategory);
+  const subCategoryCondition = hasSubCategoryFilter
+    ? subCategory === 14
+      ? "AND SUB_CATEGORY IN (6, 9, 4, 18)"
+      : "AND SUB_CATEGORY NOT IN (1, 6, 9, 4, 14, 15, 7, 10, 3, 1310, 18)"
+    : "";
 
   const query = `
     SELECT DISTINCT
@@ -208,8 +215,9 @@ const getCocktailIngredientOptions = async (search = "", pagination = {}) => {
       AND ITEM_NAME IS NOT NULL
       AND TRIM(ITEM_NAME) <> ''
       AND (CATEGORY_ID IS NULL OR CATEGORY_ID <> 14)
-      AND (SUB_CATEGORY IS NULL OR SUB_CATEGORY NOT IN (14, 15))
-      AND STATUS = 'ACTIVE'  -- Only show active items
+      AND STATUS = 'ACTIVE'
+      AND (\`A/C_UNIT\` IS NULL OR UPPER(TRIM(\`A/C_UNIT\`)) <> 'GLASS')
+      ${subCategoryCondition}
       AND (
         ? IS NULL
         OR UPPER(ITEM_NAME) LIKE CONCAT('%', UPPER(?), '%')

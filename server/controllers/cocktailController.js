@@ -74,6 +74,7 @@ const getCocktailIngredients = async (req, res) => {
     const rows = await getCocktailIngredientOptions(req.query.search, {
       limit: req.query.limit,
       offset: req.query.offset,
+      subCategory: req.query.subCategory,
     });
 
     return res.json({

@@ -307,13 +307,14 @@ export default function Offers() {
                   <thead className="bg-white/70 border-b border-gray-200">
                     <tr className="text-gray-700">
                       <th className="px-5 py-4 font-semibold">Action</th>
-                      <th className="px-5 py-4 font-semibold">Offer ID</th>
+                      {/* <th className="px-5 py-4 font-semibold">Offer ID</th> */}
                       <th className="px-5 py-4 font-semibold">Item Name</th>
                       <th className="px-5 py-4 font-semibold">Free Item</th>
                       <th className="px-5 py-4 font-semibold">Offer Date</th>
                       <th className="px-5 py-4 font-semibold">End Date</th>
-                      <th className="px-5 py-4 font-semibold">Status</th>
+
                       <th className="px-5 py-4 font-semibold">Message</th>
+                      <th className="px-5 py-4 font-semibold">Status</th>
                     </tr>
                   </thead>
 
@@ -334,9 +335,9 @@ export default function Offers() {
                           </button>
                         </td>
 
-                        <td className="px-5 py-4 font-semibold text-gray-800">
+                        {/* <td className="px-5 py-4 font-semibold text-gray-800">
                           {offer.offer_id}
-                        </td>
+                        </td> */}
 
                         <td className="px-5 py-4 text-gray-700 font-medium">
                           {offer.item_name || "-"}
@@ -354,6 +355,11 @@ export default function Offers() {
                           {formatDate(offer.end_date)}
                         </td>
 
+
+
+                        <td className="px-5 py-4 text-gray-700 min-w-[280px]">
+                          {offer.message || "-"}
+                        </td>
                         <td className="px-5 py-4">
                           <span
                             className={`px-3 py-1.5 rounded-full text-xs font-semibold border ${getStatusStyle(
@@ -363,10 +369,6 @@ export default function Offers() {
                             {offer.status || "Inactive"}
                           </span>
 
-                        </td>
-
-                        <td className="px-5 py-4 text-gray-700 min-w-[280px]">
-                          {offer.message || "-"}
                         </td>
                       </tr>
                     ))}
@@ -406,8 +408,8 @@ export default function Offers() {
                       key={page}
                       onClick={() => handlePageClick(page)}
                       className={`w-10 h-10 rounded-xl font-semibold transition ${currentPage === page
-                          ? "bg-afmc-maroon text-white shadow-md"
-                          : "bg-white border border-gray-200 text-gray-700 hover:bg-gray-100"
+                        ? "bg-afmc-maroon text-white shadow-md"
+                        : "bg-white border border-gray-200 text-gray-700 hover:bg-gray-100"
                         }`}
                     >
                       {page}

@@ -82,7 +82,7 @@ export default function CocktailCreate() {
 
   // Fetches a single page of ingredient options, filtered by `query` on the
   // backend (real search: matches ITEM_NAME or ITEM_CODE server-side).
-  const fetchIngredientOptions = useCallback(async ({ reset = true, nextPage = 0, query = "" } = {}) => {
+  const fetchIngredientOptions = useCallback(async ({ reset = true, nextPage = 0, query = "", subCategory = "" } = {}) => {
       const requestId = ++ingredientRequestIdRef.current;
       if (!reset) setIngredientsLoadingMore(true);
       else setIngredientsLoading(true);
@@ -90,6 +90,7 @@ export default function CocktailCreate() {
         const response = await cocktailAPI.getIngredientOptions(query, {
           limit: INGREDIENT_PAGE_SIZE,
           offset: nextPage * INGREDIENT_PAGE_SIZE,
+          subCategory,
         });
 
         // Ignore this result if a newer search/page request has since started
@@ -122,10 +123,10 @@ export default function CocktailCreate() {
   // the backend for matching items directly — no scrolling needed to find them.
   useEffect(() => {
     const handle = setTimeout(() => {
-      fetchIngredientOptions({ reset: true, nextPage: 0, query: ingredientSearch });
+      fetchIngredientOptions({ reset: true, nextPage: 0, query: ingredientSearch, subCategory: form.subCategory });
     }, 300);
     return () => clearTimeout(handle);
-  }, [ingredientSearch, fetchIngredientOptions]);
+  }, [ingredientSearch, form.subCategory, fetchIngredientOptions]);
 
   const handleIngredientSearchChange = useCallback((nextQuery) => {
     setIngredientSearch(nextQuery);
@@ -133,8 +134,8 @@ export default function CocktailCreate() {
   }, []);
 
   const handleIngredientMenuScroll = useCallback(() => {
-    fetchIngredientOptions({ reset: false, nextPage: ingredientPage, query: ingredientSearch });
-  }, [fetchIngredientOptions, ingredientPage, ingredientSearch]);
+    fetchIngredientOptions({ reset: false, nextPage: ingredientPage, query: ingredientSearch, subCategory: form.subCategory });
+  }, [fetchIngredientOptions, ingredientPage, ingredientSearch, form.subCategory]);
 
   const updateForm = (field, value) => {
     setForm((current) => ({ ...current, [field]: value }));
@@ -310,8 +311,8 @@ export default function CocktailCreate() {
 
   const subCategoryOptions = useMemo(
     () => [
-      { value: "14", label: "Cocktail" },
-      { value: "15", label: "Mocktail" },
+      { value: "14", label: "Mocktail" },
+      { value: "15", label: "Cocktail" },
     ],
     []
   );

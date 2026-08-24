@@ -354,7 +354,7 @@ export default function StockReports() {
                     <th className="px-4 py-3 text-left font-medium">Batch ID</th>
                   )} */}
                   <th className="px-4 py-3 text-left font-medium">
-                    Transaction Date
+                    Creation  Date
                   </th>
                   <th className="px-4 py-3 text-left font-medium">A/c Unit</th>
                   <th className="px-4 py-3 text-left font-medium">Stock</th>

@@ -264,7 +264,7 @@ export default function ProfitManagement() {
                             {nonMemberForm.category === "Snacks" && (
                                 <div className="mb-3">
                                     <label className="block mb-1 text-sm font-medium text-slate-700">
-                                        PR Charges
+                                   Food PR Charges
                                     </label>
                                     <input
                                         type="text"
