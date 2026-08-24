@@ -214,7 +214,7 @@ return (
             {toInitCap("Your order has been received successfully.")}
           </p>
 
-          <div className="mt-4 rounded-2xl border border-stone-200 bg-[#fff4f0] px-4 py-4 text-left text-sm text-stone-700">
+          <div className="mt-4 rounded-2xl border border-stone-200 bg-[#fff4f0] px-4 py-4 text-center text-sm text-stone-700">
             {orderStatus === "Completed" && paymentStatus === "Paid" ? (
               <p>
                 {toInitCap("Payment has been completed. Here is your invoice.")}
@@ -229,8 +229,8 @@ return (
               </p>
             ) : (
               <p>
-                {toInitCap("Kitchen status is currently")} <strong>{toInitCap(orderStatus)}</strong>.{" "}
-                {toInitCap("Payment will be available once all items are completed.")}
+                {toInitCap("The order is currently")} <strong>{toInitCap(orderStatus)}</strong>.{" "}
+                {toInitCap("Payment will be available once all items have been completed.")}
               </p>
             )}
           </div>
