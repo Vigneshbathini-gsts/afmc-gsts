@@ -542,6 +542,8 @@ export default function CocktailCreate() {
               placeholder="Member Profit"
               className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 outline-none focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
             /> */}
+            <div>
+              <label className="mb-1 block text-sm text-[#4d4640]">Member PR charges</label>
             <input
               inputMode="numeric"
               pattern="[0-9]*"
@@ -552,9 +554,10 @@ export default function CocktailCreate() {
                   setError("");
                 }
               }}
-              placeholder="Member Pr Charges"
+              placeholder="Member PR Charges"
               className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-3 sm:px-4 py-3 outline-none focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
             />
+            </div>
             {/* <input
               inputMode="numeric"
               pattern="[0-9]*"
@@ -568,6 +571,8 @@ export default function CocktailCreate() {
               placeholder="Non Member Profit"
               className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 outline-none focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
             /> */}
+            <div>
+             <label className="mb-1 block text-sm text-[#4d4640]">Non Member PR charges</label>
             <input
               inputMode="numeric"
               pattern="[0-9]*"
@@ -578,9 +583,10 @@ export default function CocktailCreate() {
                   setError("");
                 }
               }}
-              placeholder="Non Member Pr Charges"
+              placeholder="Non Member PR Charges"
               className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-3 sm:px-4 py-3 outline-none focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
             />
+            </div>
           </div>
 
           <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">

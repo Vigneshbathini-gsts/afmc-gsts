@@ -549,7 +549,7 @@ return (
           {/* Pr Charges inputs - side by side on mobile too, 4 cols on xl */}
           <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
              <div>
-              <label className="mb-1 block text-sm text-[#4d4640]">Member Pr charges</label>
+              <label className="mb-1 block text-sm text-[#4d4640]">Member PR charges</label>
             <input
               type="number"
               min={0}
@@ -557,12 +557,12 @@ return (
               onChange={(event) =>
                 updateField("memberPrCharges", event.target.value)
               }
-              placeholder="Member Pr Charges"
+              placeholder="Member PR Charges"
               className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-3 sm:px-4 py-3 outline-none focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
             />
             </div>
             <div>
-              <label className="mb-1 block text-sm text-[#4d4640]">Non Member Pr charges</label>
+              <label className="mb-1 block text-sm text-[#4d4640]">Non Member PR charges</label>
             <input
                type="number"
                 min={0}
@@ -570,7 +570,7 @@ return (
               onChange={(event) =>
                 updateField("nonMemberPrCharges", event.target.value)
               }
-              placeholder="Non Member Pr Charges"
+              placeholder="Non Member PR Charges"
               className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-3 sm:px-4 py-3 outline-none focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
             />
               </div>
