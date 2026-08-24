@@ -358,6 +358,12 @@ export default function OrderTransactionUI() {
 
         <Stackreporttab showTopBar={false} showReportTitle={false} />
 
+        <div className="mt-2 border border-afmc-gold/25 border-t-0 rounded-b-xl bg-white/70 backdrop-blur-md shadow-sm">
+          <div className="border-b-2 border-afmc-maroon/70 px-4 py-2 text-center text-sm font-semibold text-afmc-maroon">
+            Drinks &amp; Snacks
+          </div>
+        </div>
+
         <div className="mt-8 bg-white/80 border border-white/60 rounded-3xl shadow-xl backdrop-blur-sm p-6">
           <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
             <div>
