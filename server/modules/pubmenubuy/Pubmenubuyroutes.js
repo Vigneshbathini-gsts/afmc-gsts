@@ -14,8 +14,8 @@ router.put(
   checkBarOpen,
   PubmenubuyController.updatePubMenuOrderItemCustomization
 );
-router.delete("/Pubmenubuy/:ORDER_NUMBER/item/:ITEM_CODE", checkBarOpen, PubmenubuyController.deletePubMenuOrderItem);
-router.delete("/Pubmenubuy/:ORDER_NUMBER", checkBarOpen, PubmenubuyController.cancelPubMenuOrder);
+router.delete("/Pubmenubuy/:ORDER_NUMBER/item/:ITEM_CODE", PubmenubuyController.deletePubMenuOrderItem);
+router.delete("/Pubmenubuy/:ORDER_NUMBER", authMiddleware, PubmenubuyController.cancelPubMenuOrder);
 router.put(
   "/Pubmenubuy/:ORDER_NUMBER/line/:ORDER_LINE_ID/quantity",
   checkBarOpen,

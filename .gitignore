@@ -3,4 +3,5 @@ dist/
 build/
 .env
 uploads/
+/server/ps/
 .DS_Store
