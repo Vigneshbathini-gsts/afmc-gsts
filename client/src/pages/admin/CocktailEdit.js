@@ -455,17 +455,17 @@ return (
       <div className="absolute top-16 left-12 w-72 h-72 bg-afmc-maroon/10 rounded-full blur-3xl"></div>
       <div className="absolute bottom-20 right-20 w-80 h-80 bg-afmc-maroon2/10 rounded-full blur-3xl"></div>
 
-      <div className="px-0 py-4 md:p-8 relative z-10">
-        <div className="flex flex-wrap items-center justify-between gap-4 mb-6 md:mb-8">
-          <h1 className="text-2xl font-semibold text-afmc-maroon">
+      <div className="px-4 py-4 sm:px-5 md:p-8 relative z-10">
+        <div className="flex flex-col gap-4 mb-6 md:mb-8 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+          <h1 className="text-xl sm:text-2xl font-semibold text-afmc-maroon">
             Edit Cocktail/Mocktail
           </h1>
 
-          <div className="flex flex-wrap gap-3">
+          <div className="flex w-full gap-3 sm:w-auto sm:flex-wrap">
             <button
               type="button"
               onClick={() => navigate("/admin/cocktail-management")}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-white shadow hover:shadow-md border border-afmc-gold/30 text-gray-700 hover:text-afmc-maroon hover:bg-afmc-maroon/5 transition"
+              className="flex flex-1 items-center justify-center gap-2 px-4 py-2.5 rounded-full bg-white shadow hover:shadow-md border border-afmc-gold/30 text-gray-700 hover:text-afmc-maroon hover:bg-afmc-maroon/5 transition sm:flex-none sm:px-5"
             >
               <FaArrowLeft />
               Back
@@ -474,7 +474,7 @@ return (
               type="button"
               onClick={handleSubmit}
               disabled={saving || loading}
-              className="flex items-center gap-2 px-6 py-2.5 rounded-full bg-afmc-maroon hover:bg-afmc-maroon2 text-white font-semibold shadow hover:shadow-md transition disabled:opacity-60 disabled:cursor-not-allowed"
+              className="flex flex-1 items-center justify-center gap-2 px-4 py-2.5 rounded-full bg-afmc-maroon hover:bg-afmc-maroon2 text-white font-semibold shadow hover:shadow-md transition disabled:opacity-60 disabled:cursor-not-allowed sm:flex-none sm:px-6"
             >
               <Save size={18} />
               {saving ? "Saving..." : "Save"}
@@ -482,7 +482,7 @@ return (
           </div>
         </div>
 
-        <div className="bg-white/80 border border-afmc-gold/15 rounded-3xl shadow-xl backdrop-blur-sm p-5 md:p-6">
+        <div className="bg-white/80 border border-afmc-gold/15 rounded-2xl md:rounded-3xl shadow-xl backdrop-blur-sm p-4 sm:p-5 md:p-6">
           <div className="mb-5 md:mb-6 h-1 w-full rounded-full bg-gradient-to-r from-afmc-maroon via-afmc-gold to-afmc-maroon2" />
 
           <div className="space-y-6">
@@ -547,7 +547,7 @@ return (
           </div>
 
           {/* Pr Charges inputs - side by side on mobile too, 4 cols on xl */}
-          <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">
              <div>
               <label className="mb-1 block text-sm text-[#4d4640]">Member PR charges</label>
             <input
@@ -585,17 +585,17 @@ return (
                 <span className="text-sm font-medium">Ingredients</span>
               </div>
 
-              <div className="flex items-center gap-2 sm:ml-auto sm:gap-3">
+              <div className="flex w-full flex-col gap-2 sm:ml-auto sm:w-auto sm:flex-row sm:items-center sm:gap-3">
                 <input
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                   placeholder="Search: All Text Columns"
-                  className="min-w-0 flex-1 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 outline-none focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20 sm:flex-none"
+                  className="min-w-0 w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 outline-none focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20 sm:w-auto sm:flex-1 sm:min-w-[240px]"
                 />
                 <button
                   type="button"
                   onClick={addRow}
-                  className="shrink-0 whitespace-nowrap rounded-2xl bg-[#5b5b5b] px-4 py-3 font-semibold text-white shadow hover:shadow-md sm:px-6"
+                  className="w-full shrink-0 whitespace-nowrap rounded-2xl bg-[#5b5b5b] px-4 py-3 font-semibold text-white shadow hover:shadow-md sm:w-auto sm:px-6"
                 >
                   Add Row
                 </button>
@@ -603,7 +603,7 @@ return (
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full table-fixed text-center text-sm">
+              <table className="min-w-[900px] w-full table-fixed text-center text-sm">
                 <colgroup>
                   <col className="w-12" />
                   <col className="w-[22%]" />
@@ -723,7 +723,7 @@ return (
               </table>
             </div>
 
-            <div className="flex items-center justify-between px-4 py-3 text-sm text-gray-600">
+            <div className="flex flex-col gap-1 px-4 py-3 text-sm text-gray-600 sm:flex-row sm:items-center sm:justify-between">
               <span>Showing {filteredRows.length} rows</span>
               <span>Total {rows.length}</span>
             </div>
