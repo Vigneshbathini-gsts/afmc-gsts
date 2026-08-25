@@ -181,7 +181,7 @@ export default function OffersMarquee({
   title = "Offers for you",
   subtitle = "Premium deals curated for today.",
   useMockWhenEmpty = true,
-  speedSeconds = 100,
+  speedSeconds = 35,
 }) {
   const cleaned = useMemo(() => {
     const raw = Array.isArray(offers) ? offers : [];
