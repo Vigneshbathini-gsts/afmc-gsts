@@ -38,6 +38,7 @@ export default function StockReports() {
   const [activeTab, setActiveTab] = useState("in");
   const [fromDate, setFromDate] = useState(toInputDate(new Date()));
   const [toDate, setToDate] = useState(toInputDate(new Date()));
+  const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
@@ -50,6 +51,7 @@ export default function StockReports() {
   const [stockInHasMore, setStockInHasMore] = useState(true);
   const [stockOutHasMore, setStockOutHasMore] = useState(true);
   const requestInFlight = useRef(false);
+  const searchTermRef = useRef("");
 
   const fetchStockIn = useCallback(async (queryParams, { reset = true, nextPage = 0 } = {}) => {
     if (requestInFlight.current) return;
@@ -99,6 +101,9 @@ export default function StockReports() {
       setStockOutSummary(summary);
       setStockOutPage(nextPage + 1);
       setStockOutHasMore(rows.length === REPORT_PAGE_SIZE);
+      console.log("data stock reports",response.data)
+      console.log("summary",summary)
+      
     } catch (err) {
       console.error("Failed to load stock-out report:", err);
       setError("Failed to load stock-out report.");
@@ -115,6 +120,7 @@ export default function StockReports() {
     const queryParams = {
       fromDate: fromDate || undefined,
       toDate: toDate || undefined,
+      search: searchTermRef.current.trim() || undefined,
     };
 
     if (activeTab === "in") {
@@ -141,6 +147,7 @@ export default function StockReports() {
     const queryParams = {
       fromDate: fromDate || undefined,
       toDate: toDate || undefined,
+      search: searchTerm.trim() || undefined,
     };
 
     if (activeTab === "in") {
@@ -159,6 +166,7 @@ export default function StockReports() {
     const queryParams = {
       fromDate: fromDate || undefined,
       toDate: toDate || undefined,
+      search: searchTerm.trim() || undefined,
     };
 
     while (true) {
@@ -287,6 +295,26 @@ export default function StockReports() {
                 value={toDate}
                 onChange={(e) => setToDate(e.target.value)}
                 className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
+              />
+            </div>
+
+            <div className="col-span-2 min-w-0 md:col-span-1 md:w-64">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Search item
+              </label>
+              <input
+                type="search"
+                value={searchTerm}
+                onChange={(e) => {
+                  searchTermRef.current = e.target.value;
+                  setSearchTerm(e.target.value);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleSearch();
+                }}
+                placeholder="Name or item code"
+                className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
+                aria-label="Search by item name or item code"
               />
             </div>
 
