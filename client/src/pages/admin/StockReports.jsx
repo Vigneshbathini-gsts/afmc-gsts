@@ -99,6 +99,9 @@ export default function StockReports() {
       setStockOutSummary(summary);
       setStockOutPage(nextPage + 1);
       setStockOutHasMore(rows.length === REPORT_PAGE_SIZE);
+      console.log("data stock reports",response.data)
+      console.log("summary",summary)
+      
     } catch (err) {
       console.error("Failed to load stock-out report:", err);
       setError("Failed to load stock-out report.");

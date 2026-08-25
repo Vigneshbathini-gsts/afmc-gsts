@@ -745,7 +745,17 @@ const getStockOutReport = async ({ fromDate, toDate, limit, offset }) => {
       XSO.ITEM_CODE AS item_code,
       XSO.ITEM_NAME AS item_name,
       SUM(XSO.STOCK_QUANTITY) AS stock,
-      ROUND(SUM(IFNULL(XSO.UNIT_PRICE, 0)), 2) AS total_price,
+      ROUND(SUM(
+        CASE
+          WHEN UPPER(XSO.\`A/C_UNIT\`) = 'NOS' AND XSO.STOCK_QUANTITY > 0
+            THEN IFNULL(XSO.UNIT_PRICE, 0)
+          ELSE ROUND(
+            (IFNULL(XSO.UNIT_PRICE, 0) / IFNULL(NULLIF(XSO.PEGS, 0), 1))
+            * IFNULL(XSO.STOCK_QUANTITY, XSO.PEGS),
+            2
+          )
+        END
+      ), 2) AS total_price,
       MIN(XSO.CREATION_DATE) AS creation_date,
       COALESCE(NULLIF(XI.\`A/C_UNIT\`, ''), 'Nos') AS ac_unit
     FROM xxafmc_stock_out XSO
@@ -765,7 +775,17 @@ const getStockOutReportSummary = async ({ fromDate, toDate }) => {
   const sql = `
     SELECT
       IFNULL(SUM(XSO.STOCK_QUANTITY), 0) AS total_stock,
-      ROUND(SUM(IFNULL(XSO.TOTAL_VALUE, 0)), 2) AS total_price
+      ROUND(SUM(
+        CASE
+          WHEN UPPER(XSO.\`A/C_UNIT\`) = 'NOS' AND XSO.STOCK_QUANTITY > 0
+            THEN IFNULL(XSO.UNIT_PRICE, 0)
+          ELSE ROUND(
+            (IFNULL(XSO.UNIT_PRICE, 0) / IFNULL(NULLIF(XSO.PEGS, 0), 1))
+            * IFNULL(XSO.STOCK_QUANTITY, XSO.PEGS),
+            2
+          )
+        END
+      ), 2) AS total_price
     FROM xxafmc_stock_out XSO
     JOIN xxafmc_inventory XI ON XSO.ITEM_CODE = XI.ITEM_CODE
     WHERE XSO.CREATION_DATE >= ? AND XSO.CREATION_DATE <= ?
