@@ -8,16 +8,20 @@ const fileFilter = (req, file, cb) => {
   const allowedMimeTypes = [
     "text/csv",
     "application/vnd.ms-excel",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     "application/csv",
     "text/plain",
   ];
 
-  if (ext === ".csv" || allowedMimeTypes.includes(file.mimetype)) {
+  if (
+    [".csv", ".xls", ".xlsx"].includes(ext) ||
+    allowedMimeTypes.includes(file.mimetype)
+  ) {
     cb(null, true);
     return;
   }
 
-  cb(new Error("Only CSV files are allowed"));
+  cb(new Error("Only CSV or Excel template files are allowed"));
 };
 
 module.exports = multer({

@@ -242,39 +242,75 @@ export default function UserManagement() {
     }
   };
 
-  const handleTemplateDownload = () => {
-    const csvContent = [
+  const handleTemplateDownload = async () => {
+    const XLSX = await import("xlsx");
+    const columns = [
+      "Login Type",
+      "Full Name With Rank",
+      "First Name",
+      "Last Name",
+      "User Name",
+      "Password",
+      "Confirm Password",
+      "Email",
+      "Phone Number",
+    ];
+    const sampleRow = [
+      "END USER",
+      "Capt Ram Kumar",
+      "Ram",
+      "Kumar",
+      "ram.kumar@example.com",
+      "Pass123",
+      "Pass123",
+      "ram.kumar@example.com",
+      "9876543210",
+    ];
+    const worksheet = XLSX.utils.aoa_to_sheet([
+      ["AFMC Users Bulk Upload Template"],
       [
-        "Login Type",
-        "Full Name With Rank",
-        "First Name",
-        "Last Name",
-        "User Name",
-        "Password",
-        "Confirm Password",
-        "Email",
-      ].join(","),
-      [
-        "End User",
-        "Capt Ram Kumar",
-        "Ram",
-        "Kumar",
-        "ram.kumar",
-        "Pass123",
-        "Pass123",
-        "ram.kumar@example.com",
-      ].join(","),
-    ].join("\n");
+        "Fill all columns. Phone Number must be exactly 10 digits. Keep User Name as a valid email address.",
+      ],
+      columns,
+      sampleRow,
+    ]);
 
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute("download", "multiple-employee-template.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
+    worksheet["!merges"] = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: columns.length - 1 } },
+      { s: { r: 1, c: 0 }, e: { r: 1, c: columns.length - 1 } },
+    ];
+    worksheet["!cols"] = [
+      { wch: 16 },
+      { wch: 26 },
+      { wch: 16 },
+      { wch: 16 },
+      { wch: 28 },
+      { wch: 14 },
+      { wch: 18 },
+      { wch: 30 },
+      { wch: 16 },
+    ];
+    worksheet.A1.s = {
+      font: { bold: true, color: { rgb: "FFFFFF" }, sz: 16 },
+      fill: { fgColor: { rgb: "5B1F2A" } },
+      alignment: { horizontal: "center" },
+    };
+    worksheet.A2.s = {
+      font: { bold: true, color: { rgb: "4A2F12" } },
+      fill: { fgColor: { rgb: "FFF4D6" } },
+    };
+    columns.forEach((_, index) => {
+      const cellAddress = XLSX.utils.encode_cell({ r: 2, c: index });
+      worksheet[cellAddress].s = {
+        font: { bold: true, color: { rgb: "FFFFFF" } },
+        fill: { fgColor: { rgb: "1F2937" } },
+        alignment: { horizontal: "center" },
+      };
+    });
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Users Upload");
+    XLSX.writeFile(workbook, "multiple-employee-template.xlsx");
   };
 
   const handleUploadFileChange = (event) => {
@@ -286,7 +322,7 @@ export default function UserManagement() {
 
   const handleBulkUpload = async () => {
     if (!uploadFile) {
-      const uploadFileError = "Please choose a CSV file to upload.";
+      const uploadFileError = "Please choose a CSV or Excel template file to upload.";
       setUploadError(uploadFileError);
       toast.error(uploadFileError);
       return;
@@ -768,7 +804,7 @@ export default function UserManagement() {
                     <input
                       ref={uploadInputRef}
                       type="file"
-                      accept=".csv"
+                      accept=".csv,.xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                       onChange={handleUploadFileChange}
                       className="block w-full rounded-md border border-dashed border-[#9b8f82] bg-white px-3 py-2 text-[#241d17] file:mr-4 file:rounded file:border-0 file:bg-transparent file:text-base"
                     />
