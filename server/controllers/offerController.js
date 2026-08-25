@@ -271,12 +271,16 @@ exports.updateOffer = async (req, res) => {
     }
 
     const [currentOffer] = await db.query(
-      "SELECT STATUS FROM xxafmc_offers WHERE OFFER_ID = ?",
+      "SELECT STATUS, DATE_FORMAT(OFFER_DATE, '%Y-%m-%d') AS OFFER_DATE FROM xxafmc_offers WHERE OFFER_ID = ?",
       [id]
     );
 
     if (String(currentOffer[0].STATUS || '').toUpperCase() === 'INACTIVE' && normalizedStatus === 'ACTIVE') {
       return res.status(400).json({ message: "Inactive offers cannot be activated again" });
+    }
+
+    if (currentOffer[0].OFFER_DATE && endDate < currentOffer[0].OFFER_DATE) {
+      return res.status(400).json({ message: "End date cannot be earlier than start date" });
     }
 
     await db.query(

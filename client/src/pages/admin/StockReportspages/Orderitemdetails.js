@@ -210,7 +210,7 @@ export default function Orderitemdetails() {
     await fetchData(nextFilters, { reset: true, nextPage: 0 });
   };
 
-  const displayRows = summaryRow ? [...data, summaryRow] : data;
+  const displayRows = data.length > 0 && summaryRow ? [...data, summaryRow] : data;
 
   const handleTableScroll = (event) => {
     const { scrollTop, clientHeight, scrollHeight } = event.currentTarget;
@@ -282,6 +282,7 @@ export default function Orderitemdetails() {
           : "-",
         formatRowNumber(row, ["subtotal", "SUBTOTAL", "total", "TOTAL"]),
       ]),
+      bodyStyles: { halign: "center" },
     });
   };
 

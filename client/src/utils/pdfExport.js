@@ -111,6 +111,7 @@ export const exportTableToPdf = ({
         cellPadding: 6,
         overflow: "linebreak",
         valign: "middle",
+        halign: "center",
         textColor: [40, 40, 40],
         lineColor: [200, 200, 200],
         lineWidth: 0.5,

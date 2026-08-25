@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "react-toastify";
 import { messTimingsAPI } from "../../services/api";
-
+import TimePicker from "../../components/admin/TimePicker";
 export default function MessTimings() {
   const [timings, setTimings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -151,21 +151,21 @@ export default function MessTimings() {
 
       <div className="overflow-x-auto rounded-xl border bg-white shadow">
 
-        <table className="min-w-full">
+          <table className="min-w-full table-fixed">
 
           <thead className="bg-afmc-maroon text-white">
 
             <tr>
 
-              <th className="p-3">Day</th>
+              <th className="p-3 text-center">Day</th>
 
-              <th className="p-3">Shift 1 From</th>
+              <th className="p-3 text-center">Shift 1 From</th>
 
-              <th className="p-3">Shift 1 To</th>
+              <th className="p-3 text-center">Shift 1 To</th>
 
-              <th className="p-3">Shift 2 From</th>
+              <th className="p-3 text-center">Shift 2 From</th>
 
-              <th className="p-3">Shift 2 To</th>
+              <th className="p-3 text-center">Shift 2 To</th>
 
               <th className="p-3">Active</th>
 
@@ -184,7 +184,7 @@ export default function MessTimings() {
                     : "bg-gray-100"
                 }`}
               >
-                <td className="p-3 font-semibold">
+                <td className="p-3 text-center">
                   {row.day_name}
                 </td>
 
@@ -194,19 +194,13 @@ export default function MessTimings() {
                   "shift2_open_time",
                   "shift2_close_time",
                 ].map((field) => (
-                  <td key={field} className="p-2">
-                    <input
-                      type="time"
+                  <td key={field} className="p-2 text-center">
+                    <TimePicker
                       value={row[field] || ""}
                       disabled={saving}
-                      onChange={(e) =>
-                        handleChange(
-                          row.id,
-                          field,
-                          e.target.value
-                        )
+                      onChange={(next) =>
+                        handleChange(row.id, field, next)
                       }
-                      className="w-full rounded-md border px-2 py-2"
                     />
                   </td>
                 ))}

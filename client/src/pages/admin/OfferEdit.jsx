@@ -305,20 +305,32 @@ export default function OfferEdit() {
             </h3>
 
             <div className="grid grid-cols-1 gap-6">
-              {/* End Date - Read Only */}
+              {/* End Date */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   End Date <span className="text-red-500">*</span>
                 </label>
-                <div className="rounded-2xl border border-gray-200 bg-gray-100 px-4 py-3 shadow-sm">
-                  <div className="flex items-center gap-3">
-                    <FaCalendarCheck className="text-gray-400" />
-                    <span className="text-gray-700">{formData.endDate || "-"}</span>
-                  </div>
+                <div className="relative">
+                  <FaCalendarCheck className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="date"
+                    value={formData.endDate}
+                    min={formData.offerDate || undefined}
+                    onChange={(event) =>
+                      setFormData((previous) => ({
+                        ...previous,
+                        endDate: event.target.value,
+                      }))
+                    }
+                    disabled={formData.status === "Inactive" || saving}
+                    className="w-full rounded-2xl border border-gray-200 bg-white pl-11 pr-4 py-3 shadow-sm outline-none focus:ring-2 focus:ring-afmc-maroon disabled:cursor-not-allowed disabled:bg-gray-100"
+                  />
                 </div>
-                <p className="text-xs text-gray-400 mt-1">
-                  End Date is read-only and cannot be changed here.
-                </p>
+                {formData.status === "Inactive" && (
+                  <p className="text-xs text-gray-400 mt-1">
+                    Inactive offers cannot be edited.
+                  </p>
+                )}
               </div>
 
               <div>
