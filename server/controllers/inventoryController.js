@@ -222,9 +222,9 @@ exports.updateItemImage = async (req, res) => {
 
 exports.getStockInReport = async (req, res) => {
   try {
-    const { fromDate, toDate, limit, offset } = req.query;
-    const rows = await inventoryModel.getStockInReport({ fromDate, toDate, limit, offset });
-    const summary = await inventoryModel.getStockInReportSummary({ fromDate, toDate });
+    const { fromDate, toDate, search, limit, offset } = req.query;
+    const rows = await inventoryModel.getStockInReport({ fromDate, toDate, search, limit, offset });
+    const summary = await inventoryModel.getStockInReportSummary({ fromDate, toDate, search });
     res.status(200).json({ success: true, data: rows, summary });
   } catch (error) {
     console.error("Error fetching stock-in report:", error);
@@ -234,9 +234,9 @@ exports.getStockInReport = async (req, res) => {
 
 exports.getStockOutReport = async (req, res) => {
   try {
-    const { fromDate, toDate, limit, offset } = req.query;
-    const rows = await inventoryModel.getStockOutReport({ fromDate, toDate, limit, offset });
-    const summary = await inventoryModel.getStockOutReportSummary({ fromDate, toDate });
+    const { fromDate, toDate, search, limit, offset } = req.query;
+    const rows = await inventoryModel.getStockOutReport({ fromDate, toDate, search, limit, offset });
+    const summary = await inventoryModel.getStockOutReportSummary({ fromDate, toDate, search });
     res.status(200).json({ success: true, data: rows, summary });
   } catch (error) {
     console.error("Error fetching stock-out report:", error);
