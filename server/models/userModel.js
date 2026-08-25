@@ -547,10 +547,11 @@ const createBulkUsers = async ({ rows, createdBy }) => {
             ATTRIBUTE1,
             CONFIRM_PASSWORD,
             EMAIL,
+            PHONE_NUMBER,
             FIRST_NAME,
             LAST_NAME
           )
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `,
         [
           nextUserRow?.nextUserId,
@@ -568,6 +569,7 @@ const createBulkUsers = async ({ rows, createdBy }) => {
           "A",
           encryptedPassword,
           row.email,
+          row.phoneNumber,
           row.firstName,
           row.lastName,
         ]
