@@ -67,20 +67,20 @@ async function reserveInventoryQty(connection, itemCode, quantity, itemName = nu
   const reservedQty = Number(stockRow.reserved_qty || 0);
   const availableQty = Math.max(0, actualQty - reservedQty);
 
-  console.log(`[RESERVE] Checking stock for item ${itemCode}:`, {
-    actualQty,
-    reservedQty,
-    availableQty,
-    requestedQty: qty,
-    itemName
-  });
+  // console.log(`[RESERVE] Checking stock for item ${itemCode}:`, {
+  //   actualQty,
+  //   reservedQty,
+  //   availableQty,
+  //   requestedQty: qty,
+  //   itemName
+  // });
 
   if (qty > availableQty) {
     const namePart = itemName ? ` for ${itemName}` : "";
-    console.log(`[RESERVE] ❌ OUT OF STOCK - ${itemCode}:`, {
-      requested: qty,
-      available: availableQty
-    });
+    // console.log(`[RESERVE] ❌ OUT OF STOCK - ${itemCode}:`, {
+    //   requested: qty,
+    //   available: availableQty
+    // });
     throw createValidationError(`Out of stock${namePart}. Available quantity: ${availableQty}`);
   }
 
@@ -94,7 +94,7 @@ async function reserveInventoryQty(connection, itemCode, quantity, itemName = nu
     [qty, itemCode]
   );
 
-  console.log(`[RESERVE] ✅ Reserved ${qty} units for item ${itemCode}`);
+  // console.log(`[RESERVE] ✅ Reserved ${qty} units for item ${itemCode}`);
 }
 
 async function releaseInventoryQty(connection, itemCode, quantity) {
@@ -321,7 +321,7 @@ function computeFreeQtyForOffer(offer, quantity) {
 
 const debugOffer = (...args) => {
   if (String(process.env.DEBUG_OFFERS || "").trim() === "1") {
-    console.log("[OFFERS]", ...args);
+    // console.log("[OFFERS]", ...args);
   }
 };
 
@@ -1262,7 +1262,7 @@ async function updateOrderItemQuantity(orderNumber, itemCode, delta, authUser = 
   const normalizedDelta = Number(delta);
   const normalizedOrderLineId = orderLineId != null ? Number(orderLineId) : null;
 
-  console.log(`[UPDATE-ITEM] Updating order ${normalizedOrderNumber}, item ${normalizedItemCode}, delta ${normalizedDelta}`);
+  // console.log(`[UPDATE-ITEM] Updating order ${normalizedOrderNumber}, item ${normalizedItemCode}, delta ${normalizedDelta}`);
 
   if (!Number.isFinite(normalizedOrderNumber) || normalizedOrderNumber <= 0) {
     throw createValidationError("Valid order number is required");
@@ -1328,7 +1328,7 @@ async function updateOrderItemQuantity(orderNumber, itemCode, delta, authUser = 
     const isMocktailItem = [14, 15].includes(itemSubCategory);
     const itemType = existingRow.type || "";
 
-    console.log(`[UPDATE-ITEM] Current qty: ${currentQty}, Next qty: ${nextQty}, Type: ${itemType}`);
+    // console.log(`[UPDATE-ITEM] Current qty: ${currentQty}, Next qty: ${nextQty}, Type: ${itemType}`);
 
     if (nextQty <= 0) {
       throw createValidationError("Quantity cannot be less than 1");
@@ -1342,12 +1342,12 @@ async function updateOrderItemQuantity(orderNumber, itemCode, delta, authUser = 
     const currentUnits = currentQty * pegMultiplier;
     const nextUnits = nextQty * pegMultiplier;
 
-    console.log(`[UPDATE-ITEM] Units: current=${currentUnits}, next=${nextUnits}, multiplier=${pegMultiplier}`);
+    // console.log(`[UPDATE-ITEM] Units: current=${currentUnits}, next=${nextUnits}, multiplier=${pegMultiplier}`);
 
     if (!isMocktailItem) {
       if (normalizedDelta > 0) {
         const deltaUnits = nextUnits - currentUnits;
-        console.log(`[UPDATE-ITEM] Attempting to reserve ${deltaUnits} additional units`);
+        // console.log(`[UPDATE-ITEM] Attempting to reserve ${deltaUnits} additional units`);
         await reserveInventoryQty(connection, normalizedItemCode, deltaUnits);
       }
     }
@@ -1498,7 +1498,7 @@ async function deleteOrderItem(orderNumber, itemCode, orderLineId = null) {
 }
 
 async function createOrder(payload = {}, authUser = {}) {
-  console.log(`[CREATE-ORDER] Creating order with payload:`, payload);
+  // console.log(`[CREATE-ORDER] Creating order with payload:`, payload);
   
   const itemCode = Number(payload.itemCode);
   const rawQuantity = payload.quantity;
@@ -1640,25 +1640,25 @@ async function createOrder(payload = {}, authUser = {}) {
       // A same-item BOGO consumes both the paid units and the free units.
       const requiredUnits = effectiveQuantity + (freeItemCode === itemCode ? freeQuantity : 0);
       
-      console.log(`[CREATE-ORDER] Stock validation for ${inventoryItem?.item_name}:`, {
-        stockQty,
-        reservedQty,
-        availableQty,
-        effectiveQuantity,
-        freeQuantity,
-        requiredUnits,
-        pegMultiplier
-      });
+      // console.log(`[CREATE-ORDER] Stock validation for ${inventoryItem?.item_name}:`, {
+      //   stockQty,
+      //   reservedQty,
+      //   availableQty,
+      //   effectiveQuantity,
+      //   freeQuantity,
+      //   requiredUnits,
+      //   pegMultiplier
+      // });
       
       if (requiredUnits > availableQty) {
         const itemName = inventoryItem?.item_name || itemCode;
         const effectiveAvailableQty = pegMultiplier > 1 ? Math.floor(availableQty / pegMultiplier) : availableQty;
-        console.log(`[CREATE-ORDER] ❌ OUT OF STOCK: needed ${requiredUnits}, available ${availableQty}`);
+        // console.log(`[CREATE-ORDER] ❌ OUT OF STOCK: needed ${requiredUnits}, available ${availableQty}`);
         throw createValidationError(`Out of stock for ${itemName}. Available quantity: ${effectiveAvailableQty}`);
       }
 
       // DO NOT reserve stock here - reservation happens only on order completion
-      console.log(`[CREATE-ORDER] ✅ Stock validation passed - not reserving (will reserve on completion)`);
+      // console.log(`[CREATE-ORDER] ✅ Stock validation passed - not reserving (will reserve on completion)`);
     }
 
     let typeId = null;
@@ -1753,7 +1753,7 @@ async function createOrder(payload = {}, authUser = {}) {
     }
 
     // Sync free items - but DON'T reserve stock (reserveStock: false)
-    console.log(`[CREATE-ORDER] Syncing free item with reserveStock=false`);
+    // console.log(`[CREATE-ORDER] Syncing free item with reserveStock=false`);
     await syncFreeItemForOrderItem(connection, {
       orderNumber,
       itemCode,
@@ -1765,7 +1765,7 @@ async function createOrder(payload = {}, authUser = {}) {
 
     await connection.commit();
 
-    console.log(`[CREATE-ORDER] ✅ Order ${orderNumber} created successfully`);
+    // console.log(`[CREATE-ORDER] ✅ Order ${orderNumber} created successfully`);
     return {
       orderNumber,
       userId,
@@ -1781,7 +1781,7 @@ async function createOrder(payload = {}, authUser = {}) {
 }
 
 async function updateOrderLineQuantity(orderNumber, orderLineId, userId, quantity) {
-  console.log(`[UPDATE-LINE] Updating order ${orderNumber}, line ${orderLineId}, new quantity ${quantity}`);
+  // console.log(`[UPDATE-LINE] Updating order ${orderNumber}, line ${orderLineId}, new quantity ${quantity}`);
   
   const normalizedOrderNumber = Number(orderNumber);
   const normalizedOrderLineId = Number(orderLineId);
@@ -1868,15 +1868,15 @@ async function updateOrderLineQuantity(orderNumber, orderLineId, userId, quantit
     const currentQty = Number(detailRow.quantity || 0);
     const currentSubtotal = Number(detailRow.subtotal || 0);
 
-    console.log(`[UPDATE-LINE] Line details:`, {
-      itemId: detailRow.item_id,
-      currentQty,
-      requestedQuantity: normalizedQuantity,
-      type: detailRow.type,
-      subcategory: detailRow.subcategory,
-      price: detailRow.price,
-      subtotal: detailRow.subtotal
-    });
+    // console.log(`[UPDATE-LINE] Line details:`, {
+    //   itemId: detailRow.item_id,
+    //   currentQty,
+    //   requestedQuantity: normalizedQuantity,
+    //   type: detailRow.type,
+    //   subcategory: detailRow.subcategory,
+    //   price: detailRow.price,
+    //   subtotal: detailRow.subtotal
+    // });
 
     const storedPrice = detailRow.price;
     const hasStoredPrice =
@@ -1934,12 +1934,12 @@ async function updateOrderLineQuantity(orderNumber, orderLineId, userId, quantit
         return total + (isFreeRow ? rowQuantity : rowQuantity * getPegMultiplierForType(row.type));
       }, 0);
 
-      console.log(`[UPDATE-LINE] Projected demand for item ${itemId}:`, {
-        sameItemRows,
-        projectedDemand,
-        updatingLine: normalizedOrderLineId,
-        newQuantity: normalizedQuantity
-      });
+      // console.log(`[UPDATE-LINE] Projected demand for item ${itemId}:`, {
+      //   sameItemRows,
+      //   projectedDemand,
+      //   updatingLine: normalizedOrderLineId,
+      //   newQuantity: normalizedQuantity
+      // });
 
       // Get stock from inventory
       const stockMap = await getIngredientStockQuantities(connection, [itemId]);
@@ -1971,18 +1971,18 @@ async function updateOrderLineQuantity(orderNumber, orderLineId, userId, quantit
         stockQuantity - reservedFromOtherOrders - ownConsumption - ingredientConsumed
       );
 
-      console.log(`[UPDATE-LINE] Stock check:`, {
-        stockQuantity,
-        reservedFromOtherOrders,
-        ownConsumption,
-        ingredientConsumed,
-        availableQuantity,
-        projectedDemand
-      });
+      // console.log(`[UPDATE-LINE] Stock check:`, {
+      //   stockQuantity,
+      //   reservedFromOtherOrders,
+      //   ownConsumption,
+      //   ingredientConsumed,
+      //   availableQuantity,
+      //   projectedDemand
+      // });
 
       // Check if projected demand exceeds available
       if (projectedDemand > availableQuantity) {
-        console.log(`[UPDATE-LINE] ❌ OUT OF STOCK: projected demand ${projectedDemand} > available ${availableQuantity}`);
+        // console.log(`[UPDATE-LINE] ❌ OUT OF STOCK: projected demand ${projectedDemand} > available ${availableQuantity}`);
         const error = new Error(`Out of stock. Available quantity: ${availableQuantity}`);
         error.statusCode = 400;
         throw error;
@@ -2012,11 +2012,11 @@ async function updateOrderLineQuantity(orderNumber, orderLineId, userId, quantit
     const currentUnits = currentQty * pegMultiplier;
     const newUnits = normalizedQuantity * pegMultiplier;
 
-    console.log(`[UPDATE-LINE] Units: current=${currentUnits}, new=${newUnits}, multiplier=${pegMultiplier}`);
+    // console.log(`[UPDATE-LINE] Units: current=${currentUnits}, new=${newUnits}, multiplier=${pegMultiplier}`);
 
     // For cocktail/mocktail items, check ingredient stock
     if (isCocktailOrMocktail) {
-      console.log(`[UPDATE-LINE] Checking cocktail stock status`);
+      // console.log(`[UPDATE-LINE] Checking cocktail stock status`);
       const statusMap = await getCocktailStockStatusMap(
         connection,
         normalizedOrderNumber,
@@ -2029,7 +2029,7 @@ async function updateOrderLineQuantity(orderNumber, orderLineId, userId, quantit
       if (
         String(status?.status || "").toLowerCase() === "out of stock"
       ) {
-        console.log(`[UPDATE-LINE] ❌ Cocktail out of stock:`, status?.message);
+        // console.log(`[UPDATE-LINE] ❌ Cocktail out of stock:`, status?.message);
         const error = new Error(
           status?.message ||
             "Out of stock for cocktail/mocktail ingredients."
@@ -2042,7 +2042,7 @@ async function updateOrderLineQuantity(orderNumber, orderLineId, userId, quantit
       // This reserves stock for COMPLETED orders only
       const deltaUnits = newUnits - currentUnits;
       if (deltaUnits > 0) {
-        console.log(`[UPDATE-LINE] Reserving ${deltaUnits} additional units for completion`);
+        // console.log(`[UPDATE-LINE] Reserving ${deltaUnits} additional units for completion`);
         await reserveInventoryQty(connection, itemId, deltaUnits);
       }
     }
@@ -2158,13 +2158,13 @@ async function updateOrderLineQuantity(orderNumber, orderLineId, userId, quantit
         
         const freeQtyDelta = computedFreeQty - oldComputedFreeQty;
 
-        console.log(`[UPDATE-LINE] Offer handling:`, {
-          currentQty,
-          normalizedQuantity,
-          oldComputedFreeQty,
-          computedFreeQty,
-          freeQtyDelta
-        });
+        // console.log(`[UPDATE-LINE] Offer handling:`, {
+        //   currentQty,
+        //   normalizedQuantity,
+        //   oldComputedFreeQty,
+        //   computedFreeQty,
+        //   freeQtyDelta
+        // });
 
         // Validate stock for free item delta (but don't reserve yet)
         if (freeQtyDelta > 0 && Number.isFinite(freeItemCode) && freeItemCode > 0) {
@@ -2201,7 +2201,7 @@ async function updateOrderLineQuantity(orderNumber, orderLineId, userId, quantit
           );
 
           if (freeQtyDelta > freeAvailableQuantity) {
-            console.log(`[UPDATE-LINE] ❌ Out of stock for free item: ${freeAvailableQuantity} available`);
+            // console.log(`[UPDATE-LINE] ❌ Out of stock for free item: ${freeAvailableQuantity} available`);
             const error = new Error(
               `Out of stock for free item. Available quantity: ${freeAvailableQuantity}`
             );
@@ -2210,7 +2210,7 @@ async function updateOrderLineQuantity(orderNumber, orderLineId, userId, quantit
           }
 
           // Reserve the delta for the free item (for completion)
-          console.log(`[UPDATE-LINE] Reserving ${freeQtyDelta} units for free item (completion)`);
+          // console.log(`[UPDATE-LINE] Reserving ${freeQtyDelta} units for free item (completion)`);
           await reserveInventoryQty(connection, freeItemCode, freeQtyDelta, "free item");
         }
 
@@ -2338,10 +2338,10 @@ async function updateOrderLineQuantity(orderNumber, orderLineId, userId, quantit
     }
 
     await connection.commit();
-    console.log(`[UPDATE-LINE] ✅ Order ${normalizedOrderNumber} updated successfully`);
+    // console.log(`[UPDATE-LINE] ✅ Order ${normalizedOrderNumber} updated successfully`);
     return await getOrderSummary(normalizedOrderNumber);
   } catch (error) {
-    console.log(`[UPDATE-LINE] ❌ Error:`, error.message);
+    // console.log(`[UPDATE-LINE] ❌ Error:`, error.message);
     await connection.rollback();
     throw error;
   } finally {
@@ -2521,6 +2521,7 @@ async function updateOrderItemCustomization(orderNumber, itemCode, userId, ingre
 }
 
 module.exports = {
+  reserveInventoryQty,
   createOrder,
   getOrderSummary,
   cancelOrder,
