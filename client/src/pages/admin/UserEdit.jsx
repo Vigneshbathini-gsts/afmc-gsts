@@ -187,15 +187,16 @@ export default function UserEdit() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-afmc-bg via-white to-afmc-bg2 relative">
+    <div className="min-h-screen bg-gradient-to-br from-afmc-bg via-white to-afmc-bg2 relative overflow-x-hidden">
       <div className="absolute top-16 left-12 h-72 w-72 rounded-full bg-afmc-maroon/10 blur-3xl" />
       <div className="absolute bottom-20 right-20 h-80 w-80 rounded-full bg-afmc-maroon2/10 blur-3xl" />
 
-      <div className="relative z-10 px-0 py-4 md:p-8">
-        <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
+      <div className="relative z-10 px-3 sm:px-4 md:px-6 lg:px-8 py-4 md:py-6 max-w-7xl mx-auto">
+        {/* Header Section */}
+        <div className="mb-6 md:mb-8 flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-semibold text-gray-800">User Details</h1>
-            <p className="mt-1 text-sm text-gray-500">
+            <h1 className="text-xl sm:text-2xl font-semibold text-gray-800">User Details</h1>
+            <p className="mt-1 text-xs sm:text-sm text-gray-500">
               Update role, status, and contact information for this account.
             </p>
           </div>
@@ -203,35 +204,38 @@ export default function UserEdit() {
           <button
             type="button"
             onClick={() => navigate("/admin/users")}
-            className="flex items-center gap-2 rounded-full border border-white/60 bg-white px-5 py-2.5 text-gray-700 shadow hover:shadow-md"
+            className="flex items-center gap-2 rounded-full border border-white/60 bg-white px-4 sm:px-5 py-2 sm:py-2.5 text-sm sm:text-base text-gray-700 shadow hover:shadow-md transition-shadow self-start sm:self-auto"
           >
             <ArrowLeft size={16} />
             Back To Users
           </button>
         </div>
 
-        <div className="rounded-3xl border border-white/60 bg-white/80 p-6 shadow-xl backdrop-blur-sm">
+        {/* Main Content */}
+        <div className="rounded-2xl sm:rounded-3xl border border-white/60 bg-white/80 p-3 sm:p-4 md:p-6 shadow-xl backdrop-blur-sm">
           {loading ? (
-            <div className="rounded-2xl border border-gray-200 bg-white px-6 py-16 text-center text-gray-500">
+            <div className="rounded-2xl border border-gray-200 bg-white px-4 sm:px-6 py-12 sm:py-16 text-center text-gray-500">
               Loading user details...
             </div>
           ) : error && !formData.userName ? (
-            <div className="rounded-2xl border border-red-200 bg-red-50 px-6 py-16 text-center text-red-600">
+            <div className="rounded-2xl border border-red-200 bg-red-50 px-4 sm:px-6 py-12 sm:py-16 text-center text-red-600">
               {error}
             </div>
           ) : (
-            <form onSubmit={handleSave} className="space-y-6">
-              <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-                <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
-                  <div className="mb-5 flex items-start justify-between gap-4">
-                    <div>
-                      <p className="text-sm font-medium text-gray-500">User Name</p>
-                      <h2 className="mt-1 text-2xl font-semibold text-gray-800">
+            <form onSubmit={handleSave} className="space-y-4 sm:space-y-6">
+              {/* Grid Layout - Proper responsive */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+                {/* Left Card - User Details */}
+                <div className="rounded-2xl sm:rounded-3xl border border-gray-200 bg-white p-4 sm:p-5 md:p-6 shadow-sm overflow-hidden">
+                  <div className="mb-4 sm:mb-5 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
+                    <div className="min-w-0">
+                      <p className="text-xs sm:text-sm font-medium text-gray-500">User Name</p>
+                      <h2 className="mt-1 text-xl sm:text-2xl font-semibold text-gray-800 truncate">
                         {formData.userName || "-"}
                       </h2>
                     </div>
                     <span
-                      className={`inline-flex rounded-full border px-3 py-1 text-sm font-semibold ${
+                      className={`inline-flex rounded-full border px-2.5 sm:px-3 py-1 text-xs sm:text-sm font-semibold whitespace-nowrap self-start sm:self-auto ${
                         STATUS_STYLES[formData.status] || STATUS_STYLES.Inactive
                       }`}
                     >
@@ -239,11 +243,11 @@ export default function UserEdit() {
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                    <div className="md:col-span-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
+                    <div className="sm:col-span-2">
                       <label
                         htmlFor="firstName"
-                        className="mb-2 block text-sm font-medium text-gray-700"
+                        className="mb-1.5 sm:mb-2 block text-xs sm:text-sm font-medium text-gray-700"
                       >
                         Officer Name
                       </label>
@@ -254,14 +258,14 @@ export default function UserEdit() {
                         value={formData.firstName}
                         onChange={handleChange}
                         maxLength={50}
-                        className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-800 outline-none transition focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
+                        className="w-full rounded-xl sm:rounded-2xl border border-gray-200 bg-gray-50 px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base text-gray-800 outline-none transition focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
                       />
                     </div>
 
                     <div>
                       <label
                         htmlFor="loginType"
-                        className="mb-2 block text-sm font-medium text-gray-700"
+                        className="mb-1.5 sm:mb-2 block text-xs sm:text-sm font-medium text-gray-700"
                       >
                         Login Type
                       </label>
@@ -270,7 +274,7 @@ export default function UserEdit() {
                         name="loginType"
                         value={formData.loginType}
                         onChange={handleChange}
-                        className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-800 outline-none transition focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
+                        className="w-full rounded-xl sm:rounded-2xl border border-gray-200 bg-gray-50 px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base text-gray-800 outline-none transition focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
                       >
                         <option value="Member">Member</option>
                         <option value="Non Member">Non Member</option>
@@ -280,7 +284,7 @@ export default function UserEdit() {
                     <div>
                       <label
                         htmlFor="status"
-                        className="mb-2 block text-sm font-medium text-gray-700"
+                        className="mb-1.5 sm:mb-2 block text-xs sm:text-sm font-medium text-gray-700"
                       >
                         Status
                       </label>
@@ -289,17 +293,17 @@ export default function UserEdit() {
                         name="status"
                         value={formData.status}
                         onChange={handleChange}
-                        className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-800 outline-none transition focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
+                        className="w-full rounded-xl sm:rounded-2xl border border-gray-200 bg-gray-50 px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base text-gray-800 outline-none transition focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
                       >
                         <option value="Active">Active</option>
                         <option value="Inactive">Inactive</option>
                       </select>
                     </div>
 
-                    <div className="md:col-span-2">
+                    <div className="sm:col-span-2">
                       <label
                         htmlFor="roleId"
-                        className="mb-2 block text-sm font-medium text-gray-700"
+                        className="mb-1.5 sm:mb-2 block text-xs sm:text-sm font-medium text-gray-700"
                       >
                         Role
                       </label>
@@ -309,7 +313,7 @@ export default function UserEdit() {
                         value={formData.roleId}
                         onChange={handleChange}
                         disabled={loadingRoles}
-                        className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-800 outline-none transition focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20 disabled:cursor-not-allowed disabled:opacity-60"
+                        className="w-full rounded-xl sm:rounded-2xl border border-gray-200 bg-gray-50 px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base text-gray-800 outline-none transition focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20 disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         {roles.map((role) => (
                           <option key={role.ROLE_ID} value={role.ROLE_ID}>
@@ -321,19 +325,20 @@ export default function UserEdit() {
                   </div>
                 </div>
 
-                <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
-                  <h3 className="text-lg font-semibold text-gray-800">
+                {/* Right Card - Contact Information */}
+                <div className="rounded-2xl sm:rounded-3xl border border-gray-200 bg-white p-4 sm:p-5 md:p-6 shadow-sm overflow-hidden">
+                  <h3 className="text-base sm:text-lg font-semibold text-gray-800">
                     Contact Information
                   </h3>
-                  <p className="mt-1 text-sm text-gray-500">
+                  <p className="mt-1 text-xs sm:text-sm text-gray-500">
                     Keep the user email and phone number up to date.
                   </p>
 
-                  <div className="mt-5 space-y-5">
+                  <div className="mt-4 sm:mt-5 space-y-4 sm:space-y-5">
                     <div>
                       <label
                         htmlFor="email"
-                        className="mb-2 block text-sm font-medium text-gray-700"
+                        className="mb-1.5 sm:mb-2 block text-xs sm:text-sm font-medium text-gray-700"
                       >
                         Email
                       </label>
@@ -344,14 +349,14 @@ export default function UserEdit() {
                         value={formData.email}
                         onChange={handleChange}
                         maxLength={100}
-                        className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-800 outline-none transition focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
+                        className="w-full rounded-xl sm:rounded-2xl border border-gray-200 bg-gray-50 px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base text-gray-800 outline-none transition focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
                       />
                     </div>
 
                     <div>
                       <label
                         htmlFor="phoneNumber"
-                        className="mb-2 block text-sm font-medium text-gray-700"
+                        className="mb-1.5 sm:mb-2 block text-xs sm:text-sm font-medium text-gray-700"
                       >
                         Phone Number
                       </label>
@@ -364,37 +369,39 @@ export default function UserEdit() {
                         inputMode="numeric"
                         pattern="\d{10}"
                         maxLength={10}
-                        className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-800 outline-none transition focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
+                        className="w-full rounded-xl sm:rounded-2xl border border-gray-200 bg-gray-50 px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base text-gray-800 outline-none transition focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
                       />
                     </div>
                   </div>
                 </div>
               </div>
 
+              {/* Error/Success Messages */}
               {error ? (
-                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+                <div className="rounded-xl border border-red-200 bg-red-50 px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm text-red-600">
                   {error}
                 </div>
               ) : null}
 
               {success ? (
-                <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+                <div className="rounded-xl border border-green-200 bg-green-50 px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm text-green-700">
                   {success}
                 </div>
               ) : null}
 
-              <div className="flex flex-wrap justify-end gap-3">
+              {/* Action Buttons - Side by side on mobile */}
+              <div className="flex flex-row flex-wrap justify-end gap-2 sm:gap-3">
                 <button
                   type="button"
                   onClick={() => navigate("/admin/users")}
-                  className="rounded-2xl bg-gray-600 px-6 py-3 font-semibold text-white"
+                  className="flex-1 sm:flex-none rounded-xl sm:rounded-2xl bg-gray-600 px-4 sm:px-6 py-2.5 sm:py-3 text-sm sm:text-base font-semibold text-white hover:bg-gray-700 transition-colors min-w-[100px] sm:min-w-0"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={saving || loadingRoles}
-                  className="inline-flex items-center gap-2 rounded-2xl bg-afmc-maroon px-6 py-3 font-semibold text-white shadow transition hover:bg-afmc-maroon2 disabled:cursor-not-allowed disabled:opacity-70"
+                  className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-xl sm:rounded-2xl bg-afmc-maroon px-4 sm:px-6 py-2.5 sm:py-3 text-sm sm:text-base font-semibold text-white shadow transition hover:bg-afmc-maroon2 disabled:cursor-not-allowed disabled:opacity-70 min-w-[100px] sm:min-w-0"
                 >
                   <Save size={18} />
                   {saving ? "Saving..." : "Save Changes"}

@@ -218,7 +218,7 @@ export default function StockReports() {
     );
 
     if (isStockIn) {
-      tableRows.push(["", "", "", "Totals", "", totalStock, totalPrice]);
+      tableRows.push(["", "", "Totals", "", totalStock, totalPrice]);
     } else {
       tableRows.push(["", "", "Totals", "", totalStock, totalPrice]);
     }
