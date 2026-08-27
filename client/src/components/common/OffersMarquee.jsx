@@ -180,7 +180,7 @@ export default function OffersMarquee({
   loading,
   title = "Offers for you",
   subtitle = "Premium deals curated for today.",
-  useMockWhenEmpty = true,
+  useMockWhenEmpty = false,
   speedSeconds = 10,
 }) {
   const cleaned = useMemo(() => {
