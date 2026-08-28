@@ -179,25 +179,7 @@ const updateWeeklyTimings = async ({ timings, updatedBy }) => {
         }
       }
 
-      // Validate Shift 1
-      if (
-        day.shift1_open_time &&
-        day.shift1_close_time &&
-        day.shift1_open_time >= day.shift1_close_time
-      ) {
-        throw new Error(`${day.day_name}: Shift 1 opening time must be before closing time.`);
-      }
-
-      // Validate Shift 2
-      if (
-        day.shift2_open_time &&
-        day.shift2_close_time &&
-        day.shift2_open_time >= day.shift2_close_time
-      ) {
-        throw new Error(`${day.day_name}: Shift 2 opening time must be before closing time.`);
-      }
-
-      const [result] = await connection.execute(
+      await connection.execute(
         `
         UPDATE xxafmc_mess_timings_week
         SET
@@ -221,9 +203,6 @@ const updateWeeklyTimings = async ({ timings, updatedBy }) => {
         ]
       );
 
-      if (result.affectedRows !== 1) {
-        throw new Error(`${day.day_name}: Timing row was not updated.`);
-      }
     }
 
     await connection.commit();
