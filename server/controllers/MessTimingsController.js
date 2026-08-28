@@ -48,7 +48,28 @@ const updateWeeklyTimings = async (req, res) => {
   }
 };
 
+const getCurrentMessStatus = async (req, res) => {
+  try {
+    const isOpen = await MessTimingsService.isMessOpen();
+
+    return res.json({
+      success: true,
+      isOpen,
+      code: isOpen ? null : "MESS_CLOSED",
+      message: isOpen ? "Mess is open." : "Mess is currently closed.",
+    });
+  } catch (error) {
+    console.error("Get Current Mess Status:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Unable to check current mess status.",
+    });
+  }
+};
+
 module.exports = {
   getWeeklyTimings,
   updateWeeklyTimings,
+  getCurrentMessStatus,
 };

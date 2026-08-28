@@ -72,17 +72,17 @@ export default function MessTimings() {
       if (
         shift1_open_time &&
         shift1_close_time &&
-        shift1_open_time >= shift1_close_time
+        shift1_open_time === shift1_close_time
       ) {
-        return `${day_name}: Shift 1 opening must be before closing.`;
+        return `${day_name}: Shift 1 opening and closing cannot be the same.`;
       }
 
       if (
         shift2_open_time &&
         shift2_close_time &&
-        shift2_open_time >= shift2_close_time
+        shift2_open_time === shift2_close_time
       ) {
-        return `${day_name}: Shift 2 opening must be before closing.`;
+        return `${day_name}: Shift 2 opening and closing cannot be the same.`;
       }
     }
 

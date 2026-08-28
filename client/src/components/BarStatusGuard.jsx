@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { API_BASE_URL, barStatusAPI } from "../services/api";
+import { API_BASE_URL, barStatusAPI, messTimingsAPI } from "../services/api";
 import { getToken } from "../utils/authStorage";
 
 const EXEMPT_ROLES = [10, 40];
@@ -44,10 +44,20 @@ export default function BarStatusGuard({ children }) {
       }
     };
 
+    const handleMessStatus = (messStatus) => {
+      if (!cancelled && messStatus?.isOpen === false) {
+        navigate("/bar-closed", { replace: true });
+      }
+    };
+
     const checkBarStatusOnce = async () => {
       try {
-        const response = await barStatusAPI.getStatus();
-        handleStatus(response.data?.data);
+        const [barResponse, messResponse] = await Promise.all([
+          barStatusAPI.getStatus(),
+          messTimingsAPI.getCurrentStatus(),
+        ]);
+        handleStatus(barResponse.data?.data);
+        handleMessStatus(messResponse.data);
       } catch (error) {
         const closureCode = error.response?.data?.code;
         if (closureCode === "BAR_CLOSED" || closureCode === "MESS_CLOSED") {

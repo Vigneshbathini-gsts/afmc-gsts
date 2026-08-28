@@ -435,6 +435,7 @@ export const barStatusAPI = {
 
 export const messTimingsAPI = {
   getWeeklyTimings: () => api.get("/mess-timings"),
+  getCurrentStatus: () => api.get("/mess-timings/status"),
   updateWeeklyTimings: (timings) =>
     api.put("/mess-timings", {
       timings,
