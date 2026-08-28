@@ -3,7 +3,7 @@ import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { CheckCircle2, ChevronLeft, Minus, Pencil, Plus, Trash2, XCircle } from "lucide-react";
 import Pubmenubuyservice from "../services/Pubmenubuyservice";
 import ConfirmOrderservice from "../../../services/ConfirmOrderservice";
-import { buildStockConsumptionMap, getEffectiveAvailableQuantity, getMaxAllowedQuantity, getPegTypeOrderLimitMessage, isCocktailOrMocktail, isOutOfStock, validateNextQuantity } from "../../../utils/stockValidation";
+import { getEffectiveAvailableQuantity, getMaxAllowedQuantity, getPegTypeOrderLimitMessage, isCocktailOrMocktail, isOutOfStock, validateNextQuantity } from "../../../utils/stockValidation";
 import { barOrdersAPI, cartAPI } from "../../../services/api";
 import { toInitCap } from "../../../utils/textFormat";
 import { getCartCount } from "../../../utils/cartCount";
@@ -601,7 +601,9 @@ export default function Pubmenubuy({
       }
 
       try {
-        const currentConsumption = buildStockConsumptionMap(items, { getCocktailDetails: getCocktailDetailsForStockCheck });
+        const currentConsumption = buildPubStockConsumptionMap(items, {
+          getCocktailDetails: getCocktailDetailsForStockCheck,
+        });
         const normalAvailableByCode = buildAvailableStockByCode(items);
         const stockCodes = [...new Set([...currentConsumption.keys()])]
           .filter((code) => Number.isFinite(Number(code)) && Number(code) > 0);
