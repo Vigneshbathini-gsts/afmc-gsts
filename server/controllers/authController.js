@@ -4,6 +4,9 @@ const crypto = require("crypto");
 const { getRedirectPath } = require("../utils/roleRedirect");
 const nodemailer = require("nodemailer");
 const { generateResetToken, hashPassword ,comparePassword} = require("../helpers/authHelper");
+const MessTimingsService = require("../services/MessTimingsService");
+
+const MESS_TIMING_EXEMPT_ROLES = [10, 40];
 
 // helper: MD5 hash
 const md5Hash = (text) => {
@@ -124,6 +127,17 @@ exports.loginUser = async (req, res) => {
     }
 
     const user = rows[0];
+
+    if (
+      !MESS_TIMING_EXEMPT_ROLES.includes(Number(user.ROLE_ID)) &&
+      !(await MessTimingsService.isMessOpen())
+    ) {
+      return res.status(403).json({
+        success: false,
+        code: "MESS_CLOSED",
+        message: "Mess is currently closed.",
+      });
+    }
 
     // Always start a fresh session on login so previous in-session state
     // (e.g., scanned items) does not carry across logins / closed tabs.

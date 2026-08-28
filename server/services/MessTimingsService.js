@@ -174,5 +174,5 @@ const updateWeeklyTimings = async ({ timings, updatedBy }) => {
 module.exports = {
   getWeeklyTimings,
   updateWeeklyTimings,
-    isMessOpen,
+  isMessOpen,
 };
