@@ -75,6 +75,12 @@ const isCurrentTimeBetween = (from, to, nowMinutes) => {
   return nowMinutes >= from || nowMinutes <= to;
 };
 
+const isOvernightShiftOpenFromPreviousDay = (from, to, nowMinutes) => {
+  if (from === null || to === null || from <= to) return false;
+
+  return nowMinutes <= to;
+};
+
 const isMessOpen = async () => {
   const timings = await MessTimingsModel.getWeeklyTimings();
 
@@ -84,10 +90,12 @@ const isMessOpen = async () => {
 
   const candidateDays = [today, previousDay];
 
-  for (const dayName of candidateDays) {
-    const dayTiming = timings.find((row) => row.day_name === dayName);
+  for (const [dayIndex, dayName] of candidateDays.entries()) {
+    const dayTiming = timings.find(
+      (row) => String(row.day_name).trim().toUpperCase() === dayName
+    );
 
-    if (!dayTiming || dayTiming.active_flag !== "Y") {
+    if (!dayTiming || String(dayTiming.active_flag).trim().toUpperCase() !== "Y") {
       continue;
     }
 
@@ -96,10 +104,15 @@ const isMessOpen = async () => {
     const shift2Open = parseTimeToMinutes(dayTiming.shift2_open_time);
     const shift2Close = parseTimeToMinutes(dayTiming.shift2_close_time);
 
-    if (
+    const isOpenToday =
       isCurrentTimeBetween(shift1Open, shift1Close, currentMinutes) ||
-      isCurrentTimeBetween(shift2Open, shift2Close, currentMinutes)
-    ) {
+      isCurrentTimeBetween(shift2Open, shift2Close, currentMinutes);
+    const isOpenFromPreviousDay =
+      dayIndex === 1 &&
+      (isOvernightShiftOpenFromPreviousDay(shift1Open, shift1Close, currentMinutes) ||
+        isOvernightShiftOpenFromPreviousDay(shift2Open, shift2Close, currentMinutes));
+
+    if ((isOpenToday && dayIndex === 0) || isOpenFromPreviousDay) {
       return true;
     }
   }
