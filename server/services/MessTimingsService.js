@@ -28,6 +28,29 @@ const DAYS = [
   "SATURDAY",
 ];
 
+const BUSINESS_TIME_ZONE = "Asia/Kolkata";
+
+const getBusinessDateParts = (date = new Date()) => {
+  const parts = new Intl.DateTimeFormat("en-IN", {
+    timeZone: BUSINESS_TIME_ZONE,
+    weekday: "long",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+
+  const values = Object.fromEntries(
+    parts
+      .filter(({ type }) => type !== "literal")
+      .map(({ type, value }) => [type, value])
+  );
+
+  return {
+    dayName: values.weekday.toUpperCase(),
+    currentMinutes: Number(values.hour) * 60 + Number(values.minute),
+  };
+};
+
 const parseTimeToMinutes = (value) => {
   if (!value) return null;
 
@@ -55,10 +78,8 @@ const isCurrentTimeBetween = (from, to, nowMinutes) => {
 const isMessOpen = async () => {
   const timings = await MessTimingsModel.getWeeklyTimings();
 
-  const now = new Date();
-  const currentMinutes = now.getHours() * 60 + now.getMinutes();
-  const todayIndex = now.getDay();
-  const today = DAYS[todayIndex];
+  const { dayName: today, currentMinutes } = getBusinessDateParts();
+  const todayIndex = DAYS.indexOf(today);
   const previousDay = DAYS[(todayIndex + 6) % 7];
 
   const candidateDays = [today, previousDay];
