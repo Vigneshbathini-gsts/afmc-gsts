@@ -3,11 +3,14 @@ const express = require("express");
 const {
   getWeeklyTimings,
   updateWeeklyTimings,
+  getCurrentMessStatus,
 } = require("../controllers/MessTimingsController");
 
 const authMiddleware = require("../middleware/authMiddleware");
 
 const router = express.Router();
+
+router.get("/status", authMiddleware, getCurrentMessStatus);
 
 const adminOnly = (req, res, next) => {
   const roleId = Number(req.user?.ROLE_ID || req.user?.roleId || 0);

@@ -52,21 +52,22 @@ const getBusinessDateParts = (date = new Date()) => {
 };
 
 const parseTimeToMinutes = (value) => {
-  if (!value) return null;
+  const match = String(value ?? "").trim().match(
+    /^(\d{1,2}):(\d{2})(?::\d{2})?$/
+  );
 
-  const [hours, minutes] = String(value)
-    .split(":")
-    .map((part) => Number(part));
+  if (!match) return null;
 
-  if (Number.isNaN(hours) || Number.isNaN(minutes)) {
-    return null;
-  }
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+
+  if (hours > 23 || minutes > 59) return null;
 
   return hours * 60 + minutes;
 };
 
 const isCurrentTimeBetween = (from, to, nowMinutes) => {
-  if (from === null || to === null) return false;
+  if (from === null || to === null || from === to) return false;
 
   if (from < to) {
     return nowMinutes >= from && nowMinutes <= to;
@@ -80,6 +81,11 @@ const isOvernightShiftOpenFromPreviousDay = (from, to, nowMinutes) => {
 
   return nowMinutes <= to;
 };
+
+const getShiftValues = (dayTiming, shiftNumber) => ({
+  open: parseTimeToMinutes(dayTiming[`shift${shiftNumber}_open_time`]),
+  close: parseTimeToMinutes(dayTiming[`shift${shiftNumber}_close_time`]),
+});
 
 const isMessOpen = async () => {
   const timings = await MessTimingsModel.getWeeklyTimings();
@@ -99,18 +105,18 @@ const isMessOpen = async () => {
       continue;
     }
 
-    const shift1Open = parseTimeToMinutes(dayTiming.shift1_open_time);
-    const shift1Close = parseTimeToMinutes(dayTiming.shift1_close_time);
-    const shift2Open = parseTimeToMinutes(dayTiming.shift2_open_time);
-    const shift2Close = parseTimeToMinutes(dayTiming.shift2_close_time);
+    const shift1 = getShiftValues(dayTiming, 1);
+    const shift2 = getShiftValues(dayTiming, 2);
 
     const isOpenToday =
-      isCurrentTimeBetween(shift1Open, shift1Close, currentMinutes) ||
-      isCurrentTimeBetween(shift2Open, shift2Close, currentMinutes);
+      isCurrentTimeBetween(shift1.open, shift1.close, currentMinutes) ||
+      isCurrentTimeBetween(shift2.open, shift2.close, currentMinutes) ||
+      (shift1.open > shift1.close && currentMinutes >= shift1.open) ||
+      (shift2.open > shift2.close && currentMinutes >= shift2.open);
     const isOpenFromPreviousDay =
       dayIndex === 1 &&
-      (isOvernightShiftOpenFromPreviousDay(shift1Open, shift1Close, currentMinutes) ||
-        isOvernightShiftOpenFromPreviousDay(shift2Open, shift2Close, currentMinutes));
+      (isOvernightShiftOpenFromPreviousDay(shift1.open, shift1.close, currentMinutes) ||
+        isOvernightShiftOpenFromPreviousDay(shift2.open, shift2.close, currentMinutes));
 
     if ((isOpenToday && dayIndex === 0) || isOpenFromPreviousDay) {
       return true;
@@ -131,10 +137,35 @@ const updateWeeklyTimings = async ({ timings, updatedBy }) => {
     await connection.beginTransaction();
 
     for (const day of timings) {
-      const hasShift1 = Boolean(day.shift1_open_time && day.shift1_close_time);
-      const hasShift2 = Boolean(day.shift2_open_time && day.shift2_close_time);
+      const activeFlag = String(day.active_flag ?? "N").trim().toUpperCase();
+      const shift1OpenValue = String(day.shift1_open_time ?? "").trim() || null;
+      const shift1CloseValue = String(day.shift1_close_time ?? "").trim() || null;
+      const shift2OpenValue = String(day.shift2_open_time ?? "").trim() || null;
+      const shift2CloseValue = String(day.shift2_close_time ?? "").trim() || null;
+      const shift1Open = parseTimeToMinutes(shift1OpenValue);
+      const shift1Close = parseTimeToMinutes(shift1CloseValue);
+      const shift2Open = parseTimeToMinutes(shift2OpenValue);
+      const shift2Close = parseTimeToMinutes(shift2CloseValue);
+      const hasShift1 = Boolean(shift1OpenValue && shift1CloseValue);
+      const hasShift2 = Boolean(shift2OpenValue && shift2CloseValue);
 
-      if (day.active_flag === "Y") {
+      if (!['Y', 'N'].includes(activeFlag)) {
+        throw new Error(`${day.day_name}: Active flag must be Y or N.`);
+      }
+
+      if ((shift1OpenValue && shift1Open === null) ||
+        (shift1CloseValue && shift1Close === null) ||
+        (shift2OpenValue && shift2Open === null) ||
+        (shift2CloseValue && shift2Close === null)) {
+        throw new Error(`${day.day_name}: Timings must use valid HH:mm values.`);
+      }
+
+      if ((shift1Open !== null && shift1Close !== null && shift1Open === shift1Close) ||
+        (shift2Open !== null && shift2Close !== null && shift2Open === shift2Close)) {
+        throw new Error(`${day.day_name}: Opening and closing times cannot be the same.`);
+      }
+
+      if (activeFlag === "Y") {
         if (!hasShift1 && !hasShift2) {
           throw new Error(`${day.day_name}: Please set at least one complete shift before marking it active.`);
         }
@@ -166,7 +197,7 @@ const updateWeeklyTimings = async ({ timings, updatedBy }) => {
         throw new Error(`${day.day_name}: Shift 2 opening time must be before closing time.`);
       }
 
-      await connection.execute(
+      const [result] = await connection.execute(
         `
         UPDATE xxafmc_mess_timings_week
         SET
@@ -180,15 +211,19 @@ const updateWeeklyTimings = async ({ timings, updatedBy }) => {
         WHERE id=?
         `,
         [
-          day.shift1_open_time,
-          day.shift1_close_time,
-          day.shift2_open_time,
-          day.shift2_close_time,
-          day.active_flag,
+          shift1OpenValue,
+          shift1CloseValue,
+          shift2OpenValue,
+          shift2CloseValue,
+          activeFlag,
           updatedBy,
           day.id,
         ]
       );
+
+      if (result.affectedRows !== 1) {
+        throw new Error(`${day.day_name}: Timing row was not updated.`);
+      }
     }
 
     await connection.commit();

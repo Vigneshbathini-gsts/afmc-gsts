@@ -38,7 +38,11 @@ const messTimingsMiddleware = async (req, res, next) => {
     next();
   } catch (error) {
     console.error("Mess Timings Middleware:", error);
-    next();
+    return res.status(503).json({
+      success: false,
+      code: "MESS_STATUS_UNAVAILABLE",
+      message: "Mess status is temporarily unavailable. Please try again.",
+    });
   }
 };
 
