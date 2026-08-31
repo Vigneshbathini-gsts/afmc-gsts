@@ -151,7 +151,7 @@ export default function Dashboard() {
               </h2>
               <div className="flex items-center gap-3">
                 <a
-                  href="/AFMC%20Mess%20Application%20User%20Manual.pdf"
+                  href="/AFMC_Mess_Application_User_Manual.pdf"
                   target="_blank"
                   rel="noreferrer"
                   className="text-sm font-semibold text-afmc-maroon hover:underline"
@@ -171,7 +171,7 @@ export default function Dashboard() {
             </div>
             <iframe
               title="AFMC Mess Application User Manual"
-              src="/AFMC%20Mess%20Application%20User%20Manual.pdf"
+              src="/AFMC_Mess_Application_User_Manual.pdf"
               className="min-h-0 flex-1 bg-gray-100"
             />
           </div>
