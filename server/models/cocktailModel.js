@@ -203,8 +203,9 @@ const getCocktailIngredientOptions = async (search = "", pagination = {}) => {
   const subCategoryCondition = hasSubCategoryFilter
     ? subCategory === 14
       ? "AND SUB_CATEGORY IN (6, 9, 4, 18)"
-      : "AND SUB_CATEGORY NOT IN (1, 6, 9, 4, 14, 15, 7, 10, 3, 1310, 18)"
+      : "AND SUB_CATEGORY NOT IN (1,  14, 15, 7, 10, 3, 1310)"
     : "";
+
 
   const query = `
     SELECT DISTINCT
