@@ -31,8 +31,10 @@ const DAYS = [
 const BUSINESS_TIME_ZONE = "Asia/Kolkata";
 
 const getBusinessDateParts = (date = new Date()) => {
-  const parts = new Intl.DateTimeFormat("en-IN", {
+  const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: BUSINESS_TIME_ZONE,
+    calendar: "gregory",
+    numberingSystem: "latn",
     weekday: "long",
     hour: "2-digit",
     minute: "2-digit",
