@@ -1744,7 +1744,7 @@ const getLovIngredients = async (subCategory) => {
     }
 
     const subCategoryCondition = normalizedSubCategory === 15
-      ? "xi.sub_category NOT IN (1, 6, 9, 4, 14, 15, 7, 10, 3, 1310, 18)"
+      ? "xi.sub_category NOT IN (1,  14, 15, 7, 10, 3, 1310)"
       : "xi.sub_category IN (?, ?, ?, ?)";
 
     const query = `

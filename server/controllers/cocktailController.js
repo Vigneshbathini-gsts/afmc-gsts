@@ -76,7 +76,7 @@ const getCocktailIngredients = async (req, res) => {
       offset: req.query.offset,
       subCategory: req.query.subCategory,
     });
-
+// console.log(rows.length)
     return res.json({
       success: true,
       count: rows.length,

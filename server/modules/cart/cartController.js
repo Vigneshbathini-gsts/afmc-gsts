@@ -1153,7 +1153,7 @@ exports.getLovIngredients = async (req, res) => {
     }
 
     const data = await cartModel.getLovIngredients(subCategory);
-
+// console.log("data",data)
     return res.status(200).json({
       success: true,
       data,
