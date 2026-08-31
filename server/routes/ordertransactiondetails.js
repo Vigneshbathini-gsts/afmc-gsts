@@ -74,8 +74,7 @@ const getOrderTransactionDetails = async (req, res) => {
 
     let baseWhere = `
       WHERE 
-        TRIM(UPPER(OD.PAYMENT_STATUS)) = 'PAID'
-        AND XI.CATEGORY_ID IN (10, 14)
+        XI.CATEGORY_ID IN (10, 14)
         AND UPPER(IFNULL(OD.ORDER_STATUS, '')) <> 'CANCELLED'
         ${dateFilterClause}
     `;

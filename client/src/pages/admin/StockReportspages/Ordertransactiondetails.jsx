@@ -168,7 +168,7 @@ export default function OrderTransactionUI() {
         // Server may include a pre-calculated total row (e.g. ORD === 2). We compute totals
         // on the client so filtered/search results always show correct totals.
         const responseRows = Array.isArray(response.data) ? response.data : [];
-        console.log("Fetched order transaction rows:", responseRows);
+        // console.log("Fetched order transaction rows:", responseRows);
         const detailRows = responseRows.filter((row) => row?.ORD !== 2);
         setData((current) => (reset ? detailRows : [...current, ...detailRows]));
         setPage(nextPage + 1);

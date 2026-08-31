@@ -4,7 +4,7 @@ const db = require("../config/db");
 exports.getStockReport = async (req, res) => {
   try {
     const { itemName, itemCode, limit, offset } = req.query;
-
+// console.log("Received query parameters:", { itemName, itemCode, limit, offset });
     const parsedLimit = parseInt(limit, 10);
     const parsedOffset = parseInt(offset, 10);
     const limitNum = Number.isFinite(parsedLimit) && parsedLimit > 0
@@ -43,7 +43,8 @@ stock_summary AS (
         SUM(IFNULL(xso.STOCK_QUANTITY,0)) AS STOCK_QUANTITY,
         MAX(xso.PEGS) AS PEGS,
         MAX(inv.\`A/C_UNIT\`) AS A_C_UNIT,
-        MAX(inv.SUB_CATEGORY) AS SUB_CATEGORY
+        MAX(inv.SUB_CATEGORY) AS SUB_CATEGORY,
+        MAX(inv.STOCK_QUANTITY) AS INVENTORY_STOCK_QUANTITY
     FROM xxafmc_stock_out xso
     LEFT JOIN xxafmc_inventory inv
         ON inv.ITEM_CODE = xso.ITEM_CODE
@@ -67,16 +68,18 @@ SELECT
     ss.ITEM_CODE AS item_code,
     ss.ITEM_NAME AS item_name,
 
-    ss.STOCK_QUANTITY,
+    ss.STOCK_QUANTITY AS stock_quantity,
+    COALESCE(ss.INVENTORY_STOCK_QUANTITY, 0) AS inventory_stock,
+    COALESCE(ss.STOCK_QUANTITY, 0) + COALESCE(ss.INVENTORY_STOCK_QUANTITY, 0) AS total_stock,
 
     IFNULL(lp.unit_price,0) AS unit_price,
 
-    ROUND(ss.STOCK_QUANTITY * IFNULL(lp.unit_price,0),2) AS value,
+    ROUND((COALESCE(ss.STOCK_QUANTITY,0) + COALESCE(ss.INVENTORY_STOCK_QUANTITY,0)) * IFNULL(lp.unit_price,0),2) AS value,
 
     ss.A_C_UNIT,
 
     GREATEST(
-        ss.STOCK_QUANTITY - IFNULL(rs.reserved_stock,0),
+        (COALESCE(ss.STOCK_QUANTITY,0) + COALESCE(ss.INVENTORY_STOCK_QUANTITY,0)) - IFNULL(rs.reserved_stock,0),
         0
     ) AS AVAILABLE_STOCK,
 
@@ -84,10 +87,10 @@ SELECT
 
     CASE
         WHEN ss.A_C_UNIT IN ('Nos','Can')
-            THEN ss.STOCK_QUANTITY
+            THEN COALESCE(ss.STOCK_QUANTITY,0) + COALESCE(ss.INVENTORY_STOCK_QUANTITY,0)
 
         WHEN IFNULL(ss.PEGS,0) > 0
-            THEN FLOOR(ss.STOCK_QUANTITY/ss.PEGS)
+            THEN FLOOR((COALESCE(ss.STOCK_QUANTITY,0) + COALESCE(ss.INVENTORY_STOCK_QUANTITY,0))/ss.PEGS)
 
         ELSE 0
     END AS bottles,
@@ -97,9 +100,9 @@ SELECT
             THEN 0
 
         WHEN IFNULL(ss.PEGS,0) > 0
-            THEN MOD(ss.STOCK_QUANTITY,ss.PEGS)
+            THEN MOD((COALESCE(ss.STOCK_QUANTITY,0) + COALESCE(ss.INVENTORY_STOCK_QUANTITY,0)),ss.PEGS)
 
-        ELSE ss.STOCK_QUANTITY
+        ELSE COALESCE(ss.STOCK_QUANTITY,0) + COALESCE(ss.INVENTORY_STOCK_QUANTITY,0)
     END AS pegs
 
 FROM stock_summary ss
