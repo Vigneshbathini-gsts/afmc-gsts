@@ -130,7 +130,7 @@ exports.loginUser = async (req, res) => {
 
     if (
       !MESS_TIMING_EXEMPT_ROLES.includes(Number(user.ROLE_ID)) &&
-      !(await MessTimingsService.isMessOpen())
+      !(await MessTimingsService.isMessOpen({ forceRefresh: true }))
     ) {
       return res.status(403).json({
         success: false,

@@ -5,10 +5,10 @@ let cachedTimings = null;
 let cachedAt = 0;
 const CACHE_TTL_MS = 5000;
 
-const getWeeklyTimings = async () => {
+const getWeeklyTimings = async ({ forceRefresh = false } = {}) => {
   const now = Date.now();
 
-  if (cachedTimings && now - cachedAt < CACHE_TTL_MS) {
+  if (!forceRefresh && cachedTimings && now - cachedAt < CACHE_TTL_MS) {
     return cachedTimings;
   }
 
@@ -87,8 +87,8 @@ const getShiftValues = (dayTiming, shiftNumber) => ({
   close: parseTimeToMinutes(dayTiming[`shift${shiftNumber}_close_time`]),
 });
 
-const isMessOpen = async () => {
-  const timings = await MessTimingsModel.getWeeklyTimings();
+const isMessOpen = async ({ forceRefresh = false } = {}) => {
+  const timings = await getWeeklyTimings({ forceRefresh });
 
   const { dayName: today, currentMinutes } = getBusinessDateParts();
   const todayIndex = DAYS.indexOf(today);
