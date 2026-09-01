@@ -216,7 +216,7 @@ const getOrderItemDetails = async (req, res) => {
 
     WHERE 
         xi.category_id IN (10, 14)
-        AND UPPER(IFNULL(od.order_status, '')) <> 'CANCELLED'
+        AND UPPER(IFNULL(od.order_status, '')) = 'COMPLETED'
         ${dateFilterClause}
         AND (? IS NULL OR UPPER(COALESCE(nm.first_name, xu.first_name)) = UPPER(?))
         AND (? IS NULL OR UPPER(IFNULL(xp.pubmed_name, '')) = UPPER(?))
@@ -304,7 +304,7 @@ const getOrderItemFilterOptions = async (req, res) => {
     JOIN xxafmc_order_header oh ON od.order_id = oh.order_num
     JOIN xxafmc_inventory xi ON xi.item_code = od.item_id
     WHERE xi.category_id IN (10, 14)
-      AND UPPER(IFNULL(od.order_status, '')) <> 'CANCELLED'
+      AND UPPER(IFNULL(od.order_status, '')) = 'COMPLETED'
       ${dateFilterClause}
       AND xi.item_name IS NOT NULL
       AND TRIM(xi.item_name) <> ''
@@ -319,7 +319,7 @@ const getOrderItemFilterOptions = async (req, res) => {
     JOIN xxafmc_users xu ON oh.user_id = xu.user_id
     LEFT JOIN xxafmc_non_members nm ON nm.id = oh.member_id
     WHERE xi.category_id IN (10, 14)
-      AND UPPER(IFNULL(od.order_status, '')) <> 'CANCELLED'
+      AND UPPER(IFNULL(od.order_status, '')) = 'COMPLETED'
       ${dateFilterClause}
       AND COALESCE(nm.first_name, xu.first_name) IS NOT NULL
       AND TRIM(COALESCE(nm.first_name, xu.first_name)) <> ''
@@ -333,7 +333,7 @@ const getOrderItemFilterOptions = async (req, res) => {
     JOIN xxafmc_inventory xi ON xi.item_code = od.item_id
     LEFT JOIN xxafmc_pubmed xp ON xp.pubmed_id = oh.pubmed
     WHERE xi.category_id IN (10, 14)
-      AND UPPER(IFNULL(od.order_status, '')) <> 'CANCELLED'
+      AND UPPER(IFNULL(od.order_status, '')) = 'COMPLETED'
       ${dateFilterClause}
       AND xp.pubmed_name IS NOT NULL
       AND TRIM(xp.pubmed_name) <> ''
