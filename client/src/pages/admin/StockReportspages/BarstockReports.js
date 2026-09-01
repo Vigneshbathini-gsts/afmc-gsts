@@ -168,24 +168,24 @@ export default function BarstockReports() {
           "Item Name",
           "A/C Unit",
           "Stock",
-          "Inventory Stock",
-          "Total Stock",
           "Rate",
           "Value",
           "Bottles/Nos",
           "Pegs",
+          "Inventory Stock",
+          "Total Stock",
         ],
         rows: allRows.map((item) => [
           item.item_code ?? "-",
           toInitCap(item.item_name),
           getAcUnitLabel(item),
           item.stock_quantity ?? item.STOCK_QUANTITY ?? 0,
-          item.inventory_stock ?? item.INVENTORY_STOCK ?? 0,
-          item.total_stock ?? item.TOTAL_STOCK ?? Number(item.stock_quantity ?? item.STOCK_QUANTITY ?? 0) + Number(item.inventory_stock ?? item.INVENTORY_STOCK ?? 0),
           item.unit_price ?? 0,
           item.value ?? 0,
           item.bottles ?? 0,
           item.pegs ?? 0,
+          item.inventory_stock ?? item.INVENTORY_STOCK ?? 0,
+          item.total_stock ?? item.TOTAL_STOCK ?? Number(item.stock_quantity ?? item.STOCK_QUANTITY ?? 0) + Number(item.inventory_stock ?? item.INVENTORY_STOCK ?? 0),
         ]),
       });
     } catch (err) {
@@ -278,12 +278,6 @@ export default function BarstockReports() {
                         Stock
                       </th>
                       <th className="px-4 py-3 text-left font-medium">
-                        Inventory Stock
-                      </th>
-                      <th className="px-4 py-3 text-left font-medium">
-                        Total Stock
-                      </th>
-                      <th className="px-4 py-3 text-left font-medium">
                         Rate
                       </th>
                       <th className="px-4 py-3 text-left font-medium">
@@ -294,6 +288,12 @@ export default function BarstockReports() {
                       </th>
                       <th className="px-4 py-3 text-left font-medium">
                         Pegs
+                      </th>
+                      <th className="px-4 py-3 text-left font-medium">
+                        Inventory Stock
+                      </th>
+                      <th className="px-4 py-3 text-left font-medium">
+                        Total Stock
                       </th>
                     </tr>
                   </thead>
@@ -310,12 +310,12 @@ export default function BarstockReports() {
                         </td>
                         <td className="px-4 py-3">{getAcUnitLabel(item)}</td>
                         <td className="px-4 py-3">{item.stock_quantity ?? item.STOCK_QUANTITY ?? 0}</td>
-                        <td className="px-4 py-3">{item.inventory_stock ?? item.INVENTORY_STOCK ?? 0}</td>
-                        <td className="px-4 py-3">{item.total_stock ?? item.TOTAL_STOCK ?? Number(item.stock_quantity ?? item.STOCK_QUANTITY ?? 0) + Number(item.inventory_stock ?? item.INVENTORY_STOCK ?? 0)}</td>
                         <td className="px-4 py-3">{item.unit_price ?? 0}</td>
                         <td className="px-4 py-3">{item.value ?? 0}</td>
                         <td className="px-4 py-3">{item.bottles ?? 0}</td>
                         <td className="px-4 py-3">{item.pegs ?? 0}</td>
+                        <td className="px-4 py-3">{item.inventory_stock ?? item.INVENTORY_STOCK ?? 0}</td>
+                        <td className="px-4 py-3">{item.total_stock ?? item.TOTAL_STOCK ?? Number(item.stock_quantity ?? item.STOCK_QUANTITY ?? 0) + Number(item.inventory_stock ?? item.INVENTORY_STOCK ?? 0)}</td>
                       </tr>
                     ))}
 

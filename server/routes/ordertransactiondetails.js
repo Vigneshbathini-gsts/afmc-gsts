@@ -75,7 +75,7 @@ const getOrderTransactionDetails = async (req, res) => {
     let baseWhere = `
       WHERE 
         XI.CATEGORY_ID IN (10, 14)
-        AND UPPER(IFNULL(OD.ORDER_STATUS, '')) <> 'CANCELLED'
+        AND UPPER(IFNULL(OD.ORDER_STATUS, '')) = 'COMPLETED'
         ${dateFilterClause}
     `;
 
@@ -327,7 +327,7 @@ const getOrderTransactionDetails = async (req, res) => {
     const allParams = [...params, ...params];
 
     const [results] = await db.execute(finalQuery, allParams);
-
+// console.log("Fetched order transaction rows:", results); // Debugging log
     return res.json({
       success: true,
       count: results.length,
