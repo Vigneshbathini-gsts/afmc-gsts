@@ -764,22 +764,32 @@ async function getOrderDetails(orderNumber, { includeCancelled = false } = {}) {
       2
     ) AS subtotal,
     COALESCE(NULLIF(xi.type, ''), NULLIF(od.type, ''), 'NA') AS type,
-    COALESCE(
-      NULLIF(od.order_status, ''),
-      (
-        SELECT 
-          CASE 
-            WHEN kn.status = 'Completed' THEN 'Completed'
-            WHEN kn.status = 'Preparing' THEN 'Preparing'
-            ELSE 'Received'
-          END
+    CASE
+      WHEN TRIM(UPPER(IFNULL(od.order_status, ''))) = 'CANCELLED' THEN 'Cancelled'
+      WHEN EXISTS (
+        SELECT 1
         FROM xxafmc_kitchen_notification kn
         WHERE kn.ordernumber = od.order_id
           AND TRIM(CAST(kn.item_id AS CHAR)) = TRIM(CAST(od.item_id AS CHAR))
-        LIMIT 1
-      ),
-      'Received'
-    ) AS status,
+          AND kn.status = 'Preparing'
+      ) THEN 'Preparing'
+      WHEN EXISTS (
+        SELECT 1
+        FROM xxafmc_kitchen_notification kn
+        WHERE kn.ordernumber = od.order_id
+          AND TRIM(CAST(kn.item_id AS CHAR)) = TRIM(CAST(od.item_id AS CHAR))
+          AND kn.status = 'Received'
+      ) THEN 'Received'
+      WHEN EXISTS (
+        SELECT 1
+        FROM xxafmc_kitchen_notification kn
+        WHERE kn.ordernumber = od.order_id
+          AND TRIM(CAST(kn.item_id AS CHAR)) = TRIM(CAST(od.item_id AS CHAR))
+          AND kn.status = 'Completed'
+      ) THEN 'Completed'
+      WHEN TRIM(UPPER(IFNULL(od.order_status, ''))) = 'COMPLETED' THEN 'Completed'
+      ELSE 'Received'
+    END AS status,
     od.barcode AS barcode,
     od.FREE_ITEM_CODE AS free_item_code,
     od.FREE_ITEM_QUANTITY AS free_item_quantity,

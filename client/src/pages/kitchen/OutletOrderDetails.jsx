@@ -24,10 +24,17 @@ export default function OutletOrderDetails() {
 
   const orderDataFromState = location.state;
   const orderNumberFromQuery = searchParams.get("orderNumber") || "";
-  const kitchenTypeFromQuery = searchParams.get("kitchenType") || "";
+  const kitchenTypeFromQuery =
+    searchParams.get("kitchenType") || searchParams.get("kitchen") || "";
 
   const [orderData, setOrderData] = useState(() => {
     if (orderDataFromState) return orderDataFromState;
+    if (orderNumberFromQuery) {
+      return {
+        ORDERNUMBER: orderNumberFromQuery,
+        kitchenType: kitchenTypeFromQuery || undefined,
+      };
+    }
 
     try {
       const raw = sessionStorage.getItem("outletOrderDetails:lastOrder");
