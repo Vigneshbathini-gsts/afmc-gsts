@@ -178,13 +178,13 @@ const getOrderTransactionDetails = async (req, res) => {
     `;
 
     // FIX: For cocktails, subtotal = ingredient total + prep charge (once per order line)
-    // For regular items, subtotal = ingredient total (no prep charge)
+    // For regular items, subtotal = ingredient total + preparation charge
     const subtotalExpression = `
       CASE
         WHEN XI.SUB_CATEGORY IN (14, 15) THEN 
           ${ingredientTotalExpression} + IFNULL(OD.FOOD_PR_CHARGES, 0)
         ELSE 
-          ${ingredientTotalExpression} - IFNULL(OD.FOOD_PR_CHARGES * (${multiplierExpression} * IFNULL(OD.QUANTITY, 0)), 0)
+          ${ingredientTotalExpression} + IFNULL(OD.FOOD_PR_CHARGES * (${multiplierExpression} * IFNULL(OD.QUANTITY, 0)), 0)
       END
     `;
 

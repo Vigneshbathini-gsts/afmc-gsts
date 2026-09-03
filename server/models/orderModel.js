@@ -71,7 +71,9 @@ const LINE_SUBTOTAL_CASE = `
   CASE
     WHEN TRIM(UPPER(IFNULL(od.order_status, ''))) = 'CANCELLED' THEN 0
     WHEN od.subcategory IN (14, 15) THEN IFNULL(od.subtotal, 0)
-    WHEN scanned_totals.scanned_total > 0 AND (od.price IS NULL OR od.price <> 0) THEN scanned_totals.scanned_total
+    WHEN scanned_totals.scanned_total > 0 AND (od.price IS NULL OR od.price <> 0) THEN
+      scanned_totals.scanned_total +
+      (IFNULL(od.food_pr_charges, 0) * IFNULL(od.quantity, 0))
     WHEN custom_totals.unit_custom_total > 0 THEN custom_totals.unit_custom_total * od.quantity
     ELSE IFNULL(od.subtotal, 0)
   END
@@ -85,7 +87,9 @@ const ORDER_SUBTOTAL_SUBQUERY = `
       CASE
         WHEN TRIM(UPPER(IFNULL(xxod2.order_status, ''))) = 'CANCELLED' THEN 0
         WHEN xxod2.subcategory IN (14, 15) THEN IFNULL(xxod2.subtotal, 0)
-        WHEN scanned_totals.scanned_total > 0 AND (xxod2.price IS NULL OR xxod2.price <> 0) THEN scanned_totals.scanned_total
+        WHEN scanned_totals.scanned_total > 0 AND (xxod2.price IS NULL OR xxod2.price <> 0) THEN
+          scanned_totals.scanned_total +
+          (IFNULL(xxod2.food_pr_charges, 0) * IFNULL(xxod2.quantity, 0))
         WHEN custom_totals.unit_custom_total > 0 THEN custom_totals.unit_custom_total * xxod2.quantity
         ELSE COALESCE(xxod2.subtotal, 0)
       END
@@ -782,7 +786,8 @@ async function getOrderDetails(orderNumber, { includeCancelled = false } = {}) {
         -- For cocktails, subtotal already includes prep charge
         WHEN od.subcategory IN (14, 15) THEN IFNULL(od.subtotal, 0)
         WHEN scanned_totals.scanned_total > 0 AND (od.price IS NULL OR od.price <> 0) THEN 
-          scanned_totals.scanned_total
+          scanned_totals.scanned_total +
+          (IFNULL(od.food_pr_charges, 0) * IFNULL(od.quantity, 0))
         WHEN custom_totals.unit_custom_total > 0 THEN 
           custom_totals.unit_custom_total * od.quantity
         ELSE 
@@ -791,22 +796,32 @@ async function getOrderDetails(orderNumber, { includeCancelled = false } = {}) {
       2
     ) AS subtotal,
     COALESCE(NULLIF(xi.type, ''), NULLIF(od.type, ''), 'NA') AS type,
-    COALESCE(
-      NULLIF(od.order_status, ''),
-      (
-        SELECT 
-          CASE 
-            WHEN kn.status = 'Completed' THEN 'Completed'
-            WHEN kn.status = 'Preparing' THEN 'Preparing'
-            ELSE 'Received'
-          END
+    CASE
+      WHEN TRIM(UPPER(IFNULL(od.order_status, ''))) = 'CANCELLED' THEN 'Cancelled'
+      WHEN EXISTS (
+        SELECT 1
         FROM xxafmc_kitchen_notification kn
         WHERE kn.ordernumber = od.order_id
           AND TRIM(CAST(kn.item_id AS CHAR)) = TRIM(CAST(od.item_id AS CHAR))
-        LIMIT 1
-      ),
-      'Received'
-    ) AS status,
+          AND kn.status = 'Preparing'
+      ) THEN 'Preparing'
+      WHEN EXISTS (
+        SELECT 1
+        FROM xxafmc_kitchen_notification kn
+        WHERE kn.ordernumber = od.order_id
+          AND TRIM(CAST(kn.item_id AS CHAR)) = TRIM(CAST(od.item_id AS CHAR))
+          AND kn.status = 'Received'
+      ) THEN 'Received'
+      WHEN EXISTS (
+        SELECT 1
+        FROM xxafmc_kitchen_notification kn
+        WHERE kn.ordernumber = od.order_id
+          AND TRIM(CAST(kn.item_id AS CHAR)) = TRIM(CAST(od.item_id AS CHAR))
+          AND kn.status = 'Completed'
+      ) THEN 'Completed'
+      WHEN TRIM(UPPER(IFNULL(od.order_status, ''))) = 'COMPLETED' THEN 'Completed'
+      ELSE 'Received'
+    END AS status,
     od.barcode AS barcode,
     od.FREE_ITEM_CODE AS free_item_code,
     od.FREE_ITEM_QUANTITY AS free_item_quantity,
@@ -1035,7 +1050,9 @@ async function getUserOrderHistory({ fromDate, toDate, username, appUser }) {
             CASE
               -- For cocktails (subcategory 14 or 15), subtotal already includes prep charge
               WHEN od.subcategory IN (14, 15) THEN IFNULL(od.subtotal, 0)
-              WHEN scanned_totals.scanned_total > 0 AND (od.price IS NULL OR od.price <> 0) THEN scanned_totals.scanned_total
+              WHEN scanned_totals.scanned_total > 0 AND (od.price IS NULL OR od.price <> 0) THEN
+                scanned_totals.scanned_total +
+                (IFNULL(od.food_pr_charges, 0) * IFNULL(od.quantity, 0))
               WHEN custom_totals.unit_custom_total > 0 THEN custom_totals.unit_custom_total * od.quantity
               ELSE IFNULL(od.subtotal, 0)
             END

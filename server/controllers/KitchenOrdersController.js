@@ -617,7 +617,8 @@ exports.updateBarOrderStatus = async (req, res) => {
             // For cocktails: ingredient total + preparation charge (added once)
             finalSubtotal = ingredientTotal + prepCharge;
           } else {
-            // For regular items: just the ingredient total
+            // For regular items: ingredient total plus preparation charge per unit
+            finalSubtotal = ingredientTotal + (prepCharge * Number(lineInfo?.quantity || 0));
           }
           
           // Update the order line with the correct subtotal and status
@@ -634,11 +635,14 @@ exports.updateBarOrderStatus = async (req, res) => {
         // (For items where we just need to mark them completed)
         const [pendingLines] = await connection.query(
           `SELECT order_line_id 
-           FROM xxafmc_order_details 
-           WHERE order_id = ? 
+           FROM xxafmc_order_details xod
+           JOIN (${inventorySummarySql}) inv
+             ON inv.item_code = xod.item_id
+           WHERE xod.order_id = ?
              AND (order_status IS NULL OR order_status = '')
-             AND subcategory NOT IN (14, 15)`,
-          [ORDERNUMBER]
+             AND xod.subcategory NOT IN (14, 15)
+             AND inv.category_id = ?`,
+          [ORDERNUMBER, categoryId]
         );
         
         // console.log('Pending lines without scans:', pendingLines.length);
@@ -657,7 +661,12 @@ exports.updateBarOrderStatus = async (req, res) => {
             // console.log(`Marking line ${line.order_line_id} as COMPLETED (no scans)`);
             await connection.query(
               `UPDATE xxafmc_order_details 
-               SET ORDER_STATUS = 'COMPLETED' 
+               SET subtotal = ROUND(
+                 COALESCE(subtotal, 0) +
+                 (COALESCE(food_pr_charges, 0) * COALESCE(quantity, 0)),
+                 2
+               ),
+               ORDER_STATUS = 'COMPLETED' 
                WHERE ORDER_LINE_ID = ?`,
               [line.order_line_id]
             );
@@ -801,14 +810,29 @@ exports.getOrderItems = async (req, res) => {
     ON xod.ITEM_ID = xi.ITEM_CODE
 
   WHERE xod.ORDER_ID = ?
-    AND (xod.ORDER_STATUS IS NULL OR xod.ORDER_STATUS = '')
     AND xi.CATEGORY_ID = ?
+    AND (
+      (xod.ORDER_STATUS IS NULL OR xod.ORDER_STATUS = '')
+      OR EXISTS (
+        SELECT 1
+        FROM xxafmc_kitchen_notification xkn
+        WHERE xkn.ordernumber = xod.ORDER_ID
+          AND TRIM(CAST(xkn.item_id AS CHAR)) = TRIM(CAST(xod.ITEM_ID AS CHAR))
+          AND xkn.status IN ('Received', 'Preparing')
+          AND EXISTS (
+            SELECT 1
+            FROM (${inventorySummarySql}) notification_inv
+            WHERE notification_inv.item_code = xkn.item_id
+              AND notification_inv.category_id = ?
+          )
+      )
+    )
 
   GROUP BY xod.ITEM_ID, xod.TYPE
   ORDER BY ORDER_LINE_ID ASC;
 `;
 
-    const [rows] = await pool.query(query, [ORDERNUMBER, categoryId]);
+    const [rows] = await pool.query(query, [ORDERNUMBER, categoryId, categoryId]);
 
     const formattedData = rows.map((row) => ({
       ORDER_LINE_ID: row.ORDER_LINE_ID,
@@ -1095,9 +1119,23 @@ exports.processBarcodeScan = async (req, res) => {
           )
         GROUP BY xcmd.inventory_item_code, xcmd.item_code, xcmd.pegs
         UNION ALL
-        SELECT (CASE WHEN UPPER(TRIM(COALESCE(xo.type, ''))) = 'LARGE' THEN 2 ELSE 1 END * COALESCE(xo.quantity, 0)) AS quantity 
-        FROM xxafmc_order_details xo 
-        WHERE xo.order_id = ? AND xo.item_id = ? AND (xo.order_status IS NULL OR xo.order_status = '')
+        SELECT (CASE WHEN UPPER(TRIM(COALESCE(xo.type, ''))) = 'LARGE' THEN 2 ELSE 1 END * COALESCE(xo.quantity, 0)) AS quantity
+        FROM xxafmc_order_details xo
+        JOIN (${inventorySummarySql}) order_inv
+          ON order_inv.item_code = xo.item_id
+        WHERE xo.order_id = ?
+          AND xo.item_id = ?
+          AND order_inv.category_id = ${categoryId}
+          AND (
+            xo.order_status IS NULL OR xo.order_status = ''
+            OR EXISTS (
+              SELECT 1
+              FROM xxafmc_kitchen_notification active_kn
+              WHERE active_kn.ordernumber = xo.order_id
+                AND TRIM(CAST(active_kn.item_id AS CHAR)) = TRIM(CAST(xo.item_id AS CHAR))
+                AND active_kn.status IN ('Received', 'Preparing')
+            )
+          )
       ) a`,
       [
         ORDERNUMBER, scanItemCode, forcedParentItem, forcedParentItem,

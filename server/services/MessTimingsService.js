@@ -192,7 +192,7 @@ const updateWeeklyTimings = async ({ timings, updatedBy }) => {
           active_flag=?,
           updated_by=?,
           updated_on=NOW()
-        WHERE id=?
+          WHERE id = ?
         `,
         [
           shift1OpenValue,

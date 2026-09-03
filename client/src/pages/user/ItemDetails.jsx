@@ -806,7 +806,7 @@ return;
                                     className="inline-flex items-center gap-2 rounded-full bg-afmc-maroon px-4 py-2 text-sm font-semibold text-white shadow-sm ring-1 ring-afmc-gold/30 transition hover:bg-afmc-maroon/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-afmc-gold/60 focus-visible:ring-offset-2 focus-visible:ring-offset-afmc-maroon disabled:cursor-not-allowed disabled:bg-stone-300"
                                 >
                                     <FaSave className="text-xs" />
-                                    {isEditingCartItem ? "Save" : fromBuyFlow ? "Save Ingredients" : "Add to Cart"}
+                                    {isEditingCartItem ? "Save Ingredients" : fromBuyFlow ? "Save Ingredients" : "Add to Cart"}
                                 </button>
                             </div>
                         </div>
