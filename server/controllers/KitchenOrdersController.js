@@ -617,7 +617,8 @@ exports.updateBarOrderStatus = async (req, res) => {
             // For cocktails: ingredient total + preparation charge (added once)
             finalSubtotal = ingredientTotal + prepCharge;
           } else {
-            // For regular items: just the ingredient total
+            // For regular items: ingredient total plus preparation charge per unit
+            finalSubtotal = ingredientTotal + (prepCharge * Number(lineInfo?.quantity || 0));
           }
           
           // Update the order line with the correct subtotal and status
@@ -660,7 +661,12 @@ exports.updateBarOrderStatus = async (req, res) => {
             // console.log(`Marking line ${line.order_line_id} as COMPLETED (no scans)`);
             await connection.query(
               `UPDATE xxafmc_order_details 
-               SET ORDER_STATUS = 'COMPLETED' 
+               SET subtotal = ROUND(
+                 COALESCE(subtotal, 0) +
+                 (COALESCE(food_pr_charges, 0) * COALESCE(quantity, 0)),
+                 2
+               ),
+               ORDER_STATUS = 'COMPLETED' 
                WHERE ORDER_LINE_ID = ?`,
               [line.order_line_id]
             );
