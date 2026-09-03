@@ -349,6 +349,12 @@ async function getOrderWiseReport({
         ROUND(
           CASE
             WHEN TRIM(UPPER(IFNULL(od.order_status, ''))) = 'CANCELLED' THEN 0
+            WHEN EXISTS (
+              SELECT 1
+              FROM xxafmc_inventory flag_inventory
+              WHERE flag_inventory.item_code = od.item_id
+                AND TRIM(UPPER(IFNULL(flag_inventory.FLAG, ''))) = 'N'
+            ) THEN 0
             -- For cocktails: prep charge is food_pr_charges (once per order line)
             WHEN od.subcategory IN (14, 15) THEN IFNULL(od.food_pr_charges, 0)
             -- For regular items: prep charge is food_pr_charges * quantity
@@ -417,6 +423,12 @@ async function getOrderWiseReport({
           od.order_line_id,
           CASE
             WHEN TRIM(UPPER(IFNULL(od.order_status, ''))) = 'CANCELLED' THEN 0
+            WHEN EXISTS (
+              SELECT 1
+              FROM xxafmc_inventory flag_inventory
+              WHERE flag_inventory.item_code = od.item_id
+                AND TRIM(UPPER(IFNULL(flag_inventory.FLAG, ''))) = 'N'
+            ) THEN 0
             WHEN od.subcategory IN (14, 15) THEN IFNULL(od.food_pr_charges, 0)
             ELSE IFNULL(od.food_pr_charges, 0) * od.quantity
           END AS prep_charges,
@@ -497,6 +509,12 @@ async function getItemWiseReport({
           SUM(
             CASE
               WHEN TRIM(UPPER(IFNULL(od.order_status, ''))) = 'CANCELLED' THEN 0
+              WHEN EXISTS (
+                SELECT 1
+                FROM xxafmc_inventory flag_inventory
+                WHERE flag_inventory.item_code = od.item_id
+                  AND TRIM(UPPER(IFNULL(flag_inventory.FLAG, ''))) = 'N'
+              ) THEN 0
               WHEN od.subcategory IN (14, 15) THEN IFNULL(od.food_pr_charges, 0)
               ELSE IFNULL(od.food_pr_charges, 0) * od.quantity
             END
@@ -521,7 +539,10 @@ async function getItemWiseReport({
       FROM xxafmc_order_details od
       JOIN xxafmc_order_header xoh
         ON od.order_id = xoh.order_num
-      JOIN xxafmc_kitchen_notification xxkn
+      JOIN (
+        SELECT DISTINCT ordernumber, item_id, user_name, status
+        FROM xxafmc_kitchen_notification
+      ) xxkn
         ON xxkn.ordernumber = od.order_id
         AND xxkn.item_id = od.item_id
       JOIN xxafmc_users xu
@@ -560,6 +581,12 @@ async function getItemWiseReport({
           od.order_line_id,
           CASE
             WHEN TRIM(UPPER(IFNULL(od.order_status, ''))) = 'CANCELLED' THEN 0
+            WHEN EXISTS (
+              SELECT 1
+              FROM xxafmc_inventory flag_inventory
+              WHERE flag_inventory.item_code = od.item_id
+                AND TRIM(UPPER(IFNULL(flag_inventory.FLAG, ''))) = 'N'
+            ) THEN 0
             WHEN od.subcategory IN (14, 15) THEN IFNULL(od.food_pr_charges, 0)
             ELSE IFNULL(od.food_pr_charges, 0) * od.quantity
           END AS prep_charges,

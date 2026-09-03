@@ -63,6 +63,7 @@ export default function Buyflowconfirmorder() {
   useEffect(() => {
     let ignore = false;
     let eventSource;
+    let latestRequestVersion = 0;
 
     const fetchConfirmedOrder = async ({ silent = false } = {}) => {
       if (!orderNumber) {
@@ -71,13 +72,15 @@ export default function Buyflowconfirmorder() {
         return;
       }
 
+      const requestVersion = ++latestRequestVersion;
+
       try {
         if (!silent) {
           setLoading(true);
         }
         setError("");
         const response = await ConfirmOrderservice.getConfirmedOrder(orderNumber);
-        if (!ignore) {
+        if (!ignore && requestVersion === latestRequestVersion) {
           setOrderData(response?.data?.data || null);
         }
       } catch (fetchError) {
@@ -87,7 +90,7 @@ export default function Buyflowconfirmorder() {
           );
         }
       } finally {
-        if (!ignore && !silent) {
+        if (!ignore && !silent && requestVersion === latestRequestVersion) {
           setLoading(false);
         }
       }
@@ -142,7 +145,9 @@ export default function Buyflowconfirmorder() {
 
   const orderStatus = String(orderData?.header?.status || "Received");
   const paymentStatus = String(orderData?.header?.payment_status || "Not Paid");
-  const canProceedToPayment = orderStatus === "Completed" && paymentStatus !== "Paid";
+  const canProceedToPayment =
+    orderStatus.trim().toUpperCase() === "COMPLETED" &&
+    paymentStatus.trim().toUpperCase() !== "PAID";
   const isPaymentDone = paymentStatus === "Paid";
   const totalQuantity = useMemo(
     () => items.reduce((sum, item) => sum + Number(item.quantity || 0), 0),
