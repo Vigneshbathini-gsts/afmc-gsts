@@ -31,7 +31,12 @@ async function getInvoiceReportByOrderNumber(orderNumber) {
             -- For cocktails (subcategory 14 or 15), use subtotal from order_details directly
             -- DO NOT add food_pr_charges again because it's already included
             WHEN od.subcategory IN (14, 15) THEN IFNULL(od.subtotal, 0)
-            WHEN scanned_totals.scanned_total > 0 AND (od.price IS NULL OR od.price <> 0) THEN scanned_totals.scanned_total
+            WHEN scanned_totals.scanned_total > 0 AND (od.price IS NULL OR od.price <> 0) THEN
+              scanned_totals.scanned_total +
+              CASE
+                WHEN TRIM(UPPER(IFNULL(xi.FLAG, ''))) = 'N' THEN 0
+                ELSE IFNULL(od.food_pr_charges, 0) * IFNULL(od.quantity, 0)
+              END
             WHEN custom_totals.unit_custom_total > 0 THEN custom_totals.unit_custom_total * od.quantity
             ELSE IFNULL(od.subtotal, 0)
           END,
@@ -77,7 +82,10 @@ async function getInvoiceReportByOrderNumber(orderNumber) {
             IFNULL(cm.pegs, 0) *
             (
               IFNULL(stock_prices.base_peg_price, 0) * (1 + IFNULL(od_price.profit, 0) / 100) +
-              IFNULL(od_price.food_pr_charges, 0)
+              CASE
+                WHEN TRIM(UPPER(IFNULL(custom_inventory.FLAG, ''))) = 'N' THEN 0
+                ELSE IFNULL(od_price.food_pr_charges, 0)
+              END
             )
           ), 2) AS unit_custom_total
         FROM xxafmc_custom_cocktails_mocktails_details cm
@@ -93,6 +101,8 @@ async function getInvoiceReportByOrderNumber(orderNumber) {
           GROUP BY item_code
         ) stock_prices
           ON stock_prices.item_code = cm.item_code
+        LEFT JOIN xxafmc_inventory custom_inventory
+          ON custom_inventory.item_code = cm.inventory_item_code
         GROUP BY cm.order_number, cm.inventory_item_code
       ) custom_totals
         ON custom_totals.order_number = od.order_id
