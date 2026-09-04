@@ -383,6 +383,10 @@ function MenuPopupCompact({ item, loading, onClose, onBuy }) {
   const isMocktailItem = isCocktailOrMocktailItem(item);
   const acUnit = item?.ac_unit || item?.["A/C_UNIT"] || "Nos";
   const isPegsUnit = String(acUnit).trim().toLowerCase() === "pegs";
+  const selectedQuantity = Math.max(Number(qty) || 1, 1);
+  const displayedPrice =
+    Number(item?.unit_price || 0) +
+    Math.max(selectedQuantity - 1, 0) * Number(item?.pr_charges || 0);
 
   const fetchCartCount = async () => {
     if (!userId) return;
@@ -672,7 +676,7 @@ function MenuPopupCompact({ item, loading, onClose, onBuy }) {
                           {toInitCap("Price")}
                         </div>
                         <div className="mt-1 text-[18px] font-extrabold leading-6 text-afmc-maroon">
-                          ₹{formatPrice(item?.unit_price)}
+                          ₹{formatPrice(displayedPrice)}
                         </div>
                       </div>
                     </div>

@@ -169,9 +169,12 @@ async function getInventoryItem(connection, itemCode) {
         IFNULL(\`A/C_UNIT\`, 'Nos') AS ac_unit,
         IFNULL(TYPE, '') AS type,
         (
-          SELECT IFNULL(MAX(CASE WHEN IFNULL(so.STOCK_QUANTITY, 0) > 0 THEN so.UNIT_PRICE END), 0)
+          SELECT IFNULL(so.UNIT_PRICE, 0)
           FROM xxafmc_stock_out so
           WHERE so.item_code = xxafmc_inventory.ITEM_CODE
+            AND IFNULL(so.STOCK_QUANTITY, 0) > 0
+          ORDER BY so.CREATION_DATE DESC
+          LIMIT 1
         ) AS stock_out_unit_price,
         (
           SELECT IFNULL(
@@ -226,19 +229,17 @@ function calculateOrderUnitPrice(inventoryItem, isNonMember) {
 
   let finalPrice = inventoryUnitPrice;
 
-  const isExcludedLiquorItem = categoryId === 10 && (isExcludedLiquorSubcategory(subCategory) || [14, 15].includes(subCategory));
-  const isNonAlcoholicLiquorItem = categoryId === 10 && isExcludedLiquorSubcategory(subCategory);
+  const isMocktailItem = categoryId === 10 && [14, 15].includes(subCategory);
 
-  if (isNonAlcoholicLiquorItem) {
-    const pricePerPeg = inventoryUnitPrice / pegs;
-    finalPrice = pricePerPeg + charges;
-  } else if (isExcludedLiquorItem) {
+  if (isMocktailItem) {
     finalPrice = inventoryBasePrice + charges;
+  } else if (categoryId === 10 && isExcludedLiquorSubcategory(subCategory)) {
+    finalPrice = inventoryUnitPrice / pegs;
   } else if (categoryId === 10) {
     const pricePerPeg = inventoryUnitPrice / pegs;
     finalPrice = pricePerPeg + (pricePerPeg * profit) / 100 + charges;
   } else if (categoryId === 14) {
-    finalPrice = inventoryUnitPrice + (inventoryUnitPrice * profit) / 100 + charges;
+    finalPrice = inventoryUnitPrice / pegs + charges;
   } else {
     finalPrice = inventoryBasePrice || inventoryUnitPrice;
   }

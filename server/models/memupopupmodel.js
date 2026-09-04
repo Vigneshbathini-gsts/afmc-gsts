@@ -62,14 +62,16 @@ const getMenuPopupDetails = async ({ itemCode, itemId, authUser }) => {
         SELECT
     IFNULL(SUM(IFNULL(xso.STOCK_QUANTITY,0)),0) AS quantity,
 
-    IFNULL(
-        MAX(
-            CASE
-                WHEN IFNULL(xso.STOCK_QUANTITY,0) > 0
-                THEN xso.UNIT_PRICE
-            END
-        ),
-        0
+    COALESCE(
+      (
+        SELECT xso_price.UNIT_PRICE
+        FROM xxafmc_stock_out xso_price
+        WHERE xso_price.ITEM_CODE = ?
+          AND IFNULL(xso_price.STOCK_QUANTITY, 0) > 0
+        ORDER BY xso_price.CREATION_DATE DESC
+        LIMIT 1
+      ),
+      0
     ) AS stock_out_unit_price,
 
     IFNULL(
@@ -104,7 +106,7 @@ const getMenuPopupDetails = async ({ itemCode, itemId, authUser }) => {
 FROM xxafmc_stock_out xso
 WHERE xso.ITEM_CODE = ?
       `,
-      [normalizedItemCode],
+      [normalizedItemCode, normalizedItemCode],
     ),
     db.execute(
       `
@@ -143,37 +145,18 @@ WHERE xso.ITEM_CODE = ?
   const selectedProfit = isNonAlcoholicLiquorItem ? 0 : isMember ? memberProfit : nonMemberProfit;
   const selectedCharges = isNonAlcoholicLiquorItem ? 0 : isMember ? memberCharges : nonMemberCharges;
 
-  let cocktailBasePrice = inventoryBasePrice;
-
-  if (isCocktailOrMocktailItem) {
-    const priceColumn = isMember ? "PRICE" : "NON_MEMBER_PRICE";
-    const [detailRows] = await db.execute(
-      `SELECT COALESCE(SUM(COALESCE(${priceColumn}, 0)), 0) AS detail_total_price
-       FROM xxafmc_cocktails_mocktails_details
-       WHERE INVENTORY_ITEM_CODE = ?`,
-      [normalizedItemCode]
-    );
-
-    cocktailBasePrice = toNumber(detailRows[0]?.detail_total_price || 0);
-  }
-
   let finalPrice = inventoryUnitPrice;
 
   if (isCocktailOrMocktailItem) {
-    finalPrice = cocktailBasePrice + selectedCharges;
+    finalPrice = inventoryBasePrice + selectedCharges;
   } else if (isNonAlcoholicLiquorItem) {
-    // finalPrice = inventoryBasePrice || inventoryUnitPrice;
-     const pricePerPeg = inventoryUnitPrice / pegs;
-    finalPrice = pricePerPeg + selectedCharges;
+    finalPrice = inventoryUnitPrice / pegs;
   } else if (categoryId === 10) {
     const pricePerPeg = inventoryUnitPrice / pegs;
     finalPrice =
       pricePerPeg + (pricePerPeg * selectedProfit) / 100 + selectedCharges;
   } else if (categoryId === 14) {
-    finalPrice =
-      (inventoryUnitPrice + (inventoryUnitPrice * selectedProfit) / 100) /
-        snacksPegs +
-      selectedCharges;
+    finalPrice = inventoryUnitPrice / snacksPegs + selectedCharges;
   } else {
     finalPrice = inventoryBasePrice || inventoryUnitPrice;
   }
