@@ -35,6 +35,31 @@ const getDisplayMoney = (amount) =>
         maximumFractionDigits: 2,
     });
 
+const getPaymentItemAmounts = (item) => {
+    const quantity = Number(item.QUANTITY ?? item.quantity ?? 0);
+    const basePrice = Number(item.PRICE ?? item.price ?? 0);
+    const inventoryFlag = String(item.INVENTORY_FLAG ?? item.inventory_flag ?? "")
+        .trim()
+        .toUpperCase();
+    const categoryId = Number(item.CATEGORY_ID ?? item.category_id ?? 0);
+    const profit = Number(item.PROFIT ?? item.profit ?? 0);
+    const preparationCharge = Number(
+        item.PREP_CHARGES ?? item.prep_charges ?? item.FOOD_PR_CHARGES ?? item.food_pr_charges ?? 0
+    );
+    const isLiquor = categoryId === 10;
+    const isSnack = categoryId === 14;
+    const charge = inventoryFlag === "Y"
+        ? isLiquor
+            ? (basePrice * profit) / 100
+            : isSnack
+                ? preparationCharge
+                : 0
+        : 0;
+    const finalPrice = isFreeItem(item) ? 0 : basePrice + charge;
+
+    return { quantity, finalPrice, finalTotal: finalPrice * quantity };
+};
+
 const PaymentPage = () => {
     const [searchParams] = useSearchParams();
     const orderNumber = searchParams.get("orderNumber");
@@ -156,7 +181,11 @@ const PaymentPage = () => {
             const basePath = location.pathname.startsWith("/attendant")
                 ? "/attendant"
                 : "/user";
-            const amount = Number(order?.totalAmount || order?.order_total || 0);
+            const calculatedAmount = orderItems.reduce(
+                (sum, item) => sum + getPaymentItemAmounts(item).finalTotal,
+                0
+            );
+            const amount = calculatedAmount || Number(order?.totalAmount || order?.order_total || 0);
 
             navigate(
                 `${basePath}/invoice-report?orderNumber=${encodeURIComponent(orderNumber)}&amount=${encodeURIComponent(
@@ -175,6 +204,11 @@ const PaymentPage = () => {
             toast.error("Payment failed. Please try again.");
         }
     };
+
+    const displayedOrderTotal = orderItems.reduce(
+        (sum, item) => sum + getPaymentItemAmounts(item).finalTotal,
+        0
+    );
 
     if (loading) {
         return (
@@ -215,7 +249,7 @@ const PaymentPage = () => {
                                 {toInitCap("Order Total")}
                             </p>
                             <p className="mt-1 text-lg font-semibold text-stone-900">
-                                ₹ {getDisplayMoney(order?.totalAmount || 0)}
+                                ₹ {getDisplayMoney(displayedOrderTotal)}
                             </p>
                         </div>
 
@@ -342,13 +376,13 @@ const PaymentPage = () => {
                                                 {toInitCap(item.ITEM_NAME || item.item_name) || "-"}
                                             </td>
                                             <td className="px-4 py-3 text-center text-sm font-semibold text-stone-800">
-                                                {item.QUANTITY || item.quantity || 0}
+                                                {getPaymentItemAmounts(item).quantity}
                                             </td>
                                             <td className="px-4 py-3 text-center text-sm font-semibold text-stone-800">
-                                                <span className="whitespace-nowrap">₹{getDisplayMoney(isFreeItem(item) ? 0 : Number(item.PRICE || item.price || 0))}</span>
+                                                <span className="whitespace-nowrap">₹{getDisplayMoney(getPaymentItemAmounts(item).finalPrice)}</span>
                                             </td>
                                             <td className="px-4 py-3 text-center text-sm font-semibold text-stone-800">
-                                                <span className="whitespace-nowrap">₹{getDisplayMoney(isFreeItem(item) ? 0 : Number(item.SUBTOTAL || item.subtotal || 0))}</span>
+                                                <span className="whitespace-nowrap">₹{getDisplayMoney(getPaymentItemAmounts(item).finalTotal)}</span>
                                             </td>
                                         </tr>
                                     ))

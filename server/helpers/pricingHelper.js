@@ -7,10 +7,10 @@ function isExcludedLiquorSubcategory(subCategory) {
 function getPricingCondition(category) {
   switch (category) {
     case "Liquor":
-      return `CATEGORY_ID = 10 AND SUB_CATEGORY NOT IN (${NON_ALCOHOLIC_LIQUOR_SUBCATEGORY_IDS.join(", ")})`;
+      return `CATEGORY_ID = 10 AND SUB_CATEGORY NOT IN (${NON_ALCOHOLIC_LIQUOR_SUBCATEGORY_IDS.join(", ")}) AND TRIM(UPPER(IFNULL(FLAG, ''))) = 'Y'`;
 
     case "Snacks":
-      return "CATEGORY_ID = 14 AND SUB_CATEGORY IN (7, 10)";
+      return "CATEGORY_ID = 14 AND SUB_CATEGORY IN (7, 10) AND TRIM(UPPER(IFNULL(FLAG, ''))) = 'Y'";
 
     default:
       return null;

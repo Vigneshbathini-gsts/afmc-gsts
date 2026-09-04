@@ -17,6 +17,34 @@ function formatMoney(value) {
   return amount.toFixed(2);
 }
 
+function getFinalItemPrice(item) {
+  const quantity = Number(item?.quantity ?? item?.QUANTITY ?? 0);
+  const basePrice = Number(item?.price ?? item?.PRICE ?? 0);
+  const inventoryFlag = String(item?.inventory_flag ?? item?.INVENTORY_FLAG ?? "")
+    .trim()
+    .toUpperCase();
+  const categoryId = Number(item?.category_id ?? item?.CATEGORY_ID ?? item?.subcategory ?? 0);
+  const profit = Number(item?.profit ?? item?.PROFIT ?? 0);
+  const preparationCharge = Number(
+    item?.prep_charges ??
+      item?.PREP_CHARGES ??
+      item?.food_pr_charges ??
+      item?.FOOD_PR_CHARGES ??
+      0
+  );
+
+  if (inventoryFlag === "N") return basePrice;
+  if (inventoryFlag === "Y" && categoryId === 10) {
+    return basePrice + (basePrice * profit) / 100;
+  }
+  if (inventoryFlag === "Y" && categoryId === 14) {
+    return basePrice + preparationCharge;
+  }
+
+  const lineTotal = Number(item?.subtotal ?? item?.SUBTOTAL ?? 0);
+  return quantity > 0 && Number.isFinite(lineTotal) ? lineTotal / quantity : basePrice;
+}
+
 export default function InvoiceReport() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -53,13 +81,25 @@ export default function InvoiceReport() {
     [items]
   );
 
-  const resolvedAmount = Number(
-    reportData?.summary?.total_amount ??
-      reportData?.header?.invoice_amount ??
-      reportData?.header?.order_total ??
-      amountFromQuery ??
-      0
+  const calculatedTotal = useMemo(
+    () =>
+      items.reduce(
+        (sum, item) =>
+          sum + getFinalItemPrice(item) * Number(item.quantity || item.QUANTITY || 0),
+        0
+      ),
+    [items]
   );
+
+  const resolvedAmount = items.length
+    ? calculatedTotal
+    : Number(
+        reportData?.summary?.total_amount ??
+          reportData?.header?.invoice_amount ??
+          reportData?.header?.order_total ??
+          amountFromQuery ??
+          0
+      );
 
   const statusText = String(reportData?.header?.status || reportData?.summary?.status || "Completed");
 
@@ -248,8 +288,14 @@ export default function InvoiceReport() {
                       <tr key={`${item.item_id}-${index}`} className="transition hover:bg-[#fffdf9]">
                         <td className="px-5 py-4 text-sm text-stone-800">{toInitCap(item.item_name)}</td>
                         <td className="px-5 py-4 text-sm text-stone-700">{item.quantity}</td>
-                        <td className="px-5 py-4 text-sm text-stone-900">₹{formatMoney(item.price)}</td>
-                        <td className="px-5 py-4 text-sm text-stone-900">₹{formatMoney(item.subtotal)}</td>
+                        <td className="px-5 py-4 text-sm text-stone-900">
+                          ₹{formatMoney(getFinalItemPrice(item))}
+                        </td>
+                        <td className="px-5 py-4 text-sm text-stone-900">
+                          ₹{formatMoney(
+                            getFinalItemPrice(item) * Number(item.quantity || item.QUANTITY || 0)
+                          )}
+                        </td>
                       </tr>
                     ))}
                     <tr className="bg-[#fff8eb]">

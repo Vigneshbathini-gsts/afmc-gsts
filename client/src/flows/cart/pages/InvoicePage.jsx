@@ -16,6 +16,21 @@ function formatMoney(value) {
   return amount.toFixed(2);
 }
 
+function getFinalItemPrice(item) {
+  const basePrice = Number(item?.price ?? item?.PRICE ?? 0);
+  const flag = String(item?.inventory_flag ?? item?.INVENTORY_FLAG ?? "")
+    .trim()
+    .toUpperCase();
+  const categoryId = Number(item?.category_id ?? item?.CATEGORY_ID ?? 0);
+  const profit = Number(item?.profit ?? item?.PROFIT ?? 0);
+  const preparationCharge = Number(item?.prep_charges ?? item?.PREP_CHARGES ?? 0);
+
+  if (flag !== "Y") return basePrice;
+  if (categoryId === 10) return basePrice + (basePrice * profit) / 100;
+  if (categoryId === 14) return basePrice + preparationCharge;
+  return basePrice;
+}
+
 export default function InvoicePage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -356,6 +371,9 @@ export default function InvoicePage() {
                         <th className="px-5 py-3 text-left text-sm font-semibold text-afmc-maroon">
                           Quantity
                         </th>
+                        <th className="px-5 py-3 text-left text-sm font-semibold text-afmc-maroon">
+                          Price
+                        </th>
                       </tr>
                     </thead>
 
@@ -370,6 +388,9 @@ export default function InvoicePage() {
                           </td>
                           <td className="px-5 py-4 text-sm text-stone-700">
                             {item.quantity}
+                          </td>
+                          <td className="px-5 py-4 text-sm text-stone-700">
+                            ₹{formatMoney(getFinalItemPrice(item))}
                           </td>
                         </tr>
                       ))}

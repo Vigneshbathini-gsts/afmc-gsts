@@ -825,8 +825,11 @@ async function getOrderDetails(orderNumber, { includeCancelled = false } = {}) {
     od.barcode AS barcode,
     od.FREE_ITEM_CODE AS free_item_code,
     od.FREE_ITEM_QUANTITY AS free_item_quantity,
+    od.profit AS profit,
     od.food_pr_charges AS prep_charges,
-    od.subcategory AS subcategory
+    od.subcategory AS subcategory,
+    xi.category_id AS category_id,
+    xi.inventory_flag AS inventory_flag
   FROM xxafmc_order_details od
   LEFT JOIN (
       SELECT
@@ -873,7 +876,9 @@ async function getOrderDetails(orderNumber, { includeCancelled = false } = {}) {
       SELECT 
         item_code,
         MAX(item_name) AS item_name,
-        MAX(type) AS type
+        MAX(type) AS type,
+        MAX(category_id) AS category_id,
+        MAX(flag) AS inventory_flag
       FROM xxafmc_inventory
       GROUP BY item_code
   ) xi
