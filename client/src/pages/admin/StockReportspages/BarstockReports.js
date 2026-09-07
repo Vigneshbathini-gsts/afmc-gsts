@@ -60,7 +60,7 @@ export default function BarstockReports() {
 
         const newData = res.data.data || [];
 
-        // console.log("Barstock",newData);
+        console.log("Barstock",newData);
 
         if (reset) {
           setData(newData);
@@ -160,7 +160,7 @@ export default function BarstockReports() {
       // if (activeFilters.itemCode.trim()) subtitleParts.push(`Code: ${activeFilters.itemCode.trim()}`);
 
       exportTableToPdf({
-        title: "Bar Stock Report",
+        title: "",
         fileName: "bar-stock-report.pdf",
         subtitle: subtitleParts.length ? subtitleParts.join("   ") : undefined,
         headers: [
