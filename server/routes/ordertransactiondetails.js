@@ -116,13 +116,15 @@ const getOrderTransactionDetails = async (req, res) => {
         SELECT
           order_number,
           inventory_item_code,
+          order_line_id,
           ROUND(SUM(IFNULL(scan_quantity, 0) * IFNULL(item_price, 0)), 2) AS scanned_subtotal
         FROM order_scan_collection
         WHERE collection_name = 'S_COLLECTION'
-        GROUP BY order_number, inventory_item_code
+        GROUP BY order_number, inventory_item_code, order_line_id
       ) ST
         ON ST.order_number = OD.ORDER_ID
         AND ST.inventory_item_code = OD.ITEM_ID
+        AND (ST.order_line_id = OD.ORDER_LINE_ID OR ST.order_line_id IS NULL)
     `;
 
     const customTotalsJoin = `

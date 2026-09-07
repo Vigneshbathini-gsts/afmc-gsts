@@ -14,13 +14,15 @@ const LINE_PRICING_JOINS = `
     SELECT
       order_number,
       inventory_item_code,
+      order_line_id,
       ROUND(SUM(IFNULL(scan_quantity, 0) * IFNULL(item_price, 0)), 2) AS scanned_total
     FROM order_scan_collection
     WHERE collection_name = 'S_COLLECTION'
-    GROUP BY order_number, inventory_item_code
+    GROUP BY order_number, inventory_item_code, order_line_id
   ) scanned_totals
     ON scanned_totals.order_number = od.order_id
     AND scanned_totals.inventory_item_code = od.item_id
+    AND (scanned_totals.order_line_id = od.order_line_id OR scanned_totals.order_line_id IS NULL)
   LEFT JOIN (
     SELECT
       cm.order_number,
@@ -99,13 +101,15 @@ const ORDER_SUBTOTAL_SUBQUERY = `
       SELECT
         order_number,
         inventory_item_code,
+        order_line_id,
         ROUND(SUM(IFNULL(scan_quantity, 0) * IFNULL(item_price, 0)), 2) AS scanned_total
       FROM order_scan_collection
       WHERE collection_name = 'S_COLLECTION'
-      GROUP BY order_number, inventory_item_code
+      GROUP BY order_number, inventory_item_code, order_line_id
     ) scanned_totals
       ON scanned_totals.order_number = xxod2.order_id
       AND scanned_totals.inventory_item_code = xxod2.item_id
+      AND (scanned_totals.order_line_id = xxod2.order_line_id OR scanned_totals.order_line_id IS NULL)
     LEFT JOIN (
       SELECT
         cm.order_number,
@@ -1067,13 +1071,15 @@ async function getUserOrderHistory({ fromDate, toDate, username, appUser }) {
           SELECT
             order_number,
             inventory_item_code,
+            order_line_id,
             ROUND(SUM(IFNULL(scan_quantity, 0) * IFNULL(item_price, 0)), 2) AS scanned_total
           FROM order_scan_collection
           WHERE collection_name = 'S_COLLECTION'
-          GROUP BY order_number, inventory_item_code
+          GROUP BY order_number, inventory_item_code, order_line_id
         ) scanned_totals
           ON scanned_totals.order_number = od.order_id
           AND scanned_totals.inventory_item_code = od.item_id
+          AND (scanned_totals.order_line_id = od.order_line_id OR scanned_totals.order_line_id IS NULL)
         LEFT JOIN (
           SELECT
             cm.order_number,
