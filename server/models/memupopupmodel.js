@@ -74,20 +74,19 @@ const getMenuPopupDetails = async ({ itemCode, itemId, authUser }) => {
       0
     ) AS stock_out_unit_price,
 
-    IFNULL(
-        NULLIF(
-            MAX(
-                CASE
-                    WHEN IFNULL(xso.STOCK_QUANTITY,0) > 0 THEN
-                        CASE
-                            WHEN xso.PEGS IS NULL OR xso.PEGS = 0 THEN 1
-                            ELSE xso.PEGS
-                        END
-                END
-            ),
-            0
-        ),
-        1
+    COALESCE(
+      (
+        SELECT CASE
+          WHEN xso_pegs.PEGS IS NULL OR xso_pegs.PEGS = 0 THEN 1
+          ELSE xso_pegs.PEGS
+        END
+        FROM xxafmc_stock_out xso_pegs
+        WHERE xso_pegs.ITEM_CODE = ?
+          AND IFNULL(xso_pegs.STOCK_QUANTITY, 0) > 0
+        ORDER BY xso_pegs.CREATION_DATE DESC
+        LIMIT 1
+      ),
+      1
     ) AS pegs,
 
     IFNULL(
@@ -106,7 +105,7 @@ const getMenuPopupDetails = async ({ itemCode, itemId, authUser }) => {
 FROM xxafmc_stock_out xso
 WHERE xso.ITEM_CODE = ?
       `,
-      [normalizedItemCode, normalizedItemCode],
+      [normalizedItemCode, normalizedItemCode, normalizedItemCode],
     ),
     db.execute(
       `

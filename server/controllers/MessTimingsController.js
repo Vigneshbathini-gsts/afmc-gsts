@@ -21,7 +21,6 @@ const getWeeklyTimings = async (req, res) => {
 const updateWeeklyTimings = async (req, res) => {
   try {
     const { timings } = req.body;
-
     const updatedBy =
       req.user?.LOGIN_ID ||
       req.user?.USERNAME ||
