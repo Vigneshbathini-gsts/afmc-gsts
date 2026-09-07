@@ -272,7 +272,7 @@ async function getAdminOrderHistory({
         DATE_FORMAT(order_date, '%Y-%m-%d') AS order_date_iso,
         MAX(first_name) AS first_name,
         ${reportText("'Completed'")} AS status,
-        NULL AS payment_method,
+        MAX(payment_method) AS payment_method,
         ${reportText("'Un Paid'")} AS payment_status1,
         1 AS ord,
         ROUND(SUM(order_subtotal), 2) AS subtotal
