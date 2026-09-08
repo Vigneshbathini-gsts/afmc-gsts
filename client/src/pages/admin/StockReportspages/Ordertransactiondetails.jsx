@@ -10,34 +10,48 @@ import { stripHtml, toInitCap } from "../../../utils/textFormat";
 
 const toInputDate = (date) => {
   const d = date instanceof Date ? date : new Date(date);
+
   if (Number.isNaN(d.getTime())) return "";
+
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
   const yyyy = d.getFullYear();
+
   return `${yyyy}-${mm}-${dd}`;
 };
 
-// --- CHANGED: itemNames is now an array, joined into a comma-separated string for the API ---
+// Build API query parameters
 const buildQueryParams = (filters) => {
   const params = {};
-  const clean = (value) => (typeof value === "string" ? value.trim() : "");
+
+  const clean = (value) =>
+    typeof value === "string" ? value.trim() : "";
+
   const cleanArray = (value) =>
-    Array.isArray(value) ? value.map((v) => String(v).trim()).filter(Boolean) : [];
+    Array.isArray(value)
+      ? value
+          .map((v) => String(v).trim())
+          .filter(Boolean)
+      : [];
 
   const fromDate = clean(filters.fromDate);
   const toDate = clean(filters.toDate);
   const orderNumber = clean(filters.orderNumber);
   const userName = clean(filters.userName);
   const kitchenName = clean(filters.kitchenName);
-  const itemNames = cleanArray(filters.itemNames); // now an array
+  const itemNames = cleanArray(filters.itemNames);
 
-  // Only add non-empty values to params
   if (fromDate) params.fromDate = fromDate;
   if (toDate) params.toDate = toDate;
   if (orderNumber) params.orderNumber = orderNumber;
   if (userName) params.userName = userName;
   if (kitchenName) params.kitchenName = kitchenName;
-  if (itemNames.length) params.itemNames = itemNames.join(","); // comma-separated list for API
+
+  // Multiple selected items sent as:
+  // sandwich,burger,lolipop
+  if (itemNames.length) {
+    params.itemNames = itemNames.join(",");
+  }
 
   return params;
 };
@@ -47,21 +61,50 @@ const normalizeDropdownOptions = (options) => {
 
   return options
     .map((option) => {
-      if (typeof option === "string" || typeof option === "number") {
+      if (
+        typeof option === "string" ||
+        typeof option === "number"
+      ) {
         const value = String(option).trim();
-        return value ? { label: value, value } : null;
+
+        return value
+          ? {
+              label: value,
+              value,
+            }
+          : null;
       }
 
-      if (!option || typeof option !== "object") return null;
+      if (!option || typeof option !== "object") {
+        return null;
+      }
 
       const label = String(
-        option.label ?? option.name ?? option.title ?? option.D ?? option.d ?? option.value ?? ""
-      ).trim();
-      const value = String(
-        option.value ?? option.id ?? option.key ?? option.R ?? option.r ?? option.label ?? ""
+        option.label ??
+          option.name ??
+          option.title ??
+          option.D ??
+          option.d ??
+          option.value ??
+          ""
       ).trim();
 
-      return label && value ? { label, value } : null;
+      const value = String(
+        option.value ??
+          option.id ??
+          option.key ??
+          option.R ??
+          option.r ??
+          option.label ??
+          ""
+      ).trim();
+
+      return label && value
+        ? {
+            label,
+            value,
+          }
+        : null;
     })
     .filter(Boolean);
 };
@@ -69,10 +112,7 @@ const normalizeDropdownOptions = (options) => {
 const REPORT_PAGE_SIZE = 20;
 
 /**
- * Simple multi-select dropdown with checkboxes.
- * values: array of selected option values (strings)
- * onChange: (newArrayOfValues) => void
- * options: [{ label, value }]
+ * Multiple select dropdown with checkboxes.
  */
 function MultiSelectDropdown({
   values = [],
@@ -86,70 +126,145 @@ function MultiSelectDropdown({
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+
   const containerRef = useRef(null);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (containerRef.current && !containerRef.current.contains(event.target)) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target)
+      ) {
         setOpen(false);
       }
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+
+    document.addEventListener(
+      "mousedown",
+      handleClickOutside
+    );
+
+    return () => {
+      document.removeEventListener(
+        "mousedown",
+        handleClickOutside
+      );
+    };
   }, []);
 
   const filteredOptions = useMemo(() => {
-    if (!search.trim()) return options;
+    if (!search.trim()) {
+      return options;
+    }
+
     const q = search.trim().toLowerCase();
-    return options.filter((opt) => opt.label.toLowerCase().includes(q));
+
+    return options.filter((opt) =>
+      opt.label.toLowerCase().includes(q)
+    );
   }, [options, search]);
 
-  const isSelected = (value) => values.includes(value);
+  const isSelected = (value) => {
+    return values.includes(value);
+  };
 
   const toggleValue = (value) => {
     if (isSelected(value)) {
-      onChange(values.filter((v) => v !== value));
+      onChange(
+        values.filter((v) => v !== value)
+      );
     } else {
-      onChange([...values, value]);
+      onChange([
+        ...values,
+        value,
+      ]);
     }
   };
 
   const toggleSelectAll = () => {
-    const allValues = filteredOptions.map((o) => o.value);
-    const allSelected = allValues.length > 0 && allValues.every((v) => values.includes(v));
+    const allValues = filteredOptions.map(
+      (o) => o.value
+    );
+
+    const allSelected =
+      allValues.length > 0 &&
+      allValues.every((v) =>
+        values.includes(v)
+      );
+
     if (allSelected) {
-      onChange(values.filter((v) => !allValues.includes(v)));
+      onChange(
+        values.filter(
+          (v) => !allValues.includes(v)
+        )
+      );
     } else {
-      const merged = Array.from(new Set([...values, ...allValues]));
+      const merged = Array.from(
+        new Set([
+          ...values,
+          ...allValues,
+        ])
+      );
+
       onChange(merged);
     }
   };
 
-  const clearAll = () => onChange([]);
+  const clearAll = () => {
+    onChange([]);
+  };
 
   const buttonLabel = () => {
-    if (loading) return loadingLabel;
-    if (values.length === 0) return placeholder;
-    if (values.length === 1) {
-      const match = options.find((o) => o.value === values[0]);
-      return formatLabel(match ? match.label : values[0]);
+    if (loading) {
+      return loadingLabel;
     }
+
+    if (values.length === 0) {
+      return placeholder;
+    }
+
+    if (values.length === 1) {
+      const match = options.find(
+        (o) => o.value === values[0]
+      );
+
+      return formatLabel(
+        match ? match.label : values[0]
+      );
+    }
+
     return `${values.length} selected`;
   };
 
   const allFilteredSelected =
-    filteredOptions.length > 0 && filteredOptions.every((o) => values.includes(o.value));
+    filteredOptions.length > 0 &&
+    filteredOptions.every((o) =>
+      values.includes(o.value)
+    );
 
   return (
-    <div className="relative" ref={containerRef}>
+    <div
+      className="relative"
+      ref={containerRef}
+    >
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={() =>
+          setOpen((o) => !o)
+        }
         disabled={loading}
         className="w-full flex items-center justify-between rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-left text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20 disabled:opacity-60"
       >
-        <span className="truncate">{buttonLabel()}</span>
-        <FaChevronDown className={`ml-2 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} size={12} />
+        <span className="truncate">
+          {buttonLabel()}
+        </span>
+
+        <FaChevronDown
+          className={`ml-2 shrink-0 transition-transform ${
+            open ? "rotate-180" : ""
+          }`}
+          size={12}
+        />
       </button>
 
       {open && !loading && (
@@ -158,18 +273,31 @@ function MultiSelectDropdown({
             <input
               type="text"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) =>
+                setSearch(e.target.value)
+              }
               placeholder="Search..."
               className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-afmc-maroon2/40"
             />
           </div>
 
           <div className="flex items-center justify-between px-3 py-2 text-xs text-afmc-maroon border-b border-gray-100">
-            <button type="button" className="hover:underline" onClick={toggleSelectAll}>
-              {allFilteredSelected ? "Unselect All" : allLabel}
+            <button
+              type="button"
+              className="hover:underline"
+              onClick={toggleSelectAll}
+            >
+              {allFilteredSelected
+                ? "Unselect All"
+                : allLabel}
             </button>
+
             {values.length > 0 && (
-              <button type="button" className="hover:underline text-gray-500" onClick={clearAll}>
+              <button
+                type="button"
+                className="hover:underline text-gray-500"
+                onClick={clearAll}
+              >
                 Clear
               </button>
             )}
@@ -177,7 +305,9 @@ function MultiSelectDropdown({
 
           <div className="overflow-y-auto">
             {filteredOptions.length === 0 ? (
-              <div className="px-3 py-3 text-sm text-gray-500">No options found.</div>
+              <div className="px-3 py-3 text-sm text-gray-500">
+                No options found.
+              </div>
             ) : (
               filteredOptions.map((opt) => (
                 <label
@@ -186,11 +316,20 @@ function MultiSelectDropdown({
                 >
                   <input
                     type="checkbox"
-                    checked={isSelected(opt.value)}
-                    onChange={() => toggleValue(opt.value)}
+                    checked={isSelected(
+                      opt.value
+                    )}
+                    onChange={() =>
+                      toggleValue(
+                        opt.value
+                      )
+                    }
                     className="rounded border-gray-300 text-afmc-maroon focus:ring-afmc-maroon2"
                   />
-                  <span className="truncate">{formatLabel(opt.label)}</span>
+
+                  <span className="truncate">
+                    {formatLabel(opt.label)}
+                  </span>
                 </label>
               ))
             )}
@@ -203,7 +342,12 @@ function MultiSelectDropdown({
 
 export default function OrderTransactionUI() {
   const navigate = useNavigate();
-  const today = useMemo(() => toInputDate(new Date()), []);
+
+  const today = useMemo(
+    () => toInputDate(new Date()),
+    []
+  );
+
   const initialFilters = useMemo(
     () => ({
       fromDate: today,
@@ -211,197 +355,559 @@ export default function OrderTransactionUI() {
       orderNumber: "",
       userName: "",
       kitchenName: "",
-      itemNames: [], // --- CHANGED: now an array of selected item values ---
+      itemNames: [],
     }),
     [today]
   );
 
-  const [filters, setFilters] = useState(initialFilters);
-  const [appliedFilters, setAppliedFilters] = useState(initialFilters);
-  const [data, setData] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState("");
-  const [hasSearched, setHasSearched] = useState(false);
-  const [page, setPage] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
-  const requestInFlight = useRef(false);
-  const [filterOptions, setFilterOptions] = useState({
-    itemNames: [],
-    userNames: [],
-    kitchenNames: [],
-  });
-  const [filtersLoading, setFiltersLoading] = useState(false);
+  const [filters, setFilters] =
+    useState(initialFilters);
+
+  const [appliedFilters, setAppliedFilters] =
+    useState(initialFilters);
+
+  const [data, setData] =
+    useState([]);
+
+  const [loading, setLoading] =
+    useState(false);
+
+  const [loadingMore, setLoadingMore] =
+    useState(false);
+
+  const [error, setError] =
+    useState("");
+
+  const [hasSearched, setHasSearched] =
+    useState(false);
+
+  const [page, setPage] =
+    useState(0);
+
+  const [hasMore, setHasMore] =
+    useState(true);
+
+  const requestInFlight =
+    useRef(false);
+
+  const [filterOptions, setFilterOptions] =
+    useState({
+      itemNames: [],
+      userNames: [],
+      kitchenNames: [],
+    });
+
+  const [filtersLoading, setFiltersLoading] =
+    useState(false);
 
   const parseNumber = (value) => {
-    if (value === null || value === undefined) return 0;
+    if (
+      value === null ||
+      value === undefined
+    ) {
+      return 0;
+    }
+
     const raw = String(value).trim();
-    if (!raw) return 0;
-    const normalized = raw.replace(/[, ]+/g, "").replace(/[^\d.-]/g, "");
-    const numberValue = Number(normalized);
-    return Number.isFinite(numberValue) ? numberValue : 0;
+
+    if (!raw) {
+      return 0;
+    }
+
+    const normalized = raw
+      .replace(/[, ]+/g, "")
+      .replace(/[^\d.-]/g, "");
+
+    const numberValue =
+      Number(normalized);
+
+    return Number.isFinite(
+      numberValue
+    )
+      ? numberValue
+      : 0;
   };
 
-  const isFreeItem = (row) => parseNumber(row.SUBTOTAL) === 0;
+  const isFreeItem = (row) => {
+    return (
+      parseNumber(row.SUBTOTAL) === 0
+    );
+  };
 
   const handleChange = (event) => {
-    const { name, value } = event.target;
+    const {
+      name,
+      value,
+    } = event.target;
+
     setFilters((current) => ({
       ...current,
       [name]: value,
     }));
   };
 
-  // Fetch filter options when component mounts
+  // Fetch dropdown options
   useEffect(() => {
-    const fetchFilterOptions = async () => {
-      setFiltersLoading(true);
-      try {
-        const [itemResponse, userResponse, kitchenResponse] = await Promise.all([
-          api.get("/reports/ordertransaction/items"),
-          api.get("/reports/ordertransaction/users"),
-          api.get("/reports/ordertransaction/kitchens"),
-        ]);
+    const fetchFilterOptions =
+      async () => {
+        setFiltersLoading(true);
 
-        setFilterOptions({
-          itemNames: normalizeDropdownOptions(itemResponse.data?.data),
-          userNames: normalizeDropdownOptions(userResponse.data?.data),
-          kitchenNames: normalizeDropdownOptions(kitchenResponse.data?.data),
-        });
-      } catch (fetchError) {
-        console.error("Error fetching filter options:", fetchError);
-        setFilterOptions({
-          itemNames: [],
-          userNames: [],
-          kitchenNames: [],
-        });
-      } finally {
-        setFiltersLoading(false);
-      }
-    };
+        try {
+          const [
+            itemResponse,
+            userResponse,
+            kitchenResponse,
+          ] = await Promise.all([
+            api.get(
+              "/reports/ordertransaction/items"
+            ),
+            api.get(
+              "/reports/ordertransaction/users"
+            ),
+            api.get(
+              "/reports/ordertransaction/kitchens"
+            ),
+          ]);
+
+          setFilterOptions({
+            itemNames:
+              normalizeDropdownOptions(
+                itemResponse.data?.data
+              ),
+
+            userNames:
+              normalizeDropdownOptions(
+                userResponse.data?.data
+              ),
+
+            kitchenNames:
+              normalizeDropdownOptions(
+                kitchenResponse.data?.data
+              ),
+          });
+        } catch (fetchError) {
+          console.error(
+            "Error fetching filter options:",
+            fetchError
+          );
+
+          setFilterOptions({
+            itemNames: [],
+            userNames: [],
+            kitchenNames: [],
+          });
+        } finally {
+          setFiltersLoading(false);
+        }
+      };
 
     fetchFilterOptions();
-  }, []); // Empty dependency array - fetch only once on mount
+  }, []);
 
-  const fetchData = async (activeFilters, { reset = true, nextPage = 0 } = {}) => {
-    if (requestInFlight.current) return;
+  // Fetch report data
+  const fetchData = async (
+    activeFilters,
+    {
+      reset = true,
+      nextPage = 0,
+    } = {}
+  ) => {
+    if (requestInFlight.current) {
+      return;
+    }
+
     requestInFlight.current = true;
-    if (reset) setLoading(true);
-    else setLoadingMore(true);
+
+    if (reset) {
+      setLoading(true);
+    } else {
+      setLoadingMore(true);
+    }
+
     setError("");
 
     try {
       const queryParams = {
-        ...buildQueryParams(activeFilters),
+        ...buildQueryParams(
+          activeFilters
+        ),
+
         limit: REPORT_PAGE_SIZE,
-        offset: nextPage * REPORT_PAGE_SIZE,
+
+        offset:
+          nextPage *
+          REPORT_PAGE_SIZE,
       };
-      const { data: response } = await api.get("/reports/ordertransaction", {
-        params: queryParams,
-      });
+
+      const {
+        data: response,
+      } = await api.get(
+        "/reports/ordertransaction",
+        {
+          params: queryParams,
+        }
+      );
 
       if (response.success) {
-        const responseRows = Array.isArray(response.data) ? response.data : [];
-        const detailRows = responseRows.filter((row) => row?.ORD !== 2);
-        setData((current) => (reset ? detailRows : [...current, ...detailRows]));
-        setPage(nextPage + 1);
-        setHasMore(detailRows.length === REPORT_PAGE_SIZE);
+        const responseRows =
+          Array.isArray(
+            response.data
+          )
+            ? response.data
+            : [];
+
+        const detailRows =
+          responseRows.filter(
+            (row) => row?.ORD !== 2
+          );
+
+        setData((current) =>
+          reset
+            ? detailRows
+            : [
+                ...current,
+                ...detailRows,
+              ]
+        );
+
+        setPage(
+          nextPage + 1
+        );
+
+        setHasMore(
+          detailRows.length ===
+            REPORT_PAGE_SIZE
+        );
       } else {
-        setError(response.message || "Unable to fetch order transactions.");
-        if (reset) setData([]);
+        setError(
+          response.message ||
+            "Unable to fetch order transactions."
+        );
+
+        if (reset) {
+          setData([]);
+        }
+
         setHasMore(false);
       }
     } catch (requestError) {
-      console.error("API Error:", requestError);
-      setError(
-        requestError.response?.data?.message ||
-        "Unable to fetch order transactions. Please try again."
+      console.error(
+        "API Error:",
+        requestError
       );
-      if (reset) setData([]);
+
+      setError(
+        requestError.response?.data
+          ?.message ||
+          "Unable to fetch order transactions. Please try again."
+      );
+
+      if (reset) {
+        setData([]);
+      }
+
       setHasMore(false);
     } finally {
-      requestInFlight.current = false;
+      requestInFlight.current =
+        false;
+
       setLoading(false);
       setLoadingMore(false);
     }
   };
 
+  // Initial report
   useEffect(() => {
-    setAppliedFilters(initialFilters);
+    setAppliedFilters(
+      initialFilters
+    );
+
     setHasSearched(true);
-    fetchData(initialFilters, { reset: true, nextPage: 0 });
+
+    fetchData(
+      initialFilters,
+      {
+        reset: true,
+        nextPage: 0,
+      }
+    );
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleSearch = async () => {
-    // Validate dates
-    if (!filters.fromDate || !filters.toDate) {
-      setError("Please select both From Date and To Date before searching.");
+    if (
+      !filters.fromDate ||
+      !filters.toDate
+    ) {
+      setError(
+        "Please select both From Date and To Date before searching."
+      );
+
       return;
     }
 
-    // Validate date range
-    if (filters.fromDate > filters.toDate) {
-      setError("From Date cannot be greater than To Date.");
+    if (
+      filters.fromDate >
+      filters.toDate
+    ) {
+      setError(
+        "From Date cannot be greater than To Date."
+      );
+
       return;
     }
 
-    const nextFilters = { ...filters };
-    setAppliedFilters(nextFilters);
+    const nextFilters = {
+      ...filters,
+    };
+
+    setAppliedFilters(
+      nextFilters
+    );
+
     setHasSearched(true);
     setError("");
     setPage(0);
     setHasMore(true);
-    await fetchData(nextFilters, { reset: true, nextPage: 0 });
+
+    await fetchData(
+      nextFilters,
+      {
+        reset: true,
+        nextPage: 0,
+      }
+    );
   };
 
+  // ============================================================
+  // PDF EXPORT
+  // ============================================================
   const exportPdf = async () => {
-    if (!data.length) return;
+    if (!data.length) {
+      return;
+    }
 
     const exportRows = [];
     let offsetPage = 0;
 
     while (true) {
-      const { data: response } = await api.get("/reports/ordertransaction", {
-        params: {
-          ...buildQueryParams(appliedFilters),
-          limit: REPORT_PAGE_SIZE,
-          offset: offsetPage * REPORT_PAGE_SIZE,
-        },
-      });
-      const chunk = (Array.isArray(response.data) ? response.data : []).filter(
+      const {
+        data: response,
+      } = await api.get(
+        "/reports/ordertransaction",
+        {
+          params: {
+            ...buildQueryParams(
+              appliedFilters
+            ),
+
+            limit:
+              REPORT_PAGE_SIZE,
+
+            offset:
+              offsetPage *
+              REPORT_PAGE_SIZE,
+          },
+        }
+      );
+
+      const chunk = (
+        Array.isArray(
+          response.data
+        )
+          ? response.data
+          : []
+      ).filter(
         (row) => row?.ORD !== 2
       );
-      exportRows.push(...chunk);
-      if (chunk.length < REPORT_PAGE_SIZE) break;
+
+      exportRows.push(
+        ...chunk
+      );
+
+      if (
+        chunk.length <
+        REPORT_PAGE_SIZE
+      ) {
+        break;
+      }
+
       offsetPage += 1;
     }
 
-    const totals = exportRows.reduce(
-      (acc, row) => ({
-        quantity: acc.quantity + parseNumber(row.QUANTITY),
-        totalProfit: acc.totalProfit + parseNumber(row.TOTAL_PROFIT),
-        prepCharges: acc.prepCharges + parseNumber(row.FOOD_PR_CHARGES),
-        subtotal: acc.subtotal + parseNumber(row.SUBTOTAL),
-      }),
-      { quantity: 0, totalProfit: 0, prepCharges: 0, subtotal: 0 }
-    );
+    // ----------------------------------------------------------
+    // Calculate totals
+    // ----------------------------------------------------------
+    const totals =
+      exportRows.reduce(
+        (acc, row) => ({
+          quantity:
+            acc.quantity +
+            parseNumber(
+              row.QUANTITY
+            ),
 
-    // --- CHANGED: build a readable label for selected items, e.g. "coffee, tea" ---
-    const selectedItemLabels = (appliedFilters.itemNames || [])
-      .map((val) => {
-        const match = filterOptions.itemNames.find((o) => o.value === val);
-        return toInitCap(match ? match.label : val);
-      })
-      .join(", ");
+          totalProfit:
+            acc.totalProfit +
+            parseNumber(
+              row.TOTAL_PROFIT
+            ),
 
+          prepCharges:
+            acc.prepCharges +
+            parseNumber(
+              row.FOOD_PR_CHARGES
+            ),
+
+          subtotal:
+            acc.subtotal +
+            parseNumber(
+              row.SUBTOTAL
+            ),
+        }),
+        {
+          quantity: 0,
+          totalProfit: 0,
+          prepCharges: 0,
+          subtotal: 0,
+        }
+      );
+
+    // ----------------------------------------------------------
+    // Get selected item labels
+    //
+    // Example:
+    // ["sandwich", "burger", "lolipop"]
+    //
+    // becomes:
+    // "Sandwich, Burger, Lolipop"
+    // ----------------------------------------------------------
+    const selectedItemLabels =
+      (
+        appliedFilters.itemNames ||
+        []
+      )
+        .map((value) => {
+          const match =
+            filterOptions.itemNames.find(
+              (option) =>
+                option.value ===
+                value
+            );
+
+          return toInitCap(
+            stripHtml(
+              match
+                ? match.label
+                : value
+            )
+          );
+        })
+        .filter(Boolean);
+
+    // ----------------------------------------------------------
+    // IMPORTANT:
+    //
+    // Keep items SIDE-BY-SIDE.
+    //
+    // Example:
+    //
+    // Items: Sandwich, Burger, Lolipop, Coffee, Tea, Pizza,
+    //        Pasta, Juice, Water
+    //
+    // The PDF utility should wrap this automatically according
+    // to the available width.
+    // ----------------------------------------------------------
+    const selectedItemsText =
+      selectedItemLabels.join(
+        ", "
+      );
+
+    // ----------------------------------------------------------
+    // Build subtitle
+    // ----------------------------------------------------------
+    const subtitleParts = [
+      `From: ${
+        appliedFilters.fromDate ||
+        "All"
+      }`,
+
+      `To: ${
+        appliedFilters.toDate ||
+        "All"
+      }`,
+    ];
+
+    if (
+      appliedFilters.orderNumber
+    ) {
+      subtitleParts.push(
+        `Order No: ${appliedFilters.orderNumber}`
+      );
+    }
+
+    if (
+      appliedFilters.userName
+    ) {
+      const userMatch =
+        filterOptions.userNames.find(
+          (option) =>
+            option.value ===
+            appliedFilters.userName
+        );
+
+      subtitleParts.push(
+        `User: ${toInitCap(
+          userMatch
+            ? userMatch.label
+            : appliedFilters.userName
+        )}`
+      );
+    }
+
+    if (
+      appliedFilters.kitchenName
+    ) {
+      const kitchenMatch =
+        filterOptions.kitchenNames.find(
+          (option) =>
+            option.value ===
+            appliedFilters.kitchenName
+        );
+
+      subtitleParts.push(
+        `Kitchen: ${toInitCap(
+          kitchenMatch
+            ? kitchenMatch.label
+            : appliedFilters.kitchenName
+        )}`
+      );
+    }
+
+    if (selectedItemsText) {
+      subtitleParts.push(
+        `Items: ${selectedItemsText}`
+      );
+    }
+
+    // ----------------------------------------------------------
+    // Export PDF
+    // ----------------------------------------------------------
     exportTableToPdf({
-      title: "Order Transaction Details Report",
-      fileName: `order-transaction-details-${new Date().toISOString().split('T')[0]}.pdf`,
-      subtitle: `From: ${appliedFilters.fromDate || "All"} To: ${appliedFilters.toDate || "All"
-        }${appliedFilters.orderNumber ? ` | Order No: ${appliedFilters.orderNumber}` : ""}${appliedFilters.userName ? ` | User: ${appliedFilters.userName}` : ""
-        }${appliedFilters.kitchenName ? ` | Kitchen: ${appliedFilters.kitchenName}` : ""}${selectedItemLabels ? ` | Item: ${selectedItemLabels}` : ""
-        }`,
+      title:
+        "Order Transaction Details Report",
+
+      fileName:
+        `order-transaction-details-${new Date()
+          .toISOString()
+          .split("T")[0]}.pdf`,
+
+      subtitle:
+        subtitleParts.join(
+          " | "
+        ),
+
       headers: [
         "Order Number",
         "User",
@@ -414,19 +920,49 @@ export default function OrderTransactionUI() {
         "Preparation Charges",
         "Subtotal",
       ],
+
       rows: [
-        ...exportRows.map((row) => [
-          row.ORDER_NUM || "-",
-          row.FIRST_NAME || "-",
-          row.PUBMED_NAME || "-",
-          toInitCap(stripHtml(row.ITEM_NAME) || "-"),
-          row.TYPE || row.type || "NA",
-          row.QUANTITY || "-",
-          row.TOTALPERCENT || "0.00",
-          isFreeItem(row) ? "Free Item" : row.TOTAL_PROFIT || "0.00",
-          row.FOOD_PR_CHARGES || "0.00",
-          row.SUBTOTAL || "0.00",
-        ]),
+        ...exportRows.map(
+          (row) => [
+            row.ORDER_NUM ||
+              "-",
+
+            row.FIRST_NAME ||
+              "-",
+
+            row.PUBMED_NAME ||
+              "-",
+
+            toInitCap(
+              stripHtml(
+                row.ITEM_NAME
+              ) || "-"
+            ),
+
+            row.TYPE ||
+              row.type ||
+              "NA",
+
+            row.QUANTITY ||
+              "-",
+
+            row.TOTALPERCENT ||
+              "0.00",
+
+            isFreeItem(row)
+              ? "Free Item"
+              : row.TOTAL_PROFIT ||
+                "0.00",
+
+            row.FOOD_PR_CHARGES ||
+              "0.00",
+
+            row.SUBTOTAL ||
+              "0.00",
+          ]
+        ),
+
+        // Total row
         [
           "",
           "",
@@ -435,65 +971,131 @@ export default function OrderTransactionUI() {
           "",
           "TOTAL",
           "",
-          totals.totalProfit.toFixed(2),
-          totals.prepCharges.toFixed(2),
-          totals.subtotal.toFixed(2),
+          totals.totalProfit.toFixed(
+            2
+          ),
+          totals.prepCharges.toFixed(
+            2
+          ),
+          totals.subtotal.toFixed(
+            2
+          ),
         ],
       ],
     });
   };
 
+  // ============================================================
+  // TABLE TOTALS
+  // ============================================================
   const totals = useMemo(() => {
     return data.reduce(
       (acc, row) => ({
-        quantity: acc.quantity + parseNumber(row.QUANTITY),
-        totalProfit: acc.totalProfit + parseNumber(row.TOTAL_PROFIT),
-        prepCharges: acc.prepCharges + parseNumber(row.FOOD_PR_CHARGES),
-        subtotal: acc.subtotal + parseNumber(row.SUBTOTAL),
+        quantity:
+          acc.quantity +
+          parseNumber(
+            row.QUANTITY
+          ),
+
+        totalProfit:
+          acc.totalProfit +
+          parseNumber(
+            row.TOTAL_PROFIT
+          ),
+
+        prepCharges:
+          acc.prepCharges +
+          parseNumber(
+            row.FOOD_PR_CHARGES
+          ),
+
+        subtotal:
+          acc.subtotal +
+          parseNumber(
+            row.SUBTOTAL
+          ),
       }),
-      { quantity: 0, totalProfit: 0, prepCharges: 0, subtotal: 0 }
+      {
+        quantity: 0,
+        totalProfit: 0,
+        prepCharges: 0,
+        subtotal: 0,
+      }
     );
   }, [data]);
 
-  const formatMoney = (value) => {
-    if (!Number.isFinite(value)) return "0.00";
+  const formatMoney = (
+    value
+  ) => {
+    if (
+      !Number.isFinite(value)
+    ) {
+      return "0.00";
+    }
+
     return value.toFixed(2);
   };
 
-  const handleTableScroll = (event) => {
-    const { scrollTop, clientHeight, scrollHeight } = event.currentTarget;
+  // Infinite scroll
+  const handleTableScroll = (
+    event
+  ) => {
+    const {
+      scrollTop,
+      clientHeight,
+      scrollHeight,
+    } = event.currentTarget;
 
     if (
-      scrollTop + clientHeight >= scrollHeight - 80 &&
+      scrollTop +
+        clientHeight >=
+        scrollHeight - 80 &&
       !loading &&
       !loadingMore &&
       hasMore
     ) {
-      fetchData(appliedFilters, { reset: false, nextPage: page });
+      fetchData(
+        appliedFilters,
+        {
+          reset: false,
+          nextPage: page,
+        }
+      );
     }
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-afmc-bg via-white to-afmc-bg2 relative">
       <div className="absolute top-16 left-12 w-72 h-72 bg-afmc-maroon/10 rounded-full blur-3xl"></div>
+
       <div className="absolute bottom-20 right-20 w-80 h-80 bg-afmc-maroon2/10 rounded-full blur-3xl"></div>
 
       <div className="relative z-10 px-0 py-4 md:p-8">
+        {/* Header */}
         <div className="flex items-center justify-between mb-6 md:mb-8">
           <h1 className="text-2xl font-semibold text-afmc-maroon">
             Order Transaction Reports
           </h1>
+
           <button
             type="button"
-            onClick={() => navigate("/admin/dashboard")}
+            onClick={() =>
+              navigate(
+                "/admin/dashboard"
+              )
+            }
             className="self-end sm:self-auto inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white shadow hover:shadow-md border border-afmc-gold/30 text-gray-700 hover:text-afmc-maroon hover:bg-afmc-maroon/5 transition max-w-max"
           >
             <FaArrowLeft />
+
             Go To Dashboard
           </button>
         </div>
 
-        <Stackreporttab showTopBar={false} showReportTitle={false} />
+        <Stackreporttab
+          showTopBar={false}
+          showReportTitle={false}
+        />
 
         <div className="mt-2 border border-afmc-gold/25 border-t-0 rounded-b-xl bg-white/70 backdrop-blur-md shadow-sm">
           <div className="border-b-2 border-afmc-maroon/70 px-4 py-2 text-center text-sm font-semibold text-afmc-maroon">
@@ -501,126 +1103,221 @@ export default function OrderTransactionUI() {
           </div>
         </div>
 
+        {/* Filters */}
         <div className="mt-8 bg-white/80 border border-white/60 rounded-3xl shadow-xl backdrop-blur-sm p-6">
           <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+            {/* From Date */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                From Date <span className="text-red-500">*</span>
+                From Date{" "}
+                <span className="text-red-500">
+                  *
+                </span>
               </label>
+
               <input
                 type="date"
                 name="fromDate"
-                value={filters.fromDate}
-                onChange={handleChange}
+                value={
+                  filters.fromDate
+                }
+                onChange={
+                  handleChange
+                }
                 className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
               />
             </div>
 
+            {/* To Date */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                To Date <span className="text-red-500">*</span>
+                To Date{" "}
+                <span className="text-red-500">
+                  *
+                </span>
               </label>
+
               <input
                 type="date"
                 name="toDate"
-                value={filters.toDate}
-                onChange={handleChange}
+                value={
+                  filters.toDate
+                }
+                onChange={
+                  handleChange
+                }
                 className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
               />
             </div>
 
+            {/* Order Number */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Order Number
               </label>
+
               <input
                 type="text"
                 placeholder="Enter Order Number"
                 name="orderNumber"
-                value={filters.orderNumber}
-                onChange={handleChange}
+                value={
+                  filters.orderNumber
+                }
+                onChange={
+                  handleChange
+                }
                 className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20"
               />
             </div>
 
+            {/* Item Name */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Item Name
               </label>
-              {/* --- CHANGED: multi-select for items --- */}
+
               <MultiSelectDropdown
-                values={filters.itemNames}
-                onChange={(next) =>
-                  setFilters((current) => ({ ...current, itemNames: next }))
+                values={
+                  filters.itemNames
                 }
-                options={filterOptions.itemNames}
+                onChange={(
+                  next
+                ) =>
+                  setFilters(
+                    (current) => ({
+                      ...current,
+                      itemNames:
+                        next,
+                    })
+                  )
+                }
+                options={
+                  filterOptions.itemNames
+                }
                 placeholder="Select Item Name(s)"
                 allLabel="Select All"
-                loading={filtersLoading}
+                loading={
+                  filtersLoading
+                }
                 loadingLabel="Loading items..."
-                formatLabel={toInitCap}
+                formatLabel={
+                  toInitCap
+                }
               />
             </div>
 
+            {/* User Name */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 User Name
               </label>
+
               <FilterDropdown
-                value={filters.userName}
-                onChange={(next) =>
-                  setFilters((current) => ({ ...current, userName: next || "" }))
+                value={
+                  filters.userName
                 }
-                options={filterOptions.userNames}
+                onChange={(
+                  next
+                ) =>
+                  setFilters(
+                    (current) => ({
+                      ...current,
+                      userName:
+                        next || "",
+                    })
+                  )
+                }
+                options={
+                  filterOptions.userNames
+                }
                 placeholder="Select User Name"
                 allLabel="All Users"
-                loading={filtersLoading}
+                loading={
+                  filtersLoading
+                }
                 loadingLabel="Loading users..."
-                formatLabel={toInitCap}
+                formatLabel={
+                  toInitCap
+                }
               />
             </div>
 
+            {/* Kitchen Name */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Kitchen Name
               </label>
+
               <FilterDropdown
-                value={filters.kitchenName}
-                onChange={(next) =>
-                  setFilters((current) => ({ ...current, kitchenName: next || "" }))
+                value={
+                  filters.kitchenName
                 }
-                options={filterOptions.kitchenNames}
+                onChange={(
+                  next
+                ) =>
+                  setFilters(
+                    (current) => ({
+                      ...current,
+                      kitchenName:
+                        next || "",
+                    })
+                  )
+                }
+                options={
+                  filterOptions.kitchenNames
+                }
                 placeholder="Select Kitchen Name"
                 allLabel="All Kitchens"
-                loading={filtersLoading}
+                loading={
+                  filtersLoading
+                }
                 loadingLabel="Loading kitchens..."
-                formatLabel={toInitCap}
+                formatLabel={
+                  toInitCap
+                }
               />
             </div>
           </div>
 
+          {/* Buttons */}
           <div className="flex flex-wrap justify-end gap-3 mb-4">
             <button
               type="button"
               className="px-6 py-3 rounded-2xl bg-[#5b5b5b] text-white font-semibold flex items-center gap-2 shadow hover:shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
-              onClick={handleSearch}
+              onClick={
+                handleSearch
+              }
               disabled={loading}
             >
-              <FaSearch size={16} />
-              {loading ? "Searching..." : "Search"}
+              <FaSearch
+                size={16}
+              />
+
+              {loading
+                ? "Searching..."
+                : "Search"}
             </button>
 
             <button
               type="button"
               className="px-6 py-3 rounded-2xl bg-afmc-maroon hover:bg-afmc-maroon2 text-white font-semibold flex items-center gap-2 shadow hover:shadow-md transition disabled:opacity-60 disabled:cursor-not-allowed"
-              onClick={exportPdf}
-              disabled={!data.length || loading}
+              onClick={
+                exportPdf
+              }
+              disabled={
+                !data.length ||
+                loading
+              }
             >
-              <FaDownload size={16} />
+              <FaDownload
+                size={16}
+              />
+
               Download PDF
             </button>
           </div>
 
+          {/* Error */}
           {error && (
             <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
               {error}
@@ -629,12 +1326,24 @@ export default function OrderTransactionUI() {
 
           {!hasSearched ? (
             <div className="rounded-2xl border border-dashed border-gray-300 p-8 text-center text-gray-500 bg-white">
-              <p className="text-lg">Enter filters and click Search to view data.</p>
-              <p className="text-sm mt-2">Date range is required for search.</p>
+              <p className="text-lg">
+                Enter filters and click
+                Search to view data.
+              </p>
+
+              <p className="text-sm mt-2">
+                Date range is required
+                for search.
+              </p>
             </div>
           ) : (
             <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
-              <div className="max-h-[70vh] overflow-auto" onScroll={handleTableScroll}>
+              <div
+                className="max-h-[70vh] overflow-auto"
+                onScroll={
+                  handleTableScroll
+                }
+              >
                 <div className="overflow-x-auto">
                   <table className="min-w-[720px] w-full text-sm">
                     <thead className="bg-gray-50 text-gray-600">
@@ -642,84 +1351,157 @@ export default function OrderTransactionUI() {
                         <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
                           Order Number
                         </th>
+
                         <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
                           Item Name
                         </th>
+
                         <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
                           Type
                         </th>
+
                         <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
                           Quantity
                         </th>
+
                         <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
                           Total Profit(Amount)
                         </th>
+
                         <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
                           Preparation Charges
                         </th>
+
                         <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
                           Subtotal
                         </th>
                       </tr>
                     </thead>
+
                     <tbody>
                       {loading ? (
                         <tr>
-                          <td colSpan="7" className="text-center py-8">
+                          <td
+                            colSpan="7"
+                            className="text-center py-8"
+                          >
                             <div className="flex justify-center items-center">
                               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-afmc-maroon"></div>
-                              <span className="ml-2">Loading data...</span>
+
+                              <span className="ml-2">
+                                Loading
+                                data...
+                              </span>
                             </div>
                           </td>
                         </tr>
-                      ) : data.length === 0 ? (
+                      ) : data.length ===
+                        0 ? (
                         <tr>
-                          <td colSpan="7" className="px-4 py-6 text-center text-gray-500">
-                            No records found for the selected criteria.
+                          <td
+                            colSpan="7"
+                            className="px-4 py-6 text-center text-gray-500"
+                          >
+                            No records
+                            found for
+                            the selected
+                            criteria.
                           </td>
                         </tr>
                       ) : (
                         <>
-                          {data.map((row, index) => (
-                            <tr
-                              key={row.ORDER_LINE_ID || `row-${index}`}
-                              className="border-t border-gray-100 hover:bg-gray-50"
-                            >
-                              <td className="px-4 py-3 whitespace-nowrap">
-                                {row.ORDER_NUM || "-"}
-                              </td>
-                              <td className="px-4 py-3 whitespace-nowrap">
-                                {toInitCap(stripHtml(row.ITEM_NAME || "-"))}
-                              </td>
-                              <td className="px-4 py-3 whitespace-nowrap">
-                                {row.TYPE || row.type || "NA"}
-                              </td>
-                              <td className="px-4 py-3 whitespace-nowrap">
-                                {row.QUANTITY || "-"}
-                              </td>
-                              <td className="px-4 py-3 whitespace-nowrap">
-                                {isFreeItem(row) ? (
-                                  <span className="text-green-600 font-medium">Free Item</span>
-                                ) : (
-                                  row.TOTAL_PROFIT || "0.00"
-                                )}
-                              </td>
-                              <td className="px-4 py-3 whitespace-nowrap">
-                                {row.FOOD_PR_CHARGES || "0.00"}
-                              </td>
-                              <td className="px-4 py-3 whitespace-nowrap">
-                                {row.SUBTOTAL || "0.00"}
-                              </td>
-                            </tr>
-                          ))}
+                          {data.map(
+                            (
+                              row,
+                              index
+                            ) => (
+                              <tr
+                                key={
+                                  row.ORDER_LINE_ID ||
+                                  `row-${index}`
+                                }
+                                className="border-t border-gray-100 hover:bg-gray-50"
+                              >
+                                <td className="px-4 py-3 whitespace-nowrap">
+                                  {row.ORDER_NUM ||
+                                    "-"}
+                                </td>
+
+                                <td className="px-4 py-3 whitespace-nowrap">
+                                  {toInitCap(
+                                    stripHtml(
+                                      row.ITEM_NAME ||
+                                        "-"
+                                    )
+                                  )}
+                                </td>
+
+                                <td className="px-4 py-3 whitespace-nowrap">
+                                  {row.TYPE ||
+                                    row.type ||
+                                    "NA"}
+                                </td>
+
+                                <td className="px-4 py-3 whitespace-nowrap">
+                                  {row.QUANTITY ||
+                                    "-"}
+                                </td>
+
+                                <td className="px-4 py-3 whitespace-nowrap">
+                                  {isFreeItem(
+                                    row
+                                  ) ? (
+                                    <span className="text-green-600 font-medium">
+                                      Free Item
+                                    </span>
+                                  ) : (
+                                    row.TOTAL_PROFIT ||
+                                    "0.00"
+                                  )}
+                                </td>
+
+                                <td className="px-4 py-3 whitespace-nowrap">
+                                  {row.FOOD_PR_CHARGES ||
+                                    "0.00"}
+                                </td>
+
+                                <td className="px-4 py-3 whitespace-nowrap">
+                                  {row.SUBTOTAL ||
+                                    "0.00"}
+                                </td>
+                              </tr>
+                            )
+                          )}
+
+                          {/* Total row */}
                           <tr className="border-t border-gray-200 bg-gray-100 font-semibold">
                             <td className="px-4 py-3 whitespace-nowrap" />
-                            <td className="px-4 py-3 whitespace-nowrap">TOTAL</td>
+
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              TOTAL
+                            </td>
+
                             <td className="px-4 py-3 whitespace-nowrap" />
+
                             <td className="px-4 py-3 whitespace-nowrap" />
-                            <td className="px-4 py-3 whitespace-nowrap">{formatMoney(totals.totalProfit)}</td>
-                            <td className="px-4 py-3 whitespace-nowrap">{formatMoney(totals.prepCharges)}</td>
-                            <td className="px-4 py-3 whitespace-nowrap">{formatMoney(totals.subtotal)}</td>
+
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              {formatMoney(
+                                totals.totalProfit
+                              )}
+                            </td>
+
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              {formatMoney(
+                                totals.prepCharges
+                              )}
+                            </td>
+
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              {formatMoney(
+                                totals.subtotal
+                              )}
+                            </td>
                           </tr>
                         </>
                       )}
@@ -729,20 +1511,28 @@ export default function OrderTransactionUI() {
 
                 {loadingMore && (
                   <p className="px-4 py-4 text-center text-gray-500">
-                    Loading more data...
+                    Loading more
+                    data...
                   </p>
                 )}
-                {!loading && !loadingMore && data.length > 0 && !hasMore && (
-                  <p className="px-4 py-4 text-center text-gray-500">
-                    No more data
-                  </p>
-                )}
+
+                {!loading &&
+                  !loadingMore &&
+                  data.length > 0 &&
+                  !hasMore && (
+                    <p className="px-4 py-4 text-center text-gray-500">
+                      No more data
+                    </p>
+                  )}
               </div>
-              {!loading && data.length > 0 && (
-                <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 text-sm text-gray-600">
-                  Total Records: {data.length}
-                </div>
-              )}
+
+              {!loading &&
+                data.length > 0 && (
+                  <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 text-sm text-gray-600">
+                    Total Records:{" "}
+                    {data.length}
+                  </div>
+                )}
             </div>
           )}
         </div>
