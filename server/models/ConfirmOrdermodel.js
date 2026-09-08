@@ -1262,6 +1262,7 @@ async function getConfirmedOrderDetails(orderNumber) {
         xi.item_name,
         od.quantity,
         od.barcode,
+        COALESCE(NULLIF(TRIM(od.type), ''), NULLIF(TRIM(xi.type), ''), 'Nos') AS type,
         ROUND(MAX(IFNULL(od.subtotal, 0)), 2) AS subtotal,
         CASE
           WHEN COUNT(od.order_line_id) - SUM(CASE WHEN COALESCE(kn.status, '') = 'Cancelled' THEN 1 ELSE 0 END) > 0
@@ -1282,7 +1283,7 @@ async function getConfirmedOrderDetails(orderNumber) {
         AND kn.item_id = od.item_id
         AND (kn.barcode <=> od.barcode)
       WHERE od.order_id = ?
-      GROUP BY od.order_line_id, od.item_id, xi.item_name, od.quantity, od.barcode
+      GROUP BY od.order_line_id, od.item_id, xi.item_name, od.quantity, od.barcode, od.type, xi.type
       ORDER BY od.order_line_id ASC
     `,
     [normalizedOrderNumber]

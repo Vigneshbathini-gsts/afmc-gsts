@@ -15,6 +15,11 @@ function formatDate(value) {
   return date.toLocaleDateString("en-IN");
 }
 
+function getItemType(item) {
+  const type = String(item?.type ?? item?.TYPE ?? item?.ac_unit ?? item?.AC_UNIT ?? "").trim();
+  return !type || type.toUpperCase() === "NA" ? "Nos" : type;
+}
+
 export default function Buyflowconfirmorder() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -314,6 +319,10 @@ return (
                       {toInitCap("Quantity")}
                     </th>
 
+                    <th className="px-5 py-3 text-left text-sm font-semibold text-[#6b0f1a]">
+                      {toInitCap("Type")}
+                    </th>
+
                     {isPaymentDone && (
                       <th className="px-5 py-3 text-left text-sm font-semibold text-[#6b0f1a]">
                         {toInitCap("Subtotal")}
@@ -338,6 +347,10 @@ return (
 
                       <td className="px-5 py-4 text-sm text-stone-700">
                         {item.quantity}
+                      </td>
+
+                      <td className="px-5 py-4 text-sm text-stone-700">
+                        {getItemType(item)}
                       </td>
 
                       {isPaymentDone && (
