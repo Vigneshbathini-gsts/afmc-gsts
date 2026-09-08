@@ -17,6 +17,11 @@ function formatMoney(value) {
   return amount.toFixed(2);
 }
 
+function getInvoiceItemType(item) {
+  const type = String(item?.type ?? item?.TYPE ?? item?.ac_unit ?? item?.AC_UNIT ?? "").trim();
+  return !type || type.toUpperCase() === "NA" ? "Nos" : type;
+}
+
 function getFinalItemPrice(item) {
   const quantity = Number(item?.quantity ?? item?.QUANTITY ?? 0);
   const basePrice = Number(item?.price ?? item?.PRICE ?? 0);
@@ -275,6 +280,9 @@ export default function InvoiceReport() {
                         {toInitCap("Quantity")}
                       </th>
                       <th className="px-5 py-3 text-left text-sm font-semibold text-[#6b0f1a]">
+                        {toInitCap("Type")}
+                      </th>
+                      <th className="px-5 py-3 text-left text-sm font-semibold text-[#6b0f1a]">
                         {toInitCap("Unit Price")}
                       </th>
                       <th className="px-5 py-3 text-left text-sm font-semibold text-[#6b0f1a]">
@@ -288,6 +296,7 @@ export default function InvoiceReport() {
                       <tr key={`${item.item_id}-${index}`} className="transition hover:bg-[#fffdf9]">
                         <td className="px-5 py-4 text-sm text-stone-800">{toInitCap(item.item_name)}</td>
                         <td className="px-5 py-4 text-sm text-stone-700">{item.quantity}</td>
+                        <td className="px-5 py-4 text-sm text-stone-700">{getInvoiceItemType(item)}</td>
                         <td className="px-5 py-4 text-sm text-stone-900">
                           ₹{formatMoney(getFinalItemPrice(item))}
                         </td>
@@ -303,6 +312,7 @@ export default function InvoiceReport() {
                       <td className="px-5 py-4 text-sm text-stone-700">
                         {reportData?.summary?.total_quantity ?? totalQuantity}
                       </td>
+                      <td className="px-5 py-4 text-sm text-stone-700" />
                       <td className="px-5 py-4 text-sm font-semibold text-[#6b0f1a]">
                         {toInitCap(reportData?.summary?.total_label || "Total")}
                       </td>

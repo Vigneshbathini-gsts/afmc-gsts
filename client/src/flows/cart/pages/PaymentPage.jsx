@@ -29,6 +29,11 @@ const isFreeItem = (item) => {
     return freeItemQuantity > 0 || rowPrice === 0;
 };
 
+const getPaymentItemType = (item) => {
+    const type = String(item?.TYPE ?? item?.type ?? item?.AC_UNIT ?? item?.ac_unit ?? "").trim();
+    return !type || type.toUpperCase() === "NA" ? "Nos" : type;
+};
+
 const getDisplayMoney = (amount) =>
     Number(amount || 0).toLocaleString("en-IN", {
         minimumFractionDigits: 2,
@@ -363,6 +368,7 @@ const PaymentPage = () => {
                                 <tr>
                                     <th className="px-4 py-3 text-left text-xs font-bold tracking-wider text-afmc-maroon">{toInitCap("Item")}</th>
                                     <th className="px-4 py-3 text-center text-xs font-bold tracking-wider text-afmc-maroon">{toInitCap("Quantity")}</th>
+                                    <th className="px-4 py-3 text-center text-xs font-bold tracking-wider text-afmc-maroon">{toInitCap("Type")}</th>
                                     <th className="px-4 py-3 text-center text-xs font-bold tracking-wider text-afmc-maroon">{toInitCap("Price")}</th>
                                     <th className="px-4 py-3 text-center text-xs font-bold tracking-wider text-afmc-maroon">{toInitCap("Total")}</th>
                                 </tr>
@@ -379,6 +385,9 @@ const PaymentPage = () => {
                                                 {getPaymentItemAmounts(item).quantity}
                                             </td>
                                             <td className="px-4 py-3 text-center text-sm font-semibold text-stone-800">
+                                                {getPaymentItemType(item)}
+                                            </td>
+                                            <td className="px-4 py-3 text-center text-sm font-semibold text-stone-800">
                                                 <span className="whitespace-nowrap">₹{getDisplayMoney(getPaymentItemAmounts(item).finalPrice)}</span>
                                             </td>
                                             <td className="px-4 py-3 text-center text-sm font-semibold text-stone-800">
@@ -388,7 +397,7 @@ const PaymentPage = () => {
                                     ))
                                 ) : (
                                     <tr>
-                                        <td colSpan="2" className="px-4 py-10 text-center text-stone-400 italic text-sm bg-stone-50">
+                                        <td colSpan="5" className="px-4 py-10 text-center text-stone-400 italic text-sm bg-stone-50">
                                             {toInitCap("No item details available for this order.")}
                                         </td>
                                     </tr>
