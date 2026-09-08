@@ -158,9 +158,7 @@ const getOrderTransactionDetails = async (req, res) => {
         AND CT.inventory_item_code = OD.ITEM_ID
     `;
 
-    const multiplierExpression = `
-      CASE WHEN UPPER(TRIM(IFNULL(OD.TYPE, ''))) = 'LARGE' THEN 2 ELSE 1 END
-    `;
+    const multiplierExpression = `1`;
 
     const effectiveProfitExpression = `
       CASE

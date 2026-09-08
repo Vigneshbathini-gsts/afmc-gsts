@@ -124,9 +124,7 @@ const getOrderItemDetails = async (req, res) => {
       AND ct.inventory_item_code = od.item_id
   `;
 
-  const multiplierExpression = `
-    CASE WHEN UPPER(TRIM(IFNULL(od.TYPE, ''))) = 'LARGE' THEN 2 ELSE 1 END
-  `;
+  const multiplierExpression = `1`;
 
   // NEW: profit is forced to 0 for non-alcoholic liquor sub-categories
   // (soft drinks / mixers etc. filed under category_id = 10) so no markup
