@@ -43,7 +43,9 @@ export const exportTableToPdf = ({
 
     let currentY = 40;
 
-
+    // ============================================================
+    // LOGO
+    // ============================================================
 
     if (showLogo) {
       const logoBox = {
@@ -86,7 +88,9 @@ export const exportTableToPdf = ({
       }
     }
 
-    
+    // ============================================================
+    // MAIN HEADER
+    // ============================================================
 
     doc.setTextColor(107, 26, 79);
     doc.setFontSize(18);
@@ -101,7 +105,9 @@ export const exportTableToPdf = ({
       }
     );
 
-    
+    // ============================================================
+    // TITLE
+    // ============================================================
 
     if (title) {
       doc.setFontSize(14);
@@ -122,7 +128,19 @@ export const exportTableToPdf = ({
       currentY += 24;
     }
 
-    
+    // ============================================================
+    // SUBTITLE / FILTER INFORMATION
+    //
+    // IMPORTANT:
+    // Long item lists are automatically wrapped here.
+    //
+    // Example:
+    //
+    // From: 2026-09-08 | To: 2026-09-08 | Items: Virgin Mary,
+    // Sprite 250 ml, Smoke Classic, Rampur, Cheese Pizza Finger,
+    // The Chartreuse Swizzle, Grey Goose Vodka, Sula Red Small
+    //
+    // ============================================================
 
     if (subtitle) {
       doc.setFontSize(11);
@@ -155,7 +173,10 @@ export const exportTableToPdf = ({
         subtitleLines.length * subtitleLineHeight + 8;
     }
 
- 
+    // ============================================================
+    // GENERATED DATE
+    // ============================================================
+
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(120, 120, 120);
@@ -170,7 +191,9 @@ export const exportTableToPdf = ({
 
     currentY += 14;
 
- 
+    // ============================================================
+    // TOTAL RECORDS
+    // ============================================================
 
     const totalRecords = rows.length;
 
@@ -186,11 +209,16 @@ export const exportTableToPdf = ({
 
     currentY += 12;
 
+    // ============================================================
+    // RESET FONT
+    // ============================================================
 
     doc.setFont("helvetica", "normal");
     doc.setTextColor(0, 0, 0);
 
- 
+    // ============================================================
+    // MAIN TABLE
+    // ============================================================
 
     autoTable(doc, {
       startY: currentY,
@@ -239,13 +267,17 @@ export const exportTableToPdf = ({
       tableWidth: "auto",
     });
 
-  
+    // ============================================================
+    // FINAL TABLE POSITION
+    // ============================================================
 
     const finalY =
       doc.lastAutoTable?.finalY ||
       currentY + 100;
 
-    
+    // ============================================================
+    // FOOTER LINE
+    // ============================================================
 
     doc.setDrawColor(180, 180, 180);
     doc.setLineWidth(0.5);
@@ -257,7 +289,9 @@ export const exportTableToPdf = ({
       finalY + 15
     );
 
-   
+    // ============================================================
+    // FOOTER TEXT
+    // ============================================================
 
     doc.setFontSize(8);
     doc.setTextColor(120, 120, 120);
@@ -272,7 +306,9 @@ export const exportTableToPdf = ({
       }
     );
 
-
+    // ============================================================
+    // PAGE NUMBERS
+    // ============================================================
 
     const pageCount =
       doc.internal.getNumberOfPages();
@@ -294,7 +330,9 @@ export const exportTableToPdf = ({
       );
     }
 
-    
+    // ============================================================
+    // SAVE PDF
+    // ============================================================
 
     doc.save(fileName);
   };
