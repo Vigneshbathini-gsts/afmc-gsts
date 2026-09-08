@@ -92,20 +92,9 @@ const formatQuantity = (value) => {
   return Number(value);
 };
 
-const PEG_TYPE_SUFFIX = {
-  SMALL: "(S)",
-  LARGE: "(L)",
-};
-
 const getDisplayItemName = (row) => {
   const rawName = getRowValue(row, "item_name", "ITEM_NAME") || "-";
-  const name = toInitCap(rawName);
-  const pegType = getRowValue(row, "peg_type", "PEG_TYPE");
-  if (!pegType) return name;
-
-  const normalized = String(pegType).trim().toUpperCase();
-  const suffix = PEG_TYPE_SUFFIX[normalized];
-  return suffix ? `${name}${suffix}` : name;
+  return toInitCap(rawName);
 };
 
 const REPORT_PAGE_SIZE = 20;
