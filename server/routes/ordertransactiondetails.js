@@ -61,7 +61,10 @@ const getOrderTransactionDetails = async (req, res) => {
     const orderNumberExact = normalizeParam(req.query.orderNumber);
     const userNameExact = normalizeExactParam(req.query.userName);
     const kitchenNameExact = normalizeExactParam(req.query.kitchenName);
-    const itemNameExact = normalizeExactParam(req.query.itemNames);
+
+    // --- CHANGED: itemNames can now be a comma-separated list of item names ---
+    const itemNamesExact = normalizeMultiParam(req.query.itemNames);
+
     const { limit, offset } = parsePagination(req.query);
 
     const dateFilterClause = buildDateFilterClause(
@@ -105,11 +108,12 @@ const getOrderTransactionDetails = async (req, res) => {
       baseWhere += ` AND (? IS NULL OR UPPER(TRIM(IFNULL(XP.PUBMED_NAME, ''))) = ?)`;
     }
 
-    if (itemNameExact) {
-      baseWhere += ` AND UPPER(TRIM(IFNULL(XI.ITEM_NAME, ''))) = ?`;
-    } else {
-      baseWhere += ` AND (? IS NULL OR UPPER(TRIM(IFNULL(XI.ITEM_NAME, ''))) = ?)`;
+    // --- CHANGED: itemNames filter now uses IN (...) for multiple values ---
+    if (itemNamesExact.length > 0) {
+      const itemNamePlaceholders = itemNamesExact.map(() => "?").join(", ");
+      baseWhere += ` AND UPPER(TRIM(IFNULL(XI.ITEM_NAME, ''))) IN (${itemNamePlaceholders})`;
     }
+    // when empty, no clause is added -> filter is skipped entirely (same as "All Items")
 
     const scannedTotalsJoin = `
       LEFT JOIN (
@@ -168,7 +172,6 @@ const getOrderTransactionDetails = async (req, res) => {
       END
     `;
 
-    // For cocktails: ingredient total from scanned totals or subtotal
     const ingredientTotalExpression = `
       CASE
         WHEN IFNULL(ST.scanned_subtotal, 0) > 0 THEN ST.scanned_subtotal
@@ -177,8 +180,6 @@ const getOrderTransactionDetails = async (req, res) => {
       END
     `;
 
-    // FIX: For cocktails, subtotal = ingredient total + prep charge (once per order line)
-    // For regular items, subtotal = ingredient total + preparation charge
     const subtotalExpression = `
       CASE
         WHEN XI.SUB_CATEGORY IN (14, 15) THEN 
@@ -188,8 +189,6 @@ const getOrderTransactionDetails = async (req, res) => {
       END
     `;
 
-    // FIX: For cocktails, show the actual prep charge (15)
-    // For regular items, show the prep charge multiplied by quantity
     const foodPrChargesExpression = `
       CASE
         WHEN XI.SUB_CATEGORY IN (14, 15) THEN IFNULL(OD.FOOD_PR_CHARGES, 0)
@@ -297,6 +296,7 @@ const getOrderTransactionDetails = async (req, res) => {
       ORDER BY ORD ASC, ORDER_NUM DESC
     `;
 
+    // --- CHANGED: params building for itemNames IN(...); no placeholders pushed when list is empty ---
     const params = [];
     params.push(...dateValues);
 
@@ -318,16 +318,16 @@ const getOrderTransactionDetails = async (req, res) => {
       params.push(null, null);
     }
 
-    if (itemNameExact) {
-      params.push(itemNameExact);
-    } else {
-      params.push(null, null);
+    if (itemNamesExact.length > 0) {
+      params.push(...itemNamesExact);
     }
+    // when empty, no params needed since the clause itself was omitted above
 
+    // baseWhere is used twice (detailQuery + summaryQuery) inside finalQuery, so params must be duplicated
     const allParams = [...params, ...params];
 
     const [results] = await db.execute(finalQuery, allParams);
-// console.log("Fetched order transaction rows:", results); // Debugging log
+    // console.log("Fetched order transaction rows:", results); // Debugging log
     return res.json({
       success: true,
       count: results.length,
@@ -343,6 +343,18 @@ const getOrderTransactionDetails = async (req, res) => {
   }
 };
 
+
+function normalizeMultiParam(raw) {
+  if (raw === undefined || raw === null) return [];
+
+  const values = Array.isArray(raw) ? raw : String(raw).split(",");
+
+  const cleaned = values
+    .map((v) => String(v).trim().toUpperCase())
+    .filter((v) => v.length > 0);
+
+  return Array.from(new Set(cleaned));
+}
 const mapApexOptions = (rows) => {
   const seen = new Set();
   return rows

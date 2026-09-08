@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { FaDownload, FaSearch } from "react-icons/fa";
+import { FaDownload, FaSearch, FaChevronDown } from "react-icons/fa";
 import { FaArrowLeft } from "react-icons/fa";
 import api from "../../../services/api";
 import Stackreporttab from "./Stackreporttab";
@@ -17,16 +17,19 @@ const toInputDate = (date) => {
   return `${yyyy}-${mm}-${dd}`;
 };
 
+// --- CHANGED: itemNames is now an array, joined into a comma-separated string for the API ---
 const buildQueryParams = (filters) => {
   const params = {};
   const clean = (value) => (typeof value === "string" ? value.trim() : "");
+  const cleanArray = (value) =>
+    Array.isArray(value) ? value.map((v) => String(v).trim()).filter(Boolean) : [];
 
   const fromDate = clean(filters.fromDate);
   const toDate = clean(filters.toDate);
   const orderNumber = clean(filters.orderNumber);
   const userName = clean(filters.userName);
   const kitchenName = clean(filters.kitchenName);
-  const itemNames = clean(filters.itemNames);
+  const itemNames = cleanArray(filters.itemNames); // now an array
 
   // Only add non-empty values to params
   if (fromDate) params.fromDate = fromDate;
@@ -34,7 +37,7 @@ const buildQueryParams = (filters) => {
   if (orderNumber) params.orderNumber = orderNumber;
   if (userName) params.userName = userName;
   if (kitchenName) params.kitchenName = kitchenName;
-  if (itemNames) params.itemNames = itemNames;
+  if (itemNames.length) params.itemNames = itemNames.join(","); // comma-separated list for API
 
   return params;
 };
@@ -65,6 +68,139 @@ const normalizeDropdownOptions = (options) => {
 
 const REPORT_PAGE_SIZE = 20;
 
+/**
+ * Simple multi-select dropdown with checkboxes.
+ * values: array of selected option values (strings)
+ * onChange: (newArrayOfValues) => void
+ * options: [{ label, value }]
+ */
+function MultiSelectDropdown({
+  values = [],
+  onChange,
+  options = [],
+  placeholder = "Select...",
+  allLabel = "All",
+  loading = false,
+  loadingLabel = "Loading...",
+  formatLabel = (v) => v,
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (containerRef.current && !containerRef.current.contains(event.target)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const filteredOptions = useMemo(() => {
+    if (!search.trim()) return options;
+    const q = search.trim().toLowerCase();
+    return options.filter((opt) => opt.label.toLowerCase().includes(q));
+  }, [options, search]);
+
+  const isSelected = (value) => values.includes(value);
+
+  const toggleValue = (value) => {
+    if (isSelected(value)) {
+      onChange(values.filter((v) => v !== value));
+    } else {
+      onChange([...values, value]);
+    }
+  };
+
+  const toggleSelectAll = () => {
+    const allValues = filteredOptions.map((o) => o.value);
+    const allSelected = allValues.length > 0 && allValues.every((v) => values.includes(v));
+    if (allSelected) {
+      onChange(values.filter((v) => !allValues.includes(v)));
+    } else {
+      const merged = Array.from(new Set([...values, ...allValues]));
+      onChange(merged);
+    }
+  };
+
+  const clearAll = () => onChange([]);
+
+  const buttonLabel = () => {
+    if (loading) return loadingLabel;
+    if (values.length === 0) return placeholder;
+    if (values.length === 1) {
+      const match = options.find((o) => o.value === values[0]);
+      return formatLabel(match ? match.label : values[0]);
+    }
+    return `${values.length} selected`;
+  };
+
+  const allFilteredSelected =
+    filteredOptions.length > 0 && filteredOptions.every((o) => values.includes(o.value));
+
+  return (
+    <div className="relative" ref={containerRef}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        disabled={loading}
+        className="w-full flex items-center justify-between rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-left text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20 disabled:opacity-60"
+      >
+        <span className="truncate">{buttonLabel()}</span>
+        <FaChevronDown className={`ml-2 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} size={12} />
+      </button>
+
+      {open && !loading && (
+        <div className="absolute z-20 mt-2 w-full rounded-2xl border border-gray-200 bg-white shadow-lg max-h-72 overflow-hidden flex flex-col">
+          <div className="p-2 border-b border-gray-100">
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search..."
+              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-afmc-maroon2/40"
+            />
+          </div>
+
+          <div className="flex items-center justify-between px-3 py-2 text-xs text-afmc-maroon border-b border-gray-100">
+            <button type="button" className="hover:underline" onClick={toggleSelectAll}>
+              {allFilteredSelected ? "Unselect All" : allLabel}
+            </button>
+            {values.length > 0 && (
+              <button type="button" className="hover:underline text-gray-500" onClick={clearAll}>
+                Clear
+              </button>
+            )}
+          </div>
+
+          <div className="overflow-y-auto">
+            {filteredOptions.length === 0 ? (
+              <div className="px-3 py-3 text-sm text-gray-500">No options found.</div>
+            ) : (
+              filteredOptions.map((opt) => (
+                <label
+                  key={opt.value}
+                  className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 cursor-pointer"
+                >
+                  <input
+                    type="checkbox"
+                    checked={isSelected(opt.value)}
+                    onChange={() => toggleValue(opt.value)}
+                    className="rounded border-gray-300 text-afmc-maroon focus:ring-afmc-maroon2"
+                  />
+                  <span className="truncate">{formatLabel(opt.label)}</span>
+                </label>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function OrderTransactionUI() {
   const navigate = useNavigate();
   const today = useMemo(() => toInputDate(new Date()), []);
@@ -75,7 +211,7 @@ export default function OrderTransactionUI() {
       orderNumber: "",
       userName: "",
       kitchenName: "",
-      itemNames: "",
+      itemNames: [], // --- CHANGED: now an array of selected item values ---
     }),
     [today]
   );
@@ -165,18 +301,11 @@ export default function OrderTransactionUI() {
       });
 
       if (response.success) {
-        // Server may include a pre-calculated total row (e.g. ORD === 2). We compute totals
-        // on the client so filtered/search results always show correct totals.
         const responseRows = Array.isArray(response.data) ? response.data : [];
-        // console.log("Fetched order transaction rows:", responseRows);
         const detailRows = responseRows.filter((row) => row?.ORD !== 2);
         setData((current) => (reset ? detailRows : [...current, ...detailRows]));
         setPage(nextPage + 1);
         setHasMore(detailRows.length === REPORT_PAGE_SIZE);
-
-        // if (detailRows.length === 0) {
-        //   setError("No records found for the selected filters.");
-        // }
       } else {
         setError(response.message || "Unable to fetch order transactions.");
         if (reset) setData([]);
@@ -258,12 +387,20 @@ export default function OrderTransactionUI() {
       { quantity: 0, totalProfit: 0, prepCharges: 0, subtotal: 0 }
     );
 
+    // --- CHANGED: build a readable label for selected items, e.g. "coffee, tea" ---
+    const selectedItemLabels = (appliedFilters.itemNames || [])
+      .map((val) => {
+        const match = filterOptions.itemNames.find((o) => o.value === val);
+        return toInitCap(match ? match.label : val);
+      })
+      .join(", ");
+
     exportTableToPdf({
       title: "Order Transaction Details Report",
       fileName: `order-transaction-details-${new Date().toISOString().split('T')[0]}.pdf`,
       subtitle: `From: ${appliedFilters.fromDate || "All"} To: ${appliedFilters.toDate || "All"
         }${appliedFilters.orderNumber ? ` | Order No: ${appliedFilters.orderNumber}` : ""}${appliedFilters.userName ? ` | User: ${appliedFilters.userName}` : ""
-        }${appliedFilters.kitchenName ? ` | Kitchen: ${appliedFilters.kitchenName}` : ""}${appliedFilters.itemNames ? ` | Item: ${toInitCap(appliedFilters.itemNames)}` : ""
+        }${appliedFilters.kitchenName ? ` | Kitchen: ${appliedFilters.kitchenName}` : ""}${selectedItemLabels ? ` | Item: ${selectedItemLabels}` : ""
         }`,
       headers: [
         "Order Number",
@@ -410,14 +547,15 @@ export default function OrderTransactionUI() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Item Name
               </label>
-              <FilterDropdown
-                value={filters.itemNames}
+              {/* --- CHANGED: multi-select for items --- */}
+              <MultiSelectDropdown
+                values={filters.itemNames}
                 onChange={(next) =>
-                  setFilters((current) => ({ ...current, itemNames: next || "" }))
+                  setFilters((current) => ({ ...current, itemNames: next }))
                 }
                 options={filterOptions.itemNames}
-                placeholder="Select Item Name"
-                allLabel="All Items"
+                placeholder="Select Item Name(s)"
+                allLabel="Select All"
                 loading={filtersLoading}
                 loadingLabel="Loading items..."
                 formatLabel={toInitCap}
@@ -471,13 +609,6 @@ export default function OrderTransactionUI() {
               <FaSearch size={16} />
               {loading ? "Searching..." : "Search"}
             </button>
-            {/* <button
-              type="button"
-              className="px-6 py-3 rounded-2xl bg-gray-500 hover:bg-gray-600 text-white font-semibold flex items-center gap-2 shadow hover:shadow-md transition"
-              onClick={handleReset}
-            >
-              Reset
-            </button> */}
 
             <button
               type="button"

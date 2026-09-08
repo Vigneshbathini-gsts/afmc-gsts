@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { FaDownload, FaSearch } from "react-icons/fa";
+import { FaDownload, FaSearch, FaChevronDown } from "react-icons/fa";
 import { FaArrowLeft } from "react-icons/fa";
 import api from "../../../services/api";
 import Stackreporttab from "./Stackreporttab";
@@ -17,13 +17,48 @@ const toInputDate = (date) => {
   return `${yyyy}-${mm}-${dd}`;
 };
 
+// itemNames is an array; join into a comma-separated string for the API
 const buildQueryParams = (filters) => {
   const params = {};
   Object.entries(filters).forEach(([key, value]) => {
+    if (Array.isArray(value)) {
+      const cleaned = value.map((v) => String(v).trim()).filter(Boolean);
+      if (cleaned.length) params[key] = cleaned.join(",");
+      return;
+    }
     const trimmed = typeof value === "string" ? value.trim() : value;
     if (trimmed) params[key] = trimmed;
   });
   return params;
+};
+
+// --- FIX: normalizes plain string arrays (e.g. ["Coke", "Sprite"]) or object
+// arrays into a consistent { label, value } shape. Without this, options that
+// are plain strings have no `.value`/`.label` property, so every checkbox in
+// MultiSelectDropdown ends up sharing `value = undefined`, causing "select
+// one -> selects all" behavior. ---
+const normalizeDropdownOptions = (options) => {
+  if (!Array.isArray(options)) return [];
+
+  return options
+    .map((option) => {
+      if (typeof option === "string" || typeof option === "number") {
+        const value = String(option).trim();
+        return value ? { label: value, value } : null;
+      }
+
+      if (!option || typeof option !== "object") return null;
+
+      const label = String(
+        option.label ?? option.name ?? option.title ?? option.D ?? option.d ?? option.value ?? ""
+      ).trim();
+      const value = String(
+        option.value ?? option.id ?? option.key ?? option.R ?? option.r ?? option.label ?? ""
+      ).trim();
+
+      return label && value ? { label, value } : null;
+    })
+    .filter(Boolean);
 };
 
 const formatNumber = (value, digits = 2) => {
@@ -57,12 +92,156 @@ const formatQuantity = (value) => {
   return Number(value);
 };
 
+const PEG_TYPE_SUFFIX = {
+  SMALL: "(S)",
+  LARGE: "(L)",
+};
+
 const getDisplayItemName = (row) => {
   const rawName = getRowValue(row, "item_name", "ITEM_NAME") || "-";
-  return toInitCap(rawName);
+  const name = toInitCap(rawName);
+  const pegType = getRowValue(row, "peg_type", "PEG_TYPE");
+  if (!pegType) return name;
+
+  const normalized = String(pegType).trim().toUpperCase();
+  const suffix = PEG_TYPE_SUFFIX[normalized];
+  return suffix ? `${name}${suffix}` : name;
 };
 
 const REPORT_PAGE_SIZE = 20;
+
+/**
+ * Simple multi-select dropdown with checkboxes.
+ * values: array of selected option values (strings)
+ * onChange: (newArrayOfValues) => void
+ * options: [{ label, value }]
+ */
+function MultiSelectDropdown({
+  values = [],
+  onChange,
+  options = [],
+  placeholder = "Select...",
+  allLabel = "All",
+  loading = false,
+  loadingLabel = "Loading...",
+  formatLabel = (v) => v,
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (containerRef.current && !containerRef.current.contains(event.target)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const filteredOptions = React.useMemo(() => {
+    if (!search.trim()) return options;
+    const q = search.trim().toLowerCase();
+    return options.filter((opt) => opt.label.toLowerCase().includes(q));
+  }, [options, search]);
+
+  const isSelected = (value) => values.includes(value);
+
+  const toggleValue = (value) => {
+    if (isSelected(value)) {
+      onChange(values.filter((v) => v !== value));
+    } else {
+      onChange([...values, value]);
+    }
+  };
+
+  const toggleSelectAll = () => {
+    const allValues = filteredOptions.map((o) => o.value);
+    const allSelected = allValues.length > 0 && allValues.every((v) => values.includes(v));
+    if (allSelected) {
+      onChange(values.filter((v) => !allValues.includes(v)));
+    } else {
+      const merged = Array.from(new Set([...values, ...allValues]));
+      onChange(merged);
+    }
+  };
+
+  const clearAll = () => onChange([]);
+
+  const buttonLabel = () => {
+    if (loading) return loadingLabel;
+    if (values.length === 0) return placeholder;
+    if (values.length === 1) {
+      const match = options.find((o) => o.value === values[0]);
+      return formatLabel(match ? match.label : values[0]);
+    }
+    return `${values.length} selected`;
+  };
+
+  const allFilteredSelected =
+    filteredOptions.length > 0 && filteredOptions.every((o) => values.includes(o.value));
+
+  return (
+    <div className="relative" ref={containerRef}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        disabled={loading}
+        className="w-full flex items-center justify-between rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-left text-gray-800 focus:border-afmc-maroon2 focus:ring-2 focus:ring-afmc-maroon2/20 disabled:opacity-60"
+      >
+        <span className="truncate">{buttonLabel()}</span>
+        <FaChevronDown className={`ml-2 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} size={12} />
+      </button>
+
+      {open && !loading && (
+        <div className="absolute z-20 mt-2 w-full rounded-2xl border border-gray-200 bg-white shadow-lg max-h-72 overflow-hidden flex flex-col">
+          <div className="p-2 border-b border-gray-100">
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search..."
+              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-afmc-maroon2/40"
+            />
+          </div>
+
+          <div className="flex items-center justify-between px-3 py-2 text-xs text-afmc-maroon border-b border-gray-100">
+            <button type="button" className="hover:underline" onClick={toggleSelectAll}>
+              {allFilteredSelected ? "Unselect All" : allLabel}
+            </button>
+            {values.length > 0 && (
+              <button type="button" className="hover:underline text-gray-500" onClick={clearAll}>
+                Clear
+              </button>
+            )}
+          </div>
+
+          <div className="overflow-y-auto">
+            {filteredOptions.length === 0 ? (
+              <div className="px-3 py-3 text-sm text-gray-500">No options found.</div>
+            ) : (
+              filteredOptions.map((opt) => (
+                <label
+                  key={opt.value}
+                  className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 cursor-pointer"
+                >
+                  <input
+                    type="checkbox"
+                    checked={isSelected(opt.value)}
+                    onChange={() => toggleValue(opt.value)}
+                    className="rounded border-gray-300 text-afmc-maroon focus:ring-afmc-maroon2"
+                  />
+                  <span className="truncate">{formatLabel(opt.label)}</span>
+                </label>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function Orderitemdetails() {
   const navigate = useNavigate();
@@ -70,7 +249,7 @@ export default function Orderitemdetails() {
   const initialFilters = {
     fromDate: today,
     toDate: today,
-    itemNames: "",
+    itemNames: [], // array of selected item values
     kitchenName: "",
     userName: "",
   };
@@ -110,14 +289,20 @@ export default function Orderitemdetails() {
         });
 
         if (response.data.success) {
-          console.log("Filter options fetched:", response.data.data);
-          setFilterOptions(
-            response.data.data || {
-              itemNames: [],
-              userNames: [],
-              kitchenNames: [],
-            }
-          );
+          const raw = response.data.data || {
+            itemNames: [],
+            userNames: [],
+            kitchenNames: [],
+          };
+
+          // --- FIX: normalize raw string arrays into { label, value } objects
+          // before storing in state, so MultiSelectDropdown/FilterDropdown get
+          // consistent, unique option shapes. ---
+          setFilterOptions({
+            itemNames: normalizeDropdownOptions(raw.itemNames),
+            userNames: normalizeDropdownOptions(raw.userNames),
+            kitchenNames: normalizeDropdownOptions(raw.kitchenNames),
+          });
         }
       } catch (fetchError) {
         console.error(fetchError);
@@ -329,14 +514,14 @@ export default function Orderitemdetails() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Item Name
               </label>
-              <FilterDropdown
-                value={filters.itemNames}
+              <MultiSelectDropdown
+                values={filters.itemNames}
                 onChange={(next) =>
                   setFilters((current) => ({ ...current, itemNames: next }))
                 }
                 options={filterOptions.itemNames}
-                placeholder="Select Item Name"
-                allLabel="All Items"
+                placeholder="Select Item Name(s)"
+                allLabel="Select All"
                 loading={filtersLoading}
                 loadingLabel="Loading items..."
                 formatLabel={toInitCap}
